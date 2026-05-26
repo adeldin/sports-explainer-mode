@@ -5,18 +5,27 @@ import { GameViewer } from '@/components/GameViewer';
 import { GameSelector } from '@/components/GameSelector';
 import { explainerEngine } from '@/lib/explainers';
 import { mockFootballPlays, mockFootballGameState } from '@/lib/mockData/football';
-import { ExplanationLevel } from '@/lib/types/sports';
-import { fetchGameDetails, transformESPNGameState, transformESPNPlay } from '@/lib/api/espn';
-import { FootballPlay } from '@/lib/types/sports';
+import { mockBaseballPlays, mockBaseballGameState } from '@/lib/mockData/baseball';
+import { ExplanationLevel, Sport } from '@/lib/types/sports';
+import { 
+  fetchGameDetails, 
+  transformESPNGameState, 
+  transformESPNPlay,
+  fetchMLBGameDetails,
+  transformESPNBaseballGameState,
+  transformESPNBaseballPlay
+} from '@/lib/api/espn';
+import { BasePlay } from '@/lib/types/sports';
 
 export default function Home() {
   const [currentPlayIndex, setCurrentPlayIndex] = useState(0);
   const [explanationLevel, setExplanationLevel] = useState<ExplanationLevel>('beginner');
   const [isPlaying, setIsPlaying] = useState(false);
   const [useLiveData, setUseLiveData] = useState(false);
+  const [selectedSport, setSelectedSport] = useState<Sport>('baseball'); // Default to baseball
   const [selectedGameId, setSelectedGameId] = useState<string>('');
-  const [liveGameState, setLiveGameState] = useState(mockFootballGameState);
-  const [livePlays, setLivePlays] = useState<FootballPlay[]>(mockFootballPlays);
+  const [liveGameState, setLiveGameState] = useState(mockBaseballGameState);
+  const [livePlays, setLivePlays] = useState<BasePlay[]>(mockBaseballPlays);
   const [loading, setLoading] = useState(false);
 
   // Fetch live game data when game is selected
@@ -24,27 +33,43 @@ export default function Home() {
     if (useLiveData && selectedGameId) {
       fetchLiveGameData();
     }
-  }, [selectedGameId, useLiveData]);
+  }, [selectedGameId, useLiveData, selectedSport]);
 
   async function fetchLiveGameData() {
     setLoading(true);
     try {
-      const gameData = await fetchGameDetails(selectedGameId);
-      
-      if (gameData) {
-        // Transform game state
-        const gameState = transformESPNGameState(gameData);
-        setLiveGameState(gameState);
+      if (selectedSport === 'football') {
+        const gameData = await fetchGameDetails(selectedGameId);
         
-        // Transform plays
-        const plays = gameData.drives?.previous?.map((drive: any, index: number) => {
-          const lastPlay = drive.plays?.[drive.plays.length - 1];
-          return lastPlay ? transformESPNPlay(lastPlay, index) : null;
-        }).filter(Boolean) || [];
+        if (gameData) {
+          const gameState = transformESPNGameState(gameData);
+          setLiveGameState(gameState);
+          
+          const plays = gameData.drives?.previous?.map((drive: any, index: number) => {
+            const lastPlay = drive.plays?.[drive.plays.length - 1];
+            return lastPlay ? transformESPNPlay(lastPlay, index) : null;
+          }).filter(Boolean) || [];
+          
+          if (plays.length > 0) {
+            setLivePlays(plays);
+            setCurrentPlayIndex(0);
+          }
+        }
+      } else if (selectedSport === 'baseball') {
+        const gameData = await fetchMLBGameDetails(selectedGameId);
         
-        if (plays.length > 0) {
-          setLivePlays(plays);
-          setCurrentPlayIndex(0);
+        if (gameData) {
+          const gameState = transformESPNBaseballGameState(gameData);
+          setLiveGameState(gameState);
+          
+          const plays = gameData.plays?.map((play: any, index: number) => {
+            return transformESPNBaseballPlay(play, index);
+          }).filter(Boolean) || [];
+          
+          if (plays.length > 0) {
+            setLivePlays(plays);
+            setCurrentPlayIndex(0);
+          }
         }
       }
     } catch (error) {
@@ -54,13 +79,25 @@ export default function Home() {
     }
   }
 
-  // Choose between live and mock data
-  const currentPlays = useLiveData ? livePlays : mockFootballPlays;
-  const currentGameState = useLiveData ? liveGameState : mockFootballGameState;
-  const currentPlay = currentPlays[currentPlayIndex];
-  const explainedPlay = explainerEngine.explainPlay(currentPlay, currentGameState);
+  // Get mock data based on selected sport
+  const getMockData = () => {
+    switch (selectedSport) {
+      case 'football':
+        return { plays: mockFootballPlays, gameState: mockFootballGameState };
+      case 'baseball':
+        return { plays: mockBaseballPlays, gameState: mockBaseballGameState };
+      default:
+        return { plays: mockBaseballPlays, gameState: mockBaseballGameState };
+    }
+  };
 
-  // Auto-advance plays (simulating live game)
+  const mockData = getMockData();
+  const currentPlays = useLiveData ? livePlays : mockData.plays;
+  const currentGameState = useLiveData ? liveGameState : mockData.gameState;
+  const currentPlay = currentPlays[currentPlayIndex];
+  const explainedPlay = currentPlay ? explainerEngine.explainPlay(currentPlay, currentGameState) : null;
+
+  // Auto-advance plays
   useEffect(() => {
     if (!isPlaying) return;
     
@@ -68,10 +105,15 @@ export default function Home() {
       setCurrentPlayIndex((prev) => 
         prev < currentPlays.length - 1 ? prev + 1 : 0
       );
-    }, 5000); // New play every 5 seconds
+    }, 5000);
 
     return () => clearInterval(timer);
   }, [isPlaying, currentPlays.length]);
+
+  // Reset play index when switching sports
+  useEffect(() => {
+    setCurrentPlayIndex(0);
+  }, [selectedSport]);
 
   return (
     <main className="min-h-screen bg-gray-100 py-8">
@@ -82,6 +124,30 @@ export default function Home() {
         <p className="text-gray-600">
           Live sports, explained for everyone
         </p>
+      </div>
+
+      {/* Sport Selector */}
+      <div className="max-w-4xl mx-auto mb-6 flex justify-center gap-4">
+        <button
+          onClick={() => setSelectedSport('baseball')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+            selectedSport === 'baseball'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          }`}
+        >
+          ⚾ Baseball
+        </button>
+        <button
+          onClick={() => setSelectedSport('football')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+            selectedSport === 'football'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          }`}
+        >
+          🏈 Football
+        </button>
       </div>
 
       {/* Live Data Toggle */}
@@ -98,12 +164,13 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Game Selector (only show when using live data) */}
+      {/* Game Selector */}
       {useLiveData && (
         <div className="max-w-4xl mx-auto mb-6">
           <GameSelector
             onGameSelect={setSelectedGameId}
             currentGameId={selectedGameId}
+            sport={selectedSport}
           />
         </div>
       )}
@@ -116,7 +183,7 @@ export default function Home() {
       )}
 
       {/* Game Viewer */}
-      {!loading && currentPlay && (
+      {!loading && explainedPlay && (
         <GameViewer
           explainedPlay={explainedPlay}
           onLevelChange={setExplanationLevel}
@@ -129,20 +196,20 @@ export default function Home() {
         <button
           onClick={() => setCurrentPlayIndex(Math.max(0, currentPlayIndex - 1))}
           disabled={currentPlayIndex === 0}
-          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50 hover:bg-gray-400"
         >
           ← Previous
         </button>
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className="px-6 py-2 bg-green-600 text-white rounded font-semibold"
+          className="px-6 py-2 bg-green-600 text-white rounded font-semibold hover:bg-green-700"
         >
           {isPlaying ? '⏸ Pause' : '▶ Play'}
         </button>
         <button
           onClick={() => setCurrentPlayIndex(Math.min(currentPlays.length - 1, currentPlayIndex + 1))}
           disabled={currentPlayIndex === currentPlays.length - 1}
-          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+          className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50 hover:bg-gray-400"
         >
           Next →
         </button>
