@@ -58,6 +58,8 @@ export interface BaseballPlay extends BasePlay {
     balls?: number;
     strikes?: number;
     baseRunners?: string[];
+    batter?: string;
+    pitcher?: string;
   };
 }
 
