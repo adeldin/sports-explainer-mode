@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { GameViewer } from '@/components/GameViewer';
 import { GameSelector } from '@/components/GameSelector';
-import { explainerEngine } from '@/lib/explainers';
+import { explainerEngine } from '@/lib/explainer';
 import { mockFootballPlays, mockFootballGameState } from '@/lib/mockData/football';
 import { mockBaseballPlays, mockBaseballGameState } from '@/lib/mockData/baseball';
 import { ExplanationLevel, Sport } from '@/lib/types/sports';
@@ -40,40 +40,70 @@ export default function Home() {
     try {
       if (selectedSport === 'football') {
         const gameData = await fetchGameDetails(selectedGameId);
-        
+
         if (gameData) {
           const gameState = transformESPNGameState(gameData);
           setLiveGameState(gameState);
-          
+
           const plays = gameData.drives?.previous?.map((drive: any, index: number) => {
             const lastPlay = drive.plays?.[drive.plays.length - 1];
             return lastPlay ? transformESPNPlay(lastPlay, index) : null;
           }).filter(Boolean) || [];
-          
+
+            plays.sort((a: BasePlay, b: BasePlay) => a.timestamp.getTime() - b.timestamp.getTime());
+
+            console.log('📝 Play descriptions:', plays.slice(0, 10).map((p: BasePlay) => p.description));
+
+    console.log('✅ Transformed plays count:', plays.length);
+    console.log('First 3 plays:', plays.slice(0, 3));
+
           if (plays.length > 0) {
             setLivePlays(plays);
             setCurrentPlayIndex(0);
-          }
+          }else {
+      console.warn('⚠️ No plays found!');
+    }
         }
       } else if (selectedSport === 'baseball') {
+        console.log('🔍 Fetching baseball game:', selectedGameId);
         const gameData = await fetchMLBGameDetails(selectedGameId);
-        
+
         if (gameData) {
           const gameState = transformESPNBaseballGameState(gameData);
+          console.log('✅ Transformed game state:', gameState);
           setLiveGameState(gameState);
+  
+  // Check if plays exist before transforming
+    if (!gameData.plays || gameData.plays.length === 0) {
+      console.warn('⚠️ No plays available for this game yet. Try another game.');
+      setLivePlays([]);
+      setLoading(false);
+      return; // Exit early
+    }
           
-          const plays = gameData.plays?.map((play: any, index: number) => {
+          const playsArray = gameData.plays 
+      || gameData.header?.competitions?.[0]?.plays 
+      || gameData.competitions?.[0]?.plays
+      || [];
+          const plays = playsArray.map((play: any, index: number) => {
             return transformESPNBaseballPlay(play, index);
           }).filter(Boolean) || [];
-          
+
+          console.log('✅ Transformed plays count:', plays.length);
+          console.log('First 3 plays:', plays.slice(0, 3));
+
           if (plays.length > 0) {
             setLivePlays(plays);
             setCurrentPlayIndex(0);
+          } else {
+            console.warn('⚠️ No plays found! Check data structure.');
           }
+        } else {
+          console.error('❌ No game data returned from API');
         }
       }
     } catch (error) {
-      console.error('Error fetching live game:', error);
+      console.error('Error fetching live game data:', error);
     } finally {
       setLoading(false);
     }
@@ -99,16 +129,18 @@ export default function Home() {
 
   // Auto-advance plays
   useEffect(() => {
-    if (!isPlaying) return;
-    
-    const timer = setInterval(() => {
-      setCurrentPlayIndex((prev) => 
-        prev < currentPlays.length - 1 ? prev + 1 : 0
-      );
-    }, 5000);
+  if (!isPlaying) return;
+  
+  const timer = setInterval(() => {
+    setCurrentPlayIndex((prev) => {
+      const nextIndex = prev < currentPlays.length - 1 ? prev + 1 : 0;
+      console.log(`🎬 Advancing play: ${prev} → ${nextIndex}`); // 👈 ADD THIS
+      return nextIndex;
+    });
+  }, 5000);
 
-    return () => clearInterval(timer);
-  }, [isPlaying, currentPlays.length]);
+  return () => clearInterval(timer);
+}, [isPlaying, currentPlays.length]);
 
   // Reset play index when switching sports
   useEffect(() => {

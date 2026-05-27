@@ -58,16 +58,20 @@ export async function fetchMLBGameDetails(gameId: string) {
  * Transforms ESPN baseball game data into our GameState format
  */
 export function transformESPNBaseballGameState(espnGame: any): GameState {
-  const homeTeam = espnGame.boxscore?.teams?.[1] || espnGame.header?.competitions?.[0]?.competitors?.[0];
-  const awayTeam = espnGame.boxscore?.teams?.[0] || espnGame.header?.competitions?.[0]?.competitors?.[1];
+  // Get competitors from header (more reliable for live games)
+  const competitors = espnGame.header?.competitions?.[0]?.competitors || [];
+  
+  // Home team is typically at index 0, away at index 1 in competitors
+  const homeTeam = competitors.find((c: any) => c.homeAway === 'home') || competitors[0];
+  const awayTeam = competitors.find((c: any) => c.homeAway === 'away') || competitors[1];
   
   const inning = espnGame.header?.competitions?.[0]?.status?.period || 1;
   const inningState = espnGame.header?.competitions?.[0]?.status?.type?.shortDetail || '';
   
   return {
     sport: 'baseball',
-    homeTeam: homeTeam?.team?.displayName || homeTeam?.team?.shortDisplayName || 'Home',
-    awayTeam: awayTeam?.team?.displayName || awayTeam?.team?.shortDisplayName || 'Away',
+    homeTeam: homeTeam?.team?.displayName || 'Home',
+    awayTeam: awayTeam?.team?.displayName || 'Away',
     homeScore: parseInt(homeTeam?.score || '0'),
     awayScore: parseInt(awayTeam?.score || '0'),
     period: inningState.includes('Top') ? `Top ${inning}` : `Bot ${inning}`,
@@ -87,7 +91,7 @@ export function transformESPNBaseballPlay(espnPlay: any, index: number): any {
     timestamp: new Date(espnPlay.wallclock || Date.now()),
     sport: 'baseball',
     playType: playType,
-    description: espnPlay.text || 'Play in progress',
+    description: espnPlay.text || 'Play in progress', 
     metadata: {
       inning: espnPlay.inning,
       outs: espnPlay.outs,
