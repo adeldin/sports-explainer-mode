@@ -203,21 +203,25 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
           }
 
           // MLB: dig into play-by-play for real plays
-          if (sport === 'mlb' && liveGame?.id) {
-            try {
-              const summaryRes = await fetch(
-                `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`
-              );
-              const summaryData = await summaryRes.json();
-              const plays = summaryData?.plays || [];
-              const lastRealPlay = [...plays].reverse().find(
-                (p: any) => p?.text && !p.text.toLowerCase().includes('inning')
-              );
-              if (lastRealPlay?.text) play = lastRealPlay.text;
-            } catch (e) {
-              console.error('MLB summary fetch error:', e);
-            }
-          }
+if (sport === 'mlb' && liveGame?.id) {
+  try {
+    const summaryRes = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`
+    );
+    const summaryData = await summaryRes.json();
+    const plays = summaryData?.plays || [];
+    const lastRealPlay = [...plays].reverse().find(
+      (p: any) =>
+        p?.text &&
+        !p.text.toLowerCase().includes('end of') &&
+        !p.text.toLowerCase().includes('middle of') &&
+        !p.text.toLowerCase().includes('inning')
+    );
+    if (lastRealPlay?.text) play = lastRealPlay.text;
+  } catch (e) {
+    console.error('MLB summary fetch error:', e);
+  }
+}
         }
       } catch (espnError) {
         console.error('ESPN fetch error:', espnError);
@@ -267,4 +271,4 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
       { status: 500, headers: corsHeaders }
     );
   }
-}
+}// Mon Jun  8 23:11:38 CDT 2026
