@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f0f0f;
+      color: white;
+      padding: 0;
+    }
+
+    /* Header */
+    .header {
+      background: #cc0000;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header span {
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Body */
+    .body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Labels */
+    label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    /* Selects */
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      background: #1a1a1a;
+      color: white;
+      border: 1px solid #333;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23aaa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+    select:focus { outline: none; border-color: #cc0000; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Game list */
+    #game-list-section { display: none; }
+
+    #games-loading {
+      font-size: 12px;
+      color: #aaa;
+      text-align: center;
+      padding: 8px 0;
+      display: none;
+    }
+
+    /* Status */
+    #status {
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+      min-height: 16px;
+    }
+
+    /* Button */
+    button#toggle-btn {
+      width: 100%;
+      padding: 10px;
+      background: #cc0000;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button#toggle-btn:hover { background: #aa0000; }
+    button#toggle-btn:disabled { background: #444; cursor: not-allowed; }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid #222;
+      margin: 2px 0;
+    }
+
+    /* Level pills */
+    .level-pills {
+      display: flex;
+      gap: 6px;
+    }
+    .level-pill {
+      flex: 1;
+      padding: 6px 4px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #aaa;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .level-pill.active {
+      background: #cc0000;
+      color: white;
+      border-color: #cc0000;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span>🏟️ SPORTS EXPLAINER</span>
+  </div>
+
+  <div class="body">
+
+    <!-- Sport Picker -->
+    <div>
+      <label>Sport</label>
+      <select id="sport-select">
+        <option value="nfl">🏈 NFL</option>
+        <option value="mlb">⚾ MLB</option>
+        <option value="nba">🏀 NBA</option>
+        <option value="nhl">🏒 NHL</option>
+        <option value="soccer">⚽ MLS</option>
+        <option value="worldcup">🌍 World Cup</option>
+        <option value="rugby">🏉 Rugby</option>
+      </select>
+    </div>
+
+    <!-- Game List — appears after sport is selected -->
+    <div id="game-list-section">
+      <label>Select Game</label>
+      <div id="games-loading">Loading games...</div>
+      <select id="game-select" disabled>
+        <option value="">— Pick a game —</option>
+      </select>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Explanation Level -->
+    <div>
+      <label>Explanation Level</label>
+      <div class="level-pills">
+        <div class="level-pill" data-level="kid">👶 Kid</div>
+        <div class="level-pill active" data-level="beginner">🙋 Beginner</div>
+        <div class="level-pill" data-level="intermediate">🎓 Intermediate</div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Status + Button -->
+    <div id="status">Select a sport to load today's games</div>
+    <button id="toggle-btn" disabled>Show Overlay</button>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
