@@ -35,7 +35,15 @@ const sportContext: Record<string, string> = {
   worldcup: 'Soccer/football. Key concepts: possession, pressing, offside trap, set pieces, corners, free kicks, penalty area, clean sheet, aggregate score.',
 };
 
-// Level-specific system prompts
+// ESPN API endpoints
+const espnApis: Record<string, string> = {
+  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
+  nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+  worldcup: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+};
+
 function buildSystemPrompt(sport: string, level: string, language: string): string {
   const sportGuide = sportContext[sport] || 'a professional sport';
   const langInstruction = language && language !== 'en'
@@ -85,10 +93,11 @@ ${langInstruction}`,
     expert: `You are a former professional coach or analyst breaking down ${sport} for someone with deep knowledge of the game. They want film-room level insight.
 
 Your rules:
-CRITICAL RULE: DO NOT DEFINE THE PLAY. Assume the user is an expert who already knows exactly what happened. 
+CRITICAL RULE: DO NOT DEFINE THE PLAY. Assume the user is an expert who already knows exactly what happened.
 - Start your response immediately with strategic analysis.
 - Analyze: pre-snap/pre-play reads, scheme matchups, execution vs. design, and downstream game theory.
-- Be precise and technical. 4-5 sentences of dense insight.
+- Be precise and technical. Vague praise or criticism is useless.
+- 4-5 sentences. Every word should add information.
 - If this play changes win probability or game script, say so explicitly.
 - If you explain what the play is (e.g., "A touchdown is..."), the response is a failure.
 
@@ -111,7 +120,7 @@ Respond with a JSON object in this exact format:
   "ruleDetail": "The specific rule or mechanic that governs this play (optional — only include if genuinely useful)"
 }
 
-Make "whyItMatters" punchy and specific to THIS play, not generic. 
+Make "whyItMatters" punchy and specific to THIS play, not generic.
 Only include "ruleDetail" if there's a rule that a fan at this level would genuinely benefit from knowing.`;
 }
 
@@ -142,7 +151,7 @@ export async function POST(req: NextRequest) {
 
     // Handle follow-up Q&A
     if (action === 'ask' && question) {
-      const systemPrompt = `You are a helpful sports expert. A fan just read an explanation of a play and has a follow-up question. 
+      const systemPrompt = `You are a helpful sports expert. A fan just read an explanation of a play and has a follow-up question.
 Answer clearly and concisely in 2-3 sentences. Match the expertise level: ${level}.
 ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in English.'}`;
 
@@ -161,28 +170,19 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
     }
 
     // Fetch live play data from ESPN
-    const espnApis: Record<string, string> = {
-      nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
-      nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-      mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
-      nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
-      worldcup: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
-    };
-
-    const espnUrl = espnApis[sport];
     let play = 'A key play just happened';
     let gameContext = 'Live game in progress';
     let homeTeam = '';
     let awayTeam = '';
 
+    const espnUrl = espnApis[sport];
     if (espnUrl) {
       try {
         const espnRes = await fetch(espnUrl);
         const espnData = await espnRes.json();
         const events = espnData?.events || [];
         const liveGame = events.find((e: any) =>
-          e.status?.type?.state === 'in' ||
-          e.competitions?.[0]?.status?.type?.state === 'in'
+          e.status?.type?.state === 'in'
         ) || events[0];
 
         if (liveGame) {
@@ -203,6 +203,23 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
               if (details.length) gameContext += ` | ${details.join(' | ')}`;
             }
           }
+
+          // MLB: dig into play-by-play for real plays
+          if (sport === 'mlb' && liveGame?.id) {
+            try {
+              const summaryRes = await fetch(
+                `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`
+              );
+              const summaryData = await summaryRes.json();
+              const plays = summaryData?.plays || [];
+              const lastRealPlay = [...plays].reverse().find(
+                (p: any) => p?.text && !p.text.toLowerCase().includes('inning')
+              );
+              if (lastRealPlay?.text) play = lastRealPlay.text;
+            } catch (e) {
+              console.error('MLB summary fetch error:', e);
+            }
+          }
         }
       } catch (espnError) {
         console.error('ESPN fetch error:', espnError);
@@ -213,8 +230,13 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
     const systemPrompt = buildSystemPrompt(sport, level, language);
     const userPrompt = buildUserPrompt(play, gameContext, sport);
 
+    // Use mixtral for expert level — better at following negative constraints
+    const selectedModel = level === 'expert'
+      ? 'mixtral-8x7b-32768'
+      : 'llama-3.3-70b-versatile';
+
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: selectedModel,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
