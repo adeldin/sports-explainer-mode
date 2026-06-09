@@ -251,11 +251,13 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
       const definitionTriggers = [
         'is a type of', 'is when', 'is called', 'refers to',
         'is defined as', 'is a pitch', 'is a play', 'is a foul'
+        
       ];
       
       const firstSentence = parsed.simple?.split('.')[0]?.toLowerCase() || '';
       const isDefinition = definitionTriggers.some(t => firstSentence.includes(t));
-      
+      parsed.filter_triggered = isDefinition;
+  parsed.first_sentence_checked = firstSentence; // So we can see what it evaluated
       if (isDefinition) {
         const sentences = parsed.simple.split('.');
         parsed.simple = sentences.slice(1).join('.').trim();
@@ -276,6 +278,8 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
         homeTeam,
         awayTeam,
         gameContext,
+           filter_triggered: parsed.filter_triggered || false, 
+    first_sentence_checked: parsed.first_sentence_checked || '', 
       },
       { headers: corsHeaders }
     );
