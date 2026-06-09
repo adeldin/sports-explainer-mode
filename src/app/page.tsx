@@ -84,7 +84,7 @@ const [currentExplanation, setCurrentExplanation] = useState<string>('');
 
   // --- POLLING INTERVAL ---
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (useLiveData && selectedGameId) {
       // Set up the interval to run every 30 seconds
