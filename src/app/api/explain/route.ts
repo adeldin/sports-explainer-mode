@@ -238,7 +238,7 @@ if (sport === 'mlb' && liveGame?.id) {
   : 'llama-3.3-70b-versatile';
 
     const completion = await groq.chat.completions.create({
-  model: level === 'expert' ? 'llama-3.1-70b-versatile' : 'llama-3.3-70b-versatile',
+  model: level === 'expert' ? 'llama3-70b-8192' : 'llama-3.3-70b-versatile',
   messages: [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
