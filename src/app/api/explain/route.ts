@@ -203,25 +203,25 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
           }
 
           // MLB: dig into play-by-play for real plays
-if (sport === 'mlb' && liveGame?.id) {
-  try {
-    const summaryRes = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`
-    );
-    const summaryData = await summaryRes.json();
-    const plays = summaryData?.plays || [];
-    const lastRealPlay = [...plays].reverse().find(
-      (p: any) =>
-        p?.text &&
-        !p.text.toLowerCase().includes('end of') &&
-        !p.text.toLowerCase().includes('middle of') &&
-        !p.text.toLowerCase().includes('inning')
-    );
-    if (lastRealPlay?.text) play = lastRealPlay.text;
-  } catch (e) {
-    console.error('MLB summary fetch error:', e);
-  }
-}
+          if (sport === 'mlb' && liveGame?.id) {
+            try {
+              const summaryRes = await fetch(
+                `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`
+              );
+              const summaryData = await summaryRes.json();
+              const plays = summaryData?.plays || [];
+              const lastRealPlay = [...plays].reverse().find(
+                (p: any) =>
+                  p?.text &&
+                  !p.text.toLowerCase().includes('end of') &&
+                  !p.text.toLowerCase().includes('middle of') &&
+                  !p.text.toLowerCase().includes('inning')
+              );
+              if (lastRealPlay?.text) play = lastRealPlay.text;
+            } catch (e) {
+              console.error('MLB summary fetch error:', e);
+            }
+          }
         }
       } catch (espnError) {
         console.error('ESPN fetch error:', espnError);
@@ -232,24 +232,40 @@ if (sport === 'mlb' && liveGame?.id) {
     const systemPrompt = buildSystemPrompt(sport, level, language);
     const userPrompt = buildUserPrompt(play, gameContext, sport);
 
-    // Use mixtral for expert level — better at following negative constraints
-    const selectedModel = level === 'expert'
-  ? 'llama-3.1-70b-versatile'
-  : 'llama-3.3-70b-versatile';
-
     const completion = await groq.chat.completions.create({
-  model: level === 'expert' ? 'llama3-70b-8192' : 'llama-3.3-70b-versatile',
-  messages: [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
-  ],
-  temperature: level === 'expert' ? 0.3 : 0.65,
-  max_tokens: 600,
-  response_format: { type: 'json_object' },
-});
+      model: level === 'expert' ? 'llama3-70b-8192' : 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: level === 'expert' ? 0.3 : 0.65,
+      max_tokens: 600,
+      response_format: { type: 'json_object' },
+    });
 
     const raw = completion.choices[0]?.message?.content || '{}';
     const parsed = JSON.parse(raw);
+
+    // --- EXPERT FILTER (The "Nuclear Option") ---
+    if (level === 'expert') {
+      const definitionTriggers = [
+        'is a type of', 'is when', 'is called', 'refers to',
+        'is defined as', 'is a pitch', 'is a play', 'is a foul'
+      ];
+      
+      const firstSentence = parsed.simple?.split('.')[0]?.toLowerCase() || '';
+      const isDefinition = definitionTriggers.some(t => firstSentence.includes(t));
+      
+      if (isDefinition) {
+        const sentences = parsed.simple.split('.');
+        parsed.simple = sentences.slice(1).join('.').trim();
+        
+        if (!parsed.simple) {
+          parsed.simple = parsed.whyItMatters;
+          parsed.whyItMatters = parsed.ruleDetail || '';
+        }
+      }
+    }
 
     return NextResponse.json(
       {
@@ -271,4 +287,4 @@ if (sport === 'mlb' && liveGame?.id) {
       { status: 500, headers: corsHeaders }
     );
   }
-}// Mon Jun  8 23:11:38 CDT 2026
+}
