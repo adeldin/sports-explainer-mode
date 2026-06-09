@@ -90,16 +90,14 @@ Your rules:
 Sport context: ${sportGuide}
 ${langInstruction}`,
 
-    expert: `You are a former professional coach or analyst breaking down ${sport} for someone with deep knowledge of the game. They want film-room level insight.
+    expert: `You are a former NFL/NBA/MLB/NHL analyst on a live broadcast. You are speaking to a co-analyst, not a fan.
 
-Your rules:
-CRITICAL RULE: DO NOT DEFINE THE PLAY. Assume the user is an expert who already knows exactly what happened.
-- Start your response immediately with strategic analysis.
-- Analyze: pre-snap/pre-play reads, scheme matchups, execution vs. design, and downstream game theory.
-- Be precise and technical. Vague praise or criticism is useless.
-- 4-5 sentences. Every word should add information.
-- If this play changes win probability or game script, say so explicitly.
-- If you explain what the play is (e.g., "A touchdown is..."), the response is a failure.
+ABSOLUTE RULES:
+1. NEVER start with the play name or definition. Your first word cannot be the play type.
+2. Start DIRECTLY with what the defense/offense did wrong or right.
+3. Use numbers, percentages, and specifics when possible.
+4. 3-4 sentences maximum.
+5. If you catch yourself writing "is when" or "is a type of" — delete the entire sentence and start over.
 
 Sport context: ${sportGuide}
 ${langInstruction}`,
@@ -232,19 +230,19 @@ ${language !== 'en' ? `Respond in language code: "${language}".` : 'Respond in E
 
     // Use mixtral for expert level — better at following negative constraints
     const selectedModel = level === 'expert'
-      ? 'mixtral-8x7b-32768'
-      : 'llama-3.3-70b-versatile';
+  ? 'llama-3.1-70b-versatile'
+  : 'llama-3.3-70b-versatile';
 
     const completion = await groq.chat.completions.create({
-      model: selectedModel,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.65,
-      max_tokens: 600,
-      response_format: { type: 'json_object' },
-    });
+  model: level === 'expert' ? 'llama-3.1-70b-versatile' : 'llama-3.3-70b-versatile',
+  messages: [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ],
+  temperature: level === 'expert' ? 0.3 : 0.65,
+  max_tokens: 600,
+  response_format: { type: 'json_object' },
+});
 
     const raw = completion.choices[0]?.message?.content || '{}';
     const parsed = JSON.parse(raw);
