@@ -88,10 +88,17 @@ export default function App() {
           sport,
         };
       });
-      setGames(parsed);
-      if (parsed.length > 0 && !selectedGameId) {
-        const live = parsed.find(g => g.isLive);
-        setSelectedGameId(live?.id || parsed[0].id);
+
+      const sorted = [...parsed].sort((a: Game, b: Game) => {
+        if (a.isLive && !b.isLive) return -1;
+        if (!a.isLive && b.isLive) return 1;
+        return 0;
+      });
+      setGames(sorted);
+
+      if (sorted.length > 0 && !selectedGameId) {
+        const live = sorted.find((g: Game) => g.isLive);
+        setSelectedGameId(live?.id || sorted[0].id);
       }
     } catch (e) {
       console.error('Games fetch error:', e);
@@ -108,7 +115,6 @@ export default function App() {
     setActiveChip(null);
     
     try {
-      // FIXED: Passing selectedGameId to the API
       const data = await fetchExplanation(sport, level, selectedGameId);
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -123,7 +129,9 @@ export default function App() {
 
   async function handleFollowUp(question: string) {
     if (!result) return;
+    // HAPTIC: Light impact for chip selection
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
     setActiveChip(question);
     setFollowUpLoading(true);
     setFollowUpAnswer(null);
@@ -139,6 +147,7 @@ export default function App() {
   }
 
   async function handleSportChange(s: Sport) {
+    // HAPTIC: Selection tick for tab change
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
@@ -146,12 +155,10 @@ export default function App() {
     setGames([]);
   }
 
-  // Effect 1: Fetch games when sport changes
   useEffect(() => {
     fetchGames();
   }, [sport]);
 
-  // Effect 2: Fetch explanation when the selected game OR level changes
   useEffect(() => {
     if (selectedGameId) {
       handleFetch();
@@ -218,12 +225,16 @@ export default function App() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => handleFetch(true)}
-              tintColor="#0055ff"
+              onRefresh={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                await fetchGames();
+                await handleFetch(true);
+              }}
+              tintColor="#ffffff"
             />
           }>
 
-          {/* Game Cards Strip - MOVED INSIDE SCROLLVIEW TO KILL THE GAP */}
+          {/* Game Cards Strip */}
           {games.length > 0 && (
             <View style={styles.gameStripContainer}>
               <FlatList
@@ -250,7 +261,6 @@ export default function App() {
               <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
               <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 12 }]} />
               <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
-              <View style={[styles.skeletonLine, { width: '70%', height: 14, marginTop: 8 }]} />
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
@@ -260,7 +270,6 @@ export default function App() {
                 <Text style={styles.contextGame}>{result.gameContext || 'Live Game'}</Text>
                 {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
                 <View style={styles.playPill}>
-                  {/* FIXED: Using rawPlay for real detail */}
                   <Text style={styles.playPillText} numberOfLines={3}>
                     ▶ {result.rawPlay || result.playType || 'Latest Play'}
                   </Text>
@@ -269,9 +278,13 @@ export default function App() {
 
               {/* Explanation */}
               <View style={styles.explanationCard}>
-                <Text style={styles.explanationText}>{result.simple}</Text>
-              </View>
-
+  {result.complexity === 'high' && (
+    <View style={styles.complexityBadge}>
+      <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
+    </View>
+  )}
+  <Text style={styles.explanationText}>{result.simple}</Text>
+</View>
               {/* Why It Matters */}
               {result.whyItMatters && (
                 <View style={styles.insightCard}>
@@ -280,13 +293,13 @@ export default function App() {
                 </View>
               )}
 
-              {/* Rule Detail */}
-              {result.ruleDetail && level !== 'expert' && (
-                <View style={styles.ruleCard}>
-                  <Text style={styles.ruleLabel}>📜 THE RULE</Text>
-                  <Text style={styles.ruleText}>{result.ruleDetail}</Text>
-                </View>
-              )}
+             {/* Rule Detail - Now driven by AI "showRule" flag */}
+{result.ruleDetail && result.showRule && (
+  <View style={styles.ruleCard}>
+    <Text style={styles.ruleLabel}>📜 THE RULE</Text>
+    <Text style={styles.ruleText}>{result.ruleDetail}</Text>
+  </View>
+)}
 
               {/* Follow-up Chips */}
               <View style={styles.followUpSection}>
@@ -390,4 +403,20 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', marginTop: 80, gap: 12 },
   emptyEmoji: { fontSize: 48 },
   emptyText: { color: '#444', fontSize: 15, textAlign: 'center' },
+  complexityBadge: {
+  alignSelf: 'flex-start',
+  backgroundColor: '#1a0a00',
+  borderWidth: 1,
+  borderColor: '#ff6b00',
+  borderRadius: 6,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  marginBottom: 10,
+},
+complexityText: {
+  color: '#ff6b00',
+  fontSize: 10,
+  fontWeight: '900',
+  letterSpacing: 1,
+},
 });

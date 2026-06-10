@@ -2,14 +2,16 @@ export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
 
 export interface ExplanationResponse {
-  simple: string;
+   simple: string;
   whyItMatters: string;
   ruleDetail: string;
+  showRule: boolean;        // Added
+  complexity: 'low' | 'medium' | 'high'; // Added
   playType: string;
   homeTeam: string;
   awayTeam: string;
   gameContext: string;
-  rawPlay?: string; // Added to support real play text
+  rawPlay?: string;
 }
 
 const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
