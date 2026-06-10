@@ -24,6 +24,7 @@
   ],
   "exclude": [
     "node_modules",
-    "sports-explainer-mobile"
+    "sports-explainer-mobile",
+    "sports-explainer-mobile-v2"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "sports-explainer-mobile",
-    "slug": "sports-explainer-mobile",
+    "name": "sports-explainer-mobile-v2",
+    "slug": "sports-explainer-mobile-v2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

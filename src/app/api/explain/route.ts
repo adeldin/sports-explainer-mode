@@ -72,23 +72,23 @@ function buildSystemPrompt(sport: string, level: string, language: string): stri
 }
 
 function buildUserPrompt(play: string, gameContext: string, sport: string, level: string): string {
-  const ruleInstruction = level === 'expert' 
-    ? 'Leave "ruleDetail" as an empty string.' 
-    : 'Only include "ruleDetail" if a fan at this level would genuinely benefit from it.';
-
   return `Sport: ${sport.toUpperCase()}
-Game situation: ${gameContext || 'Live game in progress'}
-Play: "${play}"
+Game situation: ${gameContext}
+Play data (ONLY what you know): "${play}"
 
-Respond with a JSON object:
+CRITICAL RULES:
+- You ONLY know what is written in "Play data" above. Nothing else.
+- Do NOT invent pitch speeds, locations, percentages, or statistics.
+- Do NOT reference any numbers unless they appear verbatim in the play data.
+- If the play data is sparse (e.g. "Pitch 1 : Strike 1 Looking"), analyze ONLY the strategic implications — do not fill gaps with invented details.
+${level === 'expert' ? '- Leave "ruleDetail" as an empty string. No exceptions.' : 'Only include "ruleDetail" if a fan at this level would genuinely benefit from it.'}
+
+Respond with this exact JSON:
 {
-  "simple": "Your main explanation",
-  "whyItMatters": "Strategic significance",
-  "ruleDetail": "Rule explanation or empty string"
-}
-
-${ruleInstruction}
-CRITICAL: Do not invent any numbers or stats.`;
+  "simple": "Strategic analysis only — no invented facts",
+  "whyItMatters": "Game theory and situational significance",
+  "ruleDetail": "${level === 'expert' ? '' : 'Rule explanation if genuinely useful, otherwise empty'}"
+}`;
 }
 
 export async function OPTIONS() {
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { sport = 'nfl', level = 'beginner', language = 'en', action, question, context } = body;
+    const { sport = 'nfl', level = 'beginner', language = 'en', action, question, context, gameId } = body;
 
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
@@ -124,11 +124,15 @@ export async function POST(req: NextRequest) {
     let homeTeam = '', awayTeam = '';
 
     const espnUrl = espnApis[sport];
-    if (espnUrl) {
-      try {
-        const espnRes = await fetch(espnUrl);
-        const espnData = await espnRes.json();
-        const liveGame = espnData?.events?.find((e: any) => e.status?.type?.state === 'in') || espnData?.events?.[0];
+if (espnUrl) {
+  try {
+    const espnRes = await fetch(espnUrl);
+    const espnData = await espnRes.json();
+    
+    // If a specific gameId was passed, use that game — otherwise fall back to first live game
+    const liveGame = gameId
+      ? espnData?.events?.find((e: any) => e.id === gameId)
+      : espnData?.events?.find((e: any) => e.status?.type?.state === 'in') || espnData?.events?.[0];
 
         if (liveGame) {
           const comp = liveGame.competitions?.[0];
@@ -162,10 +166,12 @@ export async function POST(req: NextRequest) {
 
     // --- EXPERT FILTER (The "Nuclear Option") ---
     if (level === 'expert') {
-      const triggers = ['is a type of', 'is when', 'is called', 'refers to', 'is defined as', 'is a pitch'];
+      const triggers = ['is a type of', 'is when', 'is called', 'refers to', 'is defined as', 'is a pitch', 'is a play'];
       const firstSentence = parsed.simple?.split('.')[0]?.toLowerCase() || '';
       if (triggers.some(t => firstSentence.includes(t))) {
-        parsed.simple = parsed.simple.split('.').slice(1).join('.').trim() || parsed.whyItMatters;
+        // If the first sentence is a definition, skip it and use the rest
+        const sentences = parsed.simple.split('.');
+        parsed.simple = sentences.slice(1).join('.').trim() || parsed.whyItMatters;
       }
       parsed.ruleDetail = ""; // Force empty for experts
     }
