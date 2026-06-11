@@ -153,14 +153,14 @@ export default function App() {
     }
   }, [sport, level, selectedGameId]);
 
-const handleSportChange = async (s: Sport) => {
-  if (s === sport) return;
-  await Haptics.selectionAsync();
-  setSport(s);
-  setSelectedGameId(null);
-  setResult(null);
-  setGames([]);
-};
+  const handleSportChange = async (s: Sport) => {
+    if (s === sport) return;
+    await Haptics.selectionAsync();
+    setSport(s);
+    setSelectedGameId(null);
+    setResult(null);
+    setGames([]);
+  };
 
   const toggleFavorite = async (teamAbbr: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -178,6 +178,23 @@ const handleSportChange = async (s: Sport) => {
       const uri = await (shareRef.current as any).capture();
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share The Smart Play' });
     } catch (e) { console.error('Share failed:', e); }
+  };
+
+  const handleFollowUp = async (question: string) => {
+    if (!result) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveChip(question);
+    setFollowUpLoading(true);
+    setFollowUpAnswer(null);
+    try {
+      const context = `${result.simple} ${result.whyItMatters || ''}`;
+      const answer = await askQuestion(question, sport, level, context);
+      setFollowUpAnswer(answer);
+    } catch {
+      setFollowUpAnswer('Could not get an answer. Try again.');
+    } finally {
+      setFollowUpLoading(false);
+    }
   };
 
   // --- Effects ---
@@ -206,13 +223,13 @@ const handleSportChange = async (s: Sport) => {
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const gameId = response.notification.request.content.data?.gameId as string | undefined;
-if (gameId) setSelectedGameId(gameId);
+      if (gameId) setSelectedGameId(gameId);
     });
 
     return () => {
-  notificationListener.current?.remove();
-  responseListener.current?.remove();
-};
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
   }, [onboardingComplete, notificationsEnabled]);
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
@@ -234,6 +251,7 @@ if (gameId) setSelectedGameId(gameId);
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safe}>
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>🏆 Sports Explainer</Text>
           <View style={styles.headerRight}>
@@ -252,6 +270,7 @@ if (gameId) setSelectedGameId(gameId);
           </View>
         </View>
 
+        {/* Sport Tabs */}
         <View style={styles.tabsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
             {SPORTS.map(s => (
@@ -281,6 +300,7 @@ if (gameId) setSelectedGameId(gameId);
             />
           }>
 
+          {/* Game Strip */}
           {games.length > 0 ? (
             <View style={styles.gameStripContainer}>
               <FlatList
@@ -308,25 +328,31 @@ if (gameId) setSelectedGameId(gameId);
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
+              
+              {/* Hidden Share Card for ViewShot */}
               <ViewShot ref={shareRef} options={{ format: 'png', quality: 1.0 }} style={styles.hiddenCard}>
                 <ShareCard gameContext={result.gameContext || 'Live Game'} rawPlay={result.rawPlay || result.playType || 'Latest Play'} simple={result.simple} whyItMatters={result.whyItMatters} sport={sport} />
               </ViewShot>
 
-              <LinearGradient colors={['#0a0a1a', '#050510']} style={styles.contextCard}>
-                <Text style={styles.contextGame}>{result.gameContext || 'Live Game'}</Text>
-                {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
-                <View style={styles.playPill}>
-                  <Text style={styles.playPillText} numberOfLines={3}>▶ {result.rawPlay || result.playType || 'Latest Play'}</Text>
-                </View>
-              </LinearGradient>
-
+              {/* Explanation Card (Redesigned) */}
               <View style={styles.explanationCard}>
+                <Text style={styles.explanationLabel}>🎙️ THE PLAY</Text>
+                
+                <View style={styles.explanationHeader}>
+                  <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || 'Latest Play'}</Text>
+                  {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
+                </View>
+
                 {result.complexity === 'high' && (
-                  <View style={styles.complexityBadge}><Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text></View>
+                  <View style={styles.complexityBadge}>
+                    <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
+                  </View>
                 )}
+                
                 <Text style={styles.explanationText}>{result.simple}</Text>
               </View>
 
+              {/* Why It Matters */}
               {result.whyItMatters && (
                 <View style={styles.insightCard}>
                   <Text style={styles.insightLabel}>💡 WHY IT MATTERS</Text>
@@ -334,6 +360,7 @@ if (gameId) setSelectedGameId(gameId);
                 </View>
               )}
 
+              {/* Rule Detail */}
               {result.ruleDetail && result.showRule && (
                 <View style={styles.ruleCard}>
                   <Text style={styles.ruleLabel}>📜 THE RULE</Text>
@@ -341,9 +368,39 @@ if (gameId) setSelectedGameId(gameId);
                 </View>
               )}
 
+              {/* Share Button */}
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
                 <Text style={styles.shareBtnText}>↑ Share The Smart Play</Text>
               </TouchableOpacity>
+
+              {/* Follow-up Chips */}
+              <View style={styles.followUpSection}>
+                <Text style={styles.followUpTitle}>Ask a follow-up</Text>
+                <View style={styles.chipsWrap}>
+                  {FOLLOW_UPS.map(q => (
+                    <TouchableOpacity
+                      key={q}
+                      style={[styles.chip, activeChip === q && styles.chipActive]}
+                      onPress={() => handleFollowUp(q)}
+                      disabled={followUpLoading}>
+                      <Text style={[styles.chipText, activeChip === q && styles.chipTextActive]}>{q}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {followUpLoading && (
+                  <View style={styles.thinkingRow}>
+                    <Text style={styles.thinkingText}>Thinking...</Text>
+                  </View>
+                )}
+
+                {followUpAnswer && (
+                  <View style={styles.answerCard}>
+                    <Text style={styles.answerHeader}>{activeChip}</Text>
+                    <Text style={styles.answerText}>{followUpAnswer}</Text>
+                  </View>
+                )}
+              </View>
             </Animated.View>
           ) : !loading ? <EmptyState sport={sport} reason="select-game" /> : null}
         </ScrollView>
@@ -389,13 +446,33 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   skeleton: { padding: 20, marginHorizontal: 16, backgroundColor: '#111', borderRadius: 16 },
   skeletonLine: { backgroundColor: '#1a1a1a', borderRadius: 6 },
-  contextCard: { borderRadius: 16, padding: 18, marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1a1a2e' },
-  contextGame: { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 4 },
-  contextTime: { color: '#444', fontSize: 11, marginBottom: 12 },
-  playPill: { backgroundColor: 'rgba(255,255,255,0.06)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  playPillText: { color: '#888', fontSize: 12, fontWeight: '600', lineHeight: 18 },
-  explanationCard: { backgroundColor: '#0d0d0d', borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#1a1a1a' },
+  explanationCard: { 
+    backgroundColor: '#0a0a1a', 
+    borderRadius: 16, 
+    padding: 20, 
+    marginHorizontal: 16, 
+    marginBottom: 12, 
+    borderLeftWidth: 4, 
+    borderLeftColor: '#ffffff22',
+    borderWidth: 1, 
+    borderColor: '#1a1a2e' 
+  },
+  explanationLabel: { 
+    color: '#888', 
+    fontSize: 10, 
+    fontWeight: '900', 
+    letterSpacing: 1.5, 
+    marginBottom: 10 
+  },
+  explanationHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 12 
+  },
   explanationText: { color: '#f0f0f0', fontSize: 17, lineHeight: 26 },
+  contextTime: { color: '#444', fontSize: 11 },
+  playPillText: { color: '#888', fontSize: 12, fontWeight: '600', lineHeight: 18 },
   insightCard: { backgroundColor: '#00112a', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#0055ff', borderWidth: 1, borderColor: '#001a44' },
   insightLabel: { color: '#4488ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   insightText: { color: '#aac4ff', fontSize: 15, lineHeight: 22 },
@@ -407,4 +484,16 @@ const styles = StyleSheet.create({
   shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: '#1a0a00', borderWidth: 1, borderColor: '#ff6b00', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
   complexityText: { color: '#ff6b00', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  followUpSection: { marginTop: 8, paddingHorizontal: 16 },
+  followUpTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
+  chipActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
+  chipText: { color: '#888', fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: '#4488ff' },
+  thinkingRow: { marginTop: 16, alignItems: 'center' },
+  thinkingText: { color: '#444', fontSize: 13, fontStyle: 'italic' },
+  answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
+  answerHeader: { color: '#4488ff', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  answerText: { color: '#bbb', fontSize: 15, lineHeight: 23 },
 });
