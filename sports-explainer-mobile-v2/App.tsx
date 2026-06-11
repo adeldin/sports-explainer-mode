@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, StatusBar, FlatList,
-  RefreshControl, Animated,
+  RefreshControl, Animated, Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -314,7 +314,25 @@ export default function App() {
                     isSelected={selectedGameId === item.id}
                     isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
                     onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
-                    onToggleFavorite={() => toggleFavorite(item.homeTeam)}
+                    onToggleFavorite={() => {
+  const game = games.find(g => g.id === item.id);
+  if (!game) return;
+   const homeIsFav = favorites.includes(game.homeTeam);
+  const awayIsFav = favorites.includes(game.awayTeam);
+    if (homeIsFav || awayIsFav) {
+    toggleFavorite(homeIsFav ? game.homeTeam : game.awayTeam);
+    return;
+  }
+  Alert.alert(
+    'Favorite a Team',
+    'Which team do you want to follow?',
+    [
+      { text: game.awayTeam, onPress: () => toggleFavorite(game.awayTeam) },
+      { text: game.homeTeam, onPress: () => toggleFavorite(game.homeTeam) },
+      { text: 'Cancel', style: 'cancel' },
+    ]
+  );
+}}
                   />
                 )}
               />
@@ -465,11 +483,10 @@ const styles = StyleSheet.create({
     marginBottom: 10 
   },
   explanationHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 12 
-  },
+  flexDirection: 'column',
+  marginBottom: 12,
+  gap: 4,
+},
   explanationText: { color: '#f0f0f0', fontSize: 17, lineHeight: 26 },
   contextTime: { color: '#444', fontSize: 11 },
   playPillText: { color: '#888', fontSize: 12, fontWeight: '600', lineHeight: 18 },
