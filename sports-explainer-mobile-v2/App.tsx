@@ -6,11 +6,18 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+
+// Components
 import GameCard from './components/GameCard';
 import SettingsScreen from './components/SettingsScreen';
 import EmptyState from './components/EmptyState';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Onboarding from './components/Onboarding';
+import ShareCard from './components/ShareCard';
+
+// API & Types
 import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
 
 const SPORTS = [
@@ -46,6 +53,8 @@ interface Game {
 }
 
 export default function App() {
+  // --- State ---
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [sport, setSport] = useState<Sport>('mlb');
   const [level, setLevel] = useState<Level>('beginner');
@@ -59,11 +68,13 @@ export default function App() {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // --- Refs ---
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
-
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const shareRef = useRef<ViewShot>(null);
 
+  // --- Animations ---
   const fadeIn = () => {
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, {
@@ -73,6 +84,7 @@ export default function App() {
     }).start();
   };
 
+  // --- Logic Functions ---
   const fetchGames = useCallback(async () => {
     try {
       const res = await fetch(ESPN_APIS[sport]);
@@ -93,15 +105,11 @@ export default function App() {
         };
       });
 
-      const sorted = [...parsed].sort((a: Game, b: Game) => {
-        if (a.isLive && !b.isLive) return -1;
-        if (!a.isLive && b.isLive) return 1;
-        return 0;
-      });
+      const sorted = [...parsed].sort((a, b) => (a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1));
       setGames(sorted);
 
       if (sorted.length > 0 && !selectedGameId) {
-        const live = sorted.find((g: Game) => g.isLive);
+        const live = sorted.find((g) => g.isLive);
         setSelectedGameId(live?.id || sorted[0].id);
       }
     } catch (e) {
@@ -111,9 +119,7 @@ export default function App() {
 
   const handleFetch = useCallback(async (isRefresh = false) => {
     if (!selectedGameId) return;
-    
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     
     setFollowUpAnswer(null);
     setActiveChip(null);
@@ -131,10 +137,9 @@ export default function App() {
     }
   }, [sport, level, selectedGameId]);
 
-  async function handleFollowUp(question: string) {
+  const handleFollowUp = async (question: string) => {
     if (!result) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
     setActiveChip(question);
     setFollowUpLoading(true);
     setFollowUpAnswer(null);
@@ -147,27 +152,43 @@ export default function App() {
     } finally {
       setFollowUpLoading(false);
     }
-  }
+  };
 
-  async function handleSportChange(s: Sport) {
-    // 🛡️ ADD THIS LINE: If the sport is already selected, do nothing
-    if (s === sport) return; 
+  const handleSportChange = async (s: Sport) => {
+    if (s === sport) return;
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
     setResult(null);
     setGames([]);
-  }
+  };
 
-  useEffect(() => {
-    fetchGames();
-  }, [sport]);
-
-  useEffect(() => {
-    if (selectedGameId) {
-      handleFetch();
+  const handleShare = async () => {
+    if (!shareRef.current || !result) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+   const uri = await (shareRef.current as any).capture();
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share The Smart Play',
+      });
+    } catch (e) {
+      console.error('Share failed:', e);
     }
-  }, [selectedGameId, level]);
+  };
+
+  // --- Effects ---
+  useEffect(() => {
+    async function checkOnboarding() {
+      const done = await AsyncStorage.getItem('onboarding_complete');
+      setOnboardingComplete(done === 'true');
+    }
+    checkOnboarding();
+  }, []);
+
+  useEffect(() => { fetchGames(); }, [sport]);
+
+  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -176,29 +197,17 @@ export default function App() {
         handleFetch(true);
       }, 60000);
     }
-    return () => {
-      if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
-    };
+    return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
   }, [autoRefresh, sport, level, selectedGameId]);
 
-  useEffect(() => {
-  async function checkOnboarding() {
-    const done = await AsyncStorage.getItem('onboarding_complete');
-    setOnboardingComplete(done === 'true');
-  }
-  checkOnboarding();
-}, []);
-
- // Show nothing while checking AsyncStorage
+  // --- Conditional Returns ---
   if (onboardingComplete === null) return null;
-
-  // Show onboarding on first launch
   if (!onboardingComplete) {
     return (
       <Onboarding
-        onComplete={(level, sport) => {
-          setLevel(level);
-          setSport(sport);
+        onComplete={(l, s) => {
+          setLevel(l);
+          setSport(s);
           setOnboardingComplete(true);
         }}
       />
@@ -209,7 +218,6 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safe}>
-
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>🏆 Sports Explainer</Text>
@@ -220,6 +228,14 @@ export default function App() {
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
             )}
+            <TouchableOpacity
+              style={styles.cogBtn}
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowSettings(true);
+              }}>
+              <Text style={styles.cogIcon}>⚙️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -238,7 +254,6 @@ export default function App() {
           </ScrollView>
         </View>
 
-        {/* Main Content ScrollView */}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -254,7 +269,7 @@ export default function App() {
             />
           }>
 
-          {/* Game Cards Strip or Empty State */}
+          {/* Game Strip */}
           {games.length > 0 ? (
             <View style={styles.gameStripContainer}>
               <FlatList
@@ -274,9 +289,7 @@ export default function App() {
                 )}
               />
             </View>
-          ) : !loading ? (
-            <EmptyState sport={sport} reason="no-games" />
-          ) : null}
+          ) : !loading ? <EmptyState sport={sport} reason="no-games" /> : null}
 
           {loading && !result ? (
             <View style={styles.skeleton}>
@@ -286,6 +299,17 @@ export default function App() {
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
+              
+              {/* Hidden Share Card for ViewShot */}
+              <ViewShot ref={shareRef} options={{ format: 'png', quality: 1.0 }} style={styles.hiddenCard}>
+                <ShareCard
+                  gameContext={result.gameContext || 'Live Game'}
+                  rawPlay={result.rawPlay || result.playType || 'Latest Play'}
+                  simple={result.simple}
+                  whyItMatters={result.whyItMatters}
+                  sport={sport}
+                />
+              </ViewShot>
 
               {/* Game Context */}
               <LinearGradient colors={['#0a0a1a', '#050510']} style={styles.contextCard}>
@@ -309,20 +333,25 @@ export default function App() {
               </View>
 
               {/* Why It Matters */}
-              {result.whyItMatters ? (
+              {result.whyItMatters && (
                 <View style={styles.insightCard}>
                   <Text style={styles.insightLabel}>💡 WHY IT MATTERS</Text>
                   <Text style={styles.insightText}>{result.whyItMatters}</Text>
                 </View>
-              ) : null}
+              )}
 
               {/* Rule Detail */}
-              {result.ruleDetail && result.showRule ? (
+              {result.ruleDetail && result.showRule && (
                 <View style={styles.ruleCard}>
                   <Text style={styles.ruleLabel}>📜 THE RULE</Text>
                   <Text style={styles.ruleText}>{result.ruleDetail}</Text>
                 </View>
-              ) : null}
+              )}
+
+              {/* Share Button */}
+              <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                <Text style={styles.shareBtnText}>↑ Share The Smart Play</Text>
+              </TouchableOpacity>
 
               {/* Follow-up Chips */}
               <View style={styles.followUpSection}>
@@ -352,21 +381,10 @@ export default function App() {
                   </View>
                 )}
               </View>
-
             </Animated.View>
-          ) : !loading ? (
-            <EmptyState sport={sport} reason="select-game" />
-          ) : null}
+          ) : !loading ? <EmptyState sport={sport} reason="select-game" /> : null}
         </ScrollView>
       </SafeAreaView>
-
-<TouchableOpacity 
-  onPress={async () => {
-    await AsyncStorage.removeItem('onboarding_complete');
-    setOnboardingComplete(false);
-  }}>
-  <Text style={{ color: '#333', fontSize: 10, textAlign: 'center' }}>Reset Onboarding</Text>
-</TouchableOpacity>
 
       <SettingsScreen
         visible={showSettings}
@@ -428,20 +446,9 @@ const styles = StyleSheet.create({
   answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
   answerHeader: { color: '#4488ff', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   answerText: { color: '#bbb', fontSize: 15, lineHeight: 23 },
-  complexityBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1a0a00',
-    borderWidth: 1,
-    borderColor: '#ff6b00',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginBottom: 10,
-  },
-  complexityText: {
-    color: '#ff6b00',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
+  hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
+  shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  complexityBadge: { alignSelf: 'flex-start', backgroundColor: '#1a0a00', borderWidth: 1, borderColor: '#ff6b00', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
+  complexityText: { color: '#ff6b00', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
 });
