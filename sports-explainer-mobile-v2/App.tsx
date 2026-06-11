@@ -8,6 +8,9 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import GameCard from './components/GameCard';
 import SettingsScreen from './components/SettingsScreen';
+import EmptyState from './components/EmptyState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Onboarding from './components/Onboarding';
 import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
 
 const SPORTS = [
@@ -57,6 +60,7 @@ export default function App() {
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -129,7 +133,6 @@ export default function App() {
 
   async function handleFollowUp(question: string) {
     if (!result) return;
-    // HAPTIC: Light impact for chip selection
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     setActiveChip(question);
@@ -147,7 +150,8 @@ export default function App() {
   }
 
   async function handleSportChange(s: Sport) {
-    // HAPTIC: Selection tick for tab change
+    // 🛡️ ADD THIS LINE: If the sport is already selected, do nothing
+    if (s === sport) return; 
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
@@ -177,6 +181,30 @@ export default function App() {
     };
   }, [autoRefresh, sport, level, selectedGameId]);
 
+  useEffect(() => {
+  async function checkOnboarding() {
+    const done = await AsyncStorage.getItem('onboarding_complete');
+    setOnboardingComplete(done === 'true');
+  }
+  checkOnboarding();
+}, []);
+
+ // Show nothing while checking AsyncStorage
+  if (onboardingComplete === null) return null;
+
+  // Show onboarding on first launch
+  if (!onboardingComplete) {
+    return (
+      <Onboarding
+        onComplete={(level, sport) => {
+          setLevel(level);
+          setSport(sport);
+          setOnboardingComplete(true);
+        }}
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
@@ -192,14 +220,6 @@ export default function App() {
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
             )}
-            <TouchableOpacity
-              style={styles.cogBtn}
-              onPress={async () => {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowSettings(true);
-              }}>
-              <Text style={styles.cogIcon}>⚙️</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -234,8 +254,8 @@ export default function App() {
             />
           }>
 
-          {/* Game Cards Strip */}
-          {games.length > 0 && (
+          {/* Game Cards Strip or Empty State */}
+          {games.length > 0 ? (
             <View style={styles.gameStripContainer}>
               <FlatList
                 data={games}
@@ -254,7 +274,9 @@ export default function App() {
                 )}
               />
             </View>
-          )}
+          ) : !loading ? (
+            <EmptyState sport={sport} reason="no-games" />
+          ) : null}
 
           {loading && !result ? (
             <View style={styles.skeleton}>
@@ -278,28 +300,29 @@ export default function App() {
 
               {/* Explanation */}
               <View style={styles.explanationCard}>
-  {result.complexity === 'high' && (
-    <View style={styles.complexityBadge}>
-      <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
-    </View>
-  )}
-  <Text style={styles.explanationText}>{result.simple}</Text>
-</View>
+                {result.complexity === 'high' && (
+                  <View style={styles.complexityBadge}>
+                    <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
+                  </View>
+                )}
+                <Text style={styles.explanationText}>{result.simple}</Text>
+              </View>
+
               {/* Why It Matters */}
-              {result.whyItMatters && (
+              {result.whyItMatters ? (
                 <View style={styles.insightCard}>
                   <Text style={styles.insightLabel}>💡 WHY IT MATTERS</Text>
                   <Text style={styles.insightText}>{result.whyItMatters}</Text>
                 </View>
-              )}
+              ) : null}
 
-             {/* Rule Detail - Now driven by AI "showRule" flag */}
-{result.ruleDetail && result.showRule && (
-  <View style={styles.ruleCard}>
-    <Text style={styles.ruleLabel}>📜 THE RULE</Text>
-    <Text style={styles.ruleText}>{result.ruleDetail}</Text>
-  </View>
-)}
+              {/* Rule Detail */}
+              {result.ruleDetail && result.showRule ? (
+                <View style={styles.ruleCard}>
+                  <Text style={styles.ruleLabel}>📜 THE RULE</Text>
+                  <Text style={styles.ruleText}>{result.ruleDetail}</Text>
+                </View>
+              ) : null}
 
               {/* Follow-up Chips */}
               <View style={styles.followUpSection}>
@@ -331,14 +354,19 @@ export default function App() {
               </View>
 
             </Animated.View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>📡</Text>
-              <Text style={styles.emptyText}>Select a game to see the explanation</Text>
-            </View>
-          )}
+          ) : !loading ? (
+            <EmptyState sport={sport} reason="select-game" />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
+
+<TouchableOpacity 
+  onPress={async () => {
+    await AsyncStorage.removeItem('onboarding_complete');
+    setOnboardingComplete(false);
+  }}>
+  <Text style={{ color: '#333', fontSize: 10, textAlign: 'center' }}>Reset Onboarding</Text>
+</TouchableOpacity>
 
       <SettingsScreen
         visible={showSettings}
@@ -400,23 +428,20 @@ const styles = StyleSheet.create({
   answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
   answerHeader: { color: '#4488ff', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   answerText: { color: '#bbb', fontSize: 15, lineHeight: 23 },
-  emptyState: { alignItems: 'center', marginTop: 80, gap: 12 },
-  emptyEmoji: { fontSize: 48 },
-  emptyText: { color: '#444', fontSize: 15, textAlign: 'center' },
   complexityBadge: {
-  alignSelf: 'flex-start',
-  backgroundColor: '#1a0a00',
-  borderWidth: 1,
-  borderColor: '#ff6b00',
-  borderRadius: 6,
-  paddingHorizontal: 8,
-  paddingVertical: 3,
-  marginBottom: 10,
-},
-complexityText: {
-  color: '#ff6b00',
-  fontSize: 10,
-  fontWeight: '900',
-  letterSpacing: 1,
-},
+    alignSelf: 'flex-start',
+    backgroundColor: '#1a0a00',
+    borderWidth: 1,
+    borderColor: '#ff6b00',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 10,
+  },
+  complexityText: {
+    color: '#ff6b00',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
 });
