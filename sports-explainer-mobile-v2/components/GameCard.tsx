@@ -1,5 +1,6 @@
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons'; // Added for the star
 
 interface Game {
   id: string;
@@ -15,7 +16,9 @@ interface Game {
 interface Props {
   game: Game;
   isSelected: boolean;
+  isFavorite: boolean; // New prop
   onPress: () => void;
+  onToggleFavorite: () => void; // New prop
 }
 
 const SPORT_COLORS: Record<string, [string, string]> = {
@@ -26,7 +29,7 @@ const SPORT_COLORS: Record<string, [string, string]> = {
   mls: ['#1a001a', '#0d000d'],
 };
 
-export default function GameCard({ game, isSelected, onPress }: Props) {
+export default function GameCard({ game, isSelected, isFavorite, onPress, onToggleFavorite }: Props) {
   const colors = SPORT_COLORS[game.sport] || ['#1a1a1a', '#111'];
 
   return (
@@ -36,14 +39,31 @@ export default function GameCard({ game, isSelected, onPress }: Props) {
         style={[styles.card, isSelected && styles.cardSelected]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}>
+        
+        <View style={styles.topRow}>
+          {/* Live badge */}
+          {game.isLive ? (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          ) : <View />}
 
-        {/* Live badge */}
-        {game.isLive && (
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
-          </View>
-        )}
+          {/* Favorite Star */}
+          <TouchableOpacity 
+            onPress={(e) => {
+              e.stopPropagation(); // Prevents selecting the game when starring
+              onToggleFavorite();
+            }}
+            style={styles.starBtn}
+          >
+            <Ionicons 
+              name={isFavorite ? "star" : "star-outline"} 
+              size={18} 
+              color={isFavorite ? "#ffcc00" : "rgba(255,255,255,0.3)"} 
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* Teams + Scores */}
         <View style={styles.matchup}>
@@ -81,10 +101,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
     gap: 4,
   },
   liveDot: {
@@ -98,6 +123,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  starBtn: {
+    padding: 4,
+    marginRight: -4,
   },
   matchup: { gap: 6, marginBottom: 10 },
   teamRow: {

@@ -55,6 +55,7 @@ interface Game {
 export default function App() {
   // --- State ---
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [sport, setSport] = useState<Sport>('mlb');
   const [level, setLevel] = useState<Level>('beginner');
@@ -105,7 +106,20 @@ export default function App() {
         };
       });
 
-      const sorted = [...parsed].sort((a, b) => (a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1));
+      // --- SMART SORTING (Live + Favorites first) ---
+      const sorted = [...parsed].sort((a, b) => {
+        const aFav = favorites.includes(a.homeTeam) || favorites.includes(a.awayTeam);
+        const bFav = favorites.includes(b.homeTeam) || favorites.includes(b.awayTeam);
+
+        if ((a.isLive && aFav) && !(b.isLive && bFav)) return -1;
+        if (!(a.isLive && aFav) && (b.isLive && bFav)) return 1;
+        if (a.isLive && !b.isLive) return -1;
+        if (!a.isLive && b.isLive) return 1;
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
+        return 0;
+      });
+
       setGames(sorted);
 
       if (sorted.length > 0 && !selectedGameId) {
@@ -115,7 +129,7 @@ export default function App() {
     } catch (e) {
       console.error('Games fetch error:', e);
     }
-  }, [sport, selectedGameId]);
+  }, [sport, selectedGameId, favorites]);
 
   const handleFetch = useCallback(async (isRefresh = false) => {
     if (!selectedGameId) return;
@@ -136,6 +150,16 @@ export default function App() {
       setRefreshing(false);
     }
   }, [sport, level, selectedGameId]);
+
+  const toggleFavorite = async (teamAbbr: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newFavs = favorites.includes(teamAbbr)
+      ? favorites.filter(f => f !== teamAbbr)
+      : [...favorites, teamAbbr];
+    
+    setFavorites(newFavs);
+    await AsyncStorage.setItem('favorite_teams', JSON.stringify(newFavs));
+  };
 
   const handleFollowUp = async (question: string) => {
     if (!result) return;
@@ -167,7 +191,7 @@ export default function App() {
     if (!shareRef.current || !result) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-   const uri = await (shareRef.current as any).capture();
+      const uri = await (shareRef.current as any).capture();
       await Sharing.shareAsync(uri, {
         mimeType: 'image/png',
         dialogTitle: 'Share The Smart Play',
@@ -179,14 +203,18 @@ export default function App() {
 
   // --- Effects ---
   useEffect(() => {
-    async function checkOnboarding() {
-      const done = await AsyncStorage.getItem('onboarding_complete');
-      setOnboardingComplete(done === 'true');
+    async function init() {
+      const [onboarding, favs] = await Promise.all([
+        AsyncStorage.getItem('onboarding_complete'),
+        AsyncStorage.getItem('favorite_teams')
+      ]);
+      setOnboardingComplete(onboarding === 'true');
+      if (favs) setFavorites(JSON.parse(favs));
     }
-    checkOnboarding();
+    init();
   }, []);
 
-  useEffect(() => { fetchGames(); }, [sport]);
+  useEffect(() => { fetchGames(); }, [sport, favorites]);
 
   useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level]);
 
@@ -281,10 +309,12 @@ export default function App() {
                   <GameCard
                     game={item}
                     isSelected={selectedGameId === item.id}
+                    isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
                     onPress={async () => {
                       await Haptics.selectionAsync();
                       setSelectedGameId(item.id);
                     }}
+                    onToggleFavorite={() => toggleFavorite(item.homeTeam)}
                   />
                 )}
               />
