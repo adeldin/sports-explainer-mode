@@ -1,10 +1,15 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-export async function registerForPushNotificationsAsync() {
-  let token;
+export async function registerForPushNotificationsAsync(): Promise<string | undefined> {
+  // Guard: expo-notifications not supported in Expo Go
+  if (Constants.appOwnership === 'expo') {
+    console.log('Push notifications not supported in Expo Go — skipping.');
+    return undefined;
+  }
+
+  const Notifications = await import('expo-notifications');
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -15,29 +20,26 @@ export async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      alert('Failed to get push token for push notification!');
-      return;
-    }
-    
-    // Get the token from Expo
-    try {
-      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      console.log("Expo Push Token:", token);
-    } catch (e) {
-      console.error("Error getting push token", e);
-    }
-  } else {
-    alert('Must use physical device for Push Notifications');
+  if (!Device.isDevice) {
+    console.log('Must use physical device for push notifications.');
+    return undefined;
   }
 
-  return token;
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') return undefined;
+
+  try {
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    console.log('Expo Push Token:', token);
+    return token;
+  } catch (e) {
+    console.error('Error getting push token:', e);
+    return undefined;
+  }
 }

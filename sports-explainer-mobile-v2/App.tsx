@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
+import Constants from 'expo-constants';
 
 // Components
 import GameCard from './components/GameCard';
@@ -17,10 +19,14 @@ import SettingsScreen from './components/SettingsScreen';
 import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
+import LaunchCinematic from './components/LaunchCinematic';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
+
+// Prevent the native splash from hiding automatically
+SplashScreen.preventAutoHideAsync();
 
 const SPORTS = [
   { key: 'mlb' as Sport, emoji: '⚾', label: 'MLB' },
@@ -56,6 +62,8 @@ interface Game {
 
 export default function App() {
   // --- State ---
+  const [appReady, setAppReady] = useState(false);
+  const [isAnimationComplete, setAnimationComplete] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -79,8 +87,8 @@ export default function App() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const shareRef = useRef<ViewShot>(null);
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
 
   // --- Animations ---
   const fadeIn = () => {
@@ -197,40 +205,59 @@ export default function App() {
     }
   };
 
-  // --- Effects ---
-  useEffect(() => {
-    async function init() {
+// --- Effects ---
+useEffect(() => {
+  async function init() {
+    try {
+      await SplashScreen.hideAsync();
+
       const [onboarding, favs, notify] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
-        AsyncStorage.getItem('notifications_enabled')
+        AsyncStorage.getItem('notifications_enabled'),
       ]);
-      setOnboardingComplete(onboarding === 'true');
+
       if (favs) setFavorites(JSON.parse(favs));
       if (notify !== null) setNotificationsEnabled(notify === 'true');
-    }
-    init();
-  }, []);
 
-  useEffect(() => {
-    if (onboardingComplete && notificationsEnabled) {
-      registerForPushNotificationsAsync().then(token => setExpoPushToken(token || ''));
-    }
+      setAppReady(true);
 
+      setTimeout(() => {
+        setOnboardingComplete(onboarding === 'true');
+      }, 50);
+
+    } catch (e) {
+      console.warn('Init error:', e);
+      setAppReady(true); // Still unblock the app if something fails
+    }
+  }
+  init();
+}, []);
+
+useEffect(() => {
+  // Skip in Expo Go — not supported since SDK 53
+  if (Constants.appOwnership === 'expo') return;
+
+  if (onboardingComplete && notificationsEnabled) {
+    registerForPushNotificationsAsync().then(token => setExpoPushToken(token || ''));
+  }
+
+  import('expo-notifications').then(Notifications => {
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log("Notification Received:", notification);
+      console.log('Notification Received:', notification);
     });
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const gameId = response.notification.request.content.data?.gameId as string | undefined;
       if (gameId) setSelectedGameId(gameId);
     });
+  });
 
-    return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
-    };
-  }, [onboardingComplete, notificationsEnabled]);
+  return () => {
+    if (notificationListener.current) notificationListener.current.remove();
+    if (responseListener.current) responseListener.current.remove();
+  };
+}, [onboardingComplete, notificationsEnabled]);
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
   useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level]);
@@ -242,7 +269,19 @@ export default function App() {
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
   }, [autoRefresh, sport, level, selectedGameId]);
 
-  if (onboardingComplete === null) return null;
+  // --- Conditional Returns (The Gatekeepers) ---
+  if (!appReady || onboardingComplete === null) return null;
+
+  if (!isAnimationComplete) {
+    return (
+      <LaunchCinematic 
+        onComplete={() => {
+          setAnimationComplete(true);
+        }} 
+      />
+    );
+  }
+
   if (!onboardingComplete) {
     return <Onboarding onComplete={(l, s) => { setLevel(l); setSport(s); setOnboardingComplete(true); }} />;
   }
@@ -315,24 +354,24 @@ export default function App() {
                     isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
                     onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
                     onToggleFavorite={() => {
-  const game = games.find(g => g.id === item.id);
-  if (!game) return;
-   const homeIsFav = favorites.includes(game.homeTeam);
-  const awayIsFav = favorites.includes(game.awayTeam);
-    if (homeIsFav || awayIsFav) {
-    toggleFavorite(homeIsFav ? game.homeTeam : game.awayTeam);
-    return;
-  }
-  Alert.alert(
-    'Favorite a Team',
-    'Which team do you want to follow?',
-    [
-      { text: game.awayTeam, onPress: () => toggleFavorite(game.awayTeam) },
-      { text: game.homeTeam, onPress: () => toggleFavorite(game.homeTeam) },
-      { text: 'Cancel', style: 'cancel' },
-    ]
-  );
-}}
+                      const game = games.find(g => g.id === item.id);
+                      if (!game) return;
+                      const homeIsFav = favorites.includes(game.homeTeam);
+                      const awayIsFav = favorites.includes(game.awayTeam);
+                      if (homeIsFav || awayIsFav) {
+                        toggleFavorite(homeIsFav ? game.homeTeam : game.awayTeam);
+                        return;
+                      }
+                      Alert.alert(
+                        'Favorite a Team',
+                        'Which team do you want to follow?',
+                        [
+                          { text: game.awayTeam, onPress: () => toggleFavorite(game.awayTeam) },
+                          { text: game.homeTeam, onPress: () => toggleFavorite(game.homeTeam) },
+                          { text: 'Cancel', style: 'cancel' },
+                        ]
+                      );
+                    }}
                   />
                 )}
               />
@@ -346,27 +385,22 @@ export default function App() {
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
-              
-              {/* Hidden Share Card for ViewShot */}
               <ViewShot ref={shareRef} options={{ format: 'png', quality: 1.0 }} style={styles.hiddenCard}>
                 <ShareCard gameContext={result.gameContext || 'Live Game'} rawPlay={result.rawPlay || result.playType || 'Latest Play'} simple={result.simple} whyItMatters={result.whyItMatters} sport={sport} />
               </ViewShot>
 
-              {/* Explanation Card (Redesigned) */}
+              {/* Explanation Card */}
               <View style={styles.explanationCard}>
                 <Text style={styles.explanationLabel}>🎙️ THE PLAY</Text>
-                
                 <View style={styles.explanationHeader}>
                   <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || 'Latest Play'}</Text>
                   {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
                 </View>
-
                 {result.complexity === 'high' && (
                   <View style={styles.complexityBadge}>
                     <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
                   </View>
                 )}
-                
                 <Text style={styles.explanationText}>{result.simple}</Text>
               </View>
 
@@ -386,7 +420,6 @@ export default function App() {
                 </View>
               )}
 
-              {/* Share Button */}
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
                 <Text style={styles.shareBtnText}>↑ Share The Smart Play</Text>
               </TouchableOpacity>
@@ -405,13 +438,11 @@ export default function App() {
                     </TouchableOpacity>
                   ))}
                 </View>
-
                 {followUpLoading && (
                   <View style={styles.thinkingRow}>
                     <Text style={styles.thinkingText}>Thinking...</Text>
                   </View>
                 )}
-
                 {followUpAnswer && (
                   <View style={styles.answerCard}>
                     <Text style={styles.answerHeader}>{activeChip}</Text>
@@ -464,29 +495,9 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   skeleton: { padding: 20, marginHorizontal: 16, backgroundColor: '#111', borderRadius: 16 },
   skeletonLine: { backgroundColor: '#1a1a1a', borderRadius: 6 },
-  explanationCard: { 
-    backgroundColor: '#0a0a1a', 
-    borderRadius: 16, 
-    padding: 20, 
-    marginHorizontal: 16, 
-    marginBottom: 12, 
-    borderLeftWidth: 4, 
-    borderLeftColor: '#ffffff22',
-    borderWidth: 1, 
-    borderColor: '#1a1a2e' 
-  },
-  explanationLabel: { 
-    color: '#888', 
-    fontSize: 10, 
-    fontWeight: '900', 
-    letterSpacing: 1.5, 
-    marginBottom: 10 
-  },
-  explanationHeader: { 
-  flexDirection: 'column',
-  marginBottom: 12,
-  gap: 4,
-},
+  explanationCard: { backgroundColor: '#0a0a1a', borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#ffffff22', borderWidth: 1, borderColor: '#1a1a2e' },
+  explanationLabel: { color: '#888', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
+  explanationHeader: { flexDirection: 'column', marginBottom: 12, gap: 4 },
   explanationText: { color: '#f0f0f0', fontSize: 17, lineHeight: 26 },
   contextTime: { color: '#444', fontSize: 11 },
   playPillText: { color: '#888', fontSize: 12, fontWeight: '600', lineHeight: 18 },
