@@ -9,9 +9,11 @@ interface Props {
   visible: boolean;
   level: Level;
   autoRefresh: boolean;
+  notificationsEnabled: boolean;
   onClose: () => void;
   onLevelChange: (l: Level) => void;
   onAutoRefreshChange: (val: boolean) => void;
+  onNotificationsToggle: (val: boolean) => void;
 }
 
 const LEVELS: { key: Level; label: string; desc: string }[] = [
@@ -21,7 +23,16 @@ const LEVELS: { key: Level; label: string; desc: string }[] = [
   { key: 'expert', label: '🎓 Expert', desc: 'Coaching-level analysis' },
 ];
 
-export default function SettingsScreen({ visible, level, autoRefresh, onClose, onLevelChange, onAutoRefreshChange }: Props) {
+export default function SettingsScreen({ 
+  visible, 
+  level, 
+  autoRefresh, 
+  notificationsEnabled,
+  onClose, 
+  onLevelChange, 
+  onAutoRefreshChange,
+  onNotificationsToggle
+}: Props) {
   const translateX = useRef(new Animated.Value(width)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
@@ -55,6 +66,7 @@ export default function SettingsScreen({ visible, level, autoRefresh, onClose, o
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
+          
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.sectionLabel}>EXPERTISE LEVEL</Text>
             {LEVELS.map(l => (
@@ -69,7 +81,10 @@ export default function SettingsScreen({ visible, level, autoRefresh, onClose, o
                 {level === l.key && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
             ))}
+
             <Text style={[styles.sectionLabel, { marginTop: 30 }]}>PREFERENCES</Text>
+            
+            {/* Auto-Refresh Toggle */}
             <View style={styles.toggleRow}>
               <View>
                 <Text style={styles.toggleLabel}>Auto-Refresh</Text>
@@ -82,6 +97,21 @@ export default function SettingsScreen({ visible, level, autoRefresh, onClose, o
                 thumbColor="#fff"
               />
             </View>
+
+            {/* Notifications Toggle */}
+            <View style={[styles.toggleRow, { marginTop: 12 }]}>
+              <View>
+                <Text style={styles.toggleLabel}>Game Alerts</Text>
+                <Text style={styles.toggleDesc}>Notify me when favorite teams play</Text>
+              </View>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={onNotificationsToggle}
+                trackColor={{ false: '#333', true: '#0055ff' }}
+                thumbColor="#fff"
+              />
+            </View>
+
             <View style={styles.versionBox}>
               <Text style={styles.versionText}>Sports Explainer v1.0</Text>
               <Text style={styles.versionText}>Powered by Groq + ESPN</Text>

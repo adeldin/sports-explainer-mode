@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 
 // Components
 import GameCard from './components/GameCard';
@@ -17,8 +18,9 @@ import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
 
-// API & Types
+// Libs
 import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
+import { registerForPushNotificationsAsync } from './lib/notifications';
 
 const SPORTS = [
   { key: 'mlb' as Sport, emoji: '⚾', label: 'MLB' },
@@ -60,6 +62,9 @@ export default function App() {
   const [sport, setSport] = useState<Sport>('mlb');
   const [level, setLevel] = useState<Level>('beginner');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [expoPushToken, setExpoPushToken] = useState('');
+  
   const [result, setResult] = useState<ExplanationResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,6 +79,8 @@ export default function App() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const shareRef = useRef<ViewShot>(null);
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   // --- Animations ---
   const fadeIn = () => {
@@ -106,11 +113,9 @@ export default function App() {
         };
       });
 
-      // --- SMART SORTING (Live + Favorites first) ---
       const sorted = [...parsed].sort((a, b) => {
         const aFav = favorites.includes(a.homeTeam) || favorites.includes(a.awayTeam);
         const bFav = favorites.includes(b.homeTeam) || favorites.includes(b.awayTeam);
-
         if ((a.isLive && aFav) && !(b.isLive && bFav)) return -1;
         if (!(a.isLive && aFav) && (b.isLive && bFav)) return 1;
         if (a.isLive && !b.isLive) return -1;
@@ -121,7 +126,6 @@ export default function App() {
       });
 
       setGames(sorted);
-
       if (sorted.length > 0 && !selectedGameId) {
         const live = sorted.find((g) => g.isLive);
         setSelectedGameId(live?.id || sorted[0].id);
@@ -134,10 +138,8 @@ export default function App() {
   const handleFetch = useCallback(async (isRefresh = false) => {
     if (!selectedGameId) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    
     setFollowUpAnswer(null);
     setActiveChip(null);
-    
     try {
       const data = await fetchExplanation(sport, level, selectedGameId);
       setResult(data);
@@ -151,40 +153,22 @@ export default function App() {
     }
   }, [sport, level, selectedGameId]);
 
+const handleSportChange = async (s: Sport) => {
+  if (s === sport) return;
+  await Haptics.selectionAsync();
+  setSport(s);
+  setSelectedGameId(null);
+  setResult(null);
+  setGames([]);
+};
+
   const toggleFavorite = async (teamAbbr: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const newFavs = favorites.includes(teamAbbr)
       ? favorites.filter(f => f !== teamAbbr)
       : [...favorites, teamAbbr];
-    
     setFavorites(newFavs);
     await AsyncStorage.setItem('favorite_teams', JSON.stringify(newFavs));
-  };
-
-  const handleFollowUp = async (question: string) => {
-    if (!result) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveChip(question);
-    setFollowUpLoading(true);
-    setFollowUpAnswer(null);
-    try {
-      const context = `${result.simple} ${result.whyItMatters || ''}`;
-      const answer = await askQuestion(question, sport, level, context);
-      setFollowUpAnswer(answer);
-    } catch {
-      setFollowUpAnswer('Could not get an answer. Try again.');
-    } finally {
-      setFollowUpLoading(false);
-    }
-  };
-
-  const handleSportChange = async (s: Sport) => {
-    if (s === sport) return;
-    await Haptics.selectionAsync();
-    setSport(s);
-    setSelectedGameId(null);
-    setResult(null);
-    setGames([]);
   };
 
   const handleShare = async () => {
@@ -192,61 +176,64 @@ export default function App() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const uri = await (shareRef.current as any).capture();
-      await Sharing.shareAsync(uri, {
-        mimeType: 'image/png',
-        dialogTitle: 'Share The Smart Play',
-      });
-    } catch (e) {
-      console.error('Share failed:', e);
-    }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share The Smart Play' });
+    } catch (e) { console.error('Share failed:', e); }
   };
 
   // --- Effects ---
   useEffect(() => {
     async function init() {
-      const [onboarding, favs] = await Promise.all([
+      const [onboarding, favs, notify] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
-        AsyncStorage.getItem('favorite_teams')
+        AsyncStorage.getItem('favorite_teams'),
+        AsyncStorage.getItem('notifications_enabled')
       ]);
       setOnboardingComplete(onboarding === 'true');
       if (favs) setFavorites(JSON.parse(favs));
+      if (notify !== null) setNotificationsEnabled(notify === 'true');
     }
     init();
   }, []);
 
-  useEffect(() => { fetchGames(); }, [sport, favorites]);
+  useEffect(() => {
+    if (onboardingComplete && notificationsEnabled) {
+      registerForPushNotificationsAsync().then(token => setExpoPushToken(token || ''));
+    }
 
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notification Received:", notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const gameId = response.notification.request.content.data?.gameId as string | undefined;
+if (gameId) setSelectedGameId(gameId);
+    });
+
+    return () => {
+  notificationListener.current?.remove();
+  responseListener.current?.remove();
+};
+  }, [onboardingComplete, notificationsEnabled]);
+
+  useEffect(() => { fetchGames(); }, [sport, favorites]);
   useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level]);
 
   useEffect(() => {
     if (autoRefresh) {
-      autoRefreshRef.current = setInterval(() => {
-        fetchGames();
-        handleFetch(true);
-      }, 60000);
+      autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
   }, [autoRefresh, sport, level, selectedGameId]);
 
-  // --- Conditional Returns ---
   if (onboardingComplete === null) return null;
   if (!onboardingComplete) {
-    return (
-      <Onboarding
-        onComplete={(l, s) => {
-          setLevel(l);
-          setSport(s);
-          setOnboardingComplete(true);
-        }}
-      />
-    );
+    return <Onboarding onComplete={(l, s) => { setLevel(l); setSport(s); setOnboardingComplete(true); }} />;
   }
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safe}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>🏆 Sports Explainer</Text>
           <View style={styles.headerRight}>
@@ -256,18 +243,15 @@ export default function App() {
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
             )}
-            <TouchableOpacity
-              style={styles.cogBtn}
-              onPress={async () => {
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowSettings(true);
-              }}>
+            <TouchableOpacity style={styles.cogBtn} onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setShowSettings(true);
+            }}>
               <Text style={styles.cogIcon}>⚙️</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Sport Tabs */}
         <View style={styles.tabsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
             {SPORTS.map(s => (
@@ -297,7 +281,6 @@ export default function App() {
             />
           }>
 
-          {/* Game Strip */}
           {games.length > 0 ? (
             <View style={styles.gameStripContainer}>
               <FlatList
@@ -310,10 +293,7 @@ export default function App() {
                     game={item}
                     isSelected={selectedGameId === item.id}
                     isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
-                    onPress={async () => {
-                      await Haptics.selectionAsync();
-                      setSelectedGameId(item.id);
-                    }}
+                    onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
                     onToggleFavorite={() => toggleFavorite(item.homeTeam)}
                   />
                 )}
@@ -325,44 +305,28 @@ export default function App() {
             <View style={styles.skeleton}>
               <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
               <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 12 }]} />
-              <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
-              
-              {/* Hidden Share Card for ViewShot */}
               <ViewShot ref={shareRef} options={{ format: 'png', quality: 1.0 }} style={styles.hiddenCard}>
-                <ShareCard
-                  gameContext={result.gameContext || 'Live Game'}
-                  rawPlay={result.rawPlay || result.playType || 'Latest Play'}
-                  simple={result.simple}
-                  whyItMatters={result.whyItMatters}
-                  sport={sport}
-                />
+                <ShareCard gameContext={result.gameContext || 'Live Game'} rawPlay={result.rawPlay || result.playType || 'Latest Play'} simple={result.simple} whyItMatters={result.whyItMatters} sport={sport} />
               </ViewShot>
 
-              {/* Game Context */}
               <LinearGradient colors={['#0a0a1a', '#050510']} style={styles.contextCard}>
                 <Text style={styles.contextGame}>{result.gameContext || 'Live Game'}</Text>
                 {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
                 <View style={styles.playPill}>
-                  <Text style={styles.playPillText} numberOfLines={3}>
-                    ▶ {result.rawPlay || result.playType || 'Latest Play'}
-                  </Text>
+                  <Text style={styles.playPillText} numberOfLines={3}>▶ {result.rawPlay || result.playType || 'Latest Play'}</Text>
                 </View>
               </LinearGradient>
 
-              {/* Explanation */}
               <View style={styles.explanationCard}>
                 {result.complexity === 'high' && (
-                  <View style={styles.complexityBadge}>
-                    <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
-                  </View>
+                  <View style={styles.complexityBadge}><Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text></View>
                 )}
                 <Text style={styles.explanationText}>{result.simple}</Text>
               </View>
 
-              {/* Why It Matters */}
               {result.whyItMatters && (
                 <View style={styles.insightCard}>
                   <Text style={styles.insightLabel}>💡 WHY IT MATTERS</Text>
@@ -370,7 +334,6 @@ export default function App() {
                 </View>
               )}
 
-              {/* Rule Detail */}
               {result.ruleDetail && result.showRule && (
                 <View style={styles.ruleCard}>
                   <Text style={styles.ruleLabel}>📜 THE RULE</Text>
@@ -378,39 +341,9 @@ export default function App() {
                 </View>
               )}
 
-              {/* Share Button */}
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
                 <Text style={styles.shareBtnText}>↑ Share The Smart Play</Text>
               </TouchableOpacity>
-
-              {/* Follow-up Chips */}
-              <View style={styles.followUpSection}>
-                <Text style={styles.followUpTitle}>Ask a follow-up</Text>
-                <View style={styles.chipsWrap}>
-                  {FOLLOW_UPS.map(q => (
-                    <TouchableOpacity
-                      key={q}
-                      style={[styles.chip, activeChip === q && styles.chipActive]}
-                      onPress={() => handleFollowUp(q)}
-                      disabled={followUpLoading}>
-                      <Text style={[styles.chipText, activeChip === q && styles.chipTextActive]}>{q}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {followUpLoading && (
-                  <View style={styles.thinkingRow}>
-                    <Text style={styles.thinkingText}>Thinking...</Text>
-                  </View>
-                )}
-
-                {followUpAnswer && (
-                  <View style={styles.answerCard}>
-                    <Text style={styles.answerHeader}>{activeChip}</Text>
-                    <Text style={styles.answerText}>{followUpAnswer}</Text>
-                  </View>
-                )}
-              </View>
             </Animated.View>
           ) : !loading ? <EmptyState sport={sport} reason="select-game" /> : null}
         </ScrollView>
@@ -420,9 +353,14 @@ export default function App() {
         visible={showSettings}
         level={level}
         autoRefresh={autoRefresh}
+        notificationsEnabled={notificationsEnabled}
         onClose={() => setShowSettings(false)}
         onLevelChange={(l) => { setLevel(l); setShowSettings(false); }}
         onAutoRefreshChange={setAutoRefresh}
+        onNotificationsToggle={async (val) => {
+          setNotificationsEnabled(val);
+          await AsyncStorage.setItem('notifications_enabled', val ? 'true' : 'false');
+        }}
       />
     </View>
   );
@@ -464,18 +402,6 @@ const styles = StyleSheet.create({
   ruleCard: { backgroundColor: '#001a0d', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#34C759', borderWidth: 1, borderColor: '#003319' },
   ruleLabel: { color: '#34C759', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   ruleText: { color: '#a0ffb8', fontSize: 15, lineHeight: 22 },
-  followUpSection: { marginTop: 8, paddingHorizontal: 16 },
-  followUpTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  chipActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
-  chipText: { color: '#888', fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: '#4488ff' },
-  thinkingRow: { marginTop: 16, alignItems: 'center' },
-  thinkingText: { color: '#444', fontSize: 13, fontStyle: 'italic' },
-  answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
-  answerHeader: { color: '#4488ff', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  answerText: { color: '#bbb', fontSize: 15, lineHeight: 23 },
   hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
   shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
