@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, StatusBar, FlatList,
   RefreshControl, Animated, Alert,
+  TextInput, KeyboardAvoidingView, Keyboard, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -82,6 +83,7 @@ export default function App() {
   const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [askText, setAskText] = useState('');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   // --- Refs ---
@@ -206,6 +208,14 @@ export default function App() {
     }
   };
 
+  const handleAsk = async () => {
+    const q = askText.trim();
+    if (!q || followUpLoading) return;
+    Keyboard.dismiss();
+    setAskText('');
+    await handleFollowUp(q); // reuse the same context-grounded path as the chips
+  };
+
 // --- Effects ---
 useEffect(() => {
   async function init() {
@@ -292,7 +302,7 @@ useEffect(() => {
   }
 
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={styles.safe}>
         {/* Header */}
@@ -332,6 +342,7 @@ useEffect(() => {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -443,6 +454,28 @@ useEffect(() => {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {/* Free-text ask box — grounded in THIS play's explanation */}
+                <View style={styles.askRow}>
+                  <TextInput
+                    style={styles.askInput}
+                    value={askText}
+                    onChangeText={setAskText}
+                    placeholder="Ask anything about this play…"
+                    placeholderTextColor="#555"
+                    returnKeyType="send"
+                    onSubmitEditing={handleAsk}
+                    editable={!followUpLoading}
+                    blurOnSubmit
+                  />
+                  <TouchableOpacity
+                    style={[styles.askSend, (!askText.trim() || followUpLoading) && styles.askSendDisabled]}
+                    onPress={handleAsk}
+                    disabled={!askText.trim() || followUpLoading}>
+                    <Text style={styles.askSendText}>↑</Text>
+                  </TouchableOpacity>
+                </View>
+
                 {followUpLoading && (
                   <View style={styles.thinkingRow}>
                     <Text style={styles.thinkingText}>Thinking...</Text>
@@ -473,7 +506,7 @@ useEffect(() => {
           await AsyncStorage.setItem('notifications_enabled', val ? 'true' : 'false');
         }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -524,6 +557,11 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
   chipText: { color: '#888', fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: '#4488ff' },
+  askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  askInput: { flex: 1, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: '#fff', fontSize: 14 },
+  askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0055ff', alignItems: 'center', justifyContent: 'center' },
+  askSendDisabled: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#222' },
+  askSendText: { color: '#fff', fontSize: 18, fontWeight: '900' },
   thinkingRow: { marginTop: 16, alignItems: 'center' },
   thinkingText: { color: '#444', fontSize: 13, fontStyle: 'italic' },
   answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
