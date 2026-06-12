@@ -19,7 +19,7 @@ import SettingsScreen from './components/SettingsScreen';
 import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
-import LaunchCinematic from './components/LaunchCinematic';
+import MorphCinematic from './components/MorphCinematic';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
@@ -64,6 +64,7 @@ export default function App() {
   // --- State ---
   const [appReady, setAppReady] = useState(false);
   const [isAnimationComplete, setAnimationComplete] = useState(false);
+  const [seenCinematic, setSeenCinematic] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -211,14 +212,16 @@ useEffect(() => {
     try {
       await SplashScreen.hideAsync();
 
-      const [onboarding, favs, notify] = await Promise.all([
+      const [onboarding, favs, notify, seenCine] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
         AsyncStorage.getItem('notifications_enabled'),
+        AsyncStorage.getItem('seen_cinematic'),
       ]);
 
       if (favs) setFavorites(JSON.parse(favs));
       if (notify !== null) setNotificationsEnabled(notify === 'true');
+      if (seenCine === 'true') setSeenCinematic(true);
 
       setAppReady(true);
 
@@ -274,10 +277,12 @@ useEffect(() => {
 
   if (!isAnimationComplete) {
     return (
-      <LaunchCinematic 
+      <MorphCinematic
+        quick={seenCinematic}
         onComplete={() => {
           setAnimationComplete(true);
-        }} 
+          AsyncStorage.setItem('seen_cinematic', 'true');
+        }}
       />
     );
   }
