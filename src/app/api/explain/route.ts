@@ -14,18 +14,39 @@ const sportContext: Record<string, string> = {
   nba: 'Basketball. Key concepts: possession, shot clock, paint, three-point line, pick and roll, fast break, turnover, foul.',
   mlb: 'Baseball. Key concepts: innings, outs, strikes, balls, bases, pitcher, batter, force out, double play, tag up.',
   nhl: 'Ice hockey. Key concepts: periods, power play, penalty kill, icing, offsides, crease, faceoff, hat trick.',
+  soccer: 'Association football (soccer). Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation.',
+  worldcup: 'World Cup soccer (association football). Key concepts: group stage, knockout round, goal, offside, penalty kick, free kick, cards, extra time, penalty shootout.',
+  rugby: 'Rugby. Key concepts: try, conversion, scrum, ruck, maul, lineout, knock-on, penalty kick, drop goal.',
 };
 
-const espnApis: Record<string, string> = {
-  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
-  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
-  nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
+// ESPN endpoint config. `core` sports are NOT on the normal scoreboard API and
+// need the two-step Core-API $ref fetch (see fetchGameData). Soccer/World Cup
+// use the normal site API with their own league slugs.
+type EspnCfg = { sport: string; league: string; core?: boolean };
+const espnConfig: Record<string, EspnCfg> = {
+  nfl: { sport: 'football', league: 'nfl' },
+  nba: { sport: 'basketball', league: 'nba' },
+  mlb: { sport: 'baseball', league: 'mlb' },
+  nhl: { sport: 'hockey', league: 'nhl' },
+  soccer: { sport: 'soccer', league: 'usa.1' },
+  worldcup: { sport: 'soccer', league: 'fifa.world' },
+  // United Rugby Championship (id 270557): ~Sept–June, the longest/widest active
+  // rugby season — chosen over Olympic 7s (282, Olympics-only), Six Nations
+  // (~5 weeks) and Premiership (267979, ~9 months) for year-round coverage.
+  rugby: { sport: 'rugby', league: '270557', core: true },
+  // NOTE: cricket intentionally omitted — ESPN's public API has no usable cricket
+  // data (site API 404s; Core API lists the sport but exposes zero leagues/events).
+  // It needs a different source (e.g. ESPNcricinfo) before it can be added here.
 };
 
-function buildSystemPrompt(sport: string, level: string): string {
+const languageNames: Record<string, string> = {
+  en: 'English', es: 'Spanish', fr: 'French', pt: 'Portuguese', de: 'German',
+  ja: 'Japanese', zh: 'Chinese', ko: 'Korean', it: 'Italian', ar: 'Arabic',
+};
+
+function buildSystemPrompt(sport: string, level: string, language: string = 'en'): string {
   const sportGuide = sportContext[sport] || 'a professional sport';
-  
+
   const levelGuides: Record<string, string> = {
     kid: `You are an enthusiastic sports commentator explaining ${sport} to an 8-year-old. 
     Rules: Use ZERO jargon. Use vivid real-world analogies. Max 2 short sentences.`,
@@ -44,7 +65,109 @@ function buildSystemPrompt(sport: string, level: string): string {
     4. If you catch yourself writing "is when" or "is a type of" — delete the entire sentence and start over.`
   };
 
-  return `${levelGuides[level] || levelGuides['beginner']}\n\nSport context: ${sportGuide}`;
+  let prompt = `${levelGuides[level] || levelGuides['beginner']}\n\nSport context: ${sportGuide}`;
+  if (language && language !== 'en') {
+    const langName = languageNames[language] || language;
+    prompt += `\n\nIMPORTANT: Write every value in the JSON response entirely in ${langName}. Translate sports terms naturally; do not output English.`;
+  }
+  return prompt;
+}
+
+// Pull current game context + the latest play text for any configured sport.
+// Site-API sports read the scoreboard (+ a summary deep-dive for MLB play-by-play
+// and soccer key events); Core-API sports (rugby) use the two-step $ref fetch.
+async function fetchGameData(sport: string, gameId?: string) {
+  let play = 'A key play just happened';
+  let gameContext = 'Live game in progress';
+  let homeTeam = '', awayTeam = '';
+
+  const cfg = espnConfig[sport];
+  if (!cfg) return { play, gameContext, homeTeam, awayTeam };
+
+  const teamName = (comp: any, side: string) =>
+    comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
+
+  try {
+    if (cfg.core) {
+      // Core API: list event $refs for today, then resolve each event.
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const evRes = await fetch(
+        `https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`,
+        { cache: 'no-store' },
+      );
+      const evData = await evRes.json();
+      const items: any[] = (evData.items || []).slice(0, 20);
+      const events = (
+        await Promise.all(
+          items.map(async (it: any) => {
+            try {
+              const r = await fetch(it.$ref, { cache: 'no-store' });
+              return await r.json();
+            } catch {
+              return null;
+            }
+          }),
+        )
+      ).filter(Boolean);
+
+      const game = gameId
+        ? events.find((e: any) => String(e.id) === String(gameId))
+        : events.find((e: any) => e.status?.type?.state === 'in') || events[0];
+      if (game) {
+        const comp = game.competitions?.[0];
+        homeTeam = teamName(comp, 'home');
+        awayTeam = teamName(comp, 'away');
+        gameContext = `${awayTeam} vs ${homeTeam} — ${game.status?.type?.shortDetail || ''}`;
+        // Core-API play-by-play sits behind further $refs; use the best cue available.
+        play = comp?.situation?.lastPlay?.text || game.status?.type?.detail || play;
+      }
+    } else {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`,
+        { cache: 'no-store' },
+      );
+      const data = await res.json();
+      const game = gameId
+        ? data?.events?.find((e: any) => e.id === gameId)
+        : data?.events?.find((e: any) => e.status?.type?.state === 'in') || data?.events?.[0];
+      if (game) {
+        const comp = game.competitions?.[0];
+        homeTeam = teamName(comp, 'home');
+        awayTeam = teamName(comp, 'away');
+        play = comp?.situation?.lastPlay?.text || comp?.lastPlay?.text || play;
+        gameContext = `${awayTeam} vs ${homeTeam} — ${game.status?.type?.shortDetail || ''}`;
+
+        // MLB deep dive for play-by-play text.
+        if (sport === 'mlb' && game.id) {
+          const sumRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${game.id}`,
+            { cache: 'no-store' },
+          );
+          const sum = await sumRes.json();
+          const lastReal = sum?.plays?.reverse().find(
+            (p: any) => p.text && !p.text.toLowerCase().includes('inning'),
+          );
+          if (lastReal) play = lastReal.text;
+        }
+
+        // Soccer / World Cup: no plays[] array — use the latest key event / commentary.
+        if ((sport === 'soccer' || sport === 'worldcup') && game.id) {
+          const sumRes = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`,
+            { cache: 'no-store' },
+          );
+          const sum = await sumRes.json();
+          const ke: any[] = sum?.keyEvents || [];
+          const comm: any[] = sum?.commentary || [];
+          play = ke[ke.length - 1]?.text || comm[comm.length - 1]?.text || play;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Data fetch error:', e);
+  }
+
+  return { play, gameContext, homeTeam, awayTeam };
 }
 
 function buildUserPrompt(play: string, gameContext: string, sport: string, level: string): string {
@@ -75,14 +198,16 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sport = 'nfl', level = 'beginner', action, question, context, gameId } = body;
+    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en' } = body;
 
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
+      const langName = languageNames[language] || 'English';
+      const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
       const completion = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: `Helpful sports expert. Level: ${level}. Answer clearly and concisely in 2-3 sentences.` },
+          { role: 'system', content: `Helpful sports expert. Level: ${level}.${langLine} Answer clearly and concisely in 2-3 sentences.` },
           { role: 'user', content: `Context: ${context}\nQuestion: ${question}` }
         ],
         temperature: 0.7,
@@ -90,43 +215,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ answer: completion.choices[0]?.message?.content?.trim() }, { headers: corsHeaders });
     }
 
-    // Fetch ESPN Data
-    let play = 'A key play just happened';
-    let gameContext = 'Live game in progress';
-    let homeTeam = '', awayTeam = '';
-
-    const espnUrl = espnApis[sport];
-    if (espnUrl) {
-      try {
-        const espnRes = await fetch(espnUrl, { cache: 'no-store' });
-        const espnData = await espnRes.json();
-        const liveGame = gameId 
-          ? espnData?.events?.find((e: any) => e.id === gameId)
-          : espnData?.events?.find((e: any) => e.status?.type?.state === 'in') || espnData?.events?.[0];
-
-        if (liveGame) {
-          const comp = liveGame.competitions?.[0];
-          homeTeam = comp?.competitors?.find((c: any) => c.homeAway === 'home')?.team?.displayName || '';
-          awayTeam = comp?.competitors?.find((c: any) => c.homeAway === 'away')?.team?.displayName || '';
-          play = comp?.situation?.lastPlay?.text || comp?.lastPlay?.text || play;
-          gameContext = `${awayTeam} vs ${homeTeam} — ${liveGame.status?.type?.shortDetail || ''}`;
-          
-          // MLB Deep Dive for play-by-play
-          if (sport === 'mlb' && liveGame.id) {
-            const mlbRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${liveGame.id}`, { cache: 'no-store' });
-            const mlbData = await mlbRes.json();
-            const lastReal = mlbData?.plays?.reverse().find((p: any) => p.text && !p.text.toLowerCase().includes('inning'));
-            if (lastReal) play = lastReal.text;
-          }
-        }
-      } catch (e) { console.error('Data fetch error:', e); }
-    }
+    // Fetch live game context + latest play for the requested sport.
+    const { play, gameContext, homeTeam, awayTeam } = await fetchGameData(sport, gameId);
 
     // AI Generation
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: buildSystemPrompt(sport, level) },
+        { role: 'system', content: buildSystemPrompt(sport, level, language) },
         { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) }
       ],
       temperature: level === 'expert' ? 0.2 : 0.6,
