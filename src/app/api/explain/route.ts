@@ -180,17 +180,41 @@ Respond with this exact JSON structure:
   "simple": "Main explanation/analysis",
   "whyItMatters": "Situational significance",
   "ruleDetail": "Explanation of the rule involved (or empty string if none)",
-  "playSummary": "A short, faithful one-line restatement of the play (max ~10 words)",
   "showRule": true/false,
   "complexity": "low" | "medium" | "high"
 }
 
 Rules for JSON flags:
-- "playSummary": Restate ONLY what the play data says, concisely. Do not add or invent details.
 - "showRule": Set to true ONLY if the play involves a specific rule that needs explaining (penalties, unusual calls, rare mechanics).
 - "showRule": If level is "expert", always set to false unless the rule is extremely obscure.
 - "complexity": "high" if the play is rare or very difficult to understand. "low" for routine plays.
 - ONLY use information provided in the play data. Do not hallucinate details.`;
+}
+
+// playType is raw ESPN text, so it never passes through the explanation prompt.
+// Translate it directly (deterministic) rather than relying on the model to echo
+// a translated copy inside its JSON — which it drops unreliably. Returns null for
+// English (and on any failure) so the caller keeps the raw ESPN text.
+async function translatePlayText(play: string, language: string): Promise<string | null> {
+  if (!language || language === 'en' || !play) return null;
+  const langName = languageNames[language] || language;
+  try {
+    const c = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `Translate the sports play description into ${langName}. Keep player names, team names, and numbers exactly as given. Output ONLY the translation — no quotes, no notes.`,
+        },
+        { role: 'user', content: play },
+      ],
+      temperature: 0,
+    });
+    return c.choices[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error('Play translation error:', e);
+    return null;
+  }
 }
 
 export async function OPTIONS() {
@@ -220,16 +244,20 @@ export async function POST(req: NextRequest) {
     // Fetch live game context + latest play for the requested sport.
     const { play, gameContext, homeTeam, awayTeam } = await fetchGameData(sport, gameId);
 
-    // AI Generation
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: buildSystemPrompt(sport, level, language) },
-        { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) }
-      ],
-      temperature: level === 'expert' ? 0.2 : 0.6,
-      response_format: { type: 'json_object' },
-    });
+    // Run the explanation and the play-text translation concurrently (the
+    // translation only needs `play`, already fetched) — no added latency.
+    const [completion, translatedPlay] = await Promise.all([
+      groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: buildSystemPrompt(sport, level, language) },
+          { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) }
+        ],
+        temperature: level === 'expert' ? 0.2 : 0.6,
+        response_format: { type: 'json_object' },
+      }),
+      translatePlayText(play, language),
+    ]);
 
     const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
 
@@ -246,14 +274,13 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      simple: parsed.simple || (language !== 'en' && parsed.playSummary) || play,
+      simple: parsed.simple || play,
       whyItMatters: parsed.whyItMatters || '',
       ruleDetail: parsed.ruleDetail || '',
       showRule: parsed.showRule ?? (level !== 'expert'),
       complexity: parsed.complexity || 'low',
-      // For non-English, use the LLM's translated restatement; English keeps the
-      // raw ESPN play text unchanged. (`play` is raw ESPN data, never translated.)
-      playType: language !== 'en' && parsed.playSummary ? parsed.playSummary : play,
+      // Raw ESPN play text, translated directly for non-English; English keeps it as-is.
+      playType: translatedPlay || play,
       homeTeam,
       awayTeam,
       gameContext
