@@ -196,7 +196,11 @@ Rules for JSON flags:
 // a translated copy inside its JSON — which it drops unreliably. Returns null for
 // English (and on any failure) so the caller keeps the raw ESPN text.
 async function translatePlayText(play: string, language: string): Promise<string | null> {
-  if (!language || language === 'en' || !play) return null;
+  console.log(`[translatePlayText] TEMP-DEBUG called: language=${language} play=${JSON.stringify(play)}`);
+  if (!language || language === 'en' || !play) {
+    console.log('[translatePlayText] TEMP-DEBUG skipped (english or empty play)');
+    return null;
+  }
   const langName = languageNames[language] || language;
   try {
     const c = await groq.chat.completions.create({
@@ -210,9 +214,11 @@ async function translatePlayText(play: string, language: string): Promise<string
       ],
       temperature: 0,
     });
-    return c.choices[0]?.message?.content?.trim() || null;
-  } catch (e) {
-    console.error('Play translation error:', e);
+    const out = c.choices[0]?.message?.content?.trim() || null;
+    console.log(`[translatePlayText] TEMP-DEBUG result=${JSON.stringify(out)}`);
+    return out;
+  } catch (e: any) {
+    console.error('[translatePlayText] TEMP-DEBUG ERROR:', e?.status, e?.message, e);
     return null;
   }
 }
@@ -224,7 +230,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en' } = body;
+    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', debug } = body;
 
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
@@ -283,7 +289,9 @@ export async function POST(req: NextRequest) {
       playType: translatedPlay || play,
       homeTeam,
       awayTeam,
-      gameContext
+      gameContext,
+      // TEMP-DEBUG: remove once playType translation is confirmed.
+      ...(debug ? { _debug: { language, rawPlay: play, translatedPlay } } : {}),
     }, { headers: corsHeaders });
 
   } catch (error) {
