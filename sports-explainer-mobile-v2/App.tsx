@@ -21,10 +21,10 @@ import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
 import MorphCinematic from './components/MorphCinematic';
-import PlaysSheet from './components/PlaysSheet';
+import PastPlays from './components/PastPlays';
 
 // Libs
-import { fetchExplanation, askQuestion, fetchPlays, Sport, Level, Language, Play, ExplanationResponse } from './lib/api';
+import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
 import { useTheme, Theme } from './lib/theme';
 import { SPORT_FAQS } from './lib/faqs';
@@ -93,11 +93,6 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  // Past plays
-  const [plays, setPlays] = useState<Play[]>([]);
-  const [playsLoading, setPlaysLoading] = useState(false);
-  const [playsOpen, setPlaysOpen] = useState(false);
-  const [selectedPlay, setSelectedPlay] = useState<Play | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeChip, setActiveChip] = useState<string | null>(null);
@@ -224,7 +219,7 @@ export default function App() {
     setFollowUpAnswer(null);
     setActiveChip(null);
     try {
-      const data = await fetchExplanation(sport, level, selectedGameId, language, selectedPlay?.text);
+      const data = await fetchExplanation(sport, level, selectedGameId, language);
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       fadeIn();
@@ -234,7 +229,7 @@ export default function App() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sport, level, selectedGameId, language, selectedPlay]);
+  }, [sport, level, selectedGameId, language]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -243,30 +238,6 @@ export default function App() {
     setSelectedGameId(null);
     setResult(null);
     setGames([]);
-    setSelectedPlay(null);
-    setPlays([]);
-  };
-
-  // Lazily load the play-by-play list, then open the sheet.
-  const openPlays = async () => {
-    if (!selectedGameId) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPlaysOpen(true);
-    setPlaysLoading(true);
-    try {
-      setPlays(await fetchPlays(sport, selectedGameId));
-    } catch {
-      setPlays([]);
-    } finally {
-      setPlaysLoading(false);
-    }
-  };
-
-  // Pick a past play → the explanation effect re-runs with this play's text.
-  const selectPlay = async (p: Play) => {
-    await Haptics.selectionAsync();
-    setPlaysOpen(false);
-    setSelectedPlay(p);
   };
 
   const toggleFavorite = async (teamAbbr: string) => {
@@ -384,7 +355,7 @@ useEffect(() => {
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const gameId = response.notification.request.content.data?.gameId as string | undefined;
-      if (gameId) { setSelectedGameId(gameId); setSelectedPlay(null); }
+      if (gameId) { setSelectedGameId(gameId); }
     });
   });
 
@@ -395,18 +366,16 @@ useEffect(() => {
 }, [onboardingComplete, notificationsEnabled]);
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
-  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language, selectedPlay]);
+  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
 
   useEffect(() => {
     if (autoRefresh) {
-      // While viewing a past play, keep refreshing the games strip but don't
-      // override the explanation (the chosen play stays put).
-      autoRefreshRef.current = setInterval(() => { fetchGames(); if (!selectedPlay) handleFetch(true); }, 60000);
+      autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [autoRefresh, sport, level, selectedGameId, language, selectedPlay]);
+  }, [autoRefresh, sport, level, selectedGameId, language]);
 
   // --- Conditional Returns (The Gatekeepers) ---
   if (!appReady || onboardingComplete === null) return null;
@@ -496,7 +465,7 @@ useEffect(() => {
                     game={item}
                     isSelected={selectedGameId === item.id}
                     isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
-                    onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); setSelectedPlay(null); setPlays([]); }}
+                    onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
                     onToggleFavorite={() => {
                       const game = games.find(g => g.id === item.id);
                       if (!game) return;
@@ -538,14 +507,7 @@ useEffect(() => {
                 <Text style={styles.explanationLabel}>🎙️ {S.thePlay}</Text>
                 <View style={styles.explanationHeader}>
                   <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || S.latestPlay}</Text>
-                  {selectedPlay ? (
-                    <View style={styles.pastPlayRow}>
-                      <View style={styles.pastPlayBadge}><Text style={styles.pastPlayBadgeText}>⏪ PAST PLAY</Text></View>
-                      <TouchableOpacity onPress={() => setSelectedPlay(null)}>
-                        <Text style={styles.backToLatest}>↩ Back to latest</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (lastUpdated && <Text style={styles.contextTime}>{S.updated} {lastUpdated}</Text>)}
+                  {lastUpdated && <Text style={styles.contextTime}>{S.updated} {lastUpdated}</Text>}
                 </View>
                 {result.complexity === 'high' && (
                   <View style={styles.complexityBadge}>
@@ -571,10 +533,14 @@ useEffect(() => {
                 </View>
               )}
 
-              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba') && (
-                <TouchableOpacity style={styles.pbpBtn} onPress={openPlays}>
-                  <Text style={styles.pbpBtnText}>⏪ {S.playByPlay}</Text>
-                </TouchableOpacity>
+              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba') && selectedGameId && (
+                <PastPlays
+                  key={`${sport}-${selectedGameId}-${language}-${level}`}
+                  sport={sport}
+                  gameId={selectedGameId}
+                  level={level}
+                  language={language}
+                />
               )}
 
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
@@ -672,14 +638,6 @@ useEffect(() => {
         </ScrollView>
       </SafeAreaView>
 
-      <PlaysSheet
-        visible={playsOpen}
-        plays={plays}
-        loading={playsLoading}
-        onClose={() => setPlaysOpen(false)}
-        onSelect={selectPlay}
-      />
-
       <SettingsScreen
         visible={showSettings}
         level={level}
@@ -740,12 +698,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
   shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
-  pbpBtn: { marginHorizontal: 16, marginBottom: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  pbpBtnText: { color: t.accentText, fontSize: 15, fontWeight: '700' },
-  pastPlayRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pastPlayBadge: { backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.accent, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  pastPlayBadgeText: { color: t.accentText, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  backToLatest: { color: t.accentText, fontSize: 12, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
   complexityText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   faqSection: { marginHorizontal: 16, marginTop: 4, marginBottom: 12, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },

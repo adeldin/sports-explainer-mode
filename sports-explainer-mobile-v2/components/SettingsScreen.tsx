@@ -141,11 +141,12 @@ export default function SettingsScreen({
             <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secPreferences}</Text>
 
             <View style={styles.toggleRow}>
-              <View>
+              <View style={styles.toggleInfo}>
                 <Text style={styles.toggleLabel}>{S.autoRefresh}</Text>
                 <Text style={styles.toggleDesc}>{S.autoRefreshDesc}</Text>
               </View>
               <Switch
+                style={styles.toggleSwitch}
                 value={autoRefresh}
                 onValueChange={onAutoRefreshChange}
                 trackColor={{ false: theme.borderStrong, true: theme.accent }}
@@ -154,11 +155,12 @@ export default function SettingsScreen({
             </View>
 
             <View style={[styles.toggleRow, { marginTop: 12 }]}>
-              <View>
+              <View style={styles.toggleInfo}>
                 <Text style={styles.toggleLabel}>{S.gameAlerts}</Text>
                 <Text style={styles.toggleDesc}>{S.gameAlertsDesc}</Text>
               </View>
               <Switch
+                style={styles.toggleSwitch}
                 value={notificationsEnabled}
                 onValueChange={onNotificationsToggle}
                 trackColor={{ false: theme.borderStrong, true: theme.accent }}
@@ -203,6 +205,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   langText: { color: t.textSecondary, fontSize: 14, fontWeight: '600' },
   langTextActive: { color: t.accentText },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border },
+  // Label takes remaining width (wraps) so a long string can't push the Switch off-screen.
+  toggleInfo: { flex: 1, paddingRight: 12 },
+  toggleSwitch: { flexShrink: 0 },
   toggleLabel: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   toggleDesc: { color: t.textSecondary, fontSize: 12, marginTop: 2 },
   versionBox: { marginTop: 40, alignItems: 'center', gap: 4 },

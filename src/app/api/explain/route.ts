@@ -230,6 +230,39 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText } = body;
 
+    // Batch-translate a list of raw ESPN play descriptions (the play-by-play
+    // list). Deterministic, one call for the whole list. Returns the input
+    // unchanged for English or on any failure so the client keeps the raw text.
+    if (action === 'translate') {
+      const texts: string[] = Array.isArray(body.texts) ? body.texts.map((t: unknown) => String(t ?? '')) : [];
+      if (!language || language === 'en' || texts.length === 0) {
+        return NextResponse.json({ translations: texts }, { headers: corsHeaders });
+      }
+      const langName = languageNames[language] || language;
+      try {
+        const c = await groq.chat.completions.create({
+          model: GROQ_MODEL,
+          messages: [
+            {
+              role: 'system',
+              content: `Translate each sports play description into ${langName}. Keep player names, team names, and numbers exactly as given. Respond with JSON {"translations": [...]} containing EXACTLY ${texts.length} strings, in the same order as the input. Do not add, drop, merge, or reorder items.`,
+            },
+            { role: 'user', content: JSON.stringify(texts) },
+          ],
+          temperature: 0,
+          response_format: { type: 'json_object' },
+        });
+        const parsed = JSON.parse(c.choices[0]?.message?.content || '{}');
+        const out = parsed.translations;
+        // Length must match or the list/translation rows would misalign — fall back.
+        const safe = Array.isArray(out) && out.length === texts.length ? out.map((t: unknown) => String(t ?? '')) : texts;
+        return NextResponse.json({ translations: safe }, { headers: corsHeaders });
+      } catch (e) {
+        console.error('Play list translation error:', e);
+        return NextResponse.json({ translations: texts }, { headers: corsHeaders });
+      }
+    }
+
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
       const langName = languageNames[language] || 'English';

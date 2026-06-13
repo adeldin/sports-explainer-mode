@@ -8,7 +8,7 @@ export interface UIStrings {
   // explanation card
   thePlay: string; whyItMatters: string; theRule: string; complexPlay: string; updated: string; latestPlay: string;
   // past plays
-  playByPlay: string; loadMore: string; noPlays: string; showMore: string; showLess: string;
+  playByPlay: string; loadMore: string; noPlays: string; showMore: string; showLess: string; pbpHint: string;
   // follow-up + ask
   askFollowUp: string; fuWhy: string; fuRule: string; fuNew: string; fuNext: string;
   share: string; askPlaceholder: string; thinking: string; answerError: string;
@@ -34,7 +34,7 @@ export interface UIStrings {
 export const UI_STRINGS: Record<Language, UIStrings> = {
   en: {
     thePlay: `THE PLAY`, whyItMatters: `WHY IT MATTERS`, theRule: `THE RULE`, complexPlay: `COMPLEX PLAY`, updated: `Updated`, latestPlay: `Latest Play`,
-    playByPlay: `Play-by-Play`, loadMore: `Load more`, noPlays: `No play-by-play available for this game yet.`, showMore: `Show more`, showLess: `Show less`,
+    playByPlay: `Play-by-Play`, loadMore: `Load more`, noPlays: `No play-by-play available for this game yet.`, showMore: `Show more`, showLess: `Show less`, pbpHint: `Tap any play to explain it · ● scoring play`,
     askFollowUp: `Ask a follow-up`, fuWhy: `Why did that matter?`, fuRule: `Explain the rule`, fuNew: `Explain like I'm new`, fuNext: `What to watch for next?`,
     share: `Share The Smart Play`, askPlaceholder: `Ask anything about this play…`, thinking: `Thinking…`, answerError: `Could not get an answer. Try again.`,
     favTitle: `Favorite a Team`, favMsg: `Which team do you want to follow?`, cancel: `Cancel`,
@@ -53,7 +53,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   es: {
     thePlay: `LA JUGADA`, whyItMatters: `POR QUÉ IMPORTA`, theRule: `LA REGLA`, complexPlay: `JUGADA COMPLEJA`, updated: `Actualizado`, latestPlay: `Última jugada`,
-    playByPlay: `Jugada a jugada`, loadMore: `Cargar más`, noPlays: `Aún no hay jugada a jugada para este partido.`, showMore: `Ver más`, showLess: `Ver menos`,
+    playByPlay: `Jugada a jugada`, loadMore: `Cargar más`, noPlays: `Aún no hay jugada a jugada para este partido.`, showMore: `Ver más`, showLess: `Ver menos`, pbpHint: `Toca cualquier jugada para explicarla · ● jugada de anotación`,
     askFollowUp: `Haz una pregunta de seguimiento`, fuWhy: `¿Por qué importó eso?`, fuRule: `Explica la regla`, fuNew: `Explícamelo como si fuera nuevo`, fuNext: `¿Qué viene ahora?`,
     share: `Compartir La Jugada Inteligente`, askPlaceholder: `Pregunta lo que quieras sobre esta jugada…`, thinking: `Pensando…`, answerError: `No se pudo obtener una respuesta. Inténtalo de nuevo.`,
     favTitle: `Marcar un equipo`, favMsg: `¿A qué equipo quieres seguir?`, cancel: `Cancelar`,
@@ -72,7 +72,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   fr: {
     thePlay: `L'ACTION`, whyItMatters: `POURQUOI C'EST IMPORTANT`, theRule: `LA RÈGLE`, complexPlay: `ACTION COMPLEXE`, updated: `Mis à jour`, latestPlay: `Dernière action`,
-    playByPlay: `Action par action`, loadMore: `Charger plus`, noPlays: `Pas encore d'action par action pour ce match.`, showMore: `Voir plus`, showLess: `Voir moins`,
+    playByPlay: `Action par action`, loadMore: `Charger plus`, noPlays: `Pas encore d'action par action pour ce match.`, showMore: `Voir plus`, showLess: `Voir moins`, pbpHint: `Touchez une action pour l'expliquer · ● action décisive`,
     askFollowUp: `Poser une question`, fuWhy: `Pourquoi est-ce important ?`, fuRule: `Explique la règle`, fuNew: `Explique comme à un débutant`, fuNext: `Que faut-il surveiller ?`,
     share: `Partager Le Smart Play`, askPlaceholder: `Pose une question sur cette action…`, thinking: `Réflexion…`, answerError: `Impossible d'obtenir une réponse. Réessaie.`,
     favTitle: `Suivre une équipe`, favMsg: `Quelle équipe veux-tu suivre ?`, cancel: `Annuler`,
@@ -91,7 +91,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   pt: {
     thePlay: `A JOGADA`, whyItMatters: `POR QUE IMPORTA`, theRule: `A REGRA`, complexPlay: `JOGADA COMPLEXA`, updated: `Atualizado`, latestPlay: `Última jogada`,
-    playByPlay: `Lance a lance`, loadMore: `Carregar mais`, noPlays: `Ainda não há lance a lance para este jogo.`, showMore: `Mostrar mais`, showLess: `Mostrar menos`,
+    playByPlay: `Lance a lance`, loadMore: `Carregar mais`, noPlays: `Ainda não há lance a lance para este jogo.`, showMore: `Mostrar mais`, showLess: `Mostrar menos`, pbpHint: `Toque em qualquer jogada para explicá-la · ● jogada de pontuação`,
     askFollowUp: `Faça uma pergunta`, fuWhy: `Por que isso importou?`, fuRule: `Explique a regra`, fuNew: `Explique como se eu fosse novo`, fuNext: `O que observar a seguir?`,
     share: `Compartilhar A Jogada Inteligente`, askPlaceholder: `Pergunte qualquer coisa sobre esta jogada…`, thinking: `Pensando…`, answerError: `Não foi possível obter uma resposta. Tente novamente.`,
     favTitle: `Favoritar um time`, favMsg: `Qual time você quer seguir?`, cancel: `Cancelar`,
@@ -110,7 +110,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   de: {
     thePlay: `DER SPIELZUG`, whyItMatters: `WARUM ES ZÄHLT`, theRule: `DIE REGEL`, complexPlay: `KOMPLEXER SPIELZUG`, updated: `Aktualisiert`, latestPlay: `Letzter Spielzug`,
-    playByPlay: `Zug für Zug`, loadMore: `Mehr laden`, noPlays: `Für dieses Spiel ist noch kein Zug-für-Zug verfügbar.`, showMore: `Mehr anzeigen`, showLess: `Weniger anzeigen`,
+    playByPlay: `Zug für Zug`, loadMore: `Mehr laden`, noPlays: `Für dieses Spiel ist noch kein Zug-für-Zug verfügbar.`, showMore: `Mehr anzeigen`, showLess: `Weniger anzeigen`, pbpHint: `Tippe auf einen Spielzug für die Erklärung · ● Punktespielzug`,
     askFollowUp: `Stell eine Nachfrage`, fuWhy: `Warum war das wichtig?`, fuRule: `Erkläre die Regel`, fuNew: `Erkläre es für Einsteiger`, fuNext: `Worauf sollte ich als Nächstes achten?`,
     share: `The Smart Play teilen`, askPlaceholder: `Frag alles zu diesem Spielzug…`, thinking: `Denkt nach…`, answerError: `Antwort konnte nicht geladen werden. Versuch es erneut.`,
     favTitle: `Team favorisieren`, favMsg: `Welchem Team möchtest du folgen?`, cancel: `Abbrechen`,
@@ -129,7 +129,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   it: {
     thePlay: `L'AZIONE`, whyItMatters: `PERCHÉ CONTA`, theRule: `LA REGOLA`, complexPlay: `AZIONE COMPLESSA`, updated: `Aggiornato`, latestPlay: `Ultima azione`,
-    playByPlay: `Azione per azione`, loadMore: `Carica altro`, noPlays: `Non c'è ancora l'azione per azione per questa partita.`, showMore: `Mostra altro`, showLess: `Mostra meno`,
+    playByPlay: `Azione per azione`, loadMore: `Carica altro`, noPlays: `Non c'è ancora l'azione per azione per questa partita.`, showMore: `Mostra altro`, showLess: `Mostra meno`, pbpHint: `Tocca un'azione per spiegarla · ● azione da punto`,
     askFollowUp: `Fai una domanda`, fuWhy: `Perché è stato importante?`, fuRule: `Spiega la regola`, fuNew: `Spiegamelo come a un principiante`, fuNext: `Cosa guardare adesso?`,
     share: `Condividi The Smart Play`, askPlaceholder: `Chiedi qualsiasi cosa su questa azione…`, thinking: `Sto pensando…`, answerError: `Impossibile ottenere una risposta. Riprova.`,
     favTitle: `Aggiungi una squadra`, favMsg: `Quale squadra vuoi seguire?`, cancel: `Annulla`,
@@ -148,7 +148,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ja: {
     thePlay: `プレー`, whyItMatters: `なぜ重要か`, theRule: `ルール`, complexPlay: `複雑なプレー`, updated: `更新`, latestPlay: `最新のプレー`,
-    playByPlay: `プレーバイプレー`, loadMore: `もっと見る`, noPlays: `この試合のプレーバイプレーはまだありません。`, showMore: `もっと見る`, showLess: `閉じる`,
+    playByPlay: `プレーバイプレー`, loadMore: `もっと見る`, noPlays: `この試合のプレーバイプレーはまだありません。`, showMore: `もっと見る`, showLess: `閉じる`, pbpHint: `プレーをタップして解説 · ● 得点プレー`,
     askFollowUp: `追加で質問する`, fuWhy: `なぜ重要だったの？`, fuRule: `ルールを説明して`, fuNew: `初心者向けに説明して`, fuNext: `次は何に注目すればいい？`,
     share: `The Smart Play を共有`, askPlaceholder: `このプレーについて何でも質問…`, thinking: `考え中…`, answerError: `回答を取得できませんでした。もう一度お試しください。`,
     favTitle: `チームをお気に入りに`, favMsg: `どのチームをフォローしますか？`, cancel: `キャンセル`,
@@ -167,7 +167,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   zh: {
     thePlay: `这次进攻`, whyItMatters: `为什么重要`, theRule: `规则`, complexPlay: `复杂战术`, updated: `已更新`, latestPlay: `最新进攻`,
-    playByPlay: `逐回合`, loadMore: `加载更多`, noPlays: `本场比赛暂无逐回合记录。`, showMore: `显示更多`, showLess: `收起`,
+    playByPlay: `逐回合`, loadMore: `加载更多`, noPlays: `本场比赛暂无逐回合记录。`, showMore: `显示更多`, showLess: `收起`, pbpHint: `点按任意回合查看解说 · ● 得分回合`,
     askFollowUp: `继续追问`, fuWhy: `这为什么重要？`, fuRule: `解释一下规则`, fuNew: `像对新手一样解释`, fuNext: `接下来该看什么？`,
     share: `分享 The Smart Play`, askPlaceholder: `关于这次进攻，随便问…`, thinking: `思考中…`, answerError: `无法获取答案，请重试。`,
     favTitle: `收藏球队`, favMsg: `你想关注哪支球队？`, cancel: `取消`,
@@ -186,7 +186,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ko: {
     thePlay: `플레이`, whyItMatters: `왜 중요한가`, theRule: `규칙`, complexPlay: `복잡한 플레이`, updated: `업데이트됨`, latestPlay: `최신 플레이`,
-    playByPlay: `플레이별 기록`, loadMore: `더 보기`, noPlays: `이 경기의 플레이별 기록이 아직 없습니다.`, showMore: `더 보기`, showLess: `접기`,
+    playByPlay: `플레이별 기록`, loadMore: `더 보기`, noPlays: `이 경기의 플레이별 기록이 아직 없습니다.`, showMore: `더 보기`, showLess: `접기`, pbpHint: `플레이를 탭하면 설명이 나와요 · ● 득점 플레이`,
     askFollowUp: `추가 질문하기`, fuWhy: `그게 왜 중요했나요?`, fuRule: `규칙을 설명해 줘`, fuNew: `초보자처럼 설명해 줘`, fuNext: `다음엔 무엇을 봐야 하나요?`,
     share: `The Smart Play 공유`, askPlaceholder: `이 플레이에 대해 무엇이든 물어보세요…`, thinking: `생각 중…`, answerError: `답변을 가져오지 못했습니다. 다시 시도하세요.`,
     favTitle: `팀 즐겨찾기`, favMsg: `어느 팀을 팔로우할까요?`, cancel: `취소`,
@@ -205,7 +205,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ar: {
     thePlay: `اللعبة`, whyItMatters: `لماذا تهم`, theRule: `القاعدة`, complexPlay: `لعبة معقدة`, updated: `تم التحديث`, latestPlay: `آخر لعبة`,
-    playByPlay: `لعبة بلعبة`, loadMore: `تحميل المزيد`, noPlays: `لا يتوفر بعد سرد لعبة بلعبة لهذه المباراة.`, showMore: `عرض المزيد`, showLess: `عرض أقل`,
+    playByPlay: `لعبة بلعبة`, loadMore: `تحميل المزيد`, noPlays: `لا يتوفر بعد سرد لعبة بلعبة لهذه المباراة.`, showMore: `عرض المزيد`, showLess: `عرض أقل`, pbpHint: `اضغط على أي لعبة لشرحها · ● لعبة تسجيل`,
     askFollowUp: `اطرح سؤالاً للمتابعة`, fuWhy: `لماذا كان ذلك مهماً؟`, fuRule: `اشرح القاعدة`, fuNew: `اشرح لي وكأنني مبتدئ`, fuNext: `ما الذي يجب أن أنتبه له تالياً؟`,
     share: `مشاركة The Smart Play`, askPlaceholder: `اسأل أي شيء عن هذه اللعبة…`, thinking: `جارٍ التفكير…`, answerError: `تعذّر الحصول على إجابة. حاول مرة أخرى.`,
     favTitle: `إضافة فريق للمفضلة`, favMsg: `أي فريق تريد متابعته؟`, cancel: `إلغاء`,

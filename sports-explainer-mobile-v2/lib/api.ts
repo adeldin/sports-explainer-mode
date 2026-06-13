@@ -77,7 +77,27 @@ export async function fetchPlays(sport: Sport, gameId: string): Promise<Play[]> 
     ].filter(Boolean).join(' ');
     plays.push({ id: String(p.id ?? plays.length), text, period, scoring: !!p.scoringPlay });
   }
-  return plays.reverse(); // most recent first
+  // Most recent first, capped — the UI shows 30 with a "Load more" up to this cap.
+  return plays.reverse().slice(0, 50);
+}
+
+// Batch-translate the (English) play list into `language`. Returns the input
+// unchanged for English or on any failure, so callers always get a usable list.
+export async function translatePlays(texts: string[], language: Language): Promise<string[]> {
+  if (language === 'en' || texts.length === 0) return texts;
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'translate', texts, language }),
+    });
+    if (!response.ok) return texts;
+    const data = await response.json();
+    const out = data?.translations;
+    return Array.isArray(out) && out.length === texts.length ? out : texts;
+  } catch {
+    return texts;
+  }
 }
 
 export async function askQuestion(
