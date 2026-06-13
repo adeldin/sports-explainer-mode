@@ -65,6 +65,8 @@ interface Game {
   awayTeam: string;
   homeScore: string;
   awayScore: string;
+  homeLogo?: string;
+  awayLogo?: string;
   status: string;
   isLive: boolean;
   sport: string;
@@ -124,6 +126,9 @@ export default function App() {
       if (s == null) return '0';
       return typeof s === 'object' ? String(s.displayValue ?? s.value ?? '0') : String(s);
     };
+    // Site API gives team.logo (a URL); Core API (rugby) gives team.logos[].href.
+    const logoOf = (c: any): string | undefined =>
+      c?.team?.logo || c?.team?.logos?.[0]?.href || undefined;
     const toGame = (e: any): Game => {
       const comp = e.competitions?.[0];
       const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
@@ -134,6 +139,8 @@ export default function App() {
         awayTeam: teamName(away),
         homeScore: scoreOf(home),
         awayScore: scoreOf(away),
+        homeLogo: logoOf(home),
+        awayLogo: logoOf(away),
         status: e.status?.type?.shortDetail || '',
         isLive: e.status?.type?.state === 'in',
         sport,

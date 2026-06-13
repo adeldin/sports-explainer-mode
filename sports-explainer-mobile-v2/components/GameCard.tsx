@@ -1,4 +1,4 @@
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons'; // Added for the star
 
@@ -8,6 +8,8 @@ interface Game {
   awayTeam: string;
   homeScore: string;
   awayScore: string;
+  homeLogo?: string;
+  awayLogo?: string;
   status: string;
   isLive: boolean;
   sport: string;
@@ -71,11 +73,21 @@ export default function GameCard({ game, isSelected, isFavorite, onPress, onTogg
         {/* Teams + Scores */}
         <View style={styles.matchup}>
           <View style={styles.teamRow}>
-            <Text style={styles.teamName} numberOfLines={1}>{game.awayTeam}</Text>
+            <View style={styles.teamLeft}>
+              {game.awayLogo ? (
+                <Image source={{ uri: game.awayLogo }} style={styles.logo} resizeMode="contain" />
+              ) : null}
+              <Text style={styles.teamName} numberOfLines={1}>{game.awayTeam}</Text>
+            </View>
             <Text style={styles.score}>{game.awayScore}</Text>
           </View>
           <View style={styles.teamRow}>
-            <Text style={styles.teamName} numberOfLines={1}>{game.homeTeam}</Text>
+            <View style={styles.teamLeft}>
+              {game.homeLogo ? (
+                <Image source={{ uri: game.homeLogo }} style={styles.logo} resizeMode="contain" />
+              ) : null}
+              <Text style={styles.teamName} numberOfLines={1}>{game.homeTeam}</Text>
+            </View>
             <Text style={styles.score}>{game.homeScore}</Text>
           </View>
         </View>
@@ -137,12 +149,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  teamLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+    marginRight: 8,
+  },
+  logo: {
+    width: 24,
+    height: 24,
+  },
   teamName: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
-    marginRight: 8,
   },
   score: {
     color: '#fff',
