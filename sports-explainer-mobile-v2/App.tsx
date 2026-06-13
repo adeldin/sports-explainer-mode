@@ -26,6 +26,7 @@ import MorphCinematic from './components/MorphCinematic';
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
 import { useTheme, Theme } from './lib/theme';
+import { SPORT_FAQS } from './lib/faqs';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
@@ -98,6 +99,13 @@ export default function App() {
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [askText, setAskText] = useState('');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // --- FAQ (per-sport common questions) ---
+  const [faqSectionOpen, setFaqSectionOpen] = useState(false); // collapsed by default
+  const [activeFaq, setActiveFaq] = useState<string | null>(null);
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
+  const [faqExpanded, setFaqExpanded] = useState(false);
 
   // --- Theme ---
   const { theme } = useTheme();
@@ -274,6 +282,24 @@ export default function App() {
     await handleFollowUp(q); // reuse the same context-grounded path as the chips
   };
 
+  // FAQ rows ask without play context — the questions are self-contained, and
+  // sport/level/language still drive a correct, level-appropriate answer.
+  const toggleFaq = async (question: string) => {
+    await Haptics.selectionAsync();
+    if (activeFaq === question) { setActiveFaq(null); return; }
+    setActiveFaq(question);
+    if (faqAnswers[question]) return; // already cached
+    setFaqLoading(true);
+    try {
+      const answer = await askQuestion(question, sport, level, '', language);
+      setFaqAnswers(prev => ({ ...prev, [question]: answer }));
+    } catch {
+      setFaqAnswers(prev => ({ ...prev, [question]: 'Could not load an answer. Try again.' }));
+    } finally {
+      setFaqLoading(false);
+    }
+  };
+
 // --- Effects ---
 useEffect(() => {
   async function init() {
@@ -334,6 +360,8 @@ useEffect(() => {
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
   useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
+  // Cached FAQ answers are specific to sport/level/language — reset when they change.
+  useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -414,6 +442,41 @@ useEffect(() => {
               tintColor={theme.textSecondary}
             />
           }>
+
+          {/* Common Questions — per-sport FAQ, the "new to this sport? start here" entry point.
+              Collapsed by default so it stays compact above the games. */}
+          <View style={styles.faqSection}>
+            <TouchableOpacity style={styles.faqHeadingRow} onPress={() => setFaqSectionOpen(v => !v)} activeOpacity={0.7}>
+              <Text style={styles.faqHeading}>Common {SPORT_FAQS[sport].label} Questions</Text>
+              <Text style={styles.faqHeadingChevron}>{faqSectionOpen ? '▾' : '▸'}</Text>
+            </TouchableOpacity>
+            {faqSectionOpen && (
+              <>
+                {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => (
+                  <View key={q} style={styles.faqItem}>
+                    <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(q)} activeOpacity={0.7}>
+                      <Text style={styles.faqQ}>{q}</Text>
+                      <Text style={styles.faqChevron}>{activeFaq === q ? '−' : '+'}</Text>
+                    </TouchableOpacity>
+                    {activeFaq === q && (
+                      <View style={styles.faqAnswerBox}>
+                        {faqAnswers[q]
+                          ? <Text style={styles.faqAnswer}>{faqAnswers[q]}</Text>
+                          : <Text style={styles.faqThinking}>Thinking…</Text>}
+                      </View>
+                    )}
+                  </View>
+                ))}
+                {SPORT_FAQS[sport].questions.length > 4 && (
+                  <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
+                    <Text style={styles.faqMoreText}>
+                      {faqExpanded ? 'Show less' : `Show more (${SPORT_FAQS[sport].questions.length - 4})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
 
           {/* Game Strip */}
           {games.length > 0 ? (
@@ -615,6 +678,19 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
   complexityText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  faqSection: { marginHorizontal: 16, marginTop: 4, marginBottom: 12, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
+  faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
+  faqHeading: { color: t.textPrimary, fontSize: 14, fontWeight: '800' },
+  faqHeadingChevron: { color: t.textSecondary, fontSize: 13, fontWeight: '800' },
+  faqItem: { borderTopWidth: 1, borderTopColor: t.border },
+  faqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13, gap: 10 },
+  faqQ: { color: t.textSecondary, fontSize: 14, fontWeight: '600', flex: 1, lineHeight: 19 },
+  faqChevron: { color: t.accentText, fontSize: 18, fontWeight: '800', width: 18, textAlign: 'center' },
+  faqAnswerBox: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 2 },
+  faqAnswer: { color: t.textPrimary, fontSize: 14, lineHeight: 21 },
+  faqThinking: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
+  faqMoreBtn: { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: t.border },
+  faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
   followUpSection: { marginTop: 8, paddingHorizontal: 16 },
   followUpTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
