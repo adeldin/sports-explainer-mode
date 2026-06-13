@@ -98,6 +98,11 @@ export default function App() {
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [askText, setAskText] = useState('');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  // Share: snapshot of the data to render into the off-screen capture card. Non-null
+  // only during a capture, so the ShareCard is mounted on demand (never permanently).
+  const [shareData, setShareData] = useState<{
+    gameContext: string; rawPlay: string; simple: string; whyItMatters?: string; sport: string;
+  } | null>(null);
 
   // --- FAQ (per-sport common questions) ---
   const [faqSectionOpen, setFaqSectionOpen] = useState(false); // collapsed by default
@@ -116,6 +121,8 @@ export default function App() {
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const shareRef = useRef<ViewShot>(null);
+  // Guards the onLayout-gated capture so it fires exactly once per share session.
+  const captureInProgress = useRef(false);
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
@@ -249,13 +256,41 @@ export default function App() {
     await AsyncStorage.setItem('favorite_teams', JSON.stringify(newFavs));
   };
 
+  // Step 1 of the share flow: snapshot the CURRENT result into shareData, which
+  // mounts the off-screen ShareCard (populated with real content, not placeholders).
+  // The actual capture is deferred to onShareCardLayout, once the card has laid out.
   const handleShare = async () => {
-    if (!shareRef.current || !result) return;
+    if (!result || shareData) return; // ignore taps while a capture is already in flight
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const uri = await (shareRef.current as any).capture();
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: S.share });
-    } catch (e) { console.error('Share failed:', e); }
+    captureInProgress.current = false;
+    setShareData({
+      gameContext: result.gameContext || 'Live Game',
+      rawPlay: result.rawPlay || result.playType || 'Latest Play',
+      simple: result.simple,
+      whyItMatters: result.whyItMatters,
+      sport,
+    });
+  };
+
+  // Step 2: fired by the ShareCard's onLayout — the view has confirmed it's laid
+  // out, so it's safe to rasterize. One extra frame lets the paint settle, then we
+  // capture, unmount the card, and hand the image to the share sheet.
+  const onShareCardLayout = () => {
+    if (captureInProgress.current) return; // onLayout can fire more than once
+    captureInProgress.current = true;
+    requestAnimationFrame(async () => {
+      try {
+        if (!shareRef.current) throw new Error('ShareCard ref missing');
+        const uri = await (shareRef.current as any).capture();
+        setShareData(null); // unmount the off-screen card now that we have the image
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: S.share });
+      } catch (e) {
+        console.error('Share failed:', e);
+        setShareData(null);
+      } finally {
+        captureInProgress.current = false;
+      }
+    });
   };
 
   const handleFollowUp = async (question: string) => {
@@ -399,6 +434,31 @@ useEffect(() => {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle={theme.statusBar} />
+
+      {/* Off-screen share-capture layer: rendered on-screen at full opacity so the
+          renderer genuinely paints it, but sits BEHIND the opaque SafeAreaView so the
+          user never sees it. Mounted only while sharing; capture is gated on onLayout. */}
+      {shareData && (
+        <View style={styles.captureLayer} pointerEvents="none">
+          <ViewShot
+            ref={shareRef}
+            options={{ format: 'png', quality: 1.0 }}
+            onLayout={onShareCardLayout}>
+            {/* collapsable={false} keeps Android from flattening the captured
+                subtree out of the native view tree, which would blank the image. */}
+            <View collapsable={false}>
+              <ShareCard
+                gameContext={shareData.gameContext}
+                rawPlay={shareData.rawPlay}
+                simple={shareData.simple}
+                whyItMatters={shareData.whyItMatters}
+                sport={shareData.sport}
+              />
+            </View>
+          </ViewShot>
+        </View>
+      )}
+
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
@@ -498,10 +558,6 @@ useEffect(() => {
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
-              <ViewShot ref={shareRef} options={{ format: 'png', quality: 1.0 }} style={styles.hiddenCard}>
-                <ShareCard gameContext={result.gameContext || 'Live Game'} rawPlay={result.rawPlay || result.playType || 'Latest Play'} simple={result.simple} whyItMatters={result.whyItMatters} sport={sport} />
-              </ViewShot>
-
               {/* Explanation Card */}
               <View style={styles.explanationCard}>
                 <Text style={styles.explanationLabel}>🎙️ {S.thePlay}</Text>
@@ -662,7 +718,11 @@ useEffect(() => {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
-  safe: { flex: 1 },
+  // Opaque so it fully covers the off-screen share-capture layer beneath it.
+  safe: { flex: 1, backgroundColor: t.background },
+  // Full-screen layer drawn behind `safe`; centers the capture card on-screen
+  // (real layout + full opacity for a reliable rasterize) but stays hidden.
+  captureLayer: { ...StyleSheet.absoluteFillObject, zIndex: -1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 22, fontWeight: '900', color: t.textPrimary },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -695,7 +755,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   ruleCard: { backgroundColor: t.ruleBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.ruleLabel, borderWidth: 1, borderColor: t.ruleBorder },
   ruleLabel: { color: t.ruleLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22 },
-  hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
   shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
