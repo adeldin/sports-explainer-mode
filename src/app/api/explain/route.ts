@@ -180,12 +180,14 @@ Respond with this exact JSON structure:
   "simple": "Main explanation/analysis",
   "whyItMatters": "Situational significance",
   "ruleDetail": "Explanation of the rule involved (or empty string if none)",
+  "playSummary": "A short, faithful one-line restatement of the play (max ~10 words)",
   "showRule": true/false,
   "complexity": "low" | "medium" | "high"
 }
 
 Rules for JSON flags:
-- "showRule": Set to true ONLY if the play involves a specific rule that needs explaining (penalties, unusual calls, rare mechanics). 
+- "playSummary": Restate ONLY what the play data says, concisely. Do not add or invent details.
+- "showRule": Set to true ONLY if the play involves a specific rule that needs explaining (penalties, unusual calls, rare mechanics).
 - "showRule": If level is "expert", always set to false unless the rule is extremely obscure.
 - "complexity": "high" if the play is rare or very difficult to understand. "low" for routine plays.
 - ONLY use information provided in the play data. Do not hallucinate details.`;
@@ -244,12 +246,14 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      simple: parsed.simple || play,
+      simple: parsed.simple || (language !== 'en' && parsed.playSummary) || play,
       whyItMatters: parsed.whyItMatters || '',
       ruleDetail: parsed.ruleDetail || '',
       showRule: parsed.showRule ?? (level !== 'expert'),
       complexity: parsed.complexity || 'low',
-      playType: play,
+      // For non-English, use the LLM's translated restatement; English keeps the
+      // raw ESPN play text unchanged. (`play` is raw ESPN data, never translated.)
+      playType: language !== 'en' && parsed.playSummary ? parsed.playSummary : play,
       homeTeam,
       awayTeam,
       gameContext
