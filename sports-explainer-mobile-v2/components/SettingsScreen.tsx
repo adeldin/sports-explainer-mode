@@ -1,17 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Level } from '../lib/api';
+import { Level, Language } from '../lib/api';
 
 const { width } = Dimensions.get('window');
 
 interface Props {
   visible: boolean;
   level: Level;
+  language: Language;
   autoRefresh: boolean;
   notificationsEnabled: boolean;
   onClose: () => void;
   onLevelChange: (l: Level) => void;
+  onLanguageChange: (l: Language) => void;
   onAutoRefreshChange: (val: boolean) => void;
   onNotificationsToggle: (val: boolean) => void;
 }
@@ -23,13 +25,28 @@ const LEVELS: { key: Level; label: string; desc: string }[] = [
   { key: 'expert', label: '🎓 Expert', desc: 'Coaching-level analysis' },
 ];
 
-export default function SettingsScreen({ 
-  visible, 
-  level, 
-  autoRefresh, 
+const LANGUAGES: { key: Language; label: string }[] = [
+  { key: 'en', label: 'English' },
+  { key: 'es', label: 'Español' },
+  { key: 'fr', label: 'Français' },
+  { key: 'pt', label: 'Português' },
+  { key: 'de', label: 'Deutsch' },
+  { key: 'it', label: 'Italiano' },
+  { key: 'ja', label: '日本語' },
+  { key: 'zh', label: '中文' },
+  { key: 'ko', label: '한국어' },
+  { key: 'ar', label: 'العربية' },
+];
+
+export default function SettingsScreen({
+  visible,
+  level,
+  language,
+  autoRefresh,
   notificationsEnabled,
-  onClose, 
-  onLevelChange, 
+  onClose,
+  onLevelChange,
+  onLanguageChange,
   onAutoRefreshChange,
   onNotificationsToggle
 }: Props) {
@@ -81,6 +98,18 @@ export default function SettingsScreen({
                 {level === l.key && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
             ))}
+
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>LANGUAGE</Text>
+            <View style={styles.langWrap}>
+              {LANGUAGES.map(l => (
+                <TouchableOpacity
+                  key={l.key}
+                  style={[styles.langPill, language === l.key && styles.langPillActive]}
+                  onPress={() => onLanguageChange(l.key)}>
+                  <Text style={[styles.langText, language === l.key && styles.langTextActive]}>{l.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={[styles.sectionLabel, { marginTop: 30 }]}>PREFERENCES</Text>
             
@@ -138,6 +167,11 @@ const styles = StyleSheet.create({
   levelLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
   levelDesc: { color: '#666', fontSize: 12, marginTop: 2 },
   checkmark: { color: '#0055ff', fontSize: 18, fontWeight: '900' },
+  langWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  langPill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
+  langPillActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
+  langText: { color: '#aaa', fontSize: 14, fontWeight: '600' },
+  langTextActive: { color: '#4488ff' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#111', borderRadius: 12, borderWidth: 1, borderColor: '#222' },
   toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
   toggleDesc: { color: '#666', fontSize: 12, marginTop: 2 },

@@ -23,7 +23,7 @@ import ShareCard from './components/ShareCard';
 import MorphCinematic from './components/MorphCinematic';
 
 // Libs
-import { fetchExplanation, askQuestion, Sport, Level, ExplanationResponse } from './lib/api';
+import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
 
 // Prevent the native splash from hiding automatically
@@ -34,6 +34,9 @@ const SPORTS = [
   { key: 'nhl' as Sport, emoji: '🏒', label: 'NHL' },
   { key: 'nba' as Sport, emoji: '🏀', label: 'NBA' },
   { key: 'nfl' as Sport, emoji: '🏈', label: 'NFL' },
+  { key: 'soccer' as Sport, emoji: '⚽', label: 'Soccer' },
+  { key: 'worldcup' as Sport, emoji: '🌍', label: 'World Cup' },
+  { key: 'rugby' as Sport, emoji: '🏉', label: 'Rugby' },
 ];
 
 const FOLLOW_UPS = [
@@ -43,11 +46,17 @@ const FOLLOW_UPS = [
   '👀 What to watch for next?',
 ];
 
-const ESPN_APIS: Record<string, string> = {
-  mlb: 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
-  nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
-  nba: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
-  nfl: 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+// ESPN config per sport. `core` sports (rugby) are NOT on the normal scoreboard
+// API and need the two-step Core-API $ref fetch. Leagues match the backend so
+// the gameId we send is found server-side.
+const SPORT_CONFIG: Record<Sport, { espnSport: string; league: string; core?: boolean }> = {
+  mlb: { espnSport: 'baseball', league: 'mlb' },
+  nhl: { espnSport: 'hockey', league: 'nhl' },
+  nba: { espnSport: 'basketball', league: 'nba' },
+  nfl: { espnSport: 'football', league: 'nfl' },
+  soccer: { espnSport: 'soccer', league: 'usa.1' },
+  worldcup: { espnSport: 'soccer', league: 'fifa.world' },
+  rugby: { espnSport: 'rugby', league: '270557', core: true },
 };
 
 interface Game {
@@ -72,6 +81,7 @@ export default function App() {
   const [sport, setSport] = useState<Sport>('mlb');
   const [level, setLevel] = useState<Level>('beginner');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [language, setLanguage] = useState<Language>('en');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [expoPushToken, setExpoPushToken] = useState('');
   
@@ -105,24 +115,60 @@ export default function App() {
 
   // --- Logic Functions ---
   const fetchGames = useCallback(async () => {
+    const cfg = SPORT_CONFIG[sport];
+    // Team labels: prefer abbreviation, fall back for sports that lack it (rugby/soccer).
+    const teamName = (c: any) =>
+      c?.team?.abbreviation || c?.team?.shortDisplayName || c?.team?.displayName || '?';
+    const scoreOf = (c: any) => {
+      const s = c?.score;
+      if (s == null) return '0';
+      return typeof s === 'object' ? String(s.displayValue ?? s.value ?? '0') : String(s);
+    };
+    const toGame = (e: any): Game => {
+      const comp = e.competitions?.[0];
+      const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+      const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+      return {
+        id: String(e.id),
+        homeTeam: teamName(home),
+        awayTeam: teamName(away),
+        homeScore: scoreOf(home),
+        awayScore: scoreOf(away),
+        status: e.status?.type?.shortDetail || '',
+        isLive: e.status?.type?.state === 'in',
+        sport,
+      };
+    };
+
     try {
-      const res = await fetch(ESPN_APIS[sport]);
-      const data = await res.json();
-      const parsed: Game[] = (data?.events || []).map((e: any) => {
-        const comp = e.competitions?.[0];
-        const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-        const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
-        return {
-          id: e.id,
-          homeTeam: home?.team?.abbreviation || '?',
-          awayTeam: away?.team?.abbreviation || '?',
-          homeScore: home?.score || '0',
-          awayScore: away?.score || '0',
-          status: e.status?.type?.shortDetail || '',
-          isLive: e.status?.type?.state === 'in',
-          sport,
-        };
-      });
+      let parsed: Game[] = [];
+
+      if (cfg.core) {
+        // Rugby: Core-API two-step — list today's event $refs, then resolve each.
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const evRes = await fetch(
+          `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${today}`,
+        );
+        const evData = await evRes.json();
+        const items: any[] = (evData.items || []).slice(0, 25);
+        const events = await Promise.all(
+          items.map(async (it: any) => {
+            try {
+              const r = await fetch(it.$ref);
+              return await r.json();
+            } catch {
+              return null;
+            }
+          }),
+        );
+        parsed = events.filter(Boolean).map(toGame);
+      } else {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
+        );
+        const data = await res.json();
+        parsed = (data?.events || []).map(toGame);
+      }
 
       const sorted = [...parsed].sort((a, b) => {
         const aFav = favorites.includes(a.homeTeam) || favorites.includes(a.awayTeam);
@@ -152,7 +198,7 @@ export default function App() {
     setFollowUpAnswer(null);
     setActiveChip(null);
     try {
-      const data = await fetchExplanation(sport, level, selectedGameId);
+      const data = await fetchExplanation(sport, level, selectedGameId, language);
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       fadeIn();
@@ -162,7 +208,7 @@ export default function App() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sport, level, selectedGameId]);
+  }, [sport, level, selectedGameId, language]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -199,7 +245,7 @@ export default function App() {
     setFollowUpAnswer(null);
     try {
       const context = `${result.simple} ${result.whyItMatters || ''}`;
-      const answer = await askQuestion(question, sport, level, context);
+      const answer = await askQuestion(question, sport, level, context, language);
       setFollowUpAnswer(answer);
     } catch {
       setFollowUpAnswer('Could not get an answer. Try again.');
@@ -222,16 +268,18 @@ useEffect(() => {
     try {
       await SplashScreen.hideAsync();
 
-      const [onboarding, favs, notify, seenCine] = await Promise.all([
+      const [onboarding, favs, notify, seenCine, lang] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
         AsyncStorage.getItem('notifications_enabled'),
         AsyncStorage.getItem('seen_cinematic'),
+        AsyncStorage.getItem('user_language'),
       ]);
 
       if (favs) setFavorites(JSON.parse(favs));
       if (notify !== null) setNotificationsEnabled(notify === 'true');
       if (seenCine === 'true') setSeenCinematic(true);
+      if (lang) setLanguage(lang as Language);
 
       setAppReady(true);
 
@@ -273,14 +321,14 @@ useEffect(() => {
 }, [onboardingComplete, notificationsEnabled]);
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
-  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level]);
+  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
 
   useEffect(() => {
     if (autoRefresh) {
       autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [autoRefresh, sport, level, selectedGameId]);
+  }, [autoRefresh, sport, level, selectedGameId, language]);
 
   // --- Conditional Returns (The Gatekeepers) ---
   if (!appReady || onboardingComplete === null) return null;
@@ -496,10 +544,15 @@ useEffect(() => {
       <SettingsScreen
         visible={showSettings}
         level={level}
+        language={language}
         autoRefresh={autoRefresh}
         notificationsEnabled={notificationsEnabled}
         onClose={() => setShowSettings(false)}
         onLevelChange={(l) => { setLevel(l); setShowSettings(false); }}
+        onLanguageChange={async (lng) => {
+          setLanguage(lng);
+          await AsyncStorage.setItem('user_language', lng);
+        }}
         onAutoRefreshChange={setAutoRefresh}
         onNotificationsToggle={async (val) => {
           setNotificationsEnabled(val);

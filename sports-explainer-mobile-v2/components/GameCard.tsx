@@ -27,6 +27,9 @@ const SPORT_COLORS: Record<string, [string, string]> = {
   nba: ['#3a1a00', '#2b1200'],
   nhl: ['#001a3a', '#000d2b'],
   mls: ['#1a001a', '#0d000d'],
+  soccer: ['#0a2a1a', '#06180f'],
+  worldcup: ['#2a1a3a', '#1a0d2b'],
+  rugby: ['#06262a', '#03161a'],
 };
 
 export default function GameCard({ game, isSelected, isFavorite, onPress, onToggleFavorite }: Props) {

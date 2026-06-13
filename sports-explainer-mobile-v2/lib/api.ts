@@ -1,5 +1,6 @@
-export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl';
+export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
+export type Language = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja' | 'zh' | 'ko' | 'it' | 'ar';
 
 export interface ExplanationResponse {
    simple: string;
@@ -16,14 +17,15 @@ export interface ExplanationResponse {
 
 const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 
-export async function fetchExplanation(sport: Sport, level: Level, gameId?: string): Promise<ExplanationResponse> {
+export async function fetchExplanation(sport: Sport, level: Level, gameId?: string, language: Language = 'en'): Promise<ExplanationResponse> {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      sport, 
+    body: JSON.stringify({
+      sport,
       level,
-      gameId // Pass the ID to the backend
+      gameId, // Pass the ID to the backend
+      language
     }),
   });
 
@@ -35,7 +37,8 @@ export async function askQuestion(
   question: string,
   sport: Sport,
   level: Level,
-  context: string
+  context: string,
+  language: Language = 'en'
 ): Promise<string> {
   const response = await fetch(API_URL, {
     method: 'POST',
@@ -46,6 +49,7 @@ export async function askQuestion(
       sport,
       level,
       context,
+      language,
     }),
   });
 
