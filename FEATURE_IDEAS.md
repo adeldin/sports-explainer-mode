@@ -49,17 +49,17 @@ historical data · past plays for soccer.
 
 ## 🔜 Next phase — Mobile UI
 
-**Shipped (`ae35462`):**
+**Shipped:**
 - ✅ Widened `Sport` type (+`soccer`/`worldcup`/`rugby`) in `lib/api.ts`.
-- ✅ Soccer, World Cup, rugby in the sport picker (rugby via the Core-API two-step `$ref` fetch; leagues match the backend so `gameId`s align).
-- ✅ Language picker in `SettingsScreen.tsx` — 10 languages, persisted, re-fetches on change.
+- ✅ Soccer, World Cup, rugby in the sport picker (rugby via the Core-API two-step `$ref` fetch; leagues match the backend so `gameId`s align). (`ae35462`)
+- ✅ Language picker in `SettingsScreen.tsx` — 10 languages, persisted, re-fetches on change. (`ae35462`)
+- ✅ Team logos on game cards (ESPN logo URLs, graceful fallback). (`3126058`)
+- ✅ Dark / light / system theme (`ThemeProvider` + semantic tokens; `userInterfaceStyle: automatic`). (`d5561f2`)
 
 **Active, in order:**
-1. **Team logos on game cards** — fast win (next).
-2. **Dark / light mode.**
-3. **FAQ chips** — browsable common questions per sport, routed through the existing ask path.
-4. **Past plays** — scroll back through a game's plays and tap one to explain. Start with **MLB / NHL** (`plays[]` confirmed; NBA confirmed too; NFL verify in-season; soccer uses `commentary[]`/`keyEvents[]`).
-5. **App Store submission.**
+1. **FAQ chips** — browsable common questions per sport, routed through the existing ask path.
+2. **Past plays** — scroll back through a game's plays and tap one to explain. Start with **MLB / NHL** (`plays[]` confirmed; NBA confirmed too; NFL verify in-season; soccer uses `commentary[]`/`keyEvents[]`).
+3. **App Store submission.**
 
 ---
 
