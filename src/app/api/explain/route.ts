@@ -3,6 +3,10 @@ import Groq from 'groq-sdk';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+// Model is configurable so we can swap/upgrade tiers without code changes.
+// Defaults to the current free-tier model.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -200,7 +204,7 @@ async function translatePlayText(play: string, language: string): Promise<string
   const langName = languageNames[language] || language;
   try {
     const c = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_MODEL,
       messages: [
         {
           role: 'system',
@@ -231,7 +235,7 @@ export async function POST(req: NextRequest) {
       const langName = languageNames[language] || 'English';
       const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL,
         messages: [
           { role: 'system', content: `Helpful sports expert. Level: ${level}.${langLine} Answer clearly and concisely in 2-3 sentences.` },
           { role: 'user', content: `Context: ${context}\nQuestion: ${question}` }
@@ -248,7 +252,7 @@ export async function POST(req: NextRequest) {
     // translation only needs `play`, already fetched) — no added latency.
     const [completion, translatedPlay] = await Promise.all([
       groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: GROQ_MODEL,
         messages: [
           { role: 'system', content: buildSystemPrompt(sport, level, language) },
           { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) }
