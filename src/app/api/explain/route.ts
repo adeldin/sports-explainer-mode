@@ -80,7 +80,7 @@ function buildSystemPrompt(sport: string, level: string, language: string = 'en'
 // Pull current game context + the latest play text for any configured sport.
 // Site-API sports read the scoreboard (+ a summary deep-dive for MLB play-by-play
 // and soccer key events); Core-API sports (rugby) use the two-step $ref fetch.
-async function fetchGameData(sport: string, gameId?: string) {
+async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = false) {
   let play = 'A key play just happened';
   let gameContext = 'Live game in progress';
   let homeTeam = '', awayTeam = '';
@@ -142,7 +142,7 @@ async function fetchGameData(sport: string, gameId?: string) {
         gameContext = `${awayTeam} vs ${homeTeam} — ${game.status?.type?.shortDetail || ''}`;
 
         // MLB deep dive for play-by-play text.
-        if (sport === 'mlb' && game.id) {
+        if (sport === 'mlb' && game.id && !skipPlayLookup) {
           const sumRes = await fetch(
             `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${game.id}`,
             { cache: 'no-store' },
@@ -155,7 +155,7 @@ async function fetchGameData(sport: string, gameId?: string) {
         }
 
         // Soccer / World Cup: no plays[] array — use the latest key event / commentary.
-        if ((sport === 'soccer' || sport === 'worldcup') && game.id) {
+        if ((sport === 'soccer' || sport === 'worldcup') && game.id && !skipPlayLookup) {
           const sumRes = await fetch(
             `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`,
             { cache: 'no-store' },
@@ -228,7 +228,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en' } = body;
+    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText } = body;
 
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
@@ -245,8 +245,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ answer: completion.choices[0]?.message?.content?.trim() }, { headers: corsHeaders });
     }
 
-    // Fetch live game context + latest play for the requested sport.
-    const { play, gameContext, homeTeam, awayTeam } = await fetchGameData(sport, gameId);
+    // Fetch live game context + latest play for the requested sport. When an
+    // explicit playText is supplied (a past play), use it and skip the latest-play lookup.
+    const fetched = await fetchGameData(sport, gameId, !!playText);
+    const play = playText || fetched.play;
+    const { gameContext, homeTeam, awayTeam } = fetched;
 
     // Run the explanation and the play-text translation concurrently (the
     // translation only needs `play`, already fetched) — no added latency.
