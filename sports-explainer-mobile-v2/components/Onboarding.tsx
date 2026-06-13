@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, Theme } from '../lib/theme';
+import { Language } from '../lib/api';
+import { UI_STRINGS } from '../lib/strings';
 
 const { width } = Dimensions.get('window');
 
@@ -12,29 +14,40 @@ type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
 type Sport = 'mlb' | 'nfl' | 'nba' | 'nhl';
 
 interface Props {
+  language: Language;
   onComplete: (level: Level, sport: Sport) => void;
 }
 
-const LEVELS = [
-  { key: 'kid' as Level,          emoji: '🧒', label: 'Kid Mode',     sub: 'Simple analogies, zero jargon' },
-  { key: 'beginner' as Level,     emoji: '👋', label: 'Beginner',     sub: 'New fan friendly' },
-  { key: 'intermediate' as Level, emoji: '📺', label: 'Intermediate', sub: 'Regular viewer' },
-  { key: 'expert' as Level,       emoji: '📋', label: 'Expert',       sub: 'Coaching-level analysis' },
+const LEVELS: { key: Level; emoji: string }[] = [
+  { key: 'kid', emoji: '🧒' },
+  { key: 'beginner', emoji: '👋' },
+  { key: 'intermediate', emoji: '📺' },
+  { key: 'expert', emoji: '📋' },
 ];
 
-const SPORTS = [
-  { key: 'mlb' as Sport, emoji: '⚾', label: 'MLB', sub: 'Baseball' },
-  { key: 'nfl' as Sport, emoji: '🏈', label: 'NFL', sub: 'Football' },
-  { key: 'nba' as Sport, emoji: '🏀', label: 'NBA', sub: 'Basketball' },
-  { key: 'nhl' as Sport, emoji: '🏒', label: 'NHL', sub: 'Hockey' },
+const SPORTS: { key: Sport; emoji: string; label: string }[] = [
+  { key: 'mlb', emoji: '⚾', label: 'MLB' },
+  { key: 'nfl', emoji: '🏈', label: 'NFL' },
+  { key: 'nba', emoji: '🏀', label: 'NBA' },
+  { key: 'nhl', emoji: '🏒', label: 'NHL' },
 ];
 
-export default function Onboarding({ onComplete }: Props) {
+export default function Onboarding({ language, onComplete }: Props) {
   const [screen, setScreen] = useState<0 | 1 | 2>(0);
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const S = UI_STRINGS[language];
+  const LVL: Record<Level, { label: string; sub: string }> = {
+    kid: { label: S.lvlKid, sub: S.lvlKidDesc },
+    beginner: { label: S.lvlBeginner, sub: S.lvlBeginnerDesc },
+    intermediate: { label: S.lvlInter, sub: S.lvlInterDesc },
+    expert: { label: S.lvlExpert, sub: S.lvlExpertDesc },
+  };
+  const SPORT_SUB: Record<Sport, string> = {
+    mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
+  };
 
   async function handleComplete() {
     if (!selectedLevel || !selectedSport) return;
@@ -56,21 +69,17 @@ export default function Onboarding({ onComplete }: Props) {
             <View style={styles.taglinePill}>
               <Text style={styles.taglineText}>⚡ THE SMART PLAY</Text>
             </View>
-            <Text style={styles.heroSub}>
-              Never feel lost watching sports again.{'\n'}
-              We explain every play, in real time,{'\n'}
-              at your level.
-            </Text>
+            <Text style={styles.heroSub}>{S.heroSub}</Text>
           </View>
 
           <View style={styles.featureList}>
-            <FeatureRow emoji="📡" text="Live game explanations as they happen" />
-            <FeatureRow emoji="🧠" text="Powered by AI — not just stats" />
-            <FeatureRow emoji="🎚️" text="Your level: Kid to Coaching-level Expert" />
+            <FeatureRow emoji="📡" text={S.feat1} />
+            <FeatureRow emoji="🧠" text={S.feat2} />
+            <FeatureRow emoji="🎚️" text={S.feat3} />
           </View>
 
           <TouchableOpacity style={styles.primaryBtn} onPress={() => setScreen(1)}>
-            <Text style={styles.primaryBtnText}>Get Started →</Text>
+            <Text style={styles.primaryBtnText}>{S.getStarted} →</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -84,9 +93,9 @@ export default function Onboarding({ onComplete }: Props) {
         <StatusBar barStyle={theme.statusBar} />
         <View style={styles.container}>
           <View style={styles.stepHeader}>
-            <Text style={styles.stepIndicator}>Step 1 of 2</Text>
-            <Text style={styles.stepTitle}>How do you watch sports?</Text>
-            <Text style={styles.stepSub}>You can always change this in Settings.</Text>
+            <Text style={styles.stepIndicator}>{S.step1}</Text>
+            <Text style={styles.stepTitle}>{S.lvlTitle}</Text>
+            <Text style={styles.stepSub}>{S.lvlSub}</Text>
           </View>
 
           <View style={styles.optionList}>
@@ -98,9 +107,9 @@ export default function Onboarding({ onComplete }: Props) {
                 <Text style={styles.optionEmoji}>{l.emoji}</Text>
                 <View style={styles.optionText}>
                   <Text style={[styles.optionLabel, selectedLevel === l.key && styles.optionLabelActive]}>
-                    {l.label}
+                    {LVL[l.key].label}
                   </Text>
-                  <Text style={styles.optionSub}>{l.sub}</Text>
+                  <Text style={styles.optionSub}>{LVL[l.key].sub}</Text>
                 </View>
                 {selectedLevel === l.key && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
@@ -111,7 +120,7 @@ export default function Onboarding({ onComplete }: Props) {
             style={[styles.primaryBtn, !selectedLevel && styles.primaryBtnDisabled]}
             onPress={() => selectedLevel && setScreen(2)}
             disabled={!selectedLevel}>
-            <Text style={[styles.primaryBtnText, !selectedLevel && { color: theme.textMuted }]}>Next →</Text>
+            <Text style={[styles.primaryBtnText, !selectedLevel && { color: theme.textMuted }]}>{S.next} →</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -121,12 +130,12 @@ export default function Onboarding({ onComplete }: Props) {
   // ─── Screen 2: Pick Sport ─────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={theme.statusBar} />
       <View style={styles.container}>
         <View style={styles.stepHeader}>
-          <Text style={styles.stepIndicator}>Step 2 of 2</Text>
-          <Text style={styles.stepTitle}>What's your sport?</Text>
-          <Text style={styles.stepSub}>We'll open here by default.</Text>
+          <Text style={styles.stepIndicator}>{S.step2}</Text>
+          <Text style={styles.stepTitle}>{S.sportTitle}</Text>
+          <Text style={styles.stepSub}>{S.sportSub}</Text>
         </View>
 
         <View style={styles.sportGrid}>
@@ -139,7 +148,7 @@ export default function Onboarding({ onComplete }: Props) {
               <Text style={[styles.sportLabel, selectedSport === s.key && styles.sportLabelActive]}>
                 {s.label}
               </Text>
-              <Text style={styles.sportSub}>{s.sub}</Text>
+              <Text style={styles.sportSub}>{SPORT_SUB[s.key]}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -148,11 +157,11 @@ export default function Onboarding({ onComplete }: Props) {
           style={[styles.primaryBtn, (!selectedLevel || !selectedSport) && styles.primaryBtnDisabled]}
           onPress={handleComplete}
           disabled={!selectedLevel || !selectedSport}>
-          <Text style={[styles.primaryBtnText, (!selectedLevel || !selectedSport) && { color: theme.textMuted }]}>Let's Go 🚀</Text>
+          <Text style={[styles.primaryBtnText, (!selectedLevel || !selectedSport) && { color: theme.textMuted }]}>{S.letsGo} 🚀</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.backBtn} onPress={() => setScreen(1)}>
-          <Text style={styles.backBtnText}>← Back</Text>
+          <Text style={styles.backBtnText}>← {S.back}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

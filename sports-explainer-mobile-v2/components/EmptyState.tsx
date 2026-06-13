@@ -1,83 +1,45 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, Theme } from '../lib/theme';
+import { Language } from '../lib/api';
+import { UI_STRINGS } from '../lib/strings';
 
 interface Props {
   sport: string;
   reason: 'no-games' | 'off-season' | 'select-game';
+  language: Language;
 }
 
-const OFF_SEASON_DATES: Record<string, { start: number; end: number; next: string }> = {
-  nfl: { start: 2, end: 8, next: 'September' },   // Feb–Aug off
-  nba: { start: 6, end: 9, next: 'October' },      // Jun–Sep off
-  mlb: { start: 10, end: 2, next: 'March' },       // Oct–Feb off
-  nhl: { start: 6, end: 9, next: 'October' },      // Jun–Sep off
+const OFF_SEASON_DATES: Record<string, { start: number; end: number }> = {
+  nfl: { start: 2, end: 8 },   // Feb–Aug off
+  nba: { start: 6, end: 9 },   // Jun–Sep off
+  mlb: { start: 10, end: 2 },  // Oct–Feb off
+  nhl: { start: 6, end: 9 },   // Jun–Sep off
 };
 
-const SPORT_CONFIG: Record<string, {
-  emoji: string;
-  name: string;
-  noGamesMsg: string;
-  offSeasonMsg: string;
-  offSeasonSub: string;
-  selectMsg: string;
-}> = {
-  mlb: {
-    emoji: '⚾',
-    name: 'MLB',
-    noGamesMsg: 'No MLB games today',
-    offSeasonMsg: 'MLB is in the off-season',
-    offSeasonSub: 'Spring Training starts in February. Check back then!',
-    selectMsg: 'Select a game above to get The Smart Play',
-  },
-  nfl: {
-    emoji: '🏈',
-    name: 'NFL',
-    noGamesMsg: 'No NFL games today',
-    offSeasonMsg: 'NFL is in the off-season',
-    offSeasonSub: 'The regular season kicks off in September.',
-    selectMsg: 'Select a game above to get The Smart Play',
-  },
-  nba: {
-    emoji: '🏀',
-    name: 'NBA',
-    noGamesMsg: 'No NBA games tonight',
-    offSeasonMsg: 'NBA is in the off-season',
-    offSeasonSub: 'The regular season tips off in October.',
-    selectMsg: 'Select a game above to get The Smart Play',
-  },
-  nhl: {
-    emoji: '🏒',
-    name: 'NHL',
-    noGamesMsg: 'No NHL games tonight',
-    offSeasonMsg: 'NHL is in the off-season',
-    offSeasonSub: 'The regular season drops the puck in October.',
-    selectMsg: 'Select a game above to get The Smart Play',
-  },
+const SPORT_EMOJI: Record<string, string> = {
+  mlb: '⚾', nfl: '🏈', nba: '🏀', nhl: '🏒', soccer: '⚽', worldcup: '🌍', rugby: '🏉',
 };
 
 function isOffSeason(sport: string): boolean {
   const config = OFF_SEASON_DATES[sport];
   if (!config) return false;
   const month = new Date().getMonth() + 1; // 1-12
-  if (config.start < config.end) {
-    return month >= config.start && month <= config.end;
-  }
-  // Wraps year (e.g. MLB: Oct–Feb)
-  return month >= config.start || month <= config.end;
+  if (config.start < config.end) return month >= config.start && month <= config.end;
+  return month >= config.start || month <= config.end; // wraps year (MLB)
 }
 
-export default function EmptyState({ sport, reason }: Props) {
+export default function EmptyState({ sport, reason, language }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const config = SPORT_CONFIG[sport] || {
-    emoji: '📡',
-    name: sport.toUpperCase(),
-    noGamesMsg: 'No games available',
-    offSeasonMsg: 'Off-season',
-    offSeasonSub: 'Check back when the season starts.',
-    selectMsg: 'Select a game to get The Smart Play',
+  const S = UI_STRINGS[language];
+
+  const emoji = SPORT_EMOJI[sport] || '📡';
+  const names: Record<string, string> = {
+    mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
+    soccer: S.spSoccer, worldcup: S.spWorldCup, rugby: S.spRugby,
   };
+  const sportName = names[sport] || sport.toUpperCase();
 
   const detectedOffSeason = reason === 'no-games' && isOffSeason(sport);
   const effectiveReason = detectedOffSeason ? 'off-season' : reason;
@@ -86,7 +48,7 @@ export default function EmptyState({ sport, reason }: Props) {
     return (
       <View style={styles.container}>
         <Text style={styles.emoji}>📡</Text>
-        <Text style={styles.title}>{config.selectMsg}</Text>
+        <Text style={styles.title}>{S.selectGame}</Text>
       </View>
     );
   }
@@ -94,11 +56,11 @@ export default function EmptyState({ sport, reason }: Props) {
   if (effectiveReason === 'off-season') {
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{config.emoji}</Text>
-        <Text style={styles.title}>{config.offSeasonMsg}</Text>
-        <Text style={styles.subtitle}>{config.offSeasonSub}</Text>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={styles.title}>{S.offSeason.replace('{sport}', sportName)}</Text>
+        <Text style={styles.subtitle}>{S.offSeasonSub}</Text>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>⚡ THE SMART PLAY RETURNS SOON</Text>
+          <Text style={styles.badgeText}>⚡ {S.smartPlayReturns}</Text>
         </View>
       </View>
     );
@@ -107,49 +69,18 @@ export default function EmptyState({ sport, reason }: Props) {
   // no-games
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>{config.emoji}</Text>
-      <Text style={styles.title}>{config.noGamesMsg}</Text>
-      <Text style={styles.subtitle}>Pull down to refresh or check back later.</Text>
+      <Text style={styles.emoji}>{emoji}</Text>
+      <Text style={styles.title}>{S.noGames.replace('{sport}', sportName)}</Text>
+      <Text style={styles.subtitle}>{S.pullRefresh}</Text>
     </View>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    marginTop: 60,
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emoji: {
-    fontSize: 56,
-    marginBottom: 8,
-  },
-  title: {
-    color: t.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: t.textMuted,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  badge: {
-    marginTop: 16,
-    backgroundColor: t.warnBg,
-    borderWidth: 1,
-    borderColor: t.warn,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  badgeText: {
-    color: t.warn,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
+  container: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32, gap: 12 },
+  emoji: { fontSize: 56, marginBottom: 8 },
+  title: { color: t.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  subtitle: { color: t.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  badge: { marginTop: 16, backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  badgeText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
 });

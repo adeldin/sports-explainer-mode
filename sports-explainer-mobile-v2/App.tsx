@@ -21,12 +21,15 @@ import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
 import MorphCinematic from './components/MorphCinematic';
+import PlaysSheet from './components/PlaysSheet';
 
 // Libs
-import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from './lib/api';
+import { fetchExplanation, askQuestion, fetchPlays, Sport, Level, Language, Play, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
 import { useTheme, Theme } from './lib/theme';
 import { SPORT_FAQS } from './lib/faqs';
+import { UI_STRINGS } from './lib/strings';
+import * as Localization from 'expo-localization';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
@@ -41,12 +44,8 @@ const SPORTS = [
   { key: 'rugby' as Sport, emoji: '🏉', label: 'Rugby' },
 ];
 
-const FOLLOW_UPS = [
-  '🤔 Why did that matter?',
-  '📜 Explain the rule',
-  '👋 Explain like I\'m new',
-  '👀 What to watch for next?',
-];
+const SUPPORTED_LANGS = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
+// (follow-up chips are built per-language in render — see `followUps`)
 
 // ESPN config per sport. `core` sports (rugby) are NOT on the normal scoreboard
 // API and need the two-step Core-API $ref fetch. Leagues match the backend so
@@ -94,6 +93,11 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  // Past plays
+  const [plays, setPlays] = useState<Play[]>([]);
+  const [playsLoading, setPlaysLoading] = useState(false);
+  const [playsOpen, setPlaysOpen] = useState(false);
+  const [selectedPlay, setSelectedPlay] = useState<Play | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [activeChip, setActiveChip] = useState<string | null>(null);
@@ -107,9 +111,11 @@ export default function App() {
   const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
   const [faqExpanded, setFaqExpanded] = useState(false);
 
-  // --- Theme ---
+  // --- Theme + i18n ---
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const S = UI_STRINGS[language];
+  const followUps = [`🤔 ${S.fuWhy}`, `📜 ${S.fuRule}`, `👋 ${S.fuNew}`, `👀 ${S.fuNext}`];
 
   // --- Refs ---
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -218,7 +224,7 @@ export default function App() {
     setFollowUpAnswer(null);
     setActiveChip(null);
     try {
-      const data = await fetchExplanation(sport, level, selectedGameId, language);
+      const data = await fetchExplanation(sport, level, selectedGameId, language, selectedPlay?.text);
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       fadeIn();
@@ -228,7 +234,7 @@ export default function App() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sport, level, selectedGameId, language]);
+  }, [sport, level, selectedGameId, language, selectedPlay]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -237,6 +243,30 @@ export default function App() {
     setSelectedGameId(null);
     setResult(null);
     setGames([]);
+    setSelectedPlay(null);
+    setPlays([]);
+  };
+
+  // Lazily load the play-by-play list, then open the sheet.
+  const openPlays = async () => {
+    if (!selectedGameId) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPlaysOpen(true);
+    setPlaysLoading(true);
+    try {
+      setPlays(await fetchPlays(sport, selectedGameId));
+    } catch {
+      setPlays([]);
+    } finally {
+      setPlaysLoading(false);
+    }
+  };
+
+  // Pick a past play → the explanation effect re-runs with this play's text.
+  const selectPlay = async (p: Play) => {
+    await Haptics.selectionAsync();
+    setPlaysOpen(false);
+    setSelectedPlay(p);
   };
 
   const toggleFavorite = async (teamAbbr: string) => {
@@ -253,7 +283,7 @@ export default function App() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const uri = await (shareRef.current as any).capture();
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share The Smart Play' });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: S.share });
     } catch (e) { console.error('Share failed:', e); }
   };
 
@@ -268,7 +298,7 @@ export default function App() {
       const answer = await askQuestion(question, sport, level, context, language);
       setFollowUpAnswer(answer);
     } catch {
-      setFollowUpAnswer('Could not get an answer. Try again.');
+      setFollowUpAnswer(S.answerError);
     } finally {
       setFollowUpLoading(false);
     }
@@ -294,7 +324,7 @@ export default function App() {
       const answer = await askQuestion(question, sport, level, '', language);
       setFaqAnswers(prev => ({ ...prev, [question]: answer }));
     } catch {
-      setFaqAnswers(prev => ({ ...prev, [question]: 'Could not load an answer. Try again.' }));
+      setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
     } finally {
       setFaqLoading(false);
     }
@@ -317,7 +347,13 @@ useEffect(() => {
       if (favs) setFavorites(JSON.parse(favs));
       if (notify !== null) setNotificationsEnabled(notify === 'true');
       if (seenCine === 'true') setSeenCinematic(true);
-      if (lang) setLanguage(lang as Language);
+      if (lang) {
+        setLanguage(lang as Language);
+      } else {
+        // First run, no saved preference — default to the device language if supported.
+        const code = Localization.getLocales()[0]?.languageCode;
+        if (code && SUPPORTED_LANGS.includes(code)) setLanguage(code as Language);
+      }
 
       setAppReady(true);
 
@@ -348,7 +384,7 @@ useEffect(() => {
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const gameId = response.notification.request.content.data?.gameId as string | undefined;
-      if (gameId) setSelectedGameId(gameId);
+      if (gameId) { setSelectedGameId(gameId); setSelectedPlay(null); }
     });
   });
 
@@ -359,16 +395,18 @@ useEffect(() => {
 }, [onboardingComplete, notificationsEnabled]);
 
   useEffect(() => { fetchGames(); }, [sport, favorites]);
-  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
+  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language, selectedPlay]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
 
   useEffect(() => {
     if (autoRefresh) {
-      autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(true); }, 60000);
+      // While viewing a past play, keep refreshing the games strip but don't
+      // override the explanation (the chosen play stays put).
+      autoRefreshRef.current = setInterval(() => { fetchGames(); if (!selectedPlay) handleFetch(true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [autoRefresh, sport, level, selectedGameId, language]);
+  }, [autoRefresh, sport, level, selectedGameId, language, selectedPlay]);
 
   // --- Conditional Returns (The Gatekeepers) ---
   if (!appReady || onboardingComplete === null) return null;
@@ -386,7 +424,7 @@ useEffect(() => {
   }
 
   if (!onboardingComplete) {
-    return <Onboarding onComplete={(l, s) => { setLevel(l); setSport(s); setOnboardingComplete(true); }} />;
+    return <Onboarding language={language} onComplete={(l, s) => { setLevel(l); setSport(s); setOnboardingComplete(true); }} />;
   }
 
   return (
@@ -421,7 +459,9 @@ useEffect(() => {
                 style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
                 onPress={() => handleSportChange(s.key)}>
                 <Text style={styles.sportEmoji}>{s.emoji}</Text>
-                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>{s.label}</Text>
+                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
+                  {s.key === 'soccer' ? S.spSoccer : s.key === 'worldcup' ? S.spWorldCup : s.key === 'rugby' ? S.spRugby : s.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -464,7 +504,7 @@ useEffect(() => {
                         <View style={styles.faqAnswerBox}>
                           {faqAnswers[text]
                             ? <Text style={styles.faqAnswer}>{faqAnswers[text]}</Text>
-                            : <Text style={styles.faqThinking}>Thinking…</Text>}
+                            : <Text style={styles.faqThinking}>{S.thinking}</Text>}
                         </View>
                       )}
                     </View>
@@ -473,7 +513,7 @@ useEffect(() => {
                 {SPORT_FAQS[sport].questions.length > 4 && (
                   <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
                     <Text style={styles.faqMoreText}>
-                      {faqExpanded ? 'Show less' : `Show more (${SPORT_FAQS[sport].questions.length - 4})`}
+                      {faqExpanded ? S.showLess : `${S.showMore} (${SPORT_FAQS[sport].questions.length - 4})`}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -494,7 +534,7 @@ useEffect(() => {
                     game={item}
                     isSelected={selectedGameId === item.id}
                     isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
-                    onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
+                    onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); setSelectedPlay(null); setPlays([]); }}
                     onToggleFavorite={() => {
                       const game = games.find(g => g.id === item.id);
                       if (!game) return;
@@ -505,12 +545,12 @@ useEffect(() => {
                         return;
                       }
                       Alert.alert(
-                        'Favorite a Team',
-                        'Which team do you want to follow?',
+                        S.favTitle,
+                        S.favMsg,
                         [
                           { text: game.awayTeam, onPress: () => toggleFavorite(game.awayTeam) },
                           { text: game.homeTeam, onPress: () => toggleFavorite(game.homeTeam) },
-                          { text: 'Cancel', style: 'cancel' },
+                          { text: S.cancel, style: 'cancel' },
                         ]
                       );
                     }}
@@ -518,7 +558,7 @@ useEffect(() => {
                 )}
               />
             </View>
-          ) : !loading ? <EmptyState sport={sport} reason="no-games" /> : null}
+          ) : !loading ? <EmptyState sport={sport} reason="no-games" language={language} /> : null}
 
           {loading && !result ? (
             <View style={styles.skeleton}>
@@ -533,14 +573,21 @@ useEffect(() => {
 
               {/* Explanation Card */}
               <View style={styles.explanationCard}>
-                <Text style={styles.explanationLabel}>🎙️ THE PLAY</Text>
+                <Text style={styles.explanationLabel}>🎙️ {S.thePlay}</Text>
                 <View style={styles.explanationHeader}>
-                  <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || 'Latest Play'}</Text>
-                  {lastUpdated && <Text style={styles.contextTime}>Updated {lastUpdated}</Text>}
+                  <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || S.latestPlay}</Text>
+                  {selectedPlay ? (
+                    <View style={styles.pastPlayRow}>
+                      <View style={styles.pastPlayBadge}><Text style={styles.pastPlayBadgeText}>⏪ PAST PLAY</Text></View>
+                      <TouchableOpacity onPress={() => setSelectedPlay(null)}>
+                        <Text style={styles.backToLatest}>↩ Back to latest</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (lastUpdated && <Text style={styles.contextTime}>{S.updated} {lastUpdated}</Text>)}
                 </View>
                 {result.complexity === 'high' && (
                   <View style={styles.complexityBadge}>
-                    <Text style={styles.complexityText}>⚡ COMPLEX PLAY</Text>
+                    <Text style={styles.complexityText}>⚡ {S.complexPlay}</Text>
                   </View>
                 )}
                 <Text style={styles.explanationText}>{result.simple}</Text>
@@ -549,7 +596,7 @@ useEffect(() => {
               {/* Why It Matters */}
               {result.whyItMatters && (
                 <View style={styles.insightCard}>
-                  <Text style={styles.insightLabel}>💡 WHY IT MATTERS</Text>
+                  <Text style={styles.insightLabel}>💡 {S.whyItMatters}</Text>
                   <Text style={styles.insightText}>{result.whyItMatters}</Text>
                 </View>
               )}
@@ -557,20 +604,26 @@ useEffect(() => {
               {/* Rule Detail */}
               {result.ruleDetail && result.showRule && (
                 <View style={styles.ruleCard}>
-                  <Text style={styles.ruleLabel}>📜 THE RULE</Text>
+                  <Text style={styles.ruleLabel}>📜 {S.theRule}</Text>
                   <Text style={styles.ruleText}>{result.ruleDetail}</Text>
                 </View>
               )}
 
+              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba') && (
+                <TouchableOpacity style={styles.pbpBtn} onPress={openPlays}>
+                  <Text style={styles.pbpBtnText}>⏪ {S.playByPlay}</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-                <Text style={styles.shareBtnText}>↑ Share The Smart Play</Text>
+                <Text style={styles.shareBtnText}>↑ {S.share}</Text>
               </TouchableOpacity>
 
               {/* Follow-up Chips */}
               <View style={styles.followUpSection}>
-                <Text style={styles.followUpTitle}>Ask a follow-up</Text>
+                <Text style={styles.followUpTitle}>{S.askFollowUp}</Text>
                 <View style={styles.chipsWrap}>
-                  {FOLLOW_UPS.map(q => (
+                  {followUps.map(q => (
                     <TouchableOpacity
                       key={q}
                       style={[styles.chip, activeChip === q && styles.chipActive]}
@@ -587,7 +640,7 @@ useEffect(() => {
                     style={styles.askInput}
                     value={askText}
                     onChangeText={setAskText}
-                    placeholder="Ask anything about this play…"
+                    placeholder={S.askPlaceholder}
                     placeholderTextColor={theme.textMuted}
                     returnKeyType="send"
                     onSubmitEditing={handleAsk}
@@ -604,7 +657,7 @@ useEffect(() => {
 
                 {followUpLoading && (
                   <View style={styles.thinkingRow}>
-                    <Text style={styles.thinkingText}>Thinking...</Text>
+                    <Text style={styles.thinkingText}>{S.thinking}</Text>
                   </View>
                 )}
                 {followUpAnswer && (
@@ -615,9 +668,17 @@ useEffect(() => {
                 )}
               </View>
             </Animated.View>
-          ) : !loading ? <EmptyState sport={sport} reason="select-game" /> : null}
+          ) : !loading ? <EmptyState sport={sport} reason="select-game" language={language} /> : null}
         </ScrollView>
       </SafeAreaView>
+
+      <PlaysSheet
+        visible={playsOpen}
+        plays={plays}
+        loading={playsLoading}
+        onClose={() => setPlaysOpen(false)}
+        onSelect={selectPlay}
+      />
 
       <SettingsScreen
         visible={showSettings}
@@ -679,6 +740,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
   shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  pbpBtn: { marginHorizontal: 16, marginBottom: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  pbpBtnText: { color: t.accentText, fontSize: 15, fontWeight: '700' },
+  pastPlayRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pastPlayBadge: { backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.accent, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  pastPlayBadgeText: { color: t.accentText, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  backToLatest: { color: t.accentText, fontSize: 12, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
   complexityText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   faqSection: { marginHorizontal: 16, marginTop: 4, marginBottom: 12, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },

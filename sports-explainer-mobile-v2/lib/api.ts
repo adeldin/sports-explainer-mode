@@ -15,9 +15,29 @@ export interface ExplanationResponse {
   rawPlay?: string;
 }
 
+export interface Play {
+  id: string;
+  text: string;
+  period: string;   // human label, e.g. "Top 1st Inning" / "2nd Quarter 8:50"
+  scoring: boolean; // true for scoring plays (home run, goal, etc.)
+}
+
 const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 
-export async function fetchExplanation(sport: Sport, level: Level, gameId?: string, language: Language = 'en'): Promise<ExplanationResponse> {
+// Sports whose ESPN summary endpoint exposes a play-by-play `plays[]` array.
+const SUMMARY_PATHS: Partial<Record<Sport, string>> = {
+  mlb: 'baseball/mlb',
+  nhl: 'hockey/nhl',
+  nba: 'basketball/nba',
+};
+
+export async function fetchExplanation(
+  sport: Sport,
+  level: Level,
+  gameId?: string,
+  language: Language = 'en',
+  playText?: string, // explain THIS specific play instead of the latest
+): Promise<ExplanationResponse> {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -25,12 +45,39 @@ export async function fetchExplanation(sport: Sport, level: Level, gameId?: stri
       sport,
       level,
       gameId, // Pass the ID to the backend
-      language
+      language,
+      playText, // omitted by JSON.stringify when undefined
     }),
   });
 
   if (!response.ok) throw new Error('Failed to fetch explanation');
   return response.json();
+}
+
+// Lazy-loaded play-by-play list for a game, most-recent-first. [] if unsupported.
+export async function fetchPlays(sport: Sport, gameId: string): Promise<Play[]> {
+  const path = SUMMARY_PATHS[sport];
+  if (!path) return [];
+  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  const raw: any[] = Array.isArray(data?.plays) ? data.plays : [];
+
+  const plays: Play[] = [];
+  for (const p of raw) {
+    const text: string = p?.text || '';
+    // Skip period markers ("Top of the 1st inning", "Start of 1st Period", "Game End").
+    if (!text || /inning|^start of|^end of|game end/i.test(text)) continue;
+    const per = p.period || {};
+    const clock = p.clock?.displayValue;
+    const period = [
+      sport === 'mlb' && per.type ? per.type : null,
+      per.displayValue || (per.number ? `Period ${per.number}` : null),
+      sport !== 'mlb' && clock ? clock : null,
+    ].filter(Boolean).join(' ');
+    plays.push({ id: String(p.id ?? plays.length), text, period, scoring: !!p.scoringPlay });
+  }
+  return plays.reverse(); // most recent first
 }
 
 export async function askQuestion(

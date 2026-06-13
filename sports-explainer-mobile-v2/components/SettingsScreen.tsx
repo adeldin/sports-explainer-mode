@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated,
 import { BlurView } from 'expo-blur';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
+import { UI_STRINGS } from '../lib/strings';
 
 const { width } = Dimensions.get('window');
 
@@ -19,12 +20,14 @@ interface Props {
   onNotificationsToggle: (val: boolean) => void;
 }
 
-const LEVELS: { key: Level; label: string; desc: string }[] = [
-  { key: 'kid', label: '🧒 Kid Mode', desc: 'Simple analogies, zero jargon' },
-  { key: 'beginner', label: '👋 Beginner', desc: 'New fan friendly' },
-  { key: 'intermediate', label: '📺 Intermediate', desc: 'Regular viewer' },
-  { key: 'expert', label: '🎓 Expert', desc: 'Coaching-level analysis' },
+const LEVELS: { key: Level; emoji: string }[] = [
+  { key: 'kid', emoji: '🧒' },
+  { key: 'beginner', emoji: '👋' },
+  { key: 'intermediate', emoji: '📺' },
+  { key: 'expert', emoji: '🎓' },
 ];
+
+const THEMES: ThemeMode[] = ['system', 'dark', 'light'];
 
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'en', label: 'English' },
@@ -37,12 +40,6 @@ const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'zh', label: '中文' },
   { key: 'ko', label: '한국어' },
   { key: 'ar', label: 'العربية' },
-];
-
-const THEMES: { key: ThemeMode; label: string }[] = [
-  { key: 'system', label: 'System' },
-  { key: 'dark', label: 'Dark' },
-  { key: 'light', label: 'Light' },
 ];
 
 export default function SettingsScreen({
@@ -59,6 +56,15 @@ export default function SettingsScreen({
 }: Props) {
   const { mode, theme, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const S = UI_STRINGS[language];
+  const LVL: Record<Level, { label: string; desc: string }> = {
+    kid: { label: S.lvlKid, desc: S.lvlKidDesc },
+    beginner: { label: S.lvlBeginner, desc: S.lvlBeginnerDesc },
+    intermediate: { label: S.lvlInter, desc: S.lvlInterDesc },
+    expert: { label: S.lvlExpert, desc: S.lvlExpertDesc },
+  };
+  const THEME_LABEL: Record<ThemeMode, string> = { system: S.tSystem, dark: S.tDark, light: S.tLight };
+
   const translateX = useRef(new Animated.Value(width)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
@@ -87,40 +93,40 @@ export default function SettingsScreen({
         <BlurView intensity={40} tint={theme.mode === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>Settings</Text>
+            <Text style={styles.title}>{S.settings}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>EXPERTISE LEVEL</Text>
+            <Text style={styles.sectionLabel}>{S.secExpertise}</Text>
             {LEVELS.map(l => (
               <TouchableOpacity
                 key={l.key}
                 style={[styles.levelRow, level === l.key && styles.levelRowActive]}
                 onPress={() => onLevelChange(l.key)}>
                 <View style={styles.levelInfo}>
-                  <Text style={styles.levelLabel}>{l.label}</Text>
-                  <Text style={styles.levelDesc}>{l.desc}</Text>
+                  <Text style={styles.levelLabel}>{l.emoji} {LVL[l.key].label}</Text>
+                  <Text style={styles.levelDesc}>{LVL[l.key].desc}</Text>
                 </View>
                 {level === l.key && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
             ))}
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>APPEARANCE</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secAppearance}</Text>
             <View style={styles.segment}>
               {THEMES.map(th => (
                 <TouchableOpacity
-                  key={th.key}
-                  style={[styles.segmentItem, mode === th.key && styles.segmentItemActive]}
-                  onPress={() => setMode(th.key)}>
-                  <Text style={[styles.segmentText, mode === th.key && styles.segmentTextActive]}>{th.label}</Text>
+                  key={th}
+                  style={[styles.segmentItem, mode === th && styles.segmentItemActive]}
+                  onPress={() => setMode(th)}>
+                  <Text style={[styles.segmentText, mode === th && styles.segmentTextActive]}>{THEME_LABEL[th]}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>LANGUAGE</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secLanguage}</Text>
             <View style={styles.langWrap}>
               {LANGUAGES.map(l => (
                 <TouchableOpacity
@@ -132,13 +138,12 @@ export default function SettingsScreen({
               ))}
             </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>PREFERENCES</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secPreferences}</Text>
 
-            {/* Auto-Refresh Toggle */}
             <View style={styles.toggleRow}>
               <View>
-                <Text style={styles.toggleLabel}>Auto-Refresh</Text>
-                <Text style={styles.toggleDesc}>Update every 60 seconds</Text>
+                <Text style={styles.toggleLabel}>{S.autoRefresh}</Text>
+                <Text style={styles.toggleDesc}>{S.autoRefreshDesc}</Text>
               </View>
               <Switch
                 value={autoRefresh}
@@ -148,11 +153,10 @@ export default function SettingsScreen({
               />
             </View>
 
-            {/* Notifications Toggle */}
             <View style={[styles.toggleRow, { marginTop: 12 }]}>
               <View>
-                <Text style={styles.toggleLabel}>Game Alerts</Text>
-                <Text style={styles.toggleDesc}>Notify me when favorite teams play</Text>
+                <Text style={styles.toggleLabel}>{S.gameAlerts}</Text>
+                <Text style={styles.toggleDesc}>{S.gameAlertsDesc}</Text>
               </View>
               <Switch
                 value={notificationsEnabled}
@@ -164,7 +168,7 @@ export default function SettingsScreen({
 
             <View style={styles.versionBox}>
               <Text style={styles.versionText}>Sports Explainer v1.0</Text>
-              <Text style={styles.versionText}>Powered by Groq + ESPN</Text>
+              <Text style={styles.versionText}>{S.poweredBy}</Text>
             </View>
           </ScrollView>
         </View>
