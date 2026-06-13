@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Level, Language } from '../lib/api';
+import { useTheme, Theme, ThemeMode } from '../lib/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +39,12 @@ const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'ar', label: 'العربية' },
 ];
 
+const THEMES: { key: ThemeMode; label: string }[] = [
+  { key: 'system', label: 'System' },
+  { key: 'dark', label: 'Dark' },
+  { key: 'light', label: 'Light' },
+];
+
 export default function SettingsScreen({
   visible,
   level,
@@ -50,6 +57,8 @@ export default function SettingsScreen({
   onAutoRefreshChange,
   onNotificationsToggle
 }: Props) {
+  const { mode, theme, setMode } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const translateX = useRef(new Animated.Value(width)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(false);
@@ -75,7 +84,7 @@ export default function SettingsScreen({
     <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, { opacity }]}>
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
       <Animated.View style={[styles.panel, { transform: [{ translateX }] }]}>
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <BlurView intensity={40} tint={theme.mode === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>Settings</Text>
@@ -83,7 +92,7 @@ export default function SettingsScreen({
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.sectionLabel}>EXPERTISE LEVEL</Text>
             {LEVELS.map(l => (
@@ -99,6 +108,18 @@ export default function SettingsScreen({
               </TouchableOpacity>
             ))}
 
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>APPEARANCE</Text>
+            <View style={styles.segment}>
+              {THEMES.map(th => (
+                <TouchableOpacity
+                  key={th.key}
+                  style={[styles.segmentItem, mode === th.key && styles.segmentItemActive]}
+                  onPress={() => setMode(th.key)}>
+                  <Text style={[styles.segmentText, mode === th.key && styles.segmentTextActive]}>{th.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <Text style={[styles.sectionLabel, { marginTop: 30 }]}>LANGUAGE</Text>
             <View style={styles.langWrap}>
               {LANGUAGES.map(l => (
@@ -112,7 +133,7 @@ export default function SettingsScreen({
             </View>
 
             <Text style={[styles.sectionLabel, { marginTop: 30 }]}>PREFERENCES</Text>
-            
+
             {/* Auto-Refresh Toggle */}
             <View style={styles.toggleRow}>
               <View>
@@ -122,7 +143,7 @@ export default function SettingsScreen({
               <Switch
                 value={autoRefresh}
                 onValueChange={onAutoRefreshChange}
-                trackColor={{ false: '#333', true: '#0055ff' }}
+                trackColor={{ false: theme.borderStrong, true: theme.accent }}
                 thumbColor="#fff"
               />
             </View>
@@ -136,7 +157,7 @@ export default function SettingsScreen({
               <Switch
                 value={notificationsEnabled}
                 onValueChange={onNotificationsToggle}
-                trackColor={{ false: '#333', true: '#0055ff' }}
+                trackColor={{ false: theme.borderStrong, true: theme.accent }}
                 thumbColor="#fff"
               />
             </View>
@@ -152,29 +173,34 @@ export default function SettingsScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: { zIndex: 100, backgroundColor: 'rgba(0,0,0,0.5)' },
-  panel: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '82%', overflow: 'hidden', borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.08)' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  overlay: { zIndex: 100, backgroundColor: t.scrim },
+  panel: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '82%', overflow: 'hidden', borderLeftWidth: 1, borderLeftColor: t.border },
   content: { flex: 1, padding: 24, paddingTop: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
-  title: { color: '#fff', fontSize: 28, fontWeight: '900' },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' },
-  closeText: { color: '#fff', fontSize: 16 },
-  sectionLabel: { color: '#555', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
-  levelRow: { padding: 16, borderRadius: 12, backgroundColor: '#111', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#222' },
-  levelRowActive: { borderColor: '#0055ff', backgroundColor: '#001133' },
+  title: { color: t.textPrimary, fontSize: 28, fontWeight: '900' },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: t.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
+  closeText: { color: t.textPrimary, fontSize: 16 },
+  sectionLabel: { color: t.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
+  levelRow: { padding: 16, borderRadius: 12, backgroundColor: t.surface, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: t.border },
+  levelRowActive: { borderColor: t.accent, backgroundColor: t.surfaceActive },
   levelInfo: { flex: 1 },
-  levelLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  levelDesc: { color: '#666', fontSize: 12, marginTop: 2 },
-  checkmark: { color: '#0055ff', fontSize: 18, fontWeight: '900' },
+  levelLabel: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  levelDesc: { color: t.textSecondary, fontSize: 12, marginTop: 2 },
+  checkmark: { color: t.accent, fontSize: 18, fontWeight: '900' },
+  segment: { flexDirection: 'row', backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border, padding: 4, gap: 4 },
+  segmentItem: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  segmentItemActive: { backgroundColor: t.surfaceActive },
+  segmentText: { color: t.textSecondary, fontSize: 14, fontWeight: '700' },
+  segmentTextActive: { color: t.accentText },
   langWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  langPill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  langPillActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
-  langText: { color: '#aaa', fontSize: 14, fontWeight: '600' },
-  langTextActive: { color: '#4488ff' },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#111', borderRadius: 12, borderWidth: 1, borderColor: '#222' },
-  toggleLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  toggleDesc: { color: '#666', fontSize: 12, marginTop: 2 },
+  langPill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  langPillActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
+  langText: { color: t.textSecondary, fontSize: 14, fontWeight: '600' },
+  langTextActive: { color: t.accentText },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border },
+  toggleLabel: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  toggleDesc: { color: t.textSecondary, fontSize: 12, marginTop: 2 },
   versionBox: { marginTop: 40, alignItems: 'center', gap: 4 },
-  versionText: { color: '#333', fontSize: 12 },
+  versionText: { color: t.textMuted, fontSize: 12 },
 });

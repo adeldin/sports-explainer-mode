@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, StatusBar, FlatList,
@@ -25,6 +25,7 @@ import MorphCinematic from './components/MorphCinematic';
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from './lib/api';
 import { registerForPushNotificationsAsync } from './lib/notifications';
+import { useTheme, Theme } from './lib/theme';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
@@ -97,6 +98,10 @@ export default function App() {
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [askText, setAskText] = useState('');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // --- Theme ---
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // --- Refs ---
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -358,7 +363,7 @@ useEffect(() => {
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={theme.statusBar} />
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
@@ -406,7 +411,7 @@ useEffect(() => {
                 await fetchGames();
                 await handleFetch(true);
               }}
-              tintColor="#ffffff"
+              tintColor={theme.textSecondary}
             />
           }>
 
@@ -517,7 +522,7 @@ useEffect(() => {
                     value={askText}
                     onChangeText={setAskText}
                     placeholder="Ask anything about this play…"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={theme.textMuted}
                     returnKeyType="send"
                     onSubmitEditing={handleAsk}
                     editable={!followUpLoading}
@@ -527,7 +532,7 @@ useEffect(() => {
                     style={[styles.askSend, (!askText.trim() || followUpLoading) && styles.askSendDisabled]}
                     onPress={handleAsk}
                     disabled={!askText.trim() || followUpLoading}>
-                    <Text style={styles.askSendText}>↑</Text>
+                    <Text style={[styles.askSendText, (!askText.trim() || followUpLoading) && { color: theme.textMuted }]}>↑</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -570,61 +575,61 @@ useEffect(() => {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: t.background },
   safe: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
-  headerTitle: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: t.textPrimary },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a0000', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: '#ff3b3033' },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff3b30' },
-  livePillText: { color: '#ff3b30', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  cogBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
+  livePillText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  cogBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: t.border },
   cogIcon: { fontSize: 18 },
   tabsContainer: { height: 70, marginBottom: 10 },
   sportTabsContent: { paddingHorizontal: 16, gap: 8 },
-  sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', minWidth: 64 },
-  sportTabActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
+  sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
+  sportTabActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   sportEmoji: { fontSize: 20 },
-  sportLabel: { color: '#666', fontSize: 11, fontWeight: '700', marginTop: 2 },
-  sportLabelActive: { color: '#4488ff' },
+  sportLabel: { color: t.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  sportLabelActive: { color: t.accentText },
   gameStripContainer: { paddingHorizontal: 16, paddingVertical: 12, marginBottom: 10 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
-  skeleton: { padding: 20, marginHorizontal: 16, backgroundColor: '#111', borderRadius: 16 },
-  skeletonLine: { backgroundColor: '#1a1a1a', borderRadius: 6 },
-  explanationCard: { backgroundColor: '#0a0a1a', borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#ffffff22', borderWidth: 1, borderColor: '#1a1a2e' },
-  explanationLabel: { color: '#888', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
+  skeleton: { padding: 20, marginHorizontal: 16, backgroundColor: t.surface, borderRadius: 16 },
+  skeletonLine: { backgroundColor: t.surfaceAlt, borderRadius: 6 },
+  explanationCard: { backgroundColor: t.explanationBg, borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.stripe, borderWidth: 1, borderColor: t.border },
+  explanationLabel: { color: t.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
   explanationHeader: { flexDirection: 'column', marginBottom: 12, gap: 4 },
-  explanationText: { color: '#f0f0f0', fontSize: 17, lineHeight: 26 },
-  contextTime: { color: '#444', fontSize: 11 },
-  playPillText: { color: '#888', fontSize: 12, fontWeight: '600', lineHeight: 18 },
-  insightCard: { backgroundColor: '#00112a', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#0055ff', borderWidth: 1, borderColor: '#001a44' },
-  insightLabel: { color: '#4488ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
-  insightText: { color: '#aac4ff', fontSize: 15, lineHeight: 22 },
-  ruleCard: { backgroundColor: '#001a0d', borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#34C759', borderWidth: 1, borderColor: '#003319' },
-  ruleLabel: { color: '#34C759', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
-  ruleText: { color: '#a0ffb8', fontSize: 15, lineHeight: 22 },
+  explanationText: { color: t.textPrimary, fontSize: 17, lineHeight: 26 },
+  contextTime: { color: t.textMuted, fontSize: 11 },
+  playPillText: { color: t.textSecondary, fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  insightCard: { backgroundColor: t.insightBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.accent, borderWidth: 1, borderColor: t.insightBorder },
+  insightLabel: { color: t.insightLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
+  insightText: { color: t.insightText, fontSize: 15, lineHeight: 22 },
+  ruleCard: { backgroundColor: t.ruleBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.ruleLabel, borderWidth: 1, borderColor: t.ruleBorder },
+  ruleLabel: { color: t.ruleLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
+  ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22 },
   hiddenCard: { position: 'absolute', top: -9999, left: -9999, opacity: 0 },
-  shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  shareBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  complexityBadge: { alignSelf: 'flex-start', backgroundColor: '#1a0a00', borderWidth: 1, borderColor: '#ff6b00', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
-  complexityText: { color: '#ff6b00', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
+  complexityText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   followUpSection: { marginTop: 8, paddingHorizontal: 16 },
-  followUpTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  followUpTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  chipActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
-  chipText: { color: '#888', fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: '#4488ff' },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  chipActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
+  chipText: { color: t.textSecondary, fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: t.accentText },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  askInput: { flex: 1, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: '#fff', fontSize: 14 },
-  askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#0055ff', alignItems: 'center', justifyContent: 'center' },
-  askSendDisabled: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#222' },
-  askSendText: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  askInput: { flex: 1, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: t.textPrimary, fontSize: 14 },
+  askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
+  askSendDisabled: { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border },
+  askSendText: { color: t.onAccent, fontSize: 18, fontWeight: '900' },
   thinkingRow: { marginTop: 16, alignItems: 'center' },
-  thinkingText: { color: '#444', fontSize: 13, fontStyle: 'italic' },
-  answerCard: { marginTop: 16, padding: 16, backgroundColor: '#0a0a0a', borderRadius: 14, borderWidth: 1, borderColor: '#1a1a1a' },
-  answerHeader: { color: '#4488ff', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  answerText: { color: '#bbb', fontSize: 15, lineHeight: 23 },
+  thinkingText: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
+  answerCard: { marginTop: 16, padding: 16, backgroundColor: t.surfaceAlt, borderRadius: 14, borderWidth: 1, borderColor: t.border },
+  answerHeader: { color: t.accentText, fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  answerText: { color: t.textSecondary, fontSize: 15, lineHeight: 23 },
 });

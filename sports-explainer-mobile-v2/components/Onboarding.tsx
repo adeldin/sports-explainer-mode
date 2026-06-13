@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, Dimensions, StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme, Theme } from '../lib/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +33,8 @@ export default function Onboarding({ onComplete }: Props) {
   const [screen, setScreen] = useState<0 | 1 | 2>(0);
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   async function handleComplete() {
     if (!selectedLevel || !selectedSport) return;
@@ -45,7 +48,7 @@ export default function Onboarding({ onComplete }: Props) {
   if (screen === 0) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle={theme.statusBar} />
         <View style={styles.container}>
           <View style={styles.heroSection}>
             <Text style={styles.trophy}>🏆</Text>
@@ -78,7 +81,7 @@ export default function Onboarding({ onComplete }: Props) {
   if (screen === 1) {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar barStyle={theme.statusBar} />
         <View style={styles.container}>
           <View style={styles.stepHeader}>
             <Text style={styles.stepIndicator}>Step 1 of 2</Text>
@@ -108,7 +111,7 @@ export default function Onboarding({ onComplete }: Props) {
             style={[styles.primaryBtn, !selectedLevel && styles.primaryBtnDisabled]}
             onPress={() => selectedLevel && setScreen(2)}
             disabled={!selectedLevel}>
-            <Text style={styles.primaryBtnText}>Next →</Text>
+            <Text style={[styles.primaryBtnText, !selectedLevel && { color: theme.textMuted }]}>Next →</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -145,7 +148,7 @@ export default function Onboarding({ onComplete }: Props) {
           style={[styles.primaryBtn, (!selectedLevel || !selectedSport) && styles.primaryBtnDisabled]}
           onPress={handleComplete}
           disabled={!selectedLevel || !selectedSport}>
-          <Text style={styles.primaryBtnText}>Let's Go 🚀</Text>
+          <Text style={[styles.primaryBtnText, (!selectedLevel || !selectedSport) && { color: theme.textMuted }]}>Let's Go 🚀</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.backBtn} onPress={() => setScreen(1)}>
@@ -157,6 +160,8 @@ export default function Onboarding({ onComplete }: Props) {
 }
 
 function FeatureRow({ emoji, text }: { emoji: string; text: string }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={styles.featureRow}>
       <Text style={styles.featureEmoji}>{emoji}</Text>
@@ -165,52 +170,52 @@ function FeatureRow({ emoji, text }: { emoji: string; text: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16, justifyContent: 'space-between' },
 
   // Welcome
   heroSection: { alignItems: 'center', marginTop: 20 },
   trophy: { fontSize: 64, marginBottom: 12 },
-  appName: { fontSize: 32, fontWeight: '900', color: '#fff', marginBottom: 12 },
-  taglinePill: { backgroundColor: '#1a0a00', borderWidth: 1, borderColor: '#ff6b00', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20 },
-  taglineText: { color: '#ff6b00', fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
-  heroSub: { color: '#666', fontSize: 16, textAlign: 'center', lineHeight: 26 },
+  appName: { fontSize: 32, fontWeight: '900', color: t.textPrimary, marginBottom: 12 },
+  taglinePill: { backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20 },
+  taglineText: { color: t.warn, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  heroSub: { color: t.textSecondary, fontSize: 16, textAlign: 'center', lineHeight: 26 },
   featureList: { gap: 16, marginVertical: 20 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   featureEmoji: { fontSize: 24, width: 32, textAlign: 'center' },
-  featureText: { color: '#aaa', fontSize: 15, flex: 1, lineHeight: 22 },
+  featureText: { color: t.textSecondary, fontSize: 15, flex: 1, lineHeight: 22 },
 
   // Steps
   stepHeader: { marginBottom: 8 },
-  stepIndicator: { color: '#ff6b00', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
-  stepTitle: { color: '#fff', fontSize: 26, fontWeight: '900', marginBottom: 6 },
-  stepSub: { color: '#555', fontSize: 14 },
+  stepIndicator: { color: t.warn, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
+  stepTitle: { color: t.textPrimary, fontSize: 26, fontWeight: '900', marginBottom: 6 },
+  stepSub: { color: t.textMuted, fontSize: 14 },
 
   // Level Options
   optionList: { gap: 10, flex: 1, justifyContent: 'center' },
-  optionRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 14, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', gap: 14 },
-  optionRowActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, gap: 14 },
+  optionRowActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   optionEmoji: { fontSize: 28 },
   optionText: { flex: 1 },
-  optionLabel: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  optionLabelActive: { color: '#4488ff' },
-  optionSub: { color: '#555', fontSize: 13, marginTop: 2 },
-  checkmark: { color: '#4488ff', fontSize: 18, fontWeight: '900' },
+  optionLabel: { color: t.textPrimary, fontSize: 16, fontWeight: '700' },
+  optionLabelActive: { color: t.accentText },
+  optionSub: { color: t.textMuted, fontSize: 13, marginTop: 2 },
+  checkmark: { color: t.accentText, fontSize: 18, fontWeight: '900' },
 
   // Sport Grid
   sportGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, flex: 1, alignContent: 'center' },
-  sportTile: { width: (width - 60) / 2, alignItems: 'center', padding: 24, borderRadius: 16, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  sportTileActive: { backgroundColor: '#001133', borderColor: '#0055ff' },
+  sportTile: { width: (width - 60) / 2, alignItems: 'center', padding: 24, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  sportTileActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   sportEmoji: { fontSize: 40, marginBottom: 8 },
-  sportLabel: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  sportLabelActive: { color: '#4488ff' },
-  sportSub: { color: '#555', fontSize: 12, marginTop: 4 },
+  sportLabel: { color: t.textPrimary, fontSize: 18, fontWeight: '800' },
+  sportLabelActive: { color: t.accentText },
+  sportSub: { color: t.textMuted, fontSize: 12, marginTop: 4 },
 
   // Buttons
-  primaryBtn: { backgroundColor: '#0055ff', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
-  primaryBtnDisabled: { backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  primaryBtn: { backgroundColor: t.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
+  primaryBtnDisabled: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  primaryBtnText: { color: t.onAccent, fontSize: 17, fontWeight: '800' },
   backBtn: { alignItems: 'center', paddingVertical: 12 },
-  backBtnText: { color: '#444', fontSize: 15 },
+  backBtnText: { color: t.textMuted, fontSize: 15 },
 });

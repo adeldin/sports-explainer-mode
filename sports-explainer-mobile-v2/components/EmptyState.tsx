@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme, Theme } from '../lib/theme';
 
 interface Props {
   sport: string;
@@ -66,6 +68,8 @@ function isOffSeason(sport: string): boolean {
 }
 
 export default function EmptyState({ sport, reason }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const config = SPORT_CONFIG[sport] || {
     emoji: '📡',
     name: sport.toUpperCase(),
@@ -110,7 +114,7 @@ export default function EmptyState({ sport, reason }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     alignItems: 'center',
     marginTop: 60,
@@ -122,28 +126,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    color: '#fff',
+    color: t.textPrimary,
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
   },
   subtitle: {
-    color: '#555',
+    color: t.textMuted,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
   },
   badge: {
     marginTop: 16,
-    backgroundColor: '#1a0a00',
+    backgroundColor: t.warnBg,
     borderWidth: 1,
-    borderColor: '#ff6b00',
+    borderColor: t.warn,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   badgeText: {
-    color: '#ff6b00',
+    color: t.warn,
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1,
