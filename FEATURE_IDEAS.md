@@ -47,12 +47,19 @@ historical data · past plays for soccer.
 
 **Remaining backend: nothing — the backend expansion is complete.**
 
-## 🔜 Next phase — Mobile UI (active tasks, in order)
+## 🔜 Next phase — Mobile UI
 
-1. **Widen `Sport` type** in `sports-explainer-mobile-v2/lib/api.ts` to include `soccer` / `worldcup` / `rugby`.
-2. **Add soccer, World Cup, rugby to the sport picker** (port game-listing logic — soccer via the normal scoreboard API, rugby via the Core-API two-step fetch from the extension's `background.js`).
-3. **Add a language picker UI** that sends the `language` param (`SettingsScreen.tsx` already exists to host it).
+**Shipped (`ae35462`):**
+- ✅ Widened `Sport` type (+`soccer`/`worldcup`/`rugby`) in `lib/api.ts`.
+- ✅ Soccer, World Cup, rugby in the sport picker (rugby via the Core-API two-step `$ref` fetch; leagues match the backend so `gameId`s align).
+- ✅ Language picker in `SettingsScreen.tsx` — 10 languages, persisted, re-fetches on change.
+
+**Active, in order:**
+1. **Team logos on game cards** — fast win (next).
+2. **Dark / light mode.**
+3. **FAQ chips** — browsable common questions per sport, routed through the existing ask path.
 4. **Past plays** — scroll back through a game's plays and tap one to explain. Start with **MLB / NHL** (`plays[]` confirmed; NBA confirmed too; NFL verify in-season; soccer uses `commentary[]`/`keyEvents[]`).
+5. **App Store submission.**
 
 ---
 
