@@ -447,26 +447,29 @@ useEffect(() => {
               Collapsed by default so it stays compact above the games. */}
           <View style={styles.faqSection}>
             <TouchableOpacity style={styles.faqHeadingRow} onPress={() => setFaqSectionOpen(v => !v)} activeOpacity={0.7}>
-              <Text style={styles.faqHeading}>Common {SPORT_FAQS[sport].label} Questions</Text>
+              <Text style={styles.faqHeading}>{SPORT_FAQS[sport].label[language]}</Text>
               <Text style={styles.faqHeadingChevron}>{faqSectionOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
             {faqSectionOpen && (
               <>
-                {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => (
-                  <View key={q} style={styles.faqItem}>
-                    <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(q)} activeOpacity={0.7}>
-                      <Text style={styles.faqQ}>{q}</Text>
-                      <Text style={styles.faqChevron}>{activeFaq === q ? '−' : '+'}</Text>
-                    </TouchableOpacity>
-                    {activeFaq === q && (
-                      <View style={styles.faqAnswerBox}>
-                        {faqAnswers[q]
-                          ? <Text style={styles.faqAnswer}>{faqAnswers[q]}</Text>
-                          : <Text style={styles.faqThinking}>Thinking…</Text>}
-                      </View>
-                    )}
-                  </View>
-                ))}
+                {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => {
+                  const text = q[language] || q.en;
+                  return (
+                    <View key={q.en} style={styles.faqItem}>
+                      <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(text)} activeOpacity={0.7}>
+                        <Text style={styles.faqQ}>{text}</Text>
+                        <Text style={styles.faqChevron}>{activeFaq === text ? '−' : '+'}</Text>
+                      </TouchableOpacity>
+                      {activeFaq === text && (
+                        <View style={styles.faqAnswerBox}>
+                          {faqAnswers[text]
+                            ? <Text style={styles.faqAnswer}>{faqAnswers[text]}</Text>
+                            : <Text style={styles.faqThinking}>Thinking…</Text>}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
                 {SPORT_FAQS[sport].questions.length > 4 && (
                   <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
                     <Text style={styles.faqMoreText}>
