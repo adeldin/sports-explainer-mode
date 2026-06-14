@@ -13,6 +13,12 @@ import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
+import {
+  useFonts,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
 
 // Components
 import GameCard from './components/GameCard';
@@ -74,6 +80,13 @@ interface Game {
 }
 
 export default function App() {
+  // --- Fonts (Space Grotesk — SportsWise brand) ---
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk_700Bold,     // "SportsWise" wordmark (cinematic — applied separately)
+    SpaceGrotesk_600SemiBold, // main header
+    SpaceGrotesk_500Medium,   // "The Smart Play" tagline (applied separately)
+  });
+
   // --- State ---
   const [appReady, setAppReady] = useState(false);
   const [isAnimationComplete, setAnimationComplete] = useState(false);
@@ -340,8 +353,6 @@ export default function App() {
 useEffect(() => {
   async function init() {
     try {
-      await SplashScreen.hideAsync();
-
       const [onboarding, favs, notify, seenCine, lang] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
@@ -374,6 +385,14 @@ useEffect(() => {
   }
   init();
 }, []);
+
+// Hide the native splash only once data AND fonts are ready, so the first
+// real content paints with Space Grotesk already loaded — no font-swap flash.
+useEffect(() => {
+  if (appReady && fontsLoaded && onboardingComplete !== null) {
+    SplashScreen.hideAsync();
+  }
+}, [appReady, fontsLoaded, onboardingComplete]);
 
 useEffect(() => {
   // Skip in Expo Go — not supported since SDK 53
@@ -413,7 +432,7 @@ useEffect(() => {
   }, [autoRefresh, sport, level, selectedGameId, language]);
 
   // --- Conditional Returns (The Gatekeepers) ---
-  if (!appReady || onboardingComplete === null) return null;
+  if (!appReady || !fontsLoaded || onboardingComplete === null) return null;
 
   if (!isAnimationComplete) {
     return (
@@ -724,7 +743,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // (real layout + full opacity for a reliable rasterize) but stays hidden.
   captureLayer: { ...StyleSheet.absoluteFillObject, zIndex: -1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
-  headerTitle: { fontSize: 22, fontWeight: '900', color: t.textPrimary },
+  headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
