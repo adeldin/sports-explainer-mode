@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.adeldin.sportsexplainer"
+      "bundleIdentifier": "com.adeldin.sportswise"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.adeldin.sportsexplainer"
+      "package": "com.adeldin.sportswise"
     },
     "web": {
       "favicon": "./assets/favicon.png"
