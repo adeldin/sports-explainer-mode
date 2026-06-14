@@ -626,14 +626,18 @@ useEffect(() => {
               <View style={styles.followUpSection}>
                 <Text style={styles.followUpTitle}>{S.askFollowUp}</Text>
                 <View style={styles.chipsWrap}>
-                  {followUps.map(q => (
-                    <TouchableOpacity
-                      key={q}
-                      style={[styles.chip, activeChip === q && styles.chipActive]}
-                      onPress={() => handleFollowUp(q)}
-                      disabled={followUpLoading}>
-                      <Text style={[styles.chipText, activeChip === q && styles.chipTextActive]}>{q}</Text>
-                    </TouchableOpacity>
+                  {[followUps.slice(0, 2), followUps.slice(2, 4)].map((row, i) => (
+                    <View key={i} style={styles.chipRow}>
+                      {row.map(q => (
+                        <TouchableOpacity
+                          key={q}
+                          style={[styles.chip, activeChip === q && styles.chipActive]}
+                          onPress={() => handleFollowUp(q)}
+                          disabled={followUpLoading}>
+                          <Text style={[styles.chipText, activeChip === q && styles.chipTextActive]} numberOfLines={1}>{q}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   ))}
                 </View>
 
@@ -793,8 +797,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
   followUpSection: { marginTop: 8, paddingHorizontal: 16 },
   followUpTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  chipsWrap: { gap: 8 },                          // column of rows; 8px gap between the two rows
+  chipRow: { flexDirection: 'row', gap: 8 },      // two chips per row, 8px gap between them
+  chip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center' },
   chipActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   chipText: { color: t.textSecondary, fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: t.accentText },
