@@ -35,7 +35,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
   en: {
     thePlay: `THE PLAY`, whyItMatters: `WHY IT MATTERS`, theRule: `THE RULE`, complexPlay: `COMPLEX PLAY`, updated: `Updated`, latestPlay: `Latest Play`,
     playByPlay: `Play-by-Play`, loadMore: `Load more`, noPlays: `No play-by-play available for this game yet.`, showMore: `Show more`, showLess: `Show less`, pbpHint: `Tap any play to explain it · ● scoring play`,
-    askFollowUp: `Ask a follow-up`, fuWhy: `Why did that matter?`, fuRule: `Explain the rule`, fuNew: `Explain like I'm new`, fuNext: `What to watch for next?`,
+    askFollowUp: `Ask a follow-up`, fuWhy: `Why it mattered`, fuRule: `Explain the rule`, fuNew: `Explain like I'm new`, fuNext: `What's next?`,
     share: `Share The Smart Play`, askPlaceholder: `Ask anything about this play…`, thinking: `Thinking…`, answerError: `Could not get an answer. Try again.`,
     favTitle: `Favorite a Team`, favMsg: `Which team do you want to follow?`, cancel: `Cancel`,
     settings: `Settings`, secExpertise: `EXPERTISE LEVEL`, secAppearance: `APPEARANCE`, secLanguage: `LANGUAGE`, secPreferences: `PREFERENCES`,
