@@ -62,7 +62,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
           // "SportsWise" fades in.
           Animated.timing(titleOpacity, { toValue: 1, duration: 250, easing: ease, useNativeDriver: true }),
           // Short hold.
-          Animated.delay(500),
+          Animated.delay(800),
         ])
       : Animated.sequence([
           // Beat 1 — icon floats up + scales up + fades in together (0 → 1.2s).
