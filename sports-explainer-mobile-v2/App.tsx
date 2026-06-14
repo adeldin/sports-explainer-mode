@@ -353,6 +353,13 @@ export default function App() {
 useEffect(() => {
   async function init() {
     try {
+      // DEV ONLY — force the full launch cinematic every reload by clearing the
+      // persisted flag before it's read. Never runs in a production build.
+      // TODO: remove before App Store submission.
+      if (__DEV__) {
+        await AsyncStorage.removeItem('seen_cinematic');
+      }
+
       const [onboarding, favs, notify, seenCine, lang] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
