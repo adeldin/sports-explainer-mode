@@ -481,7 +481,7 @@ useEffect(() => {
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>🏆 SportsWise</Text>
+          <Text style={styles.headerTitle}>SportsWise</Text>
           <View style={styles.headerRight}>
             {autoRefresh && (
               <View style={styles.livePill}>
