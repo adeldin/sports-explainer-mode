@@ -19,7 +19,7 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
       <View style={styles.header}>
         <Text style={styles.trophy}>🏆</Text>
         <View>
-          <Text style={styles.appName}>Sports Explainer</Text>
+          <Text style={styles.appName}>SportsWise</Text>
           <Text style={styles.tagline}>⚡ THE SMART PLAY</Text>
         </View>
         <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport] || '🏆'}</Text>
@@ -49,7 +49,7 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>sportsexplainer.app</Text>
+        <Text style={styles.footerText}>sportswise.app</Text>
       </View>
     </View>
   );

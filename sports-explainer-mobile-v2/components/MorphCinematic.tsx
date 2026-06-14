@@ -236,7 +236,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
         </View>
 
         {/* Title + tagline */}
-        <Animated.Text style={[styles.title, titleStyle]}>SPORTS EXPLAINER</Animated.Text>
+        <Animated.Text style={[styles.title, titleStyle]}>SPORTSWISE</Animated.Text>
         <Animated.Text style={[styles.tagline, taglineStyle]}>⚡ THE SMART PLAY</Animated.Text>
       </Animated.View>
     </Pressable>

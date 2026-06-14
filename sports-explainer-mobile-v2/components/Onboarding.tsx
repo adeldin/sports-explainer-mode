@@ -65,7 +65,7 @@ export default function Onboarding({ language, onComplete }: Props) {
         <View style={styles.container}>
           <View style={styles.heroSection}>
             <Text style={styles.trophy}>🏆</Text>
-            <Text style={styles.appName}>Sports Explainer</Text>
+            <Text style={styles.appName}>SportsWise</Text>
             <View style={styles.taglinePill}>
               <Text style={styles.taglineText}>⚡ THE SMART PLAY</Text>
             </View>

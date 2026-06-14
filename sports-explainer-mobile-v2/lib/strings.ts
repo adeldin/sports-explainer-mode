@@ -2,7 +2,7 @@ import { Language } from './api';
 
 // Static UI copy, pre-translated into all 10 languages (Option B).
 // NOTE: ja/zh/ko/ar are a v1 first pass needing native review before launch
-// (see FEATURE_IDEAS.md). The app name "Sports Explainer" and the tagline
+// (see FEATURE_IDEAS.md). The app name "SportsWise" and the tagline
 // "THE SMART PLAY" are kept in English as brand.
 export interface UIStrings {
   // explanation card
