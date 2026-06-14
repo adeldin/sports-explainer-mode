@@ -20,7 +20,7 @@ in the conversation**, not to serve existing experts.
 - **Team Knowledge Companion** *(new)* — learn about a specific team before/outside games:
   standings context, player spotlights, key stats explained for non-fans.
   Use case: *"I just started dating a Bears fan, teach me about the Bears."*
-- **News Explainer** *(new, complex)* — breaking sports news translated for non-fans.
+- **News Companion** *(new, complex)* — breaking sports news translated for non-fans.
   Proactive / push-based. Requires a notification system or feed — **later phase**.
 
 ## 🔒 V1.0 scope lock
@@ -28,7 +28,7 @@ in the conversation**, not to serve existing experts.
 **IN:** translation fix · team logos · dark mode · past plays (MLB/NHL first) · FAQ chips ·
 soccer/rugby UI · App Store submission.
 
-**OUT (explicitly v2.0):** TV app · Government Explainer · Finance Explainer · full language
+**OUT (explicitly v2.0):** TV app · GovWise · StockWise · full language
 UI (backend done, UI later) · pop-up facts system · Team Knowledge Companion mode ·
 historical data · past plays for soccer.
 
@@ -86,6 +86,43 @@ Viewers don't understand broadcast jargon. The free-text box already handles thi
 mostly a **surfacing/prompting** problem. Add framing near the ask box like
 *"Heard a term you don't know? Ask what it means."*
 
+### 📸 Image / video upload — "show me what's on screen" *(v2, post-launch)*
+
+**Concept:** User points their phone at the TV, takes a photo or screenshot of a confusing
+moment, and uploads it. An AI **vision** model analyzes the image and returns a
+**level-appropriate** explanation of what it sees. Fills the gap when the live data feed
+misses something that's only visible on the broadcast.
+
+**Use cases:**
+- A confusing play the ESPN API didn't capture clearly.
+- A referee/official explanation graphic shown on screen.
+- A replay graphic showing penalty or call details.
+- A booth-review decision displayed on the broadcast.
+- A stats or standings graphic the user doesn't understand.
+- Anything on screen the live data feed misses.
+
+**Technical path:**
+- **Still photos preferred over video** — faster upload, cheaper, more reliable.
+- **Vision model:** GPT-4o vision (most capable), Claude vision, or Gemini — pick during build.
+- **Backend:** new `/api/explain-image` endpoint accepting **base64 image + sport + level + language**.
+- Same **four expertise levels** and **language support** as the text explanations.
+- **Prompt shape:** *"This is a screenshot from a live [sport] broadcast. Describe what is
+  happening and explain it at a [level] level."*
+
+**Monetization:** a natural **paid-tier** feature. Free = live API explanations; Paid = image
+upload for the moments the API misses. (See `MONETIZATION.md`.)
+
+**Platform extension:** the same capability applies to every future vertical —
+courtroom broadcast screenshot → **LegalWise**; financial news chart → **StockWise**;
+government hearing graphic → **GovWise**. Ties into the "[Topic]Wise" family above.
+
+**Challenges:**
+- Phone-camera angle / glare on TV screens (manageable).
+- Video too large/slow — **stick to still frames for v1**.
+- Higher cost per query than text — reinforces the paid-tier positioning.
+
+**Priority:** post-launch **v2**. Build **after App Store submission**.
+
 ---
 
 ## 🧲 Yahoo Sports features to steal
@@ -106,7 +143,7 @@ mostly a **surfacing/prompting** problem. Add framing near the ask box like
 - **Streaming live sports** is a **legal wall** (broadcast rights), not a technical one.
 - **Buildable:** an **Apple TV app (tvOS)** via the **Expo TV target** — same codebase,
   different build. The user watches the game through their own service; the app runs alongside.
-- **Picture-in-Picture:** user puts YouTube TV in a PiP corner, Sports Explainer fills the
+- **Picture-in-Picture:** user puts YouTube TV in a PiP corner, SportsWise fills the
   main screen — the closest thing to the overlay vision, and it **works today on tvOS**.
 - **TV provider integration** *(longer term)*: user signs in with YouTube TV/cable, the app
   knows what game they're watching = more relevant explanations.
@@ -116,7 +153,7 @@ mostly a **surfacing/prompting** problem. Add framing near the ask box like
 
 ---
 
-## 🌐 Platform vision — the "[Topic] Explainer" family
+## 🌐 Platform vision — the "[Topic]Wise" family
 
 The core product is a **real-time complexity translator**. Sports is the beachhead.
 
@@ -134,9 +171,9 @@ Repeated explanation needed · Wildly different expertise levels.
 
 **Key:** all verticals share the **same engine** (Groq + four expertise levels + ask
 anything). New verticals = **new data feeds + prompt context, not new architecture.**
-Brand asset: the **"[Topic] Explainer"** naming pattern is clean and scalable.
+Brand asset: the **"[Topic]Wise"** naming pattern is clean and scalable.
 
-**Sequencing:** prove Sports Explainer fully first, then expand — but keep the architecture
+**Sequencing:** prove SportsWise fully first, then expand — but keep the architecture
 **topic-agnostic**: no sports-specific hardcoding in the explanation layer.
 
 ---
