@@ -109,7 +109,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
         {/* Icon — shadow on the wrapper, rounding/clip on the Image (correct on both platforms) */}
         <Animated.View style={{ opacity: iconOpacity, transform: [{ translateY: iconY }, { scale: iconScale }] }}>
           <View style={styles.iconShadow}>
-            <Image source={require('../assets/icon-placeholder.png')} style={styles.icon} resizeMode="cover" />
+            <Image source={require('../assets/icon-source.png')} style={styles.icon} resizeMode="cover" />
           </View>
         </Animated.View>
 
