@@ -18,6 +18,7 @@ export interface Theme {
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  placeholderText: string;
 
   accent: string;
   accentText: string;
@@ -71,6 +72,7 @@ export const darkTheme: Theme = {
   textPrimary: '#ffffff',
   textSecondary: '#6b7690',
   textMuted: '#6b7690',
+  placeholderText: '#8b94a8',
   accent: '#E87722',
   accentText: '#F5A623',
   onAccent: '#0d1b3e',
@@ -103,6 +105,7 @@ export const lightTheme: Theme = {
   textPrimary: '#11151c',
   textSecondary: '#5b6573',
   textMuted: '#95a0ad',
+  placeholderText: '#8896a8',
   accent: '#E87722',
   accentText: '#C2611A',
   onAccent: '#0d1b3e',

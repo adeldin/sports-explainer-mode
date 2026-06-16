@@ -693,7 +693,7 @@ useEffect(() => {
                     value={askText}
                     onChangeText={setAskText}
                     placeholder={S.askPlaceholder}
-                    placeholderTextColor={theme.textMuted}
+                    placeholderTextColor={theme.placeholderText}
                     returnKeyType="send"
                     onSubmitEditing={handleAsk}
                     editable={!followUpLoading}
@@ -815,12 +815,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   explanationCard: { backgroundColor: t.explanationBg, borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.stripe, borderWidth: 1, borderColor: t.border },
   explanationLabel: { color: t.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
   explanationHeader: { flexDirection: 'column', marginBottom: 12, gap: 4 },
-  explanationText: { color: t.textPrimary, fontSize: 17, lineHeight: 26 },
+  explanationText: { color: t.textPrimary, fontSize: 18, fontWeight: '600', lineHeight: 26 },
   contextTime: { color: t.textMuted, fontSize: 11 },
-  playPillText: { color: t.textSecondary, fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  playPillText: { color: t.textSecondary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   insightCard: { backgroundColor: t.insightBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.accent, borderWidth: 1, borderColor: t.insightBorder },
   insightLabel: { color: t.insightLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
-  insightText: { color: t.insightText, fontSize: 15, lineHeight: 22 },
+  insightText: { color: t.textPrimary, fontSize: 18, fontWeight: '600', lineHeight: 26 },
   ruleCard: { backgroundColor: t.ruleBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.ruleLabel, borderWidth: 1, borderColor: t.ruleBorder },
   ruleLabel: { color: t.ruleLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22 },
@@ -847,7 +847,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chipRow: { flexDirection: 'row', gap: 8 },      // two chips per row, 8px gap between them
   chip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center' },
   chipActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
-  chipText: { color: t.textSecondary, fontSize: 13, fontWeight: '500' },
+  chipText: { color: t.textPrimary, fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: t.accentText },
   askHint: { color: t.textMuted, fontSize: 12, lineHeight: 16, marginTop: 12 },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
