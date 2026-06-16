@@ -1,9 +1,9 @@
 # .easignore — used by EAS Build INSTEAD of .gitignore when present.
-# Mirrors the repo .gitignore, EXCEPT it intentionally does NOT ignore
-# *.png, so the app icon and splash assets get uploaded to the build.
+# Lives at the GIT REPO ROOT (the archive root EAS uploads). It intentionally
+# does NOT ignore *.png, so the app icon and splash assets reach the build.
 
-# dependencies
-/node_modules
+# dependencies — un-anchored so it also catches sports-explainer-mobile-v2/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,6 +14,11 @@
 
 # testing
 /coverage
+
+# Expo / React Native (sports-explainer-mobile-v2) — caches/outputs, regenerated on the build
+.expo/
+dist/
+web-build/
 
 # next.js
 /.next/

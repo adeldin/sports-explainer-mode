@@ -41,7 +41,7 @@ yarn-error.*
 /android
 
 # Brand assets — keep these PNG icons in version control despite the root *.png ignore
+# (icon-source.png is intentionally NOT here — it's a local-only source, unreferenced by app.json/code)
 !assets/icon.png
-!assets/icon-source.png
 !assets/splash-icon.png
 !assets/adaptive-icon.png
