@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Brand assets — keep these PNG icons in version control despite the root *.png ignore
+!assets/icon.png
+!assets/icon-source.png
+!assets/splash-icon.png
+!assets/adaptive-icon.png
