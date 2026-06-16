@@ -488,7 +488,7 @@ useEffect(() => {
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>SportsWise</Text>
+          <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text></Text>
           <View style={styles.headerRight}>
             {autoRefresh && (
               <View style={styles.livePill}>
@@ -755,6 +755,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   captureLayer: { ...StyleSheet.absoluteFillObject, zIndex: -1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
+  headerTitleAccent: { color: t.accent },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },

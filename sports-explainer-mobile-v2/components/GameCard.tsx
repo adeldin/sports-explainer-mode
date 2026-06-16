@@ -25,41 +25,35 @@ interface Props {
   onToggleFavorite: () => void;
 }
 
-// Dark-mode card gradients (team-colored, dark).
+// Dark-mode card gradients (team-colored). Tuned to read as raised, premium
+// surfaces on the navy app background (#0d1b3e) — each is a navy-blended
+// mid-tone of the sport's hue, lighter than the bg so cards lift off it.
 const SPORT_COLORS: Record<string, [string, string]> = {
-  nfl: ['#1a3a1a', '#0d2b0d'],
-  mlb: ['#1a1a3a', '#0d0d2b'],
-  nba: ['#3a1a00', '#2b1200'],
-  nhl: ['#001a3a', '#000d2b'],
-  mls: ['#1a001a', '#0d000d'],
-  soccer: ['#0a2a1a', '#06180f'],
-  worldcup: ['#2a1a3a', '#1a0d2b'],
-  rugby: ['#06262a', '#03161a'],
+  nfl: ['#1d4a2e', '#143620'],
+  mlb: ['#26315e', '#1a2344'],
+  nba: ['#4a2a10', '#33200c'],
+  nhl: ['#1a3a6b', '#12294d'],
+  mls: ['#3a1a4a', '#281236'],
+  soccer: ['#14402a', '#0e2c1d'],
+  worldcup: ['#3a2a5e', '#281c44'],
+  rugby: ['#124449', '#0c3035'],
 };
 
-// Light-mode top-accent color per sport (white card + colored edge).
-const SPORT_ACCENT: Record<string, string> = {
-  nfl: '#2f9e44',
-  mlb: '#3b5bdb',
-  nba: '#e8590c',
-  nhl: '#1971c2',
-  mls: '#ae3ec9',
-  soccer: '#2f9e44',
-  worldcup: '#7048e8',
-  rugby: '#0c8599',
-};
+// Selected card is a brand treatment — navy fill + orange border in BOTH
+// themes (white text sits on it), so the navy is explicit rather than a
+// mode-dependent surface token.
+const SELECTED_GRADIENT: [string, string] = ['#1a2d52', '#0d1b3e'];
 
 export default function GameCard({ game, isSelected, isFavorite, onPress, onToggleFavorite }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const isLight = theme.mode === 'light';
-  const sportAccent = SPORT_ACCENT[game.sport] || theme.accent;
 
   const gradientColors: [string, string] = isSelected
-    ? ['#0055ff', '#0033aa']
+    ? SELECTED_GRADIENT
     : isLight
       ? [theme.surface, theme.surface]
-      : SPORT_COLORS[game.sport] || ['#1a1a1a', '#111'];
+      : SPORT_COLORS[game.sport] || [theme.surface, theme.background];
 
   // Text sits on a colored/dark gradient (white) unless it's a light, unselected card.
   const onCard = isSelected ? '#ffffff' : theme.textPrimary;
@@ -74,7 +68,7 @@ export default function GameCard({ game, isSelected, isFavorite, onPress, onTogg
           isSelected && styles.cardSelected,
           isLight && !isSelected && {
             borderTopWidth: 3,
-            borderTopColor: sportAccent,
+            borderTopColor: theme.accent,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.06,
@@ -145,8 +139,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.border,
   },
   cardSelected: {
-    borderColor: 'rgba(0,120,255,0.6)',
-    shadowColor: '#0055ff',
+    borderColor: t.accent,
+    borderWidth: 2,
+    shadowColor: t.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,

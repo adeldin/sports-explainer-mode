@@ -65,7 +65,7 @@ export default function Onboarding({ language, onComplete }: Props) {
         <View style={styles.container}>
           <View style={styles.heroSection}>
             <Text style={styles.trophy}>🏆</Text>
-            <Text style={styles.appName}>SportsWise</Text>
+            <Text style={styles.appName}>Sports<Text style={styles.appNameAccent}>wise</Text></Text>
             <View style={styles.taglinePill}>
               <Text style={styles.taglineText}>⚡ THE SMART PLAY</Text>
             </View>
@@ -187,6 +187,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   heroSection: { alignItems: 'center', marginTop: 20 },
   trophy: { fontSize: 64, marginBottom: 12 },
   appName: { fontSize: 32, fontWeight: '900', color: t.textPrimary, marginBottom: 12 },
+  appNameAccent: { color: t.accent },
   taglinePill: { backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20 },
   taglineText: { color: t.warn, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
   heroSub: { color: t.textSecondary, fontSize: 16, textAlign: 'center', lineHeight: 26 },

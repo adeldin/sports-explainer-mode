@@ -125,6 +125,52 @@ government hearing graphic → **GovWise**. Ties into the "[Topic]Wise" family a
 
 ---
 
+## 🎮 Gamification / Learning progression *(v2)*
+
+Duolingo-inspired learning mechanics. The point isn't game-for-game's-sake — it's making
+the core promise (**getting wiser**) visible and rewarding, and building a daily habit loop.
+
+### Priority 1 — Knowledge progression system *(most on-brand)*
+Users **earn** their way through expertise levels (**Kid → Beginner → Intermediate →
+Expert**) instead of manually setting them. After engaging with X explanations at a level,
+the app prompts: *"Ready to try the next level?"* Optional, never forced. Makes the core
+product promise — getting wiser — visible and rewarding. The most on-brand gamification
+feature for SportsWise.
+
+### Priority 2 — Streaks *(lowest lift, highest habit impact)*
+Track consecutive days/games using SportsWise. *"3-day streak,"* *"explained 5 games in a
+row."* Creates a daily habit loop. Low complexity (AsyncStorage counter), high engagement
+impact. Natural fit with sports-season schedules. **Build this first.**
+
+### Priority 3 — Quick quiz moments
+After an explanation loads, **occasionally** surface a quick 3-option question about what
+was just explained. Optional / skippable. Dramatically improves retention. Core Duolingo
+mechanic in its simplest form.
+
+### Priority 4 — Badges / achievements
+*"First rugby game explained,"* *"Asked 10 questions,"* *"5 sports explored."* AsyncStorage
+counters, cheap to build, moments of delight. Commission badge assets from a Fiverr designer.
+
+### Priority 5 — Daily challenge
+A featured play or sports moment each day. A reason to open the app **outside of watching a
+game**. Requires content curation — AI-generated or editorial. Solves the offseason
+engagement problem.
+
+### Skip
+- **Lives / hearts** — punishing in a live-companion context.
+- **Mandatory lesson gates** — kills the core use case.
+- **Leaderboards** — needs user accounts + critical mass.
+
+### Connection to the platform vision
+The same progression system applies to **all `[Topic]Wise` verticals**. LegalWise:
+Kid → Beginner → Intermediate → Expert in legal literacy. GovWise: same for civic
+knowledge. **The progression system *is* the platform's core learning promise.**
+
+**Priority:** v2, after App Store launch. Build **streaks first** (lowest lift, highest
+habit impact), then the **progression system** (highest brand alignment).
+
+---
+
 ## 🧲 Yahoo Sports features to steal
 
 - **Team logos on game cards** — already on the list; **reprioritize as a fast win.**

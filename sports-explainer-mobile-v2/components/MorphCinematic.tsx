@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Image, StyleSheet, Pressable, Animated, Easing } from 'react-native';
-import { useTheme } from '../lib/theme';
+import { useTheme, brand } from '../lib/theme';
 
 interface Props {
   onComplete: () => void;
@@ -113,7 +113,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
           </View>
         </Animated.View>
 
-        <Animated.Text style={[styles.title, { opacity: titleOpacity }]}>SportsWise</Animated.Text>
+        <Animated.Text style={[styles.title, { opacity: titleOpacity }]}>Sports<Text style={styles.titleAccent}>wise</Text></Animated.Text>
         {!quick && (
           <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>The Smart Play</Animated.Text>
         )}
@@ -126,14 +126,14 @@ const styles = StyleSheet.create({
   outer: { flex: 1 },
   screen: {
     flex: 1,
-    backgroundColor: '#0d1b3e',
+    backgroundColor: brand.navy,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // Wrapper carries the drop shadow; the Image inside clips to the rounded corners.
   iconShadow: {
     borderRadius: 22,
-    backgroundColor: '#0d1b3e',
+    backgroundColor: brand.navy,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
@@ -147,11 +147,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   title: {
-    color: '#ffffff',
+    color: brand.white,
     fontFamily: 'SpaceGrotesk_700Bold',
     fontSize: 32,
     textAlign: 'center',
     marginTop: 28,
+  },
+  titleAccent: {
+    color: brand.orange,
   },
   tagline: {
     color: 'rgba(255,255,255,0.7)',

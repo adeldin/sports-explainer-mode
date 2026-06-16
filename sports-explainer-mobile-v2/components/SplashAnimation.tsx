@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { brand } from '../lib/theme';
 
 const { width, height } = Dimensions.get('window');
 const SPORT_ICONS = ['🏈', '⚾', '🏒', '🏀', '⚽', '🏈'];
@@ -39,7 +40,7 @@ export default function SplashAnimation({ onFinish }: Props) {
 
   return (
     <Animated.View style={[styles.container, { opacity: containerOpacity }]}>
-      <LinearGradient colors={['#000000', '#0a0a1a', '#000820']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[brand.navy, brand.navyDeep, '#081026']} style={StyleSheet.absoluteFill} />
       <View style={styles.iconsContainer}>
         {SPORT_ICONS.map((icon, i) => (
           <Animated.Text
@@ -66,6 +67,6 @@ const styles = StyleSheet.create({
   floatingIcon: { position: 'absolute', fontSize: 36, bottom: 0 },
   centerContent: { alignItems: 'center' },
   emoji: { fontSize: 64, marginBottom: 16 },
-  title: { fontSize: 52, fontWeight: '900', color: '#fff', textAlign: 'center', lineHeight: 56, letterSpacing: -1 },
-  subtitle: { fontSize: 18, color: '#4488ff', marginTop: 16, fontWeight: '500', letterSpacing: 1 },
+  title: { fontSize: 52, fontWeight: '900', color: brand.white, textAlign: 'center', lineHeight: 56, letterSpacing: -1 },
+  subtitle: { fontSize: 18, color: brand.amber, marginTop: 16, fontWeight: '500', letterSpacing: 1 },
 });

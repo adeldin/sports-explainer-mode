@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { brand } from '../lib/theme';
 
 interface Props {
   gameContext: string;
@@ -19,7 +20,7 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
       <View style={styles.header}>
         <Text style={styles.trophy}>🏆</Text>
         <View>
-          <Text style={styles.appName}>SportsWise</Text>
+          <Text style={styles.appName}>Sports<Text style={styles.appNameAccent}>wise</Text></Text>
           <Text style={styles.tagline}>⚡ THE SMART PLAY</Text>
         </View>
         <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport] || '🏆'}</Text>
@@ -58,11 +59,11 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
 const styles = StyleSheet.create({
   card: {
     width: 360,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: brand.navy,
     borderRadius: 20,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#1a1a1a',
+    borderColor: brand.navySurface,
   },
   header: {
     flexDirection: 'row',
@@ -71,37 +72,38 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   trophy: { fontSize: 32 },
-  appName: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  tagline: { color: '#ff6b00', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginTop: 2 },
+  appName: { color: brand.white, fontSize: 16, fontWeight: '900' },
+  appNameAccent: { color: brand.orange },
+  tagline: { color: brand.orange, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginTop: 2 },
   sportEmoji: { fontSize: 28, marginLeft: 'auto' },
-  divider: { height: 1, backgroundColor: '#1a1a1a', marginBottom: 16 },
-  gameContext: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 10 },
+  divider: { height: 1, backgroundColor: brand.navySurface, marginBottom: 16 },
+  gameContext: { color: brand.white, fontSize: 18, fontWeight: '900', marginBottom: 10 },
   playPill: {
-    backgroundColor: '#111',
+    backgroundColor: brand.navySurface,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 16,
     alignSelf: 'flex-start',
   },
-  playText: { color: '#aaa', fontSize: 13 },
+  playText: { color: '#9aa6bd', fontSize: 13 },
   explanationBox: {
-    backgroundColor: '#111',
+    backgroundColor: brand.navySurface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
   explanationText: { color: '#f0f0f0', fontSize: 15, lineHeight: 24 },
   whyBox: {
-    backgroundColor: '#0d1a2e',
+    backgroundColor: brand.slate,
     borderLeftWidth: 3,
-    borderLeftColor: '#0055ff',
+    borderLeftColor: brand.slateAccent,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
-  whyLabel: { color: '#4488ff', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginBottom: 6 },
-  whyText: { color: '#ccc', fontSize: 14, lineHeight: 22 },
+  whyLabel: { color: brand.slateAccent, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginBottom: 6 },
+  whyText: { color: brand.slateText, fontSize: 14, lineHeight: 22 },
   footer: { alignItems: 'center', marginTop: 8 },
-  footerText: { color: '#333', fontSize: 11 },
+  footerText: { color: '#4a5a78', fontSize: 11 },
 });
