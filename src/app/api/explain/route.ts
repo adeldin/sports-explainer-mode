@@ -21,6 +21,10 @@ const sportContext: Record<string, string> = {
   soccer: 'Association football (soccer). Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation.',
   worldcup: 'World Cup soccer (association football). Key concepts: group stage, knockout round, goal, offside, penalty kick, free kick, cards, extra time, penalty shootout.',
   rugby: 'Rugby. Key concepts: try, conversion, scrum, ruck, maul, lineout, knock-on, penalty kick, drop goal.',
+  wnba: "Women's National Basketball Association (WNBA) basketball. Key concepts: possession, shot clock, paint, three-point line, pick and roll, fast break, turnover, foul.",
+  epl: "English Premier League — England's top soccer (association football) division. Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation, relegation.",
+  laliga: "La Liga — Spain's top soccer (association football) division. Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation, relegation.",
+  mlr: 'Major League Rugby (MLR) — the premier professional rugby union league in the United States and Canada. Key concepts: try (5 points), conversion (2 points), penalty kick (3 points), drop goal (3 points), scrum, lineout, ruck, maul, offside, tackle, breakdown.',
 };
 
 // ESPN endpoint config. `core` sports are NOT on the normal scoreboard API and
@@ -38,6 +42,13 @@ const espnConfig: Record<string, EspnCfg> = {
   // rugby season — chosen over Olympic 7s (282, Olympics-only), Six Nations
   // (~5 weeks) and Premiership (267979, ~9 months) for year-round coverage.
   rugby: { sport: 'rugby', league: '270557', core: true },
+  // Major League Rugby (US/Canada, id 289262): same Core-API two-step fetch as URC.
+  mlr: { sport: 'rugby', league: '289262', core: true },
+  // Drop-in site-API leagues sharing existing logic: WNBA uses the generic
+  // scoreboard lastPlay (like NBA); EPL/La Liga reuse the soccer keyEvents path.
+  wnba: { sport: 'basketball', league: 'wnba' },
+  epl: { sport: 'soccer', league: 'eng.1' },
+  laliga: { sport: 'soccer', league: 'esp.1' },
   // NOTE: cricket intentionally omitted — ESPN's public API has no usable cricket
   // data (site API 404s; Core API lists the sport but exposes zero leagues/events).
   // It needs a different source (e.g. ESPNcricinfo) before it can be added here.
@@ -154,8 +165,9 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
           if (lastReal) play = lastReal.text;
         }
 
-        // Soccer / World Cup: no plays[] array — use the latest key event / commentary.
-        if ((sport === 'soccer' || sport === 'worldcup') && game.id && !skipPlayLookup) {
+        // Soccer leagues (MLS / World Cup / EPL / La Liga): no plays[] array —
+        // use the latest key event / commentary from the summary endpoint.
+        if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport) && game.id && !skipPlayLookup) {
           const sumRes = await fetch(
             `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`,
             { cache: 'no-store' },

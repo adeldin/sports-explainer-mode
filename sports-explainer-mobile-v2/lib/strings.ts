@@ -26,9 +26,9 @@ export interface UIStrings {
   step1: string; step2: string; lvlTitle: string; lvlSub: string; sportTitle: string; sportSub: string;
   next: string; letsGo: string; back: string;
   // sport names (onboarding subs + empty state)
-  spBaseball: string; spFootball: string; spBasketball: string; spHockey: string; spSoccer: string; spWorldCup: string; spRugby: string;
+  spBaseball: string; spFootball: string; spBasketball: string; spHockey: string; spSoccer: string; spWorldCup: string; spRugby: string; spWnba: string; spPremierLeague: string; spLaLiga: string; spMlr: string;
   // empty state ({sport} is replaced at render)
-  noGames: string; selectGame: string; pullRefresh: string; offSeason: string; offSeasonSub: string; smartPlayReturns: string;
+  noGames: string; selectGame: string; pullRefresh: string; offSeason: string; offSeasonSub: string; smartPlayReturns: string; seasonTitle: string; seasonRuns: string; worldCupRuns: string;
 }
 
 export const UI_STRINGS: Record<Language, UIStrings> = {
@@ -47,8 +47,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Live game explanations as they happen`, feat2: `Powered by AI — not just stats`, feat3: `Your level: Kid to Coaching-level Expert`, getStarted: `Get Started`,
     step1: `Step 1 of 2`, step2: `Step 2 of 2`, lvlTitle: `How do you watch sports?`, lvlSub: `You can always change this in Settings.`, sportTitle: `What's your sport?`, sportSub: `We'll open here by default.`,
     next: `Next`, letsGo: `Let's Go`, back: `Back`,
-    spBaseball: `Baseball`, spFootball: `Football`, spBasketball: `Basketball`, spHockey: `Hockey`, spSoccer: `Soccer`, spWorldCup: `World Cup`, spRugby: `Rugby`,
-    noGames: `No {sport} games today`, selectGame: `Select a game above for an explanation`, pullRefresh: `Pull down to refresh or check back later.`, offSeason: `{sport} is in the off-season`, offSeasonSub: `Check back when the season starts.`, smartPlayReturns: `THE SMART PLAY RETURNS SOON`,
+    spBaseball: `Baseball`, spFootball: `Football`, spBasketball: `Basketball`, spHockey: `Hockey`, spSoccer: `Soccer`, spWorldCup: `World Cup`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `No {sport} games today`, selectGame: `Select a game above for an explanation`, pullRefresh: `Pull down to refresh or check back later.`, offSeason: `{sport} is in the off-season`, offSeasonSub: `Check back when the season starts.`, smartPlayReturns: `THE SMART PLAY RETURNS SOON`, seasonTitle: `No {sport} games right now.`, seasonRuns: `The season runs {start} to {end} — check back then!`, worldCupRuns: `The tournament runs every 4 years — check back for the next one!`,
   },
 
   es: {
@@ -66,8 +66,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Explicaciones de los partidos en directo`, feat2: `Impulsado por IA, no solo estadísticas`, feat3: `Tu nivel: de Niño a Experto`, getStarted: `Empezar`,
     step1: `Paso 1 de 2`, step2: `Paso 2 de 2`, lvlTitle: `¿Cómo ves los deportes?`, lvlSub: `Siempre puedes cambiarlo en Ajustes.`, sportTitle: `¿Cuál es tu deporte?`, sportSub: `Abriremos aquí por defecto.`,
     next: `Siguiente`, letsGo: `Vamos`, back: `Atrás`,
-    spBaseball: `Béisbol`, spFootball: `Fútbol americano`, spBasketball: `Baloncesto`, spHockey: `Hockey`, spSoccer: `Fútbol`, spWorldCup: `Mundial`, spRugby: `Rugby`,
-    noGames: `No hay partidos de {sport} hoy`, selectGame: `Selecciona un partido arriba para ver una explicación`, pullRefresh: `Desliza hacia abajo para actualizar o vuelve más tarde.`, offSeason: `{sport} está en temporada baja`, offSeasonSub: `Vuelve cuando empiece la temporada.`, smartPlayReturns: `LA JUGADA INTELIGENTE VUELVE PRONTO`,
+    spBaseball: `Béisbol`, spFootball: `Fútbol americano`, spBasketball: `Baloncesto`, spHockey: `Hockey`, spSoccer: `Fútbol`, spWorldCup: `Mundial`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `No hay partidos de {sport} hoy`, selectGame: `Selecciona un partido arriba para ver una explicación`, pullRefresh: `Desliza hacia abajo para actualizar o vuelve más tarde.`, offSeason: `{sport} está en temporada baja`, offSeasonSub: `Vuelve cuando empiece la temporada.`, smartPlayReturns: `LA JUGADA INTELIGENTE VUELVE PRONTO`, seasonTitle: `No hay partidos de {sport} en este momento.`, seasonRuns: `La temporada va de {start} a {end}: ¡vuelve entonces!`, worldCupRuns: `El torneo se juega cada 4 años: ¡vuelve para el próximo!`,
   },
 
   fr: {
@@ -85,8 +85,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Explications des matchs en direct`, feat2: `Propulsé par l'IA, pas que des stats`, feat3: `Votre niveau : d'Enfant à Expert`, getStarted: `Commencer`,
     step1: `Étape 1 sur 2`, step2: `Étape 2 sur 2`, lvlTitle: `Comment regardez-vous le sport ?`, lvlSub: `Vous pouvez changer cela dans les Paramètres.`, sportTitle: `Quel est votre sport ?`, sportSub: `Nous ouvrirons ici par défaut.`,
     next: `Suivant`, letsGo: `C'est parti`, back: `Retour`,
-    spBaseball: `Baseball`, spFootball: `Football américain`, spBasketball: `Basket-ball`, spHockey: `Hockey`, spSoccer: `Football`, spWorldCup: `Coupe du Monde`, spRugby: `Rugby`,
-    noGames: `Aucun match de {sport} aujourd'hui`, selectGame: `Sélectionnez un match ci-dessus pour une explication`, pullRefresh: `Tirez vers le bas pour actualiser ou revenez plus tard.`, offSeason: `{sport} est en intersaison`, offSeasonSub: `Revenez au début de la saison.`, smartPlayReturns: `LE SMART PLAY REVIENT BIENTÔT`,
+    spBaseball: `Baseball`, spFootball: `Football américain`, spBasketball: `Basket-ball`, spHockey: `Hockey`, spSoccer: `Football`, spWorldCup: `Coupe du Monde`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `Aucun match de {sport} aujourd'hui`, selectGame: `Sélectionnez un match ci-dessus pour une explication`, pullRefresh: `Tirez vers le bas pour actualiser ou revenez plus tard.`, offSeason: `{sport} est en intersaison`, offSeasonSub: `Revenez au début de la saison.`, smartPlayReturns: `LE SMART PLAY REVIENT BIENTÔT`, seasonTitle: `Aucun match de {sport} pour le moment.`, seasonRuns: `La saison va de {start} à {end} — revenez à ce moment-là !`, worldCupRuns: `Le tournoi a lieu tous les 4 ans — revenez pour le prochain !`,
   },
 
   pt: {
@@ -104,8 +104,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Explicações dos jogos ao vivo`, feat2: `Movido por IA, não só estatísticas`, feat3: `Seu nível: de Criança a Especialista`, getStarted: `Começar`,
     step1: `Etapa 1 de 2`, step2: `Etapa 2 de 2`, lvlTitle: `Como você assiste esportes?`, lvlSub: `Você pode mudar isso nas Configurações.`, sportTitle: `Qual é o seu esporte?`, sportSub: `Abriremos aqui por padrão.`,
     next: `Próximo`, letsGo: `Vamos`, back: `Voltar`,
-    spBaseball: `Beisebol`, spFootball: `Futebol americano`, spBasketball: `Basquete`, spHockey: `Hóquei`, spSoccer: `Futebol`, spWorldCup: `Copa do Mundo`, spRugby: `Rugby`,
-    noGames: `Nenhum jogo de {sport} hoje`, selectGame: `Selecione um jogo acima para ver uma explicação`, pullRefresh: `Puxe para baixo para atualizar ou volte mais tarde.`, offSeason: `{sport} está na pré-temporada`, offSeasonSub: `Volte quando a temporada começar.`, smartPlayReturns: `A JOGADA INTELIGENTE VOLTA EM BREVE`,
+    spBaseball: `Beisebol`, spFootball: `Futebol americano`, spBasketball: `Basquete`, spHockey: `Hóquei`, spSoccer: `Futebol`, spWorldCup: `Copa do Mundo`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `Nenhum jogo de {sport} hoje`, selectGame: `Selecione um jogo acima para ver uma explicação`, pullRefresh: `Puxe para baixo para atualizar ou volte mais tarde.`, offSeason: `{sport} está na pré-temporada`, offSeasonSub: `Volte quando a temporada começar.`, smartPlayReturns: `A JOGADA INTELIGENTE VOLTA EM BREVE`, seasonTitle: `Nenhum jogo de {sport} no momento.`, seasonRuns: `A temporada vai de {start} a {end} — volte nessa época!`, worldCupRuns: `O torneio acontece a cada 4 anos — volte para o próximo!`,
   },
 
   de: {
@@ -123,8 +123,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Live-Erklärungen während des Spiels`, feat2: `KI-gestützt, nicht nur Statistik`, feat3: `Dein Niveau: vom Kind bis zum Experten`, getStarted: `Loslegen`,
     step1: `Schritt 1 von 2`, step2: `Schritt 2 von 2`, lvlTitle: `Wie schaust du Sport?`, lvlSub: `Du kannst das jederzeit in den Einstellungen ändern.`, sportTitle: `Was ist deine Sportart?`, sportSub: `Wir öffnen standardmäßig hier.`,
     next: `Weiter`, letsGo: `Los geht's`, back: `Zurück`,
-    spBaseball: `Baseball`, spFootball: `American Football`, spBasketball: `Basketball`, spHockey: `Eishockey`, spSoccer: `Fußball`, spWorldCup: `WM`, spRugby: `Rugby`,
-    noGames: `Heute keine {sport}-Spiele`, selectGame: `Wähle oben ein Spiel für eine Erklärung`, pullRefresh: `Zum Aktualisieren nach unten ziehen oder später wiederkommen.`, offSeason: `{sport} ist in der Saisonpause`, offSeasonSub: `Schau zum Saisonstart wieder vorbei.`, smartPlayReturns: `THE SMART PLAY KEHRT BALD ZURÜCK`,
+    spBaseball: `Baseball`, spFootball: `American Football`, spBasketball: `Basketball`, spHockey: `Eishockey`, spSoccer: `Fußball`, spWorldCup: `WM`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `Heute keine {sport}-Spiele`, selectGame: `Wähle oben ein Spiel für eine Erklärung`, pullRefresh: `Zum Aktualisieren nach unten ziehen oder später wiederkommen.`, offSeason: `{sport} ist in der Saisonpause`, offSeasonSub: `Schau zum Saisonstart wieder vorbei.`, smartPlayReturns: `THE SMART PLAY KEHRT BALD ZURÜCK`, seasonTitle: `Gerade keine {sport}-Spiele.`, seasonRuns: `Die Saison läuft von {start} bis {end} — schau dann wieder vorbei!`, worldCupRuns: `Das Turnier findet alle 4 Jahre statt — schau beim nächsten wieder vorbei!`,
   },
 
   it: {
@@ -142,8 +142,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `Spiegazioni delle partite in diretta`, feat2: `Basato sull'IA, non solo statistiche`, feat3: `Il tuo livello: da Bambino a Esperto`, getStarted: `Inizia`,
     step1: `Passo 1 di 2`, step2: `Passo 2 di 2`, lvlTitle: `Come guardi lo sport?`, lvlSub: `Puoi sempre cambiarlo nelle Impostazioni.`, sportTitle: `Qual è il tuo sport?`, sportSub: `Apriremo qui per impostazione predefinita.`,
     next: `Avanti`, letsGo: `Andiamo`, back: `Indietro`,
-    spBaseball: `Baseball`, spFootball: `Football americano`, spBasketball: `Basket`, spHockey: `Hockey`, spSoccer: `Calcio`, spWorldCup: `Mondiali`, spRugby: `Rugby`,
-    noGames: `Nessuna partita di {sport} oggi`, selectGame: `Seleziona una partita sopra per una spiegazione`, pullRefresh: `Trascina verso il basso per aggiornare o torna più tardi.`, offSeason: `{sport} è in pausa stagionale`, offSeasonSub: `Torna all'inizio della stagione.`, smartPlayReturns: `THE SMART PLAY TORNA PRESTO`,
+    spBaseball: `Baseball`, spFootball: `Football americano`, spBasketball: `Basket`, spHockey: `Hockey`, spSoccer: `Calcio`, spWorldCup: `Mondiali`, spRugby: `Rugby`, spWnba: `WNBA`, spPremierLeague: `Premier League`, spLaLiga: `La Liga`, spMlr: `MLR`,
+    noGames: `Nessuna partita di {sport} oggi`, selectGame: `Seleziona una partita sopra per una spiegazione`, pullRefresh: `Trascina verso il basso per aggiornare o torna più tardi.`, offSeason: `{sport} è in pausa stagionale`, offSeasonSub: `Torna all'inizio della stagione.`, smartPlayReturns: `THE SMART PLAY TORNA PRESTO`, seasonTitle: `Nessuna partita di {sport} al momento.`, seasonRuns: `La stagione va da {start} a {end} — torna in quel periodo!`, worldCupRuns: `Il torneo si gioca ogni 4 anni — torna per il prossimo!`,
   },
 
   ja: {
@@ -161,8 +161,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `試合中にライブで解説`, feat2: `統計だけでなくAIが解説`, feat3: `レベル：キッズからコーチ級まで`, getStarted: `はじめる`,
     step1: `ステップ 1 / 2`, step2: `ステップ 2 / 2`, lvlTitle: `スポーツをどう見ていますか？`, lvlSub: `設定でいつでも変更できます。`, sportTitle: `好きなスポーツは？`, sportSub: `デフォルトでここを開きます。`,
     next: `次へ`, letsGo: `はじめよう`, back: `戻る`,
-    spBaseball: `野球`, spFootball: `アメフト`, spBasketball: `バスケットボール`, spHockey: `アイスホッケー`, spSoccer: `サッカー`, spWorldCup: `ワールドカップ`, spRugby: `ラグビー`,
-    noGames: `今日は{sport}の試合がありません`, selectGame: `上の試合を選ぶと解説が表示されます`, pullRefresh: `下に引いて更新するか、後でもう一度確認してください。`, offSeason: `{sport}はオフシーズンです`, offSeasonSub: `シーズンが始まったらまた来てください。`, smartPlayReturns: `THE SMART PLAY まもなく再開`,
+    spBaseball: `野球`, spFootball: `アメフト`, spBasketball: `バスケットボール`, spHockey: `アイスホッケー`, spSoccer: `サッカー`, spWorldCup: `ワールドカップ`, spRugby: `ラグビー`, spWnba: `WNBA`, spPremierLeague: `プレミアリーグ`, spLaLiga: `ラ・リーガ`, spMlr: `MLR`,
+    noGames: `今日は{sport}の試合がありません`, selectGame: `上の試合を選ぶと解説が表示されます`, pullRefresh: `下に引いて更新するか、後でもう一度確認してください。`, offSeason: `{sport}はオフシーズンです`, offSeasonSub: `シーズンが始まったらまた来てください。`, smartPlayReturns: `THE SMART PLAY まもなく再開`, seasonTitle: `現在{sport}の試合はありません。`, seasonRuns: `シーズンは{start}から{end}までです。その頃にまたチェックしてください！`, worldCupRuns: `大会は4年ごとに開催されます。次回をお楽しみに！`,
   },
 
   zh: {
@@ -180,8 +180,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `比赛进行中实时解说`, feat2: `由 AI 驱动，不只是数据`, feat3: `你的水平：从儿童到教练级专家`, getStarted: `开始`,
     step1: `第 1 步，共 2 步`, step2: `第 2 步，共 2 步`, lvlTitle: `你是怎么看体育的？`, lvlSub: `你随时可以在设置中更改。`, sportTitle: `你喜欢哪项运动？`, sportSub: `默认从这里打开。`,
     next: `下一步`, letsGo: `出发`, back: `返回`,
-    spBaseball: `棒球`, spFootball: `美式橄榄球`, spBasketball: `篮球`, spHockey: `冰球`, spSoccer: `足球`, spWorldCup: `世界杯`, spRugby: `橄榄球`,
-    noGames: `今天没有{sport}比赛`, selectGame: `选择上面的比赛查看解说`, pullRefresh: `下拉刷新或稍后再来。`, offSeason: `{sport}正处于休赛期`, offSeasonSub: `赛季开始后再来看看。`, smartPlayReturns: `THE SMART PLAY 即将回归`,
+    spBaseball: `棒球`, spFootball: `美式橄榄球`, spBasketball: `篮球`, spHockey: `冰球`, spSoccer: `足球`, spWorldCup: `世界杯`, spRugby: `橄榄球`, spWnba: `WNBA`, spPremierLeague: `英超联赛`, spLaLiga: `西甲联赛`, spMlr: `MLR`,
+    noGames: `今天没有{sport}比赛`, selectGame: `选择上面的比赛查看解说`, pullRefresh: `下拉刷新或稍后再来。`, offSeason: `{sport}正处于休赛期`, offSeasonSub: `赛季开始后再来看看。`, smartPlayReturns: `THE SMART PLAY 即将回归`, seasonTitle: `目前没有{sport}比赛。`, seasonRuns: `赛季为{start}至{end}，到时再来看看！`, worldCupRuns: `该赛事每4年举办一次，下次再来看看！`,
   },
 
   ko: {
@@ -199,8 +199,8 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `경기 중 실시간 해설`, feat2: `통계만이 아닌 AI 기반`, feat3: `당신의 수준: 키즈부터 코치급 전문가까지`, getStarted: `시작하기`,
     step1: `2단계 중 1단계`, step2: `2단계 중 2단계`, lvlTitle: `스포츠를 어떻게 보시나요?`, lvlSub: `설정에서 언제든 바꿀 수 있어요.`, sportTitle: `어떤 스포츠를 좋아하세요?`, sportSub: `기본으로 여기서 열려요.`,
     next: `다음`, letsGo: `시작`, back: `뒤로`,
-    spBaseball: `야구`, spFootball: `미식축구`, spBasketball: `농구`, spHockey: `아이스하키`, spSoccer: `축구`, spWorldCup: `월드컵`, spRugby: `럭비`,
-    noGames: `오늘은 {sport} 경기가 없습니다`, selectGame: `위에서 경기를 선택하면 설명이 나와요`, pullRefresh: `아래로 당겨 새로고침하거나 나중에 다시 확인하세요.`, offSeason: `{sport}은 비시즌입니다`, offSeasonSub: `시즌이 시작되면 다시 확인하세요.`, smartPlayReturns: `THE SMART PLAY 곧 돌아옵니다`,
+    spBaseball: `야구`, spFootball: `미식축구`, spBasketball: `농구`, spHockey: `아이스하키`, spSoccer: `축구`, spWorldCup: `월드컵`, spRugby: `럭비`, spWnba: `WNBA`, spPremierLeague: `프리미어리그`, spLaLiga: `라리가`, spMlr: `MLR`,
+    noGames: `오늘은 {sport} 경기가 없습니다`, selectGame: `위에서 경기를 선택하면 설명이 나와요`, pullRefresh: `아래로 당겨 새로고침하거나 나중에 다시 확인하세요.`, offSeason: `{sport}은 비시즌입니다`, offSeasonSub: `시즌이 시작되면 다시 확인하세요.`, smartPlayReturns: `THE SMART PLAY 곧 돌아옵니다`, seasonTitle: `현재 {sport} 경기가 없습니다.`, seasonRuns: `시즌은 {start}부터 {end}까지입니다 — 그때 다시 확인하세요!`, worldCupRuns: `이 대회는 4년마다 열립니다 — 다음 대회를 기대해 주세요!`,
   },
 
   ar: {
@@ -218,7 +218,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     feat1: `شروحات مباشرة أثناء المباراة`, feat2: `مدعوم بالذكاء الاصطناعي، وليس الإحصائيات فقط`, feat3: `مستواك: من الأطفال إلى مستوى المدربين`, getStarted: `ابدأ`,
     step1: `الخطوة 1 من 2`, step2: `الخطوة 2 من 2`, lvlTitle: `كيف تشاهد الرياضة؟`, lvlSub: `يمكنك تغيير ذلك في الإعدادات في أي وقت.`, sportTitle: `ما رياضتك المفضلة؟`, sportSub: `سنفتح هنا افتراضياً.`,
     next: `التالي`, letsGo: `هيا بنا`, back: `رجوع`,
-    spBaseball: `البيسبول`, spFootball: `كرة القدم الأمريكية`, spBasketball: `كرة السلة`, spHockey: `الهوكي`, spSoccer: `كرة القدم`, spWorldCup: `كأس العالم`, spRugby: `الرغبي`,
-    noGames: `لا توجد مباريات {sport} اليوم`, selectGame: `اختر مباراة بالأعلى للحصول على شرح`, pullRefresh: `اسحب للأسفل للتحديث أو عُد لاحقاً.`, offSeason: `{sport} في فترة توقف الموسم`, offSeasonSub: `عُد عند بدء الموسم.`, smartPlayReturns: `THE SMART PLAY يعود قريباً`,
+    spBaseball: `البيسبول`, spFootball: `كرة القدم الأمريكية`, spBasketball: `كرة السلة`, spHockey: `الهوكي`, spSoccer: `كرة القدم`, spWorldCup: `كأس العالم`, spRugby: `الرغبي`, spWnba: `WNBA`, spPremierLeague: `الدوري الإنجليزي الممتاز`, spLaLiga: `الدوري الإسباني`, spMlr: `MLR`,
+    noGames: `لا توجد مباريات {sport} اليوم`, selectGame: `اختر مباراة بالأعلى للحصول على شرح`, pullRefresh: `اسحب للأسفل للتحديث أو عُد لاحقاً.`, offSeason: `{sport} في فترة توقف الموسم`, offSeasonSub: `عُد عند بدء الموسم.`, smartPlayReturns: `THE SMART PLAY يعود قريباً`, seasonTitle: `لا توجد مباريات {sport} حالياً.`, seasonRuns: `يمتد الموسم من {start} إلى {end} — تحقق مرة أخرى حينها!`, worldCupRuns: `تقام البطولة كل 4 سنوات — تحقق مرة أخرى للبطولة القادمة!`,
   },
 };

@@ -13,7 +13,9 @@ export interface SportFaq {
   questions: LocalizedText[];
 }
 
-export const SPORT_FAQS: Record<Sport, SportFaq> = {
+// Base sports with their own authored question sets. Drop-in leagues below
+// reuse these question arrays with their own heading.
+const BASE_FAQS = {
   mlb: {
     label: {
       en: `Common Baseball Questions`,
@@ -731,5 +733,72 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
         ar: `ما الفرق بين رغبي الاتحاد (union) ورغبي الدوري (league)؟`,
       },
     ],
+  },
+};
+
+// Drop-in leagues: same rules as the parent sport, so they reuse its question
+// set with their own localized heading. WNBA -> basketball; EPL / La Liga -> soccer.
+// (ja/zh/ko/ar headings are a v1 first pass — flag for native review.)
+export const SPORT_FAQS: Record<Sport, SportFaq> = {
+  ...BASE_FAQS,
+  wnba: {
+    label: {
+      en: `Common WNBA Questions`,
+      es: `Preguntas comunes de la WNBA`,
+      fr: `Questions courantes sur la WNBA`,
+      pt: `Perguntas comuns sobre a WNBA`,
+      de: `Häufige Fragen zur WNBA`,
+      it: `Domande comuni sulla WNBA`,
+      ja: `WNBAのよくある質問`,
+      zh: `WNBA常见问题`,
+      ko: `WNBA 자주 묻는 질문`,
+      ar: `أسئلة شائعة عن WNBA`,
+    },
+    questions: BASE_FAQS.nba.questions,
+  },
+  epl: {
+    label: {
+      en: `Common Premier League Questions`,
+      es: `Preguntas comunes de la Premier League`,
+      fr: `Questions courantes sur la Premier League`,
+      pt: `Perguntas comuns sobre a Premier League`,
+      de: `Häufige Fragen zur Premier League`,
+      it: `Domande comuni sulla Premier League`,
+      ja: `プレミアリーグのよくある質問`,
+      zh: `英超联赛常见问题`,
+      ko: `프리미어리그 자주 묻는 질문`,
+      ar: `أسئلة شائعة عن الدوري الإنجليزي الممتاز`,
+    },
+    questions: BASE_FAQS.soccer.questions,
+  },
+  laliga: {
+    label: {
+      en: `Common La Liga Questions`,
+      es: `Preguntas comunes de La Liga`,
+      fr: `Questions courantes sur la Liga`,
+      pt: `Perguntas comuns sobre a La Liga`,
+      de: `Häufige Fragen zur La Liga`,
+      it: `Domande comuni sulla Liga`,
+      ja: `ラ・リーガのよくある質問`,
+      zh: `西甲联赛常见问题`,
+      ko: `라리가 자주 묻는 질문`,
+      ar: `أسئلة شائعة عن الدوري الإسباني`,
+    },
+    questions: BASE_FAQS.soccer.questions,
+  },
+  mlr: {
+    label: {
+      en: `Common MLR Questions`,
+      es: `Preguntas comunes de MLR`,
+      fr: `Questions courantes sur la MLR`,
+      pt: `Perguntas comuns sobre a MLR`,
+      de: `Häufige Fragen zur MLR`,
+      it: `Domande comuni sulla MLR`,
+      ja: `MLRのよくある質問`,
+      zh: `MLR常见问题`,
+      ko: `MLR 자주 묻는 질문`,
+      ar: `أسئلة شائعة عن MLR`,
+    },
+    questions: BASE_FAQS.rugby.questions,
   },
 };

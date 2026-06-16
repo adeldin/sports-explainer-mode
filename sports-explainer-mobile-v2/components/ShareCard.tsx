@@ -10,7 +10,8 @@ interface Props {
 }
 
 const SPORT_EMOJI: Record<string, string> = {
-  mlb: '⚾', nfl: '🏈', nba: '🏀', nhl: '🏒',
+  mlb: '⚾', nfl: '🏈', nba: '🏀', nhl: '🏒', soccer: '⚽', worldcup: '🌍', rugby: '🏉',
+  wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉',
 };
 
 export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, sport }: Props) {
@@ -18,12 +19,11 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
     <View style={styles.card}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.trophy}>🏆</Text>
         <View>
           <Text style={styles.appName}>Sports<Text style={styles.appNameAccent}>wise</Text></Text>
           <Text style={styles.tagline}>⚡ THE SMART PLAY</Text>
         </View>
-        <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport] || '🏆'}</Text>
+        <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport]}</Text>
       </View>
 
       {/* Divider */}
@@ -71,7 +71,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
-  trophy: { fontSize: 32 },
   appName: { color: brand.white, fontSize: 16, fontWeight: '900' },
   appNameAccent: { color: brand.orange },
   tagline: { color: brand.orange, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginTop: 2 },
