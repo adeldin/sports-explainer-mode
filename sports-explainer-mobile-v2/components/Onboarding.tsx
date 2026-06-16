@@ -1,17 +1,18 @@
 import { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, Dimensions, StatusBar,
+  SafeAreaView, Dimensions, StatusBar, ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, Theme } from '../lib/theme';
-import { Language } from '../lib/api';
+import { Language, Sport } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
+import { SPORTS, SPORT_FULL_NAME } from '../lib/sports';
 
 const { width } = Dimensions.get('window');
 
 type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
-type Sport = 'mlb' | 'nfl' | 'nba' | 'nhl';
+// Sport type + the SPORTS list come from the shared modules (lib/api, lib/sports).
 
 interface Props {
   language: Language;
@@ -23,13 +24,6 @@ const LEVELS: { key: Level; emoji: string }[] = [
   { key: 'beginner', emoji: '👋' },
   { key: 'intermediate', emoji: '📺' },
   { key: 'expert', emoji: '📋' },
-];
-
-const SPORTS: { key: Sport; emoji: string; label: string }[] = [
-  { key: 'mlb', emoji: '⚾', label: 'MLB' },
-  { key: 'nfl', emoji: '🏈', label: 'NFL' },
-  { key: 'nba', emoji: '🏀', label: 'NBA' },
-  { key: 'nhl', emoji: '🏒', label: 'NHL' },
 ];
 
 export default function Onboarding({ language, onComplete }: Props) {
@@ -45,10 +39,6 @@ export default function Onboarding({ language, onComplete }: Props) {
     intermediate: { label: S.lvlInter, sub: S.lvlInterDesc },
     expert: { label: S.lvlExpert, sub: S.lvlExpertDesc },
   };
-  const SPORT_SUB: Record<Sport, string> = {
-    mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
-  };
-
   async function handleComplete() {
     if (!selectedLevel || !selectedSport) return;
     await AsyncStorage.setItem('onboarding_complete', 'true');
@@ -138,7 +128,10 @@ export default function Onboarding({ language, onComplete }: Props) {
           <Text style={styles.stepSub}>{S.sportSub}</Text>
         </View>
 
-        <View style={styles.sportGrid}>
+        <ScrollView
+          style={styles.sportScroll}
+          contentContainerStyle={styles.sportGrid}
+          showsVerticalScrollIndicator={true}>
           {SPORTS.map(s => (
             <TouchableOpacity
               key={s.key}
@@ -148,10 +141,10 @@ export default function Onboarding({ language, onComplete }: Props) {
               <Text style={[styles.sportLabel, selectedSport === s.key && styles.sportLabelActive]}>
                 {s.label}
               </Text>
-              <Text style={styles.sportSub}>{SPORT_SUB[s.key]}</Text>
+              <Text style={styles.sportSub}>{S[SPORT_FULL_NAME[s.key]]}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         <TouchableOpacity
           style={[styles.primaryBtn, (!selectedLevel || !selectedSport) && styles.primaryBtnDisabled]}
@@ -213,11 +206,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   optionSub: { color: t.textMuted, fontSize: 13, marginTop: 2 },
   checkmark: { color: t.accentText, fontSize: 18, fontWeight: '900' },
 
-  // Sport Grid
-  sportGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, flex: 1, alignContent: 'center' },
-  sportTile: { width: (width - 60) / 2, alignItems: 'center', padding: 24, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  // Sport Grid (scrollable — shows all sports, ~6–8 tiles before scrolling)
+  sportScroll: { flex: 1, marginVertical: 4 },
+  sportGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingVertical: 8, paddingBottom: 16 },
+  sportTile: { width: (width - 60) / 2, alignItems: 'center', padding: 18, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   sportTileActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
-  sportEmoji: { fontSize: 40, marginBottom: 8 },
+  sportEmoji: { fontSize: 36, marginBottom: 8 },
   sportLabel: { color: t.textPrimary, fontSize: 18, fontWeight: '800' },
   sportLabelActive: { color: t.accentText },
   sportSub: { color: t.textMuted, fontSize: 12, marginTop: 4 },
