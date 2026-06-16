@@ -35,20 +35,25 @@ import { registerForPushNotificationsAsync } from './lib/notifications';
 import { useTheme, Theme } from './lib/theme';
 import { SPORT_FAQS } from './lib/faqs';
 import { UI_STRINGS } from './lib/strings';
+import { SPORTS, orderSports, type SportTab } from './lib/sports';
+import Reanimated, { useAnimatedRef } from 'react-native-reanimated';
+import Sortable, { type SortableGridRenderItem } from 'react-native-sortables';
 import * as Localization from 'expo-localization';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
 
-const SPORTS = [
-  { key: 'mlb' as Sport, emoji: '⚾', label: 'MLB' },
-  { key: 'nhl' as Sport, emoji: '🏒', label: 'NHL' },
-  { key: 'nba' as Sport, emoji: '🏀', label: 'NBA' },
-  { key: 'nfl' as Sport, emoji: '🏈', label: 'NFL' },
-  { key: 'soccer' as Sport, emoji: '⚽', label: 'Soccer' },
-  { key: 'worldcup' as Sport, emoji: '🌍', label: 'World Cup' },
-  { key: 'rugby' as Sport, emoji: '🏉', label: 'Rugby' },
-];
+// SPORTS now lives in ./lib/sports (shared with the onboarding picker).
+
+// Cross-axis height of a single sport tab row (used by the sortable grid).
+const TAB_ROW_HEIGHT = 52;
+
+// Per-sport localized display-name key (acronyms like MLB/NBA aren't here — they
+// fall back to s.label in render). Keyed by Sport for the tab + picker labels.
+const SPORT_NAME_KEY: Partial<Record<Sport, keyof (typeof UI_STRINGS)['en']>> = {
+  soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
+  wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
+};
 
 const SUPPORTED_LANGS = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
 // (follow-up chips are built per-language in render — see `followUps`)
@@ -64,6 +69,10 @@ const SPORT_CONFIG: Record<Sport, { espnSport: string; league: string; core?: bo
   soccer: { espnSport: 'soccer', league: 'usa.1' },
   worldcup: { espnSport: 'soccer', league: 'fifa.world' },
   rugby: { espnSport: 'rugby', league: '270557', core: true },
+  wnba: { espnSport: 'basketball', league: 'wnba' },
+  epl: { espnSport: 'soccer', league: 'eng.1' },
+  laliga: { espnSport: 'soccer', league: 'esp.1' },
+  mlr: { espnSport: 'rugby', league: '289262', core: true },
 };
 
 interface Game {
@@ -95,6 +104,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [sport, setSport] = useState<Sport>('mlb');
+  const [orderedSports, setOrderedSports] = useState<SportTab[]>(SPORTS);
   const [level, setLevel] = useState<Level>('beginner');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
@@ -133,6 +143,7 @@ export default function App() {
   // --- Refs ---
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const sportTabsRef = useAnimatedRef<Reanimated.ScrollView>(); // for drag auto-scroll
   const shareRef = useRef<ViewShot>(null);
   // Guards the onLayout-gated capture so it fires exactly once per share session.
   const captureInProgress = useRef(false);
@@ -260,6 +271,19 @@ export default function App() {
     setGames([]);
   };
 
+  // Renders one draggable sport tab. Tap selects; long-press (handled by the
+  // grid) starts a drag. Selection is keyed by `sport`, so it survives reorders.
+  const renderSportTab: SortableGridRenderItem<SportTab> = ({ item: s }) => (
+    <TouchableOpacity
+      style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
+      onPress={() => handleSportChange(s.key)}>
+      <Text style={styles.sportEmoji}>{s.emoji}</Text>
+      <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
+        {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const toggleFavorite = async (teamAbbr: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const newFavs = favorites.includes(teamAbbr)
@@ -353,15 +377,21 @@ export default function App() {
 useEffect(() => {
   async function init() {
     try {
-      const [onboarding, favs, notify, seenCine, lang] = await Promise.all([
+      const [onboarding, favs, notify, seenCine, lang, tabOrder] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
         AsyncStorage.getItem('notifications_enabled'),
         AsyncStorage.getItem('seen_cinematic'),
         AsyncStorage.getItem('user_language'),
+        AsyncStorage.getItem('sport_tab_order'),
       ]);
 
       if (favs) setFavorites(JSON.parse(favs));
+      // Restore the user's saved sport-tab order (reconstructed from the shared
+      // SPORTS list so new sports appear and removed ones drop out).
+      if (tabOrder) {
+        try { setOrderedSports(orderSports(JSON.parse(tabOrder))); } catch { /* keep default order */ }
+      }
       if (notify !== null) setNotificationsEnabled(notify === 'true');
       if (seenCine === 'true') setSeenCinematic(true);
       if (lang) {
@@ -498,21 +528,31 @@ useEffect(() => {
           </View>
         </View>
 
-        {/* Sport Tabs */}
+        {/* Sport Tabs — long-press a tab to drag-reorder; order persists. */}
         <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
-            {SPORTS.map(s => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
-                onPress={() => handleSportChange(s.key)}>
-                <Text style={styles.sportEmoji}>{s.emoji}</Text>
-                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
-                  {s.key === 'soccer' ? S.spSoccer : s.key === 'worldcup' ? S.spWorldCup : s.key === 'rugby' ? S.spRugby : s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <Reanimated.ScrollView
+            ref={sportTabsRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sportTabsContent}>
+            <Sortable.Grid
+              rows={1}
+              rowHeight={TAB_ROW_HEIGHT}
+              columnGap={8}
+              data={orderedSports}
+              keyExtractor={(s) => s.key}
+              renderItem={renderSportTab}
+              scrollableRef={sportTabsRef}
+              dragActivationDelay={180}
+              activeItemScale={1.05}
+              activeItemOpacity={0.9}
+              onDragStart={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
+              onDragEnd={({ indexToKey }) => {
+                setOrderedSports(orderSports(indexToKey));
+                AsyncStorage.setItem('sport_tab_order', JSON.stringify(indexToKey));
+              }}
+            />
+          </Reanimated.ScrollView>
         </View>
 
         <ScrollView
@@ -608,7 +648,7 @@ useEffect(() => {
                 </View>
               )}
 
-              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba') && selectedGameId && (
+              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
                 <PastPlays
                   key={`${sport}-${selectedGameId}-${language}-${level}`}
                   sport={sport}
