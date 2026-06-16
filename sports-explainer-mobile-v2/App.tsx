@@ -353,13 +353,6 @@ export default function App() {
 useEffect(() => {
   async function init() {
     try {
-      // DEV ONLY — force the full launch cinematic every reload by clearing the
-      // persisted flag before it's read. Never runs in a production build.
-      // TODO: remove before App Store submission.
-      if (__DEV__) {
-        await AsyncStorage.removeItem('seen_cinematic');
-      }
-
       const [onboarding, favs, notify, seenCine, lang] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
@@ -648,6 +641,11 @@ useEffect(() => {
                   ))}
                 </View>
 
+                {/* Discovery hint — only when the ask box is idle */}
+                {!followUpLoading && !followUpAnswer && (
+                  <Text style={styles.askHint}>{S.askHint}</Text>
+                )}
+
                 {/* Free-text ask box — grounded in THIS play's explanation */}
                 <View style={styles.askRow}>
                   <TextInput
@@ -811,6 +809,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chipActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   chipText: { color: t.textSecondary, fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: t.accentText },
+  askHint: { color: t.textMuted, fontSize: 12, lineHeight: 16, marginTop: 12 },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   askInput: { flex: 1, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: t.textPrimary, fontSize: 14 },
   askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
