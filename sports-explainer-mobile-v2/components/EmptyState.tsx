@@ -42,6 +42,17 @@ export default function EmptyState({ sport, reason, language }: Props) {
     );
   }
 
+  // World Cup is data-driven: with no live games, show the "every 4 years" note.
+  if (reason === 'no-games' && sport === 'worldcup') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
+        <Text style={styles.subtitle}>{S.worldCupRuns}</Text>
+      </View>
+    );
+  }
+
   // Learn Mode sports with no live data (year-round, but nothing on right now).
   if (reason === 'no-games' && sport === 'cricket') {
     return (

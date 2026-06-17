@@ -72,7 +72,8 @@ export const SEASON_WINDOWS: Record<string, { start: number; end: number }> = {
 };
 
 export function isOffSeason(sport: string): boolean {
-  if (sport === 'worldcup') return true; // rare tournament — always show the season note
+  // World Cup is data-driven (see fetchGames + EmptyState): live games show when
+  // ESPN has them; the "every 4 years" note shows only when there are none.
   const w = SEASON_WINDOWS[sport];
   if (!w) return false;
   const month = new Date().getMonth() + 1; // 1-12
