@@ -278,15 +278,18 @@ export default function App() {
           })
           .map(toGame);
 
-        // End-of-season guard: if ESPN returns ONLY completed games (no live or
-        // upcoming), treat it as no-games regardless of the date window. Uses the
-        // raw event state (in/pre/post), since the mapped Game only keeps isLive.
-        const hasLiveOrUpcoming = (data?.events || []).some((e: any) => {
+        // End-of-season guard (date-aware): clear the list only when ESPN returns
+        // nothing live/upcoming AND no game dated today-or-later — i.e. genuinely
+        // past completed games. Daily sports (MLB) briefly show today's whole slate
+        // as `post` between games; those are dated today/future, so we keep them.
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const hasCurrent = (data?.events || []).some((e: any) => {
           const st = e.status?.type?.state;
-          return st === 'in' || st === 'pre';
+          if (st === 'in' || st === 'pre') return true;
+          return (e.date || '').slice(0, 10) >= todayStr;
         });
-        if (!hasLiveOrUpcoming && parsed.length > 0) {
-          parsed = []; // only completed games remain → end of season
+        if (!hasCurrent && parsed.length > 0) {
+          parsed = [];
         }
       }
 
