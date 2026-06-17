@@ -1,11 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated, Dimensions, Linking, Share } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
-
-const { width } = Dimensions.get('window');
 
 // TODO: replace with the real App Store ID once the app is registered.
 const APP_ID = 'APP_ID';
@@ -15,12 +13,10 @@ const SHARE_MESSAGE =
   'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sportswise.app';
 
 interface Props {
-  visible: boolean;
   level: Level;
   language: Language;
   autoRefresh: boolean;
   notificationsEnabled: boolean;
-  onClose: () => void;
   onOpenMySports: () => void;
   onLevelChange: (l: Level) => void;
   onLanguageChange: (l: Language) => void;
@@ -51,12 +47,10 @@ const LANGUAGES: { key: Language; label: string }[] = [
 ];
 
 export default function SettingsScreen({
-  visible,
   level,
   language,
   autoRefresh,
   notificationsEnabled,
-  onClose,
   onOpenMySports,
   onLevelChange,
   onLanguageChange,
@@ -74,152 +68,122 @@ export default function SettingsScreen({
   };
   const THEME_LABEL: Record<ThemeMode, string> = { system: S.tSystem, dark: S.tDark, light: S.tLight };
 
-  const translateX = useRef(new Animated.Value(width)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(translateX, { toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(translateX, { toValue: width, duration: 250, useNativeDriver: true }),
-      ]).start(() => setMounted(false));
-    }
-  }, [visible]);
-
-  if (!mounted) return null;
-
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, { opacity }]}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
-      <Animated.View style={[styles.panel, { transform: [{ translateX }] }]}>
-        <BlurView intensity={40} tint={theme.mode === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{S.settings}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
-            </TouchableOpacity>
-          </View>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{S.settings}</Text>
+        </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>{S.mySports}</Text>
-            <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
-              <Text style={styles.linkLabel}>{S.customizeSports}</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.sectionLabel}>{S.mySports}</Text>
+          <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
+            <Text style={styles.linkLabel}>{S.customizeSports}</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secExpertise}</Text>
-            {LEVELS.map(l => (
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secExpertise}</Text>
+          {LEVELS.map(l => (
+            <TouchableOpacity
+              key={l.key}
+              style={[styles.levelRow, level === l.key && styles.levelRowActive]}
+              onPress={() => onLevelChange(l.key)}>
+              <View style={styles.levelInfo}>
+                <Text style={styles.levelLabel}>{l.emoji} {LVL[l.key].label}</Text>
+                <Text style={styles.levelDesc}>{LVL[l.key].desc}</Text>
+              </View>
+              {level === l.key && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          ))}
+
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secAppearance}</Text>
+          <View style={styles.segment}>
+            {THEMES.map(th => (
               <TouchableOpacity
-                key={l.key}
-                style={[styles.levelRow, level === l.key && styles.levelRowActive]}
-                onPress={() => onLevelChange(l.key)}>
-                <View style={styles.levelInfo}>
-                  <Text style={styles.levelLabel}>{l.emoji} {LVL[l.key].label}</Text>
-                  <Text style={styles.levelDesc}>{LVL[l.key].desc}</Text>
-                </View>
-                {level === l.key && <Text style={styles.checkmark}>✓</Text>}
+                key={th}
+                style={[styles.segmentItem, mode === th && styles.segmentItemActive]}
+                onPress={() => setMode(th)}>
+                <Text style={[styles.segmentText, mode === th && styles.segmentTextActive]}>{THEME_LABEL[th]}</Text>
               </TouchableOpacity>
             ))}
+          </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secAppearance}</Text>
-            <View style={styles.segment}>
-              {THEMES.map(th => (
-                <TouchableOpacity
-                  key={th}
-                  style={[styles.segmentItem, mode === th && styles.segmentItemActive]}
-                  onPress={() => setMode(th)}>
-                  <Text style={[styles.segmentText, mode === th && styles.segmentTextActive]}>{THEME_LABEL[th]}</Text>
-                </TouchableOpacity>
-              ))}
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secLanguage}</Text>
+          <View style={styles.langWrap}>
+            {LANGUAGES.map(l => (
+              <TouchableOpacity
+                key={l.key}
+                style={[styles.langPill, language === l.key && styles.langPillActive]}
+                onPress={() => onLanguageChange(l.key)}>
+                <Text style={[styles.langText, language === l.key && styles.langTextActive]}>{l.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secPreferences}</Text>
+
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>{S.autoRefresh}</Text>
+              <Text style={styles.toggleDesc}>{S.autoRefreshDesc}</Text>
             </View>
+            <Switch
+              style={styles.toggleSwitch}
+              value={autoRefresh}
+              onValueChange={onAutoRefreshChange}
+              trackColor={{ false: theme.borderStrong, true: theme.accent }}
+              thumbColor="#fff"
+            />
+          </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secLanguage}</Text>
-            <View style={styles.langWrap}>
-              {LANGUAGES.map(l => (
-                <TouchableOpacity
-                  key={l.key}
-                  style={[styles.langPill, language === l.key && styles.langPillActive]}
-                  onPress={() => onLanguageChange(l.key)}>
-                  <Text style={[styles.langText, language === l.key && styles.langTextActive]}>{l.label}</Text>
-                </TouchableOpacity>
-              ))}
+          <View style={[styles.toggleRow, { marginTop: 12 }]}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>{S.gameAlerts}</Text>
+              <Text style={styles.toggleDesc}>{S.gameAlertsDesc}</Text>
             </View>
+            <Switch
+              style={styles.toggleSwitch}
+              value={notificationsEnabled}
+              onValueChange={onNotificationsToggle}
+              trackColor={{ false: theme.borderStrong, true: theme.accent }}
+              thumbColor="#fff"
+            />
+          </View>
 
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secPreferences}</Text>
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secApp}</Text>
+          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(`itms-apps://itunes.apple.com/app/id${APP_ID}/`).catch(() => {})}>
+            <Text style={styles.linkLabel}>⭐ {S.rateApp}</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Share.share({ message: SHARE_MESSAGE }).catch(() => {})}>
+            <Text style={styles.linkLabel}>↗ {S.shareApp}</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(`mailto:${FEEDBACK_EMAIL}`).catch(() => {})}>
+            <Text style={styles.linkLabel}>✉️ {S.sendFeedback}</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}>
+            <Text style={styles.linkLabel}>🔒 {S.privacyPolicy}</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
 
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleInfo}>
-                <Text style={styles.toggleLabel}>{S.autoRefresh}</Text>
-                <Text style={styles.toggleDesc}>{S.autoRefreshDesc}</Text>
-              </View>
-              <Switch
-                style={styles.toggleSwitch}
-                value={autoRefresh}
-                onValueChange={onAutoRefreshChange}
-                trackColor={{ false: theme.borderStrong, true: theme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            <View style={[styles.toggleRow, { marginTop: 12 }]}>
-              <View style={styles.toggleInfo}>
-                <Text style={styles.toggleLabel}>{S.gameAlerts}</Text>
-                <Text style={styles.toggleDesc}>{S.gameAlertsDesc}</Text>
-              </View>
-              <Switch
-                style={styles.toggleSwitch}
-                value={notificationsEnabled}
-                onValueChange={onNotificationsToggle}
-                trackColor={{ false: theme.borderStrong, true: theme.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secApp}</Text>
-            <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(`itms-apps://itunes.apple.com/app/id${APP_ID}/`).catch(() => {})}>
-              <Text style={styles.linkLabel}>⭐ {S.rateApp}</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Share.share({ message: SHARE_MESSAGE }).catch(() => {})}>
-              <Text style={styles.linkLabel}>↗ {S.shareApp}</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(`mailto:${FEEDBACK_EMAIL}`).catch(() => {})}>
-              <Text style={styles.linkLabel}>✉️ {S.sendFeedback}</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}>
-              <Text style={styles.linkLabel}>🔒 {S.privacyPolicy}</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.versionBox}>
-              <Text style={styles.versionText}>SportsWise v1.0</Text>
-              <Text style={styles.versionText}>{S.poweredBy}</Text>
-            </View>
-          </ScrollView>
-        </View>
-      </Animated.View>
-    </Animated.View>
+          <View style={styles.versionBox}>
+            <Text style={styles.versionText}>SportsWise v1.0</Text>
+            <Text style={styles.versionText}>{S.poweredBy}</Text>
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  overlay: { zIndex: 100, backgroundColor: t.scrim },
-  panel: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '82%', overflow: 'hidden', borderLeftWidth: 1, borderLeftColor: t.border },
-  content: { flex: 1, padding: 24, paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
+  screen: { flex: 1, backgroundColor: t.background },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { color: t.textPrimary, fontSize: 28, fontWeight: '900' },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: t.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
-  closeText: { color: t.textPrimary, fontSize: 16 },
+  scrollContent: { paddingBottom: 24 },
   sectionLabel: { color: t.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
   levelRow: { padding: 16, borderRadius: 12, backgroundColor: t.surface, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: t.border },
   levelRowActive: { borderColor: t.accent, backgroundColor: t.surfaceActive },

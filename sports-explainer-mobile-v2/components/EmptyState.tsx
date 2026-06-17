@@ -9,6 +9,7 @@ interface Props {
   sport: string;
   reason: 'no-games' | 'off-season' | 'select-game';
   language: Language;
+  seasonEnded?: boolean; // in-window sport whose season just finished (NBA/NHL in June)
 }
 
 const SPORT_EMOJI: Record<string, string> = {
@@ -16,7 +17,7 @@ const SPORT_EMOJI: Record<string, string> = {
   wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉', tennis: '🎾', golf: '⛳', cricket: '🏏',
 };
 
-export default function EmptyState({ sport, reason, language }: Props) {
+export default function EmptyState({ sport, reason, language, seasonEnded }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -38,6 +39,17 @@ export default function EmptyState({ sport, reason, language }: Props) {
       <View style={styles.container}>
         <Text style={styles.emoji}>📡</Text>
         <Text style={styles.title}>{S.selectGame}</Text>
+      </View>
+    );
+  }
+
+  // Season just ended (NBA/NHL still inside their Oct–June window): no more games
+  // this season, so point users to next season instead of "no games today".
+  if (reason === 'no-games' && seasonEnded) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={styles.title}>{S.seasonJustEnded.replace('{sport}', sportName)}</Text>
       </View>
     );
   }
