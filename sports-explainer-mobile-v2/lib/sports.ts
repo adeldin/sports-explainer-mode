@@ -12,12 +12,15 @@ export const SPORTS: SportTab[] = [
   { key: 'nba', emoji: '🏀', label: 'NBA' },
   { key: 'wnba', emoji: '🏀', label: 'WNBA' },
   { key: 'nfl', emoji: '🏈', label: 'NFL' },
-  { key: 'soccer', emoji: '⚽', label: 'Soccer' },
+  { key: 'soccer', emoji: '⚽', label: 'MLS' },
   { key: 'worldcup', emoji: '🌍', label: 'World Cup' },
-  { key: 'epl', emoji: '⚽', label: 'Premier League' },
+  { key: 'epl', emoji: '⚽', label: 'EPL' },
   { key: 'laliga', emoji: '⚽', label: 'La Liga' },
-  { key: 'rugby', emoji: '🏉', label: 'Rugby' },
+  { key: 'rugby', emoji: '🏉', label: 'URC' },
   { key: 'mlr', emoji: '🏉', label: 'MLR' },
+  { key: 'tennis', emoji: '🎾', label: 'Tennis' },
+  { key: 'golf', emoji: '⛳', label: 'Golf' },
+  { key: 'cricket', emoji: '🏏', label: 'Cricket' },
 ];
 
 // Descriptive localized name per sport (the full-name sub-label, e.g. "Baseball"
@@ -26,6 +29,7 @@ export const SPORT_FULL_NAME: Record<Sport, keyof UIStrings> = {
   mlb: 'spBaseball', nfl: 'spFootball', nba: 'spBasketball', nhl: 'spHockey',
   soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
   wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
+  tennis: 'spTennis', golf: 'spGolf', cricket: 'spCricket',
 };
 
 // Reorder SPORTS by a user's saved key order (from AsyncStorage). Keeps saved
@@ -44,4 +48,36 @@ export function orderSports(savedKeys: unknown): SportTab[] {
   }
   for (const s of SPORTS) if (!seen.has(s.key)) ordered.push(s); // append new sports
   return ordered;
+}
+
+// ── Season awareness ────────────────────────────────────────────────────────
+// Shared by EmptyState (off-season messaging) and App (skip stale ESPN fetches).
+export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// IN-season month windows (1-12). Drives both off-season detection and the
+// displayed "season runs X to Y" copy. World Cup has no annual window — handled
+// specially (every 4 years).
+export const SEASON_WINDOWS: Record<string, { start: number; end: number }> = {
+  mlb: { start: 3, end: 10 },    // March–October
+  nfl: { start: 9, end: 2 },     // September–February
+  nba: { start: 10, end: 6 },    // October–June
+  nhl: { start: 10, end: 6 },    // October–June
+  wnba: { start: 5, end: 10 },   // May–October
+  soccer: { start: 3, end: 10 }, // March–October (MLS)
+  epl: { start: 8, end: 5 },     // August–May
+  laliga: { start: 8, end: 5 },  // August–May
+  rugby: { start: 9, end: 6 },   // September–June (URC)
+  mlr: { start: 2, end: 7 },     // February–July
+};
+
+export function isOffSeason(sport: string): boolean {
+  if (sport === 'worldcup') return true; // rare tournament — always show the season note
+  const w = SEASON_WINDOWS[sport];
+  if (!w) return false;
+  const month = new Date().getMonth() + 1; // 1-12
+  const inSeason = w.start <= w.end
+    ? (month >= w.start && month <= w.end)
+    : (month >= w.start || month <= w.end); // wraps the year (NFL/NBA/NHL/EPL/La Liga/rugby)
+  return !inSeason;
 }

@@ -23,6 +23,7 @@ import {
 // Components
 import GameCard from './components/GameCard';
 import SettingsScreen from './components/SettingsScreen';
+import MySportsScreen from './components/MySportsScreen';
 import EmptyState from './components/EmptyState';
 import Onboarding from './components/Onboarding';
 import ShareCard from './components/ShareCard';
@@ -35,9 +36,7 @@ import { registerForPushNotificationsAsync } from './lib/notifications';
 import { useTheme, Theme } from './lib/theme';
 import { SPORT_FAQS } from './lib/faqs';
 import { UI_STRINGS } from './lib/strings';
-import { SPORTS, orderSports, type SportTab } from './lib/sports';
-import Reanimated, { useAnimatedRef } from 'react-native-reanimated';
-import Sortable, { type SortableGridRenderItem } from 'react-native-sortables';
+import { SPORTS, orderSports, isOffSeason, SPORT_FULL_NAME, type SportTab } from './lib/sports';
 import * as Localization from 'expo-localization';
 
 // Prevent the native splash from hiding automatically
@@ -45,8 +44,11 @@ SplashScreen.preventAutoHideAsync();
 
 // SPORTS now lives in ./lib/sports (shared with the onboarding picker).
 
-// Cross-axis height of a single sport tab row (used by the sortable grid).
-const TAB_ROW_HEIGHT = 52;
+// Level emojis for the main-screen level pill (match the Settings level rows).
+const LEVEL_EMOJI: Record<Level, string> = { kid: '👶', beginner: '👋', intermediate: '📺', expert: '🎙️' };
+const LEVEL_NAME_KEY: Record<Level, keyof (typeof UI_STRINGS)['en']> = {
+  kid: 'lvlKid', beginner: 'lvlBeginner', intermediate: 'lvlInter', expert: 'lvlExpert',
+};
 
 // Per-sport localized display-name key (acronyms like MLB/NBA aren't here — they
 // fall back to s.label in render). Keyed by Sport for the tab + picker labels.
@@ -61,7 +63,7 @@ const SUPPORTED_LANGS = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', '
 // ESPN config per sport. `core` sports (rugby) are NOT on the normal scoreboard
 // API and need the two-step Core-API $ref fetch. Leagues match the backend so
 // the gameId we send is found server-side.
-const SPORT_CONFIG: Record<Sport, { espnSport: string; league: string; core?: boolean }> = {
+const SPORT_CONFIG: Record<Sport, { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean }> = {
   mlb: { espnSport: 'baseball', league: 'mlb' },
   nhl: { espnSport: 'hockey', league: 'nhl' },
   nba: { espnSport: 'basketball', league: 'nba' },
@@ -73,6 +75,10 @@ const SPORT_CONFIG: Record<Sport, { espnSport: string; league: string; core?: bo
   epl: { espnSport: 'soccer', league: 'eng.1' },
   laliga: { espnSport: 'soccer', league: 'esp.1' },
   mlr: { espnSport: 'rugby', league: '289262', core: true },
+  // Learn Mode sports — tennis/golf fetch tournament context; cricket has no data source.
+  tennis: { espnSport: 'tennis', league: 'atp', learnMode: true },
+  golf: { espnSport: 'golf', league: 'pga', learnMode: true },
+  cricket: { learnMode: true },
 };
 
 interface Game {
@@ -93,7 +99,7 @@ export default function App() {
   const [fontsLoaded] = useFonts({
     SpaceGrotesk_700Bold,     // "SportsWise" wordmark (cinematic — applied separately)
     SpaceGrotesk_600SemiBold, // main header
-    SpaceGrotesk_500Medium,   // "The Smart Play" tagline (applied separately)
+    SpaceGrotesk_500Medium,   // "Watch and ask why." tagline (applied separately)
   });
 
   // --- State ---
@@ -105,6 +111,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [sport, setSport] = useState<Sport>('mlb');
   const [orderedSports, setOrderedSports] = useState<SportTab[]>(SPORTS);
+  const [sportVisibility, setSportVisibility] = useState<Record<string, boolean>>({});
+  const [showMySports, setShowMySports] = useState(false);
+  const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [level, setLevel] = useState<Level>('beginner');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
@@ -139,11 +148,16 @@ export default function App() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
   const followUps = [`🤔 ${S.fuWhy}`, `📜 ${S.fuRule}`, `👋 ${S.fuNew}`, `👀 ${S.fuNext}`];
+  // Learn Mode = explicit Learn sport (tennis/golf/cricket) OR an off-season Live sport.
+  // Both show the educational state (no PLAY card; ask box + FAQ).
+  const offSeason = isOffSeason(sport);
+  const learnMode = SPORT_CONFIG[sport]?.learnMode === true || offSeason;
+  // Sports shown in the tab bar: ordered, minus any hidden in My Sports (missing key = visible).
+  const visibleSports = orderedSports.filter(s => sportVisibility[s.key] !== false);
 
   // --- Refs ---
   const autoRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const sportTabsRef = useAnimatedRef<Reanimated.ScrollView>(); // for drag auto-scroll
   const shareRef = useRef<ViewShot>(null);
   // Guards the onLayout-gated capture so it fires exactly once per share session.
   const captureInProgress = useRef(false);
@@ -163,6 +177,34 @@ export default function App() {
   // --- Logic Functions ---
   const fetchGames = useCallback(async () => {
     const cfg = SPORT_CONFIG[sport];
+    // Learn Mode (explicit tennis/golf/cricket) or an off-season Live sport: no
+    // head-to-head games. Tennis/golf fetch the current tournament for the card;
+    // cricket / off-season have no card (EmptyState shows the right message).
+    if (cfg.learnMode || isOffSeason(sport)) {
+      setGames([]);
+      setSelectedGameId(null);
+      setResult(null);
+      setLearnContext(null);
+      if (cfg.learnMode && cfg.espnSport && cfg.league) {
+        try {
+          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`);
+          const data = await res.json();
+          const ev = data?.events?.[0];
+          if (ev) {
+            if (sport === 'golf') {
+              const comp = ev.competitions?.[0];
+              const sorted = (comp?.competitors || []).slice().sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999));
+              const leader = sorted[0];
+              setLearnContext(leader?.athlete?.displayName ? `${ev.name} — ${leader.athlete.displayName} (${leader.score})` : ev.name);
+            } else {
+              setLearnContext(ev.status?.type?.shortDetail ? `${ev.name} — ${ev.status.type.shortDetail}` : ev.name);
+            }
+          }
+        } catch { /* leave null → EmptyState shows "no tournaments this week" */ }
+      }
+      return;
+    }
+    setLearnContext(null);
     // Team labels: prefer abbreviation, fall back for sports that lack it (rugby/soccer).
     const teamName = (c: any) =>
       c?.team?.abbreviation || c?.team?.shortDisplayName || c?.team?.displayName || '?';
@@ -219,7 +261,16 @@ export default function App() {
           `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
         );
         const data = await res.json();
-        parsed = (data?.events || []).map(toGame);
+        // Belt-and-suspenders: drop completed games older than 24h so a stale
+        // scoreboard can't surface last season's results even if isOffSeason misses.
+        const now = Date.now();
+        parsed = (data?.events || [])
+          .filter((e: any) => {
+            const isFinal = e.status?.type?.state === 'post';
+            const ageMs = e.date ? now - new Date(e.date).getTime() : 0;
+            return !(isFinal && ageMs > 24 * 60 * 60 * 1000);
+          })
+          .map(toGame);
       }
 
       const sorted = [...parsed].sort((a, b) => {
@@ -271,17 +322,56 @@ export default function App() {
     setGames([]);
   };
 
-  // Renders one draggable sport tab. Tap selects; long-press (handled by the
-  // grid) starts a drag. Selection is keyed by `sport`, so it survives reorders.
-  const renderSportTab: SortableGridRenderItem<SportTab> = ({ item: s }) => (
-    <TouchableOpacity
-      style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
-      onPress={() => handleSportChange(s.key)}>
-      <Text style={styles.sportEmoji}>{s.emoji}</Text>
-      <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
-        {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
-      </Text>
-    </TouchableOpacity>
+  // My Sports: persist the new order + visibility, and if the active sport was
+  // just hidden, switch to the first visible one.
+  const handleSportsChange = (order: string[], visibility: Record<string, boolean>) => {
+    const newOrdered = orderSports(order);
+    setOrderedSports(newOrdered);
+    setSportVisibility(visibility);
+    AsyncStorage.setItem('sport_tab_order', JSON.stringify(order));
+    AsyncStorage.setItem('sport_visibility', JSON.stringify(visibility));
+    if (visibility[sport] === false) {
+      const firstVisible = newOrdered.find(s => visibility[s.key] !== false);
+      if (firstVisible) handleSportChange(firstVisible.key);
+    }
+  };
+
+  // Free-text ask box (input + thinking + answer). Reused by the Live-mode
+  // play card and the off-season educational state, with a mode-specific
+  // placeholder. Routes through handleAsk (context-less when there's no play).
+  const renderAskBox = (placeholder: string) => (
+    <>
+      <View style={styles.askRow}>
+        <TextInput
+          style={styles.askInput}
+          value={askText}
+          onChangeText={setAskText}
+          placeholder={placeholder}
+          placeholderTextColor={theme.placeholderText}
+          returnKeyType="send"
+          onSubmitEditing={handleAsk}
+          editable={!followUpLoading}
+          blurOnSubmit
+        />
+        <TouchableOpacity
+          style={[styles.askSend, (!askText.trim() || followUpLoading) && styles.askSendDisabled]}
+          onPress={handleAsk}
+          disabled={!askText.trim() || followUpLoading}>
+          <Text style={[styles.askSendText, (!askText.trim() || followUpLoading) && { color: theme.textMuted }]}>↑</Text>
+        </TouchableOpacity>
+      </View>
+      {followUpLoading && (
+        <View style={styles.thinkingRow}>
+          <Text style={styles.thinkingText}>{S.thinking}</Text>
+        </View>
+      )}
+      {followUpAnswer && (
+        <View style={styles.answerCard}>
+          <Text style={styles.answerHeader}>{activeChip}</Text>
+          <Text style={styles.answerText}>{followUpAnswer}</Text>
+        </View>
+      )}
+    </>
   );
 
   const toggleFavorite = async (teamAbbr: string) => {
@@ -377,13 +467,14 @@ export default function App() {
 useEffect(() => {
   async function init() {
     try {
-      const [onboarding, favs, notify, seenCine, lang, tabOrder] = await Promise.all([
+      const [onboarding, favs, notify, seenCine, lang, tabOrder, visRaw] = await Promise.all([
         AsyncStorage.getItem('onboarding_complete'),
         AsyncStorage.getItem('favorite_teams'),
         AsyncStorage.getItem('notifications_enabled'),
         AsyncStorage.getItem('seen_cinematic'),
         AsyncStorage.getItem('user_language'),
         AsyncStorage.getItem('sport_tab_order'),
+        AsyncStorage.getItem('sport_visibility'),
       ]);
 
       if (favs) setFavorites(JSON.parse(favs));
@@ -391,6 +482,9 @@ useEffect(() => {
       // SPORTS list so new sports appear and removed ones drop out).
       if (tabOrder) {
         try { setOrderedSports(orderSports(JSON.parse(tabOrder))); } catch { /* keep default order */ }
+      }
+      if (visRaw) {
+        try { setSportVisibility(JSON.parse(visRaw)); } catch { /* keep all-visible */ }
       }
       if (notify !== null) setNotificationsEnabled(notify === 'true');
       if (seenCine === 'true') setSeenCinematic(true);
@@ -528,31 +622,26 @@ useEffect(() => {
           </View>
         </View>
 
-        {/* Sport Tabs — long-press a tab to drag-reorder; order persists. */}
+        {/* Current level — tap to open Settings */}
+        <TouchableOpacity style={styles.levelPill} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
+          <Text style={styles.levelPillText}>{LEVEL_EMOJI[level]} {S[LEVEL_NAME_KEY[level]]}</Text>
+        </TouchableOpacity>
+
+        {/* Sport Tabs — visible sports in saved order (customize in Settings › My Sports). */}
         <View style={styles.tabsContainer}>
-          <Reanimated.ScrollView
-            ref={sportTabsRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.sportTabsContent}>
-            <Sortable.Grid
-              rows={1}
-              rowHeight={TAB_ROW_HEIGHT}
-              columnGap={8}
-              data={orderedSports}
-              keyExtractor={(s) => s.key}
-              renderItem={renderSportTab}
-              scrollableRef={sportTabsRef}
-              dragActivationDelay={180}
-              activeItemScale={1.05}
-              activeItemOpacity={0.9}
-              onDragStart={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); }}
-              onDragEnd={({ indexToKey }) => {
-                setOrderedSports(orderSports(indexToKey));
-                AsyncStorage.setItem('sport_tab_order', JSON.stringify(indexToKey));
-              }}
-            />
-          </Reanimated.ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
+            {visibleSports.map(s => (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
+                onPress={() => handleSportChange(s.key)}>
+                <Text style={styles.sportEmoji}>{s.emoji}</Text>
+                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
+                  {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         <ScrollView
@@ -607,6 +696,10 @@ useEffect(() => {
                   />
                 )}
               />
+            </View>
+          ) : learnMode && learnContext ? (
+            <View style={styles.tournamentCard}>
+              <Text style={styles.tournamentText}>🏆 {learnContext}</Text>
             </View>
           ) : !loading ? <EmptyState sport={sport} reason="no-games" language={language} /> : null}
 
@@ -687,39 +780,17 @@ useEffect(() => {
                 )}
 
                 {/* Free-text ask box — grounded in THIS play's explanation */}
-                <View style={styles.askRow}>
-                  <TextInput
-                    style={styles.askInput}
-                    value={askText}
-                    onChangeText={setAskText}
-                    placeholder={S.askPlaceholder}
-                    placeholderTextColor={theme.placeholderText}
-                    returnKeyType="send"
-                    onSubmitEditing={handleAsk}
-                    editable={!followUpLoading}
-                    blurOnSubmit
-                  />
-                  <TouchableOpacity
-                    style={[styles.askSend, (!askText.trim() || followUpLoading) && styles.askSendDisabled]}
-                    onPress={handleAsk}
-                    disabled={!askText.trim() || followUpLoading}>
-                    <Text style={[styles.askSendText, (!askText.trim() || followUpLoading) && { color: theme.textMuted }]}>↑</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {followUpLoading && (
-                  <View style={styles.thinkingRow}>
-                    <Text style={styles.thinkingText}>{S.thinking}</Text>
-                  </View>
-                )}
-                {followUpAnswer && (
-                  <View style={styles.answerCard}>
-                    <Text style={styles.answerHeader}>{activeChip}</Text>
-                    <Text style={styles.answerText}>{followUpAnswer}</Text>
-                  </View>
-                )}
+                {renderAskBox(S.askPlaceholder)}
               </View>
             </Animated.View>
+          ) : learnMode ? (
+            <View style={styles.learnBlock}>
+              <View style={styles.learnBadge}><Text style={styles.learnBadgeText}>LEARN MODE</Text></View>
+              <Text style={styles.learnPrompt}>
+                {S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]).replace('…', '')}
+              </Text>
+              {renderAskBox(S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]))}
+            </View>
           ) : !loading ? <EmptyState sport={sport} reason="select-game" language={language} /> : null}
 
           {/* Common Questions — per-sport FAQ. Secondary/educational, so it lives at
@@ -727,9 +798,9 @@ useEffect(() => {
           <View style={styles.faqSection}>
             <TouchableOpacity style={styles.faqHeadingRow} onPress={() => setFaqSectionOpen(v => !v)} activeOpacity={0.7}>
               <Text style={styles.faqHeading}>{SPORT_FAQS[sport].label[language]}</Text>
-              <Text style={styles.faqHeadingChevron}>{faqSectionOpen ? '▾' : '▸'}</Text>
+              <Text style={styles.faqHeadingChevron}>{(faqSectionOpen || learnMode) ? '▾' : '▸'}</Text>
             </TouchableOpacity>
-            {faqSectionOpen && (
+            {(faqSectionOpen || learnMode) && (
               <>
                 {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => {
                   const text = q[language] || q.en;
@@ -769,6 +840,7 @@ useEffect(() => {
         autoRefresh={autoRefresh}
         notificationsEnabled={notificationsEnabled}
         onClose={() => setShowSettings(false)}
+        onOpenMySports={() => setShowMySports(true)}
         onLevelChange={(l) => { setLevel(l); setShowSettings(false); }}
         onLanguageChange={async (lng) => {
           setLanguage(lng);
@@ -779,6 +851,15 @@ useEffect(() => {
           setNotificationsEnabled(val);
           await AsyncStorage.setItem('notifications_enabled', val ? 'true' : 'false');
         }}
+      />
+
+      <MySportsScreen
+        visible={showMySports}
+        language={language}
+        order={orderedSports.map(s => s.key)}
+        visibility={sportVisibility}
+        onClose={() => setShowMySports(false)}
+        onChange={handleSportsChange}
       />
     </KeyboardAvoidingView>
   );
@@ -794,6 +875,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerTitleAccent: { color: t.accent },
+  levelPill: { alignSelf: 'flex-start', marginHorizontal: 20, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  levelPillText: { color: t.textMuted, fontSize: 12, fontWeight: '600' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
@@ -843,6 +926,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
   followUpSection: { marginTop: 8, paddingHorizontal: 16 },
   followUpTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  // Off-season educational ask block
+  learnBlock: { marginTop: 8, paddingHorizontal: 16 },
+  learnPrompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
+  learnBadge: { alignSelf: 'flex-start', backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
+  learnBadgeText: { color: t.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   chipsWrap: { gap: 8 },                          // column of rows; 8px gap between the two rows
   chipRow: { flexDirection: 'row', gap: 8 },      // two chips per row, 8px gap between them
   chip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center' },

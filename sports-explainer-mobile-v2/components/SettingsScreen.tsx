@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Animated, Dimensions, Linking, Share } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
 
 const { width } = Dimensions.get('window');
+
+// TODO: replace with the real App Store ID once the app is registered.
+const APP_ID = 'APP_ID';
+const FEEDBACK_EMAIL = 'feedback@sportswise.app';
+const PRIVACY_URL = 'https://sportswise.app/privacy';
+const SHARE_MESSAGE =
+  'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sportswise.app';
 
 interface Props {
   visible: boolean;
@@ -14,6 +21,7 @@ interface Props {
   autoRefresh: boolean;
   notificationsEnabled: boolean;
   onClose: () => void;
+  onOpenMySports: () => void;
   onLevelChange: (l: Level) => void;
   onLanguageChange: (l: Language) => void;
   onAutoRefreshChange: (val: boolean) => void;
@@ -21,10 +29,10 @@ interface Props {
 }
 
 const LEVELS: { key: Level; emoji: string }[] = [
-  { key: 'kid', emoji: '🧒' },
+  { key: 'kid', emoji: '👶' },
   { key: 'beginner', emoji: '👋' },
   { key: 'intermediate', emoji: '📺' },
-  { key: 'expert', emoji: '🎓' },
+  { key: 'expert', emoji: '🎙️' },
 ];
 
 const THEMES: ThemeMode[] = ['system', 'dark', 'light'];
@@ -49,6 +57,7 @@ export default function SettingsScreen({
   autoRefresh,
   notificationsEnabled,
   onClose,
+  onOpenMySports,
   onLevelChange,
   onLanguageChange,
   onAutoRefreshChange,
@@ -100,7 +109,13 @@ export default function SettingsScreen({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sectionLabel}>{S.secExpertise}</Text>
+            <Text style={styles.sectionLabel}>{S.mySports}</Text>
+            <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
+              <Text style={styles.linkLabel}>{S.customizeSports}</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secExpertise}</Text>
             {LEVELS.map(l => (
               <TouchableOpacity
                 key={l.key}
@@ -168,6 +183,24 @@ export default function SettingsScreen({
               />
             </View>
 
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secApp}</Text>
+            <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(`itms-apps://itunes.apple.com/app/id${APP_ID}/`).catch(() => {})}>
+              <Text style={styles.linkLabel}>⭐ {S.rateApp}</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Share.share({ message: SHARE_MESSAGE }).catch(() => {})}>
+              <Text style={styles.linkLabel}>↗ {S.shareApp}</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(`mailto:${FEEDBACK_EMAIL}`).catch(() => {})}>
+              <Text style={styles.linkLabel}>✉️ {S.sendFeedback}</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}>
+              <Text style={styles.linkLabel}>🔒 {S.privacyPolicy}</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+
             <View style={styles.versionBox}>
               <Text style={styles.versionText}>SportsWise v1.0</Text>
               <Text style={styles.versionText}>{S.poweredBy}</Text>
@@ -210,6 +243,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   toggleSwitch: { flexShrink: 0 },
   toggleLabel: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   toggleDesc: { color: t.textSecondary, fontSize: 12, marginTop: 2 },
+  linkRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border },
+  linkLabel: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  linkChevron: { color: t.textMuted, fontSize: 20, fontWeight: '700' },
   versionBox: { marginTop: 40, alignItems: 'center', gap: 4 },
   versionText: { color: t.textMuted, fontSize: 12 },
 });

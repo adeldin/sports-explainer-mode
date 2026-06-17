@@ -25,12 +25,15 @@ const sportContext: Record<string, string> = {
   epl: "English Premier League — England's top soccer (association football) division. Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation, relegation.",
   laliga: "La Liga — Spain's top soccer (association football) division. Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation, relegation.",
   mlr: 'Major League Rugby (MLR) — the premier professional rugby union league in the United States and Canada. Key concepts: try (5 points), conversion (2 points), penalty kick (3 points), drop goal (3 points), scrum, lineout, ruck, maul, offside, tackle, breakdown.',
+  tennis: "Tennis is an individual racket sport. Scoring: love=0, 15, 30, 40, game. Sets won by first to 6 games (win by 2). Tiebreak at 6-6. Match won by best of 3 or 5 sets. Key terms: ace, fault, deuce, advantage, break, hold, rally, volley, baseline, net.",
+  golf: 'Golf is an individual sport where players complete 18 holes using as few strokes as possible. Scoring relative to par: eagle=-2, birdie=-1, par=0, bogey=+1, double bogey=+2. Key terms: fairway, rough, green, hazard, bunker, driver, iron, wedge, putter, handicap, cut, stroke play, match play.',
+  cricket: 'Cricket is a bat-and-ball sport between two teams of eleven. Key concepts: wicket, over (6 balls), runs, boundary (4/6), batting, bowling, LBW, duck, innings; formats include Test (up to 5 days), ODI, and T20.',
 };
 
 // ESPN endpoint config. `core` sports are NOT on the normal scoreboard API and
 // need the two-step Core-API $ref fetch (see fetchGameData). Soccer/World Cup
 // use the normal site API with their own league slugs.
-type EspnCfg = { sport: string; league: string; core?: boolean };
+type EspnCfg = { sport: string; league: string; core?: boolean; learnMode?: boolean };
 const espnConfig: Record<string, EspnCfg> = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
@@ -49,7 +52,11 @@ const espnConfig: Record<string, EspnCfg> = {
   wnba: { sport: 'basketball', league: 'wnba' },
   epl: { sport: 'soccer', league: 'eng.1' },
   laliga: { sport: 'soccer', league: 'esp.1' },
-  // NOTE: cricket intentionally omitted — ESPN's public API has no usable cricket
+  // Learn Mode sports — individual/tournament formats with no play-by-play.
+  // The explain endpoint returns an educational "what to watch for" response.
+  tennis: { sport: 'tennis', league: 'atp', learnMode: true },
+  golf: { sport: 'golf', league: 'pga', learnMode: true },
+  // NOTE: cricket intentionally omitted from espnConfig — no usable ESPN data. — ESPN's public API has no usable cricket
   // data (site API 404s; Core API lists the sport but exposes zero leagues/events).
   // It needs a different source (e.g. ESPNcricinfo) before it can be added here.
 };
@@ -98,6 +105,36 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
 
   const cfg = espnConfig[sport];
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
+
+  // Learn Mode (tennis/golf): tournament-shaped, not head-to-head. Build a
+  // context string from the current tournament rather than home/away teams.
+  if (cfg.learnMode) {
+    try {
+      const res = await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`,
+        { cache: 'no-store' },
+      );
+      const data = await res.json();
+      const ev = data?.events?.[0];
+      if (ev) {
+        if (cfg.sport === 'golf') {
+          const comp = ev.competitions?.[0];
+          const sorted = (comp?.competitors || []).slice().sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999));
+          const leader = sorted[0];
+          gameContext = leader?.athlete?.displayName
+            ? `${ev.name} — Leader: ${leader.athlete.displayName} (${leader.score})`
+            : ev.name;
+        } else {
+          gameContext = ev.status?.type?.shortDetail ? `${ev.name} — ${ev.status.type.shortDetail}` : ev.name;
+        }
+      } else {
+        gameContext = `No ${sport} tournaments are currently in progress.`;
+      }
+    } catch {
+      gameContext = `Learning about ${sport}.`;
+    }
+    return { play, gameContext, homeTeam, awayTeam };
+  }
 
   const teamName = (comp: any, side: string) =>
     comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
@@ -207,6 +244,18 @@ Rules for JSON flags:
 - ONLY use information provided in the play data. Do not hallucinate details.`;
 }
 
+// Learn Mode prompt — no specific play; explain the sport / current context.
+function buildLearnUserPrompt(sport: string, gameContext: string, level: string): string {
+  return `The user is watching ${sport}. Current context: ${gameContext}. Explain what is happening and what to watch for at a ${level} level. Be educational and engaging.
+
+Respond with this exact JSON structure:
+{
+  "simple": "What is happening and what to watch for",
+  "whyItMatters": "Why it's interesting / extra context",
+  "complexity": "low" | "medium" | "high"
+}`;
+}
+
 // playType is raw ESPN text, so it never passes through the explanation prompt.
 // Translate it directly (deterministic) rather than relying on the model to echo
 // a translated copy inside its JSON — which it drops unreliably. Returns null for
@@ -288,6 +337,36 @@ export async function POST(req: NextRequest) {
         temperature: 0.7,
       });
       return NextResponse.json({ answer: completion.choices[0]?.message?.content?.trim() }, { headers: corsHeaders });
+    }
+
+    // Learn Mode (tennis/golf, or any request with learnMode): no specific play —
+    // explain the sport + current tournament context. No playType/rawPlay.
+    const learn = (espnConfig[sport]?.learnMode || body.learnMode) === true;
+    if (learn) {
+      const fetched = await fetchGameData(sport, gameId);
+      const gameContext = fetched.gameContext;
+      const langLine = language && language !== 'en'
+        ? ` Respond entirely in ${languageNames[language] || language}.`
+        : '';
+      const completion = await groq.chat.completions.create({
+        model: GROQ_MODEL,
+        messages: [
+          { role: 'system', content: buildSystemPrompt(sport, level, language) },
+          { role: 'user', content: buildLearnUserPrompt(sport, gameContext, level) + langLine },
+        ],
+        temperature: 0.6,
+        response_format: { type: 'json_object' },
+      });
+      const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      return NextResponse.json({
+        simple: parsed.simple || '',
+        whyItMatters: parsed.whyItMatters || '',
+        ruleDetail: '',
+        showRule: false,
+        complexity: parsed.complexity || 'low',
+        gameContext,
+        learnMode: true,
+      }, { headers: corsHeaders });
     }
 
     // Fetch live game context + latest play for the requested sport. When an

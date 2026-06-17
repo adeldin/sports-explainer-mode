@@ -11,7 +11,7 @@ interface Props {
 /**
  * Launch cinematic — clean and premium, two beats on deep navy (#0d1b3e):
  *   1. The app icon floats up + scales into center as it fades in (~1.2s).
- *   2. "SportsWise" fades in below it, then "The Smart Play" 300ms later.
+ *   2. "SportsWise" fades in below it, then "Watch and ask why." 300ms later.
  * A 1s hold, then the navy content layer fades out to reveal the app
  * background underneath, handing off to the app.
  *
@@ -71,7 +71,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
             Animated.timing(iconY, { toValue: 0, duration: 1200, easing: ease, useNativeDriver: true }),
             Animated.timing(iconScale, { toValue: 1, duration: 1200, easing: ease, useNativeDriver: true }),
           ]),
-          // Beat 2 — "SportsWise" then "The Smart Play" 300ms later (1.2s → 2.0s).
+          // Beat 2 — "SportsWise" then "Watch and ask why." 300ms later (1.2s → 2.0s).
           Animated.stagger(300, [
             Animated.timing(titleOpacity, { toValue: 1, duration: 400, easing: ease, useNativeDriver: true }),
             Animated.timing(taglineOpacity, { toValue: 1, duration: 400, easing: ease, useNativeDriver: true }),
@@ -115,7 +115,7 @@ export default function MorphCinematic({ onComplete, quick = false }: Props) {
 
         <Animated.Text style={[styles.title, { opacity: titleOpacity }]}>Sports<Text style={styles.titleAccent}>wise</Text></Animated.Text>
         {!quick && (
-          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>The Smart Play</Animated.Text>
+          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>Watch and ask why.</Animated.Text>
         )}
       </Animated.View>
     </Pressable>

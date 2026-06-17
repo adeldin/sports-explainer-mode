@@ -21,7 +21,7 @@ export default function ShareCard({ gameContext, rawPlay, simple, whyItMatters, 
       <View style={styles.header}>
         <View>
           <Text style={styles.appName}>Sports<Text style={styles.appNameAccent}>wise</Text></Text>
-          <Text style={styles.tagline}>⚡ THE SMART PLAY</Text>
+          <Text style={styles.tagline}>⚡ WATCH AND ASK WHY.</Text>
         </View>
         <Text style={styles.sportEmoji}>{SPORT_EMOJI[sport]}</Text>
       </View>

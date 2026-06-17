@@ -29,7 +29,7 @@ interface Props {
 // surfaces on the navy app background (#0d1b3e) — each is a navy-blended
 // mid-tone of the sport's hue, lighter than the bg so cards lift off it.
 const SPORT_COLORS: Record<string, [string, string]> = {
-  nfl: ['#1d4a2e', '#143620'],
+  nfl: ['#2b3340', '#1e242e'],
   mlb: ['#26315e', '#1a2344'],
   nba: ['#4a2a10', '#33200c'],
   nhl: ['#1a3a6b', '#12294d'],

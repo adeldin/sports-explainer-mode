@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme, Theme } from '../lib/theme';
 import { Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
+import { MONTHS, SEASON_WINDOWS, isOffSeason } from '../lib/sports';
 
 interface Props {
   sport: string;
@@ -10,40 +11,10 @@ interface Props {
   language: Language;
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'];
-
-// IN-season month windows (1-12). Drives both off-season detection and the
-// displayed "season runs X to Y" copy. World Cup has no annual window — handled
-// specially (every 4 years).
-const SEASON_WINDOWS: Record<string, { start: number; end: number }> = {
-  mlb: { start: 3, end: 10 },    // March–October
-  nfl: { start: 9, end: 2 },     // September–February
-  nba: { start: 10, end: 6 },    // October–June
-  nhl: { start: 10, end: 6 },    // October–June
-  wnba: { start: 5, end: 10 },   // May–October
-  soccer: { start: 3, end: 10 }, // March–October (MLS)
-  epl: { start: 8, end: 5 },     // August–May
-  laliga: { start: 8, end: 5 },  // August–May
-  rugby: { start: 9, end: 6 },   // September–June (URC)
-  mlr: { start: 2, end: 7 },     // February–July
-};
-
 const SPORT_EMOJI: Record<string, string> = {
   mlb: '⚾', nfl: '🏈', nba: '🏀', nhl: '🏒', soccer: '⚽', worldcup: '🌍', rugby: '🏉',
-  wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉',
+  wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉', tennis: '🎾', golf: '⛳', cricket: '🏏',
 };
-
-function isOffSeason(sport: string): boolean {
-  if (sport === 'worldcup') return true; // rare tournament — always show the season note
-  const w = SEASON_WINDOWS[sport];
-  if (!w) return false;
-  const month = new Date().getMonth() + 1; // 1-12
-  const inSeason = w.start <= w.end
-    ? (month >= w.start && month <= w.end)
-    : (month >= w.start || month <= w.end); // wraps the year (NFL/NBA/NHL/EPL/La Liga/rugby)
-  return !inSeason;
-}
 
 export default function EmptyState({ sport, reason, language }: Props) {
   const { theme } = useTheme();
@@ -55,6 +26,7 @@ export default function EmptyState({ sport, reason, language }: Props) {
     mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
     soccer: S.spSoccer, worldcup: S.spWorldCup, rugby: S.spRugby,
     wnba: S.spWnba, epl: S.spPremierLeague, laliga: S.spLaLiga, mlr: S.spMlr,
+    tennis: S.spTennis, golf: S.spGolf, cricket: S.spCricket,
   };
   const sportName = names[sport] || sport.toUpperCase();
 
@@ -66,6 +38,24 @@ export default function EmptyState({ sport, reason, language }: Props) {
       <View style={styles.container}>
         <Text style={styles.emoji}>📡</Text>
         <Text style={styles.title}>{S.selectGame}</Text>
+      </View>
+    );
+  }
+
+  // Learn Mode sports with no live data (year-round, but nothing on right now).
+  if (reason === 'no-games' && sport === 'cricket') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>🏏</Text>
+        <Text style={styles.title}>{S.noCricketData}</Text>
+      </View>
+    );
+  }
+  if (reason === 'no-games' && (sport === 'tennis' || sport === 'golf')) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emoji}>{emoji}</Text>
+        <Text style={styles.title}>{S.noTournaments}</Text>
       </View>
     );
   }

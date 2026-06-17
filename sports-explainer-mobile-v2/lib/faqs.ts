@@ -8,6 +8,11 @@ import { Sport, Language } from './api';
 // submission (see FEATURE_IDEAS.md).
 export type LocalizedText = Record<Language, string>;
 
+// English-first-pass localized text: the same English string in all 10 slots.
+// Used for the tennis/golf/cricket FAQ sets — TODO: translate before launch
+// (CJK/Arabic especially need native review).
+const allEn = (s: string): LocalizedText => ({ en: s, es: s, fr: s, pt: s, de: s, it: s, ja: s, zh: s, ko: s, ar: s });
+
 export interface SportFaq {
   label: LocalizedText;
   questions: LocalizedText[];
@@ -800,5 +805,41 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
       ar: `أسئلة شائعة عن MLR`,
     },
     questions: BASE_FAQS.rugby.questions,
+  },
+  tennis: {
+    label: allEn(`Common Tennis Questions`),
+    questions: [
+      allEn(`What does 'love' mean in tennis?`),
+      allEn(`Why are the scores 15, 30, 40?`),
+      allEn(`What's the difference between sets and games?`),
+      allEn(`What is a tiebreak?`),
+      allEn(`What's the difference between clay, grass, and hard courts?`),
+      allEn(`What is a Grand Slam?`),
+      allEn(`What does 'deuce' mean?`),
+    ],
+  },
+  golf: {
+    label: allEn(`Common Golf Questions`),
+    questions: [
+      allEn(`What does 'under par' mean?`),
+      allEn(`What's the difference between birdie, eagle, and bogey?`),
+      allEn(`What is a handicap?`),
+      allEn(`What does 'the cut' mean?`),
+      allEn(`Why do golfers yell 'fore'?`),
+      allEn(`What's a mulligan?`),
+      allEn(`What is match play vs stroke play?`),
+    ],
+  },
+  cricket: {
+    label: allEn(`Common Cricket Questions`),
+    questions: [
+      allEn(`What is a wicket?`),
+      allEn(`What does it mean to be 'out for a duck'?`),
+      allEn(`What's the difference between Test cricket and T20?`),
+      allEn(`Why can a cricket match last 5 days?`),
+      allEn(`What is an over?`),
+      allEn(`What does LBW mean?`),
+      allEn(`What's the difference between batting and bowling?`),
+    ],
   },
 };
