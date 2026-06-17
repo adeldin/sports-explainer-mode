@@ -44,12 +44,6 @@ SplashScreen.preventAutoHideAsync();
 
 // SPORTS now lives in ./lib/sports (shared with the onboarding picker).
 
-// Level emojis for the main-screen level pill (match the Settings level rows).
-const LEVEL_EMOJI: Record<Level, string> = { kid: '👶', beginner: '👋', intermediate: '📺', expert: '🎙️' };
-const LEVEL_NAME_KEY: Record<Level, keyof (typeof UI_STRINGS)['en']> = {
-  kid: 'lvlKid', beginner: 'lvlBeginner', intermediate: 'lvlInter', expert: 'lvlExpert',
-};
-
 // Per-sport localized display-name key (acronyms like MLB/NBA aren't here — they
 // fall back to s.label in render). Keyed by Sport for the tab + picker labels.
 const SPORT_NAME_KEY: Partial<Record<Sport, keyof (typeof UI_STRINGS)['en']>> = {
@@ -238,14 +232,19 @@ export default function App() {
       let parsed: Game[] = [];
 
       if (cfg.core) {
-        // Rugby: Core-API two-step — list today's event $refs, then resolve each.
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        // Rugby: Core-API two-step — list event $refs for the next 7 days, then
+        // resolve + dedup. A single-date query misses upcoming finals (and ESPN's
+        // single-day matching is unreliable); the range form is what it answers.
+        const today = new Date();
+        const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
+        const start = fmt(today);
+        const end = fmt(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
         const evRes = await fetch(
-          `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${today}`,
+          `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${start}-${end}`,
         );
         const evData = await evRes.json();
         const items: any[] = (evData.items || []).slice(0, 25);
-        const events = await Promise.all(
+        const resolvedEvents = (await Promise.all(
           items.map(async (it: any) => {
             try {
               const r = await fetch(it.$ref);
@@ -254,8 +253,15 @@ export default function App() {
               return null;
             }
           }),
-        );
-        parsed = events.filter(Boolean).map(toGame);
+        )).filter(Boolean);
+        // Dedup by event ID — ESPN can list the same fixture twice.
+        const seen = new Set<string>();
+        const uniqueEvents = resolvedEvents.filter((ev: any) => {
+          if (seen.has(ev.id)) return false;
+          seen.add(ev.id);
+          return true;
+        });
+        parsed = uniqueEvents.map(toGame);
       } else {
         const res = await fetch(
           `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
@@ -271,6 +277,17 @@ export default function App() {
             return !(isFinal && ageMs > 24 * 60 * 60 * 1000);
           })
           .map(toGame);
+
+        // End-of-season guard: if ESPN returns ONLY completed games (no live or
+        // upcoming), treat it as no-games regardless of the date window. Uses the
+        // raw event state (in/pre/post), since the mapped Game only keeps isLive.
+        const hasLiveOrUpcoming = (data?.events || []).some((e: any) => {
+          const st = e.status?.type?.state;
+          return st === 'in' || st === 'pre';
+        });
+        if (!hasLiveOrUpcoming && parsed.length > 0) {
+          parsed = []; // only completed games remain → end of season
+        }
       }
 
       const sorted = [...parsed].sort((a, b) => {
@@ -607,12 +624,16 @@ useEffect(() => {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text></Text>
           <View style={styles.headerRight}>
-            {autoRefresh && (
+            {learnMode ? (
+              <TouchableOpacity style={styles.livePill} onPress={() => Alert.alert('Learn Mode', S.learnModeExplainer)} activeOpacity={0.7}>
+                <Text style={styles.livePillText}>📚 LEARN</Text>
+              </TouchableOpacity>
+            ) : games.length > 0 ? (
               <View style={styles.livePill}>
                 <View style={styles.liveDot} />
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
-            )}
+            ) : null}
             <TouchableOpacity style={styles.cogBtn} onPress={async () => {
               await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowSettings(true);
@@ -621,11 +642,6 @@ useEffect(() => {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Current level — tap to open Settings */}
-        <TouchableOpacity style={styles.levelPill} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
-          <Text style={styles.levelPillText}>{LEVEL_EMOJI[level]} {S[LEVEL_NAME_KEY[level]]}</Text>
-        </TouchableOpacity>
 
         {/* Sport Tabs — visible sports in saved order (customize in Settings › My Sports). */}
         <View style={styles.tabsContainer}>
@@ -786,6 +802,7 @@ useEffect(() => {
           ) : learnMode ? (
             <View style={styles.learnBlock}>
               <View style={styles.learnBadge}><Text style={styles.learnBadgeText}>LEARN MODE</Text></View>
+              <Text style={styles.learnExplainer}>{S.learnModeExplainer}</Text>
               <Text style={styles.learnPrompt}>
                 {S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]).replace('…', '')}
               </Text>
@@ -875,8 +892,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerTitleAccent: { color: t.accent },
-  levelPill: { alignSelf: 'flex-start', marginHorizontal: 20, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
-  levelPillText: { color: t.textMuted, fontSize: 12, fontWeight: '600' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
@@ -929,8 +944,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // Off-season educational ask block
   learnBlock: { marginTop: 8, paddingHorizontal: 16 },
   learnPrompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
-  learnBadge: { alignSelf: 'flex-start', backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
-  learnBadgeText: { color: t.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  learnBadge: { alignSelf: 'flex-start', backgroundColor: t.accent, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 8 },
+  learnBadgeText: { color: t.onAccent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   chipsWrap: { gap: 8 },                          // column of rows; 8px gap between the two rows

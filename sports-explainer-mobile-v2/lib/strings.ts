@@ -28,7 +28,7 @@ export interface UIStrings {
   // sport names (onboarding subs + empty state)
   spBaseball: string; spFootball: string; spBasketball: string; spHockey: string; spSoccer: string; spWorldCup: string; spRugby: string; spWnba: string; spPremierLeague: string; spLaLiga: string; spMlr: string; spTennis: string; spGolf: string; spCricket: string;
   // learn-mode empty states (tennis/golf/cricket)
-  noTournaments: string; noCricketData: string;
+  noTournaments: string; noCricketData: string; learnModeExplainer: string;
   // empty state ({sport} is replaced at render)
   noGames: string; selectGame: string; pullRefresh: string; offSeason: string; offSeasonSub: string; seasonTitle: string; seasonRuns: string; worldCupRuns: string;
   // my sports + app section
@@ -55,7 +55,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Baseball`, spFootball: `Football`, spBasketball: `Basketball`, spHockey: `Hockey`, spSoccer: `MLS`, spWorldCup: `World Cup`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `No {sport} games today`, selectGame: `Select a game above for an explanation`, pullRefresh: `Pull down to refresh or check back later.`, offSeason: `{sport} is in the off-season`, offSeasonSub: `Check back when the season starts.`, seasonTitle: `No {sport} games right now.`, seasonRuns: `The season runs {start} to {end} — check back then!`, worldCupRuns: `The tournament runs every 4 years — check back for the next one!`,
     mySports: `My Sports`, customizeSports: `Customize My Sports`, resetDefault: `Reset to Default`, keepOneSport: `Keep at least one sport visible`, secApp: `APP`, rateApp: `Rate SportsWise`, shareApp: `Share SportsWise`, sendFeedback: `Send Feedback`, privacyPolicy: `Privacy Policy`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `No tournaments this week — check back soon!`, noCricketData: `No live cricket data yet — ask anything about the sport below!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `No tournaments this week — check back soon!`, noCricketData: `No live cricket data yet — ask anything about the sport below!`, learnModeExplainer: `No live games right now — explore the sport and ask anything below.`,
   },
 
   es: {
@@ -76,7 +76,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Béisbol`, spFootball: `Fútbol americano`, spBasketball: `Baloncesto`, spHockey: `Hockey`, spSoccer: `MLS`, spWorldCup: `Mundial`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `No hay partidos de {sport} hoy`, selectGame: `Selecciona un partido arriba para ver una explicación`, pullRefresh: `Desliza hacia abajo para actualizar o vuelve más tarde.`, offSeason: `{sport} está en temporada baja`, offSeasonSub: `Vuelve cuando empiece la temporada.`, seasonTitle: `No hay partidos de {sport} en este momento.`, seasonRuns: `La temporada va de {start} a {end}: ¡vuelve entonces!`, worldCupRuns: `El torneo se juega cada 4 años: ¡vuelve para el próximo!`,
     mySports: `Mis deportes`, customizeSports: `Personalizar mis deportes`, resetDefault: `Restablecer`, keepOneSport: `Mantén al menos un deporte visible`, secApp: `APLICACIÓN`, rateApp: `Califica SportsWise`, shareApp: `Compartir SportsWise`, sendFeedback: `Enviar comentarios`, privacyPolicy: `Política de privacidad`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `No hay torneos esta semana: ¡vuelve pronto!`, noCricketData: `Aún no hay datos de críquet en vivo: ¡pregunta lo que quieras sobre el deporte abajo!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `No hay torneos esta semana: ¡vuelve pronto!`, noCricketData: `Aún no hay datos de críquet en vivo: ¡pregunta lo que quieras sobre el deporte abajo!`, learnModeExplainer: `No hay partidos en vivo ahora mismo: explora el deporte y pregunta lo que quieras abajo.`,
   },
 
   fr: {
@@ -97,7 +97,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Baseball`, spFootball: `Football américain`, spBasketball: `Basket-ball`, spHockey: `Hockey`, spSoccer: `MLS`, spWorldCup: `Coupe du Monde`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `Aucun match de {sport} aujourd'hui`, selectGame: `Sélectionnez un match ci-dessus pour une explication`, pullRefresh: `Tirez vers le bas pour actualiser ou revenez plus tard.`, offSeason: `{sport} est en intersaison`, offSeasonSub: `Revenez au début de la saison.`, seasonTitle: `Aucun match de {sport} pour le moment.`, seasonRuns: `La saison va de {start} à {end} — revenez à ce moment-là !`, worldCupRuns: `Le tournoi a lieu tous les 4 ans — revenez pour le prochain !`,
     mySports: `Mes sports`, customizeSports: `Personnaliser mes sports`, resetDefault: `Réinitialiser`, keepOneSport: `Gardez au moins un sport visible`, secApp: `APPLICATION`, rateApp: `Noter SportsWise`, shareApp: `Partager SportsWise`, sendFeedback: `Envoyer un commentaire`, privacyPolicy: `Politique de confidentialité`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Aucun tournoi cette semaine — revenez bientôt !`, noCricketData: `Pas encore de données de cricket en direct — posez vos questions sur ce sport ci-dessous !`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Aucun tournoi cette semaine — revenez bientôt !`, noCricketData: `Pas encore de données de cricket en direct — posez vos questions sur ce sport ci-dessous !`, learnModeExplainer: `Aucun match en direct pour le moment — explorez le sport et posez vos questions ci-dessous.`,
   },
 
   pt: {
@@ -118,7 +118,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Beisebol`, spFootball: `Futebol americano`, spBasketball: `Basquete`, spHockey: `Hóquei`, spSoccer: `MLS`, spWorldCup: `Copa do Mundo`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `Nenhum jogo de {sport} hoje`, selectGame: `Selecione um jogo acima para ver uma explicação`, pullRefresh: `Puxe para baixo para atualizar ou volte mais tarde.`, offSeason: `{sport} está na pré-temporada`, offSeasonSub: `Volte quando a temporada começar.`, seasonTitle: `Nenhum jogo de {sport} no momento.`, seasonRuns: `A temporada vai de {start} a {end} — volte nessa época!`, worldCupRuns: `O torneio acontece a cada 4 anos — volte para o próximo!`,
     mySports: `Meus esportes`, customizeSports: `Personalizar meus esportes`, resetDefault: `Redefinir`, keepOneSport: `Mantenha pelo menos um esporte visível`, secApp: `APLICATIVO`, rateApp: `Avaliar o SportsWise`, shareApp: `Compartilhar o SportsWise`, sendFeedback: `Enviar feedback`, privacyPolicy: `Política de privacidade`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Nenhum torneio esta semana — volte em breve!`, noCricketData: `Ainda não há dados de críquete ao vivo — pergunte o que quiser sobre o esporte abaixo!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Nenhum torneio esta semana — volte em breve!`, noCricketData: `Ainda não há dados de críquete ao vivo — pergunte o que quiser sobre o esporte abaixo!`, learnModeExplainer: `Nenhum jogo ao vivo no momento — explore o esporte e pergunte o que quiser abaixo.`,
   },
 
   de: {
@@ -139,7 +139,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Baseball`, spFootball: `American Football`, spBasketball: `Basketball`, spHockey: `Eishockey`, spSoccer: `MLS`, spWorldCup: `WM`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `Heute keine {sport}-Spiele`, selectGame: `Wähle oben ein Spiel für eine Erklärung`, pullRefresh: `Zum Aktualisieren nach unten ziehen oder später wiederkommen.`, offSeason: `{sport} ist in der Saisonpause`, offSeasonSub: `Schau zum Saisonstart wieder vorbei.`, seasonTitle: `Gerade keine {sport}-Spiele.`, seasonRuns: `Die Saison läuft von {start} bis {end} — schau dann wieder vorbei!`, worldCupRuns: `Das Turnier findet alle 4 Jahre statt — schau beim nächsten wieder vorbei!`,
     mySports: `Meine Sportarten`, customizeSports: `Meine Sportarten anpassen`, resetDefault: `Zurücksetzen`, keepOneSport: `Mindestens eine Sportart sichtbar lassen`, secApp: `APP`, rateApp: `SportsWise bewerten`, shareApp: `SportsWise teilen`, sendFeedback: `Feedback senden`, privacyPolicy: `Datenschutzrichtlinie`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Diese Woche keine Turniere — schau bald wieder vorbei!`, noCricketData: `Noch keine Live-Cricket-Daten — frag unten alles über die Sportart!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Diese Woche keine Turniere — schau bald wieder vorbei!`, noCricketData: `Noch keine Live-Cricket-Daten — frag unten alles über die Sportart!`, learnModeExplainer: `Gerade keine Live-Spiele — entdecke die Sportart und frag unten alles.`,
   },
 
   it: {
@@ -160,7 +160,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `Baseball`, spFootball: `Football americano`, spBasketball: `Basket`, spHockey: `Hockey`, spSoccer: `MLS`, spWorldCup: `Mondiali`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `La Liga`, spMlr: `MLR`,
     noGames: `Nessuna partita di {sport} oggi`, selectGame: `Seleziona una partita sopra per una spiegazione`, pullRefresh: `Trascina verso il basso per aggiornare o torna più tardi.`, offSeason: `{sport} è in pausa stagionale`, offSeasonSub: `Torna all'inizio della stagione.`, seasonTitle: `Nessuna partita di {sport} al momento.`, seasonRuns: `La stagione va da {start} a {end} — torna in quel periodo!`, worldCupRuns: `Il torneo si gioca ogni 4 anni — torna per il prossimo!`,
     mySports: `I miei sport`, customizeSports: `Personalizza i miei sport`, resetDefault: `Ripristina`, keepOneSport: `Mantieni almeno uno sport visibile`, secApp: `APP`, rateApp: `Valuta SportsWise`, shareApp: `Condividi SportsWise`, sendFeedback: `Invia feedback`, privacyPolicy: `Informativa sulla privacy`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Nessun torneo questa settimana — torna presto!`, noCricketData: `Ancora nessun dato dal vivo sul cricket — chiedi qualsiasi cosa sullo sport qui sotto!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `Nessun torneo questa settimana — torna presto!`, noCricketData: `Ancora nessun dato dal vivo sul cricket — chiedi qualsiasi cosa sullo sport qui sotto!`, learnModeExplainer: `Nessuna partita dal vivo al momento — esplora lo sport e chiedi qualsiasi cosa qui sotto.`,
   },
 
   ja: {
@@ -181,7 +181,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `野球`, spFootball: `アメフト`, spBasketball: `バスケットボール`, spHockey: `アイスホッケー`, spSoccer: `MLS`, spWorldCup: `ワールドカップ`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `ラ・リーガ`, spMlr: `MLR`,
     noGames: `今日は{sport}の試合がありません`, selectGame: `上の試合を選ぶと解説が表示されます`, pullRefresh: `下に引いて更新するか、後でもう一度確認してください。`, offSeason: `{sport}はオフシーズンです`, offSeasonSub: `シーズンが始まったらまた来てください。`, seasonTitle: `現在{sport}の試合はありません。`, seasonRuns: `シーズンは{start}から{end}までです。その頃にまたチェックしてください！`, worldCupRuns: `大会は4年ごとに開催されます。次回をお楽しみに！`,
     mySports: `マイスポーツ`, customizeSports: `マイスポーツを編集`, resetDefault: `デフォルトに戻す`, keepOneSport: `少なくとも1つのスポーツを表示してください`, secApp: `アプリ`, rateApp: `SportsWiseを評価`, shareApp: `SportsWiseをシェア`, sendFeedback: `フィードバックを送信`, privacyPolicy: `プライバシーポリシー`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `今週は大会がありません。またチェックしてください！`, noCricketData: `ライブのクリケットデータはまだありません。下でこのスポーツについて何でも質問してください！`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `今週は大会がありません。またチェックしてください！`, noCricketData: `ライブのクリケットデータはまだありません。下でこのスポーツについて何でも質問してください！`, learnModeExplainer: `現在ライブの試合はありません。下でこのスポーツについて何でも質問してください。`,
   },
 
   zh: {
@@ -202,7 +202,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `棒球`, spFootball: `美式橄榄球`, spBasketball: `篮球`, spHockey: `冰球`, spSoccer: `MLS`, spWorldCup: `世界杯`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `西甲联赛`, spMlr: `MLR`,
     noGames: `今天没有{sport}比赛`, selectGame: `选择上面的比赛查看解说`, pullRefresh: `下拉刷新或稍后再来。`, offSeason: `{sport}正处于休赛期`, offSeasonSub: `赛季开始后再来看看。`, seasonTitle: `目前没有{sport}比赛。`, seasonRuns: `赛季为{start}至{end}，到时再来看看！`, worldCupRuns: `该赛事每4年举办一次，下次再来看看！`,
     mySports: `我的运动`, customizeSports: `自定义我的运动`, resetDefault: `恢复默认`, keepOneSport: `请至少保留一项运动`, secApp: `应用`, rateApp: `评价 SportsWise`, shareApp: `分享 SportsWise`, sendFeedback: `发送反馈`, privacyPolicy: `隐私政策`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `本周没有赛事，请稍后再来！`, noCricketData: `暂无板球实时数据，在下方随便问关于这项运动的问题吧！`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `本周没有赛事，请稍后再来！`, noCricketData: `暂无板球实时数据，在下方随便问关于这项运动的问题吧！`, learnModeExplainer: `目前没有实时比赛——在下方了解这项运动并随便提问。`,
   },
 
   ko: {
@@ -223,7 +223,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `야구`, spFootball: `미식축구`, spBasketball: `농구`, spHockey: `아이스하키`, spSoccer: `MLS`, spWorldCup: `월드컵`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `라리가`, spMlr: `MLR`,
     noGames: `오늘은 {sport} 경기가 없습니다`, selectGame: `위에서 경기를 선택하면 설명이 나와요`, pullRefresh: `아래로 당겨 새로고침하거나 나중에 다시 확인하세요.`, offSeason: `{sport}은 비시즌입니다`, offSeasonSub: `시즌이 시작되면 다시 확인하세요.`, seasonTitle: `현재 {sport} 경기가 없습니다.`, seasonRuns: `시즌은 {start}부터 {end}까지입니다 — 그때 다시 확인하세요!`, worldCupRuns: `이 대회는 4년마다 열립니다 — 다음 대회를 기대해 주세요!`,
     mySports: `내 스포츠`, customizeSports: `내 스포츠 맞춤설정`, resetDefault: `기본값으로 재설정`, keepOneSport: `최소 하나의 스포츠는 표시하세요`, secApp: `앱`, rateApp: `SportsWise 평가하기`, shareApp: `SportsWise 공유하기`, sendFeedback: `피드백 보내기`, privacyPolicy: `개인정보 처리방침`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `이번 주에는 대회가 없습니다 — 곧 다시 확인하세요!`, noCricketData: `아직 라이브 크리켓 데이터가 없습니다 — 아래에서 이 스포츠에 대해 무엇이든 물어보세요!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `이번 주에는 대회가 없습니다 — 곧 다시 확인하세요!`, noCricketData: `아직 라이브 크리켓 데이터가 없습니다 — 아래에서 이 스포츠에 대해 무엇이든 물어보세요!`, learnModeExplainer: `현재 라이브 경기가 없습니다 — 아래에서 이 스포츠를 살펴보고 무엇이든 물어보세요.`,
   },
 
   ar: {
@@ -244,6 +244,6 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
     spBaseball: `البيسبول`, spFootball: `كرة القدم الأمريكية`, spBasketball: `كرة السلة`, spHockey: `الهوكي`, spSoccer: `MLS`, spWorldCup: `كأس العالم`, spRugby: `URC`, spWnba: `WNBA`, spPremierLeague: `EPL`, spLaLiga: `الدوري الإسباني`, spMlr: `MLR`,
     noGames: `لا توجد مباريات {sport} اليوم`, selectGame: `اختر مباراة بالأعلى للحصول على شرح`, pullRefresh: `اسحب للأسفل للتحديث أو عُد لاحقاً.`, offSeason: `{sport} في فترة توقف الموسم`, offSeasonSub: `عُد عند بدء الموسم.`, seasonTitle: `لا توجد مباريات {sport} حالياً.`, seasonRuns: `يمتد الموسم من {start} إلى {end} — تحقق مرة أخرى حينها!`, worldCupRuns: `تقام البطولة كل 4 سنوات — تحقق مرة أخرى للبطولة القادمة!`,
     mySports: `رياضاتي`, customizeSports: `تخصيص رياضاتي`, resetDefault: `إعادة التعيين`, keepOneSport: `أبقِ رياضة واحدة على الأقل ظاهرة`, secApp: `التطبيق`, rateApp: `قيّم SportsWise`, shareApp: `مشاركة SportsWise`, sendFeedback: `إرسال ملاحظات`, privacyPolicy: `سياسة الخصوصية`,
-    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `لا توجد بطولات هذا الأسبوع — تحقق مرة أخرى قريباً!`, noCricketData: `لا توجد بيانات كريكيت مباشرة بعد — اسأل أي شيء عن الرياضة أدناه!`,
+    spTennis: `Tennis`, spGolf: `Golf`, spCricket: `Cricket`, noTournaments: `لا توجد بطولات هذا الأسبوع — تحقق مرة أخرى قريباً!`, noCricketData: `لا توجد بيانات كريكيت مباشرة بعد — اسأل أي شيء عن الرياضة أدناه!`, learnModeExplainer: `لا توجد مباريات مباشرة الآن — استكشف الرياضة واسأل أي شيء أدناه.`,
   },
 };

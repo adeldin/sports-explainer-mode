@@ -10,7 +10,7 @@ const { width } = Dimensions.get('window');
 // TODO: replace with the real App Store ID once the app is registered.
 const APP_ID = 'APP_ID';
 const FEEDBACK_EMAIL = 'feedback@sportswise.app';
-const PRIVACY_URL = 'https://sportswise.app/privacy';
+const PRIVACY_URL = 'https://privacy.sportswise.app';
 const SHARE_MESSAGE =
   'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sportswise.app';
 

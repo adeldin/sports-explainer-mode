@@ -92,9 +92,8 @@ export default function MySportsScreen({ visible, language, order, visibility, o
               const isLast = i === order.length - 1;
               return (
                 <View key={key} style={styles.row}>
-                  <Text style={styles.handle}>≡</Text>
                   <Text style={styles.emoji}>{s.emoji}</Text>
-                  <Text style={[styles.name, !vis && styles.nameHidden]}>{s.label}</Text>
+                  <Text style={[styles.name, !vis && styles.nameHidden]} numberOfLines={1} ellipsizeMode="tail">{s.label}</Text>
                   <View style={styles.arrows}>
                     <TouchableOpacity onPress={() => move(i, -1)} disabled={isFirst} style={styles.arrowBtn}>
                       <Text style={[styles.arrow, isFirst && styles.arrowDisabled]}>↑</Text>
@@ -132,9 +131,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   backText: { color: t.textPrimary, fontSize: 24, lineHeight: 26, marginTop: -2 },
   title: { color: t.textPrimary, fontSize: 22, fontWeight: '900' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, marginBottom: 8, gap: 10 },
-  handle: { color: t.textMuted, fontSize: 18 },
   emoji: { fontSize: 20 },
-  name: { color: t.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 },
+  name: { color: t.textPrimary, fontSize: 14, fontWeight: '700', flex: 1 },
   nameHidden: { color: t.textMuted },
   arrows: { flexDirection: 'row', gap: 2 },
   arrowBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: t.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
