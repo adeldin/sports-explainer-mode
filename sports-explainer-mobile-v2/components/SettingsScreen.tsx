@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as StoreReview from 'expo-store-review';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { useAppState } from '../lib/appState';
 import { UI_STRINGS } from '../lib/strings';
 
-// TODO: replace with the real App Store ID once the app is registered.
-const APP_ID = 'APP_ID';
+const APP_ID = '6781028656'; // SportsWise App Store ID (App Store Connect)
 const FEEDBACK_EMAIL = 'feedback@sportswise.app';
 const PRIVACY_URL = 'https://privacy.sportswise.app';
 const SHARE_MESSAGE =
@@ -56,6 +56,16 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
     expert: { label: S.lvlExpert, desc: S.lvlExpertDesc },
   };
   const THEME_LABEL: Record<ThemeMode, string> = { system: S.tSystem, dark: S.tDark, light: S.tLight };
+
+  // Rate: prefer the native in-app review sheet; fall back to the App Store
+  // "write a review" deep link (modern apps.apple.com host).
+  const handleRate = async () => {
+    if (await StoreReview.isAvailableAsync()) {
+      await StoreReview.requestReview();
+      return;
+    }
+    Linking.openURL(`itms-apps://apps.apple.com/app/id${APP_ID}?action=write-review`).catch(() => {});
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -140,7 +150,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
           </View>
 
           <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.secApp}</Text>
-          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL(`itms-apps://itunes.apple.com/app/id${APP_ID}/`).catch(() => {})}>
+          <TouchableOpacity style={styles.linkRow} onPress={handleRate}>
             <Text style={styles.linkLabel}>⭐ {S.rateApp}</Text>
             <Text style={styles.linkChevron}>›</Text>
           </TouchableOpacity>
