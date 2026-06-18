@@ -1,6 +1,6 @@
 # SportsWise — Project Handoff
 
-_Last updated: 2026-06-17_
+_Last updated: 2026-06-18_
 
 A React Native / Expo (SDK 54) mobile app that explains live sports plays at the
 user's chosen expertise level, in 10 languages, with an always-on "Academy"
@@ -34,20 +34,31 @@ project back up cold.
   World Cup data-driven, learn-mode sports (tennis/golf/cricket).
 - ✅ **10-language i18n** (`lib/strings.ts`). en/es/fr/pt/de/it are real
   translations; ja/zh/ko/ar are a v1 first pass that **needs native review**.
-
-### Built but uncommitted (Stage 3 + fixes — see §4)
-- 🚧 **Academy tab** — full "Duolingo-meets-sports-trivia" experience:
-  - Sport selector (mirrors Live styling, filtered by My Sports visibility).
-  - **Streak counter** with Reanimated bounce + milestone celebrations at 3/5/10.
-  - **Did You Know** card (`components/DidYouKnow.tsx`) — cross-fading facts.
-  - **Quick Quiz** card (`components/QuizCard.tsx`) — animated correct/wrong
-    (green/red fill, bounce, shake), encouragement/consolation lines,
-    explanation, "Next question" (no-repeat-within-3 logic).
+- ✅ **Academy tab** — full "Duolingo-meets-sports-trivia" experience:
+  - **9-category sport list** (`lib/academyCategories.ts`) — Academy-only, decoupled
+    from the Live tab / My Sports. Soccer pools soccer/epl/laliga/worldcup and Rugby
+    pools rugby/mlr (combine-on-read across each category's `sportKeys`).
+  - **Quick Quiz** (`components/QuizCard.tsx`) — difficulty filtering by the GLOBAL
+    app level (synced with Settings + Live), on-card 4-level picker (Kid/Beginner/
+    Intermediate/Expert), per-question answer **shuffle** (correct answer no longer
+    always first), full-pool no-repeat cycling, streak + milestone celebrations
+    (3/5/10), green/red reveal with bounce/shake, graceful empty-state fallback.
+  - **Did You Know** (`components/DidYouKnow.tsx`) — cross-fading per-category facts.
   - FAQ section (auto-expanded) + sport-general ask box.
-- 🚧 **Header polish** — Live tab tagline "Watch and ask why."; Academy header
-  reads "Sports**wise** Academy 🎓" so the wordmark stays anchored across tabs.
-- 🚧 **FIX 4** — MLR/rugby team-name + score resolution from ESPN Core API
-  (`$ref` expansion). **Needs on-device verification** (see §3).
+  - Header "Sports**wise** Academy 🎓" + tagline; streak bar pinned below the pills.
+- ✅ **Quiz bank** (`lib/facts.ts`) — 307 questions across 14 sport keys with
+  difficulty tiers (`kid`/`beginner`/`intermediate`/`expert`). English-only (see §3).
+- ✅ **First-run scrum intro** (`components/ScrumIntro.tsx`) — animated 3-beat
+  "what just happened / why it matters / the rule" aha screen shown once before
+  onboarding (gated on `scrum_intro_seen`), over a real licensed rugby scrum photo.
+- ✅ **Welcome screen** — real Sportswise logo lockup (theme-aware dark/light),
+  centered hero + features (spacing fix); Live tab tagline "Watch and ask why."
+- ✅ **FIX 4** — MLR/rugby team-name + score resolution from ESPN Core API
+  (`$ref` expansion, 3s timeout + `?`/`0` fallback). Code committed; ⚠️ still
+  **needs on-device verification** of live scores (see §3).
+
+### Built but uncommitted
+- _(none — working tree clean; everything above is committed and pushed. See §4.)_
 
 ### Typecheck
 `npx tsc --noEmit` is clean (exit 0) as of this writing. tsconfig extends
@@ -76,9 +87,9 @@ screens/
   SettingsTab.tsx         Native stack: SettingsHome + MySports
 
 components/
-  DidYouKnow.tsx          Academy "Did You Know" card (Reanimated fade)
-  QuizCard.tsx            Academy quiz card (Reanimated; props: sport, streak,
-                          onCorrect, onWrong)
+  DidYouKnow.tsx          Academy "Did You Know" card (Reanimated fade; props: sportKeys[])
+  QuizCard.tsx            Academy quiz card (Reanimated; props: sportKeys: Sport[],
+                          streak, onCorrect, onWrong). Reads global level via useAppState.
   SettingsScreen.tsx      Settings screen (reads useAppState)
   MySportsScreen.tsx      Reorder/show-hide sports (reads useAppState)
   GameCard.tsx            Game strip card (Live)
@@ -86,6 +97,7 @@ components/
   ShareCard.tsx           Off-screen share-image card
   EmptyState.tsx          No-games / off-season / season-ended messaging
   Onboarding.tsx          First-run level + sport picker
+  ScrumIntro.tsx          First-run "what's a scrum" aha screen (before Onboarding)
   MorphCinematic.tsx      Launch animation
 
 lib/
@@ -98,11 +110,17 @@ lib/
                           SPORT_FULL_NAME, SportTab
   strings.ts              UI_STRINGS (10 languages), UIStrings interface
   faqs.ts                 SPORT_FAQS (per-sport common questions, localized)
-  facts.ts                FACTS + QUIZ banks (Academy) — ENGLISH ONLY
+  facts.ts                FACTS + QUIZ banks (Academy), 307 Qs w/ difficulty — ENGLISH ONLY
+  academyCategories.ts    ACADEMY_CATEGORIES (9 Academy-only categories + sportKeys[];
+                          Soccer/Rugby pool multiple leagues, combine-on-read)
   notifications.ts        registerForPushNotificationsAsync
 
 assets/                   icon.png, adaptive-icon.png, splash-icon.png, favicon.png,
-                          icon-source.png
+                          icon-source.png,
+                          onboarding-scrum.jpg (ScrumIntro photo, ~568KB),
+                          logo-lockup-dark.png / logo-lockup-light.png (welcome wordmark)
+                          NOTE: assets/.gitignore ignores *.png except whitelisted
+                          brand PNGs (icons + the two logo lockups); .jpg is tracked.
 ```
 
 ### Backend (separate, not in this repo)
@@ -112,9 +130,9 @@ assets/                   icon.png, adaptive-icon.png, splash-icon.png, favicon.
   Core API `sports.core.api.espn.com/...` for rugby/MLR (`cfg.core`).
 
 ### Persisted AsyncStorage keys
-`onboarding_complete`, `seen_cinematic`, `favorite_teams`, `user_language`,
-`user_level`, `auto_refresh`, `notifications_enabled`, `sport_tab_order`,
-`sport_visibility`, `theme_mode`.
+`onboarding_complete`, `seen_cinematic`, `scrum_intro_seen`, `favorite_teams`,
+`user_language`, `user_level`, `auto_refresh`, `notifications_enabled`,
+`sport_tab_order`, `sport_visibility`, `theme_mode`.
 
 ---
 
@@ -158,32 +176,47 @@ but revisits the "Live sport independent" decision.
 ### Parked onboarding idea — "wall of questions"
 Concept for first-run onboarding (not yet built; alternative or precursor to the ScrumIntro screen): naive fan questions from multiple sports cascade in and overlap, piling up until the screen is deliberately overwhelming — e.g. 'What is a wicket?', 'Why did he throw a yellow handkerchief?', 'I thought nutmeg was a spice?', 'What's icing?'. Then it all clears and resolves into clarity, landing on SportsWise as the thing that makes the confusion stop. Dramatizes the feeling of being a lost fan (multi-sport = signals broad coverage) rather than explaining one play. Possible strongest flow: question-pile (the problem, felt) → resolves → ScrumIntro reveal (the proof). Note: questions must be authentically naive in phrasing but not factually wrong about each sport.
 
+### 📋 Live Screen Design Pass (next session)
+Four Live-tab UI issues to tackle **together as one focused design pass** — and pair
+this with the **Live header settings-cog removal** parked under "Other known TODOs"
+above (same screen, do both in the same session). All in `screens/LiveScreen.tsx`.
+
+1. **📋 Redundant Academy pill.** Now that Academy is a bottom tab, the in-body
+   "ACADEMY" pill on the Live empty/learn state (and possibly the header LIVE/ACADEMY
+   pill) is confusing/redundant. ❓ **First confirm what the header pill vs. the body
+   pill each currently do**, then decide per pill: either make the body pill clearly
+   navigate to Academy ("Take me to the Academy →") or remove it.
+2. **📋 Broken text hierarchy in the "no games" empty state.** Mixed centered
+   headline/subtext followed by a left-justified "Ask anything about [Sport]". Needs
+   consistent alignment + a clear visual hierarchy.
+3. **📋 Active-game sections blur together.** Why It Matters / Play-by-Play / Share /
+   Ask-a-follow-up / question box / Common Questions run into each other with no clear
+   separation. Add visual grouping — ❓ decide dividers vs. tighter card-grouping/
+   spacing **on device** (hairlines can add clutter).
+4. **📋 Live ↔ Academy inconsistency.** The "Common Questions" accordion and the "Ask"
+   text box are arranged differently between the two tabs. Unify them so they read as
+   the same component across Live and Academy.
+
 ---
 
 ## 4. Current git status
 
-- **Branch:** `main` (commits land on main per project convention; push is done
-  by the owner from their own terminal — do **not** push).
-- **Latest commit:** `b9de6a6` — _AppStateProvider shared context_.
+- **Branch:** `main`. **HEAD:** `f2ebcd3`. Working tree **clean** — nothing
+  uncommitted.
+- **In sync with `origin/main`** (pushed; local is no longer ahead).
+- Convention: commits land on `main`; the owner pushes from their own terminal.
 
+Recent commits (newest first):
 ```
-b9de6a6 feat: AppStateProvider shared context — eliminates prop drilling, persists level + autoRefresh across cold starts
-9eb33be feat: bottom tab navigation — Live, Academy (placeholder), Settings tabs + Context architecture Stage 1
-1c54444 fix: date-aware end-of-season guard — fixes MLB showing no games between slates
-7058c48 fix: LIVE/LEARN pill, off-season guard, MLR championship, learn mode badge, ...
+f2ebcd3 feat: Academy quiz redesign — difficulty levels, shuffle, on-card picker
+8311bb7 feat: Academy 9-category sport list, decoupled from Live
+d31f50d feat: expand quiz bank to 307 questions with difficulty tiers
+93f8036 feat: Academy header + layout polish
+2bc3027 feat: real scrum photo on intro screen + welcome-screen spacing fix
+f9a475b feat: first-run scrum intro 'aha' screen + real logo on welcome screen
+8d1f3ba feat: Academy tab — streak, animated quiz, did-you-know, FAQ + ask; Live tagline; MLR/rugby core-API team-name fix
+b9de6a6 feat: AppStateProvider shared context — eliminates prop drilling
 ```
-
-### Uncommitted (Stage 3 + the 4 fixes) — NOT yet committed
-```
- M screens/AcademyScreen.tsx     (full Academy build + header fix)
- M screens/LiveScreen.tsx        (Live tagline + FIX 4 core-API ref expansion)
-?? components/DidYouKnow.tsx      (new)
-?? components/QuizCard.tsx        (new)
-?? lib/facts.ts                   (new — FACTS + QUIZ banks)
-?? HANDOFF.md                     (this file)
-```
-**Suggested next commit** (after FIX 4 device verification), e.g.:
-`feat: Academy tab — streak, animated quiz, did-you-know, FAQ + ask; Live tagline; MLR/rugby core-API team-name fix`
 
 ---
 
