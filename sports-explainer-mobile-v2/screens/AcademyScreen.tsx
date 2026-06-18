@@ -9,38 +9,32 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { askQuestion, Sport } from '../lib/api';
+import { askQuestion } from '../lib/api';
 import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
+import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
 
 import DidYouKnow from '../components/DidYouKnow';
 import QuizCard from '../components/QuizCard';
 
-// Localized short labels for the sport pills (acronyms fall back to s.label).
-const SPORT_NAME_KEY: Partial<Record<Sport, keyof (typeof UI_STRINGS)['en']>> = {
-  soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
-  wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
-};
-
-// Academy tab — the always-on "learn" experience: pick a sport, read a fact, take
-// a quiz (with a streak mechanic), browse common questions, and ask anything.
-// Designed to feel energetic and rewarding vs. the calm Live tab. The selected
-// sport is LOCAL to this tab (seeded from the first visible sport).
+// Academy tab — the always-on "learn" experience: pick a category, read a fact,
+// take a quiz (with a streak mechanic), browse common questions, and ask anything.
+// The category list is Academy-only (lib/academyCategories) and decoupled from the
+// Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
 export default function AcademyScreen() {
-  const { language, level, orderedSports, sportVisibility } = useAppState();
+  const { language, level } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
 
-  const visibleSports = orderedSports.filter(s => sportVisibility[s.key] !== false);
-
-  const [sport, setSport] = useState<Sport>(() => {
-    const first = orderedSports.find(s => sportVisibility[s.key] !== false);
-    return first ? first.key : 'mlb';
-  });
+  // Academy-local selected category (decoupled from Live's sport list); defaults
+  // to the first category (MLB).
+  const [category, setCategory] = useState<AcademyCategory>(ACADEMY_CATEGORIES[0]);
+  // Representative sport for the FAQ + ask box, which need a single Sport key.
+  const primarySport = category.sportKeys[0];
 
   // --- Streak (the addicting bit) ---
   const [streak, setStreak] = useState(0);
@@ -61,7 +55,7 @@ export default function AcademyScreen() {
   const [answer, setAnswer] = useState<string | null>(null);
   const [askedQ, setAskedQ] = useState<string | null>(null);
 
-  const sportName = S[SPORT_FULL_NAME[sport]];
+  const sportName = S[SPORT_FULL_NAME[primarySport]];
 
   // Bounce the streak counter on each increment; bigger bounce + a milestone
   // banner at 3 / 5 / 10.
@@ -88,16 +82,7 @@ export default function AcademyScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streak]);
 
-  // If My Sports hides the active sport, fall back to the first visible one.
-  useEffect(() => {
-    if (sportVisibility[sport] === false) {
-      const fv = orderedSports.find(s => sportVisibility[s.key] !== false);
-      if (fv) setSport(fv.key);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sportVisibility, orderedSports]);
-
-  // Cached answers are specific to sport/level/language — reset when they change.
+  // Cached answers are specific to category/level/language — reset when they change.
   useEffect(() => {
     setActiveFaq(null);
     setFaqAnswers({});
@@ -105,12 +90,12 @@ export default function AcademyScreen() {
     setAnswer(null);
     setAskedQ(null);
     setAskText('');
-  }, [sport, level, language]);
+  }, [category.key, level, language]);
 
-  const handleSportChange = async (s: Sport) => {
-    if (s === sport) return;
+  const handleCategoryChange = async (c: AcademyCategory) => {
+    if (c.key === category.key) return;
     await Haptics.selectionAsync();
-    setSport(s);
+    setCategory(c);
   };
 
   // FAQ rows ask without play context — the questions are self-contained, and
@@ -122,7 +107,7 @@ export default function AcademyScreen() {
     if (faqAnswers[question]) return; // already cached
     setFaqLoading(true);
     try {
-      const a = await askQuestion(question, sport, level, '', language);
+      const a = await askQuestion(question, primarySport, level, '', language);
       setFaqAnswers(prev => ({ ...prev, [question]: a }));
     } catch {
       setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
@@ -141,7 +126,7 @@ export default function AcademyScreen() {
     setAnswer(null);
     setAsking(true);
     try {
-      const a = await askQuestion(q, sport, level, '', language);
+      const a = await askQuestion(q, primarySport, level, '', language);
       setAnswer(a);
     } catch {
       setAnswer(S.answerError);
@@ -159,7 +144,7 @@ export default function AcademyScreen() {
     : streak >= 1 ? `🎯 ${streak} in a row!`
     : 'Start a streak — answer correctly!';
 
-  const faqs = SPORT_FAQS[sport];
+  const faqs = SPORT_FAQS[primarySport];
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -176,17 +161,18 @@ export default function AcademyScreen() {
           </View>
         </View>
 
-        {/* Sport selector — visible sports in saved order (customize in Settings › My Sports). */}
+        {/* Category selector — Academy-only learning categories (lib/academyCategories),
+            independent of the Live tab's My Sports settings. */}
         <View style={styles.tabsContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
-            {visibleSports.map(s => (
+            {ACADEMY_CATEGORIES.map(c => (
               <TouchableOpacity
-                key={s.key}
-                style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
-                onPress={() => handleSportChange(s.key)}>
-                <Text style={styles.sportEmoji}>{s.emoji}</Text>
-                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
-                  {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
+                key={c.key}
+                style={[styles.sportTab, category.key === c.key && styles.sportTabActive]}
+                onPress={() => handleCategoryChange(c)}>
+                <Text style={styles.sportEmoji}>{c.emoji}</Text>
+                <Text style={[styles.sportLabel, category.key === c.key && styles.sportLabelActive]}>
+                  {c.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -218,7 +204,7 @@ export default function AcademyScreen() {
           {/* 1. Quick Quiz */}
           <View style={styles.section}>
             <QuizCard
-              sport={sport}
+              sportKeys={category.sportKeys}
               streak={streak}
               onCorrect={() => setStreak(s => s + 1)}
               onWrong={() => setStreak(0)}
@@ -227,7 +213,7 @@ export default function AcademyScreen() {
 
           {/* 2. Did You Know */}
           <View style={styles.section}>
-            <DidYouKnow sport={sport} />
+            <DidYouKnow sportKeys={category.sportKeys} />
           </View>
 
           {/* 3. Common Questions — auto-expanded (Academy is always learn mode). */}

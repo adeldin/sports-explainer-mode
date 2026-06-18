@@ -6,7 +6,7 @@ import { useTheme, Theme } from '../lib/theme';
 import FACTS from '../lib/facts';
 
 interface Props {
-  sport: Sport;
+  sportKeys: Sport[]; // one or more league keys; facts are pooled across them
 }
 
 // Picks a random index in [0, len), optionally avoiding `exclude`.
@@ -20,20 +20,21 @@ function randomIndex(len: number, exclude?: number): number {
 // "Did You Know" card — one fact at a time from the per-sport facts bank. "Next
 // fact" cross-fades to a different random fact (fade out → swap → fade in). Orange
 // left accent matches the Live tab's WHY IT MATTERS card.
-export default function DidYouKnow({ sport }: Props) {
+export default function DidYouKnow({ sportKeys }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const facts = FACTS[sport] || [];
+  // Pool facts across every league key in the category.
+  const facts = sportKeys.flatMap(k => FACTS[k] || []);
 
   const [idx, setIdx] = useState(() => randomIndex(facts.length));
   const opacity = useSharedValue(1);
 
-  // Fresh random fact whenever the sport changes.
+  // Fresh random fact whenever the category's keys change.
   useEffect(() => {
-    setIdx(randomIndex((FACTS[sport] || []).length));
+    setIdx(randomIndex(facts.length));
     opacity.value = 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sport]);
+  }, [sportKeys.join(',')]);
 
   if (facts.length === 0) return null;
 

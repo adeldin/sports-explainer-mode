@@ -9,7 +9,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { QUIZ } from '../lib/facts';
 
 interface Props {
-  sport: Sport;
+  sportKeys: Sport[]; // one or more league keys; questions are pooled across them
   streak: number;
   onCorrect: () => void;
   onWrong: () => void;
@@ -116,10 +116,11 @@ function QuizOption({ label, mode, bounce, shake, disabled, onPress, theme, styl
 // "Quick Quiz" — one multiple-choice question at a time. Tapping an option reveals
 // the answer (green/red + bounce/shake), shows a random encouragement/consolation
 // line + explanation, and reports the result up so Academy can drive the streak.
-export default function QuizCard({ sport, streak, onCorrect, onWrong }: Props) {
+export default function QuizCard({ sportKeys, streak, onCorrect, onWrong }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const questions = QUIZ[sport] || [];
+  // Pool questions across every league key in the category (e.g. all soccer comps).
+  const questions = sportKeys.flatMap(k => QUIZ[k] || []);
 
   const [qIdx, setQIdx] = useState(() => randomIndex(questions.length));
   const [selected, setSelected] = useState<number | null>(null);
@@ -142,16 +143,16 @@ export default function QuizCard({ sport, streak, onCorrect, onWrong }: Props) {
   const cardOpacity = useSharedValue(1);
   const revealOpacity = useSharedValue(0);
 
-  // Fresh question (recent history reset) whenever the sport changes.
+  // Fresh question (recent history reset) whenever the category's keys change.
   useEffect(() => {
     recent.current = [];
-    setQIdx(pickIndex((QUIZ[sport] || []).length));
+    setQIdx(pickIndex(questions.length));
     setSelected(null);
     setMessage(null);
     cardOpacity.value = 1;
     revealOpacity.value = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sport]);
+  }, [sportKeys.join(',')]);
 
   if (questions.length === 0) return null;
 
