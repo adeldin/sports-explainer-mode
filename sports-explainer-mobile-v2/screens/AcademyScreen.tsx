@@ -166,9 +166,14 @@ export default function AcademyScreen() {
       <StatusBar barStyle={theme.statusBar} />
       <SafeAreaView style={styles.safe} edges={['top']}>
         {/* Header — matches the Live tab wordmark, with "Academy 🎓" appended so the
-            "Sportswise" portion stays visually anchored when switching tabs. */}
+            "Sportswise" portion stays visually anchored when switching tabs. Title +
+            tagline are stacked in a column (tagline hugging the title) like Live;
+            Academy has no right-side group, so there's no left/right split. */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy 🎓</Text>
+          <View>
+            <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy 🎓</Text>
+            <Text style={styles.tagline}>Quizzes and facts to level up your game IQ.</Text>
+          </View>
         </View>
 
         {/* Sport selector — visible sports in saved order (customize in Settings › My Sports). */}
@@ -188,14 +193,10 @@ export default function AcademyScreen() {
           </ScrollView>
         </View>
 
-        {/* Tagline below the sport selector. */}
-        <Text style={styles.tagline}>Watch and ask why.</Text>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled">
-
+        {/* Streak + milestone — pinned below the sport pills, fixed above the scroll
+            so it stays visible while the cards scroll beneath. (Same Animated.Views as
+            before, just lifted out of the ScrollView — scale/fade wiring unchanged.) */}
+        <View style={styles.streakBar}>
           {/* Streak counter */}
           <Animated.View style={[styles.streakWrap, streakStyle]}>
             <Text style={streak > 0 ? styles.streakActive : styles.streakIdle}>{streakLabel}</Text>
@@ -207,13 +208,14 @@ export default function AcademyScreen() {
               <Text style={styles.milestoneText}>{milestone}</Text>
             </Animated.View>
           )}
+        </View>
 
-          {/* 1. Did You Know */}
-          <View style={styles.section}>
-            <DidYouKnow sport={sport} />
-          </View>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
 
-          {/* 2. Quick Quiz */}
+          {/* 1. Quick Quiz */}
           <View style={styles.section}>
             <QuizCard
               sport={sport}
@@ -221,6 +223,11 @@ export default function AcademyScreen() {
               onCorrect={() => setStreak(s => s + 1)}
               onWrong={() => setStreak(0)}
             />
+          </View>
+
+          {/* 2. Did You Know */}
+          <View style={styles.section}>
+            <DidYouKnow sport={sport} />
           </View>
 
           {/* 3. Common Questions — auto-expanded (Academy is always learn mode). */}
@@ -304,7 +311,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerTitleAccent: { color: t.accent },
   tabsContainer: { height: 70, marginBottom: 4 },
-  tagline: { color: t.textMuted, fontSize: 12, fontStyle: 'italic', paddingHorizontal: 20, marginBottom: 4 },
+  // Hugs the title in the header column, matching the Live tab's headerTagline.
+  tagline: { color: t.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 1 },
   sportTabsContent: { paddingHorizontal: 16, gap: 8 },
   sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
   sportTabActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
@@ -313,7 +321,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sportLabelActive: { color: t.accentText },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
-  // Streak + milestone
+  // Streak + milestone — fixed bar below the tagline (outside the ScrollView).
+  // Opaque background + 16px horizontal padding to align with the cards below.
+  streakBar: { backgroundColor: t.background, paddingHorizontal: 16 },
   streakWrap: { alignItems: 'center', paddingVertical: 12 },
   streakActive: { color: t.accent, fontSize: 18, fontWeight: '900', textAlign: 'center' },
   streakIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },

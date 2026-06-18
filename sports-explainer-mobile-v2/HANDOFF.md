@@ -153,6 +153,7 @@ but revisits the "Live sport independent" decision.
 - ja/zh/ko/ar UI strings need native review before submission.
 - `react-native-sortables` + `expo-av`/`lottie` are still in deps — audit whether
   all are still used (drag-to-reorder was replaced by My Sports).
+- [ ] Remove the settings cog (⚙️) from the top-right of the Live screen header (LiveScreen.tsx) — redundant with the Settings bottom tab, and inconsistent with Academy which has no header cog. Verify the cog isn't the only entry point to any setting before removing.
 
 ### Parked onboarding idea — "wall of questions"
 Concept for first-run onboarding (not yet built; alternative or precursor to the ScrumIntro screen): naive fan questions from multiple sports cascade in and overlap, piling up until the screen is deliberately overwhelming — e.g. 'What is a wicket?', 'Why did he throw a yellow handkerchief?', 'I thought nutmeg was a spice?', 'What's icing?'. Then it all clears and resolves into clarity, landing on SportsWise as the thing that makes the confusion stop. Dramatizes the feeling of being a lost fan (multi-sport = signals broad coverage) rather than explaining one play. Possible strongest flow: question-pile (the problem, felt) → resolves → ScrumIntro reveal (the proof). Note: questions must be authentically naive in phrasing but not factually wrong about each sport.
