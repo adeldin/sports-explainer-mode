@@ -18,6 +18,7 @@ import { useTheme } from './lib/theme';
 import { useAppState } from './lib/appState';
 
 import Onboarding from './components/Onboarding';
+import ScrumIntro from './components/ScrumIntro';
 import MorphCinematic from './components/MorphCinematic';
 import LiveScreen from './screens/LiveScreen';
 import AcademyScreen from './screens/AcademyScreen';
@@ -48,6 +49,7 @@ export default function App() {
   // --- Gate state (launch-only, not shared) ---
   const [isAnimationComplete, setAnimationComplete] = useState(false);
   const [seenCinematic, setSeenCinematic] = useState(false);
+  const [scrumIntroSeen, setScrumIntroSeen] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [, setExpoPushToken] = useState('');
   // The sport chosen during onboarding seeds the Live tab's local selection (one-time).
@@ -62,11 +64,13 @@ export default function App() {
   useEffect(() => {
     async function initGate() {
       try {
-        const [onboarding, seenCine] = await Promise.all([
+        const [onboarding, seenCine, scrumSeen] = await Promise.all([
           AsyncStorage.getItem('onboarding_complete'),
           AsyncStorage.getItem('seen_cinematic'),
+          AsyncStorage.getItem('scrum_intro_seen'),
         ]);
         if (seenCine === 'true') setSeenCinematic(true);
+        setScrumIntroSeen(scrumSeen === 'true');
         // Brief defer so the splash stays up until the first real frame is ready.
         setTimeout(() => setOnboardingComplete(onboarding === 'true'), 50);
       } catch (e) {
@@ -121,6 +125,17 @@ export default function App() {
         onComplete={() => {
           setAnimationComplete(true);
           AsyncStorage.setItem('seen_cinematic', 'true');
+        }}
+      />
+    );
+  }
+
+  if (!scrumIntroSeen) {
+    return (
+      <ScrumIntro
+        onComplete={() => {
+          setScrumIntroSeen(true);
+          AsyncStorage.setItem('scrum_intro_seen', 'true');
         }}
       />
     );

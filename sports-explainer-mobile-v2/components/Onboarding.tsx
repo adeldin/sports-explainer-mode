@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, Image, TouchableOpacity, StyleSheet,
   SafeAreaView, Dimensions, StatusBar, ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -54,8 +54,15 @@ export default function Onboarding({ language, onComplete }: Props) {
         <StatusBar barStyle={theme.statusBar} />
         <View style={styles.container}>
           <View style={styles.heroSection}>
-            <Text style={styles.trophy}>🏆</Text>
-            <Text style={styles.appName}>Sports<Text style={styles.appNameAccent}>wise</Text></Text>
+            {/* Brand lockup (mark + wordmark) — theme-aware so "Sports" stays legible
+                on both navy (dark) and light backgrounds. Replaces the old 🏆 + text. */}
+            <Image
+              source={theme.mode === 'dark'
+                ? require('../assets/logo-lockup-dark.png')
+                : require('../assets/logo-lockup-light.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <View style={styles.taglinePill}>
               <Text style={styles.taglineText}>⚡ WATCH AND ASK WHY.</Text>
             </View>
@@ -178,9 +185,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 
   // Welcome
   heroSection: { alignItems: 'center', marginTop: 20 },
-  trophy: { fontSize: 64, marginBottom: 12 },
-  appName: { fontSize: 32, fontWeight: '900', color: t.textPrimary, marginBottom: 12 },
-  appNameAccent: { color: t.accent },
+  // Explicit width + height (no aspectRatio): on the New Arch, width + aspectRatio
+  // without a height can fall back to the source's intrinsic 1440px width and
+  // overflow. 220×44 matches the cropped art's ~5:1 ratio; contain keeps it crisp.
+  logo: { width: 220, height: 44, alignSelf: 'center', marginBottom: 16 },
   taglinePill: { backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20 },
   taglineText: { color: t.warn, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
   heroSub: { color: t.textSecondary, fontSize: 16, textAlign: 'center', lineHeight: 26 },
