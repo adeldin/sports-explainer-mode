@@ -25,8 +25,14 @@ in the conversation**, not to serve existing experts.
 
 ## 🔒 V1.0 scope lock
 
-**IN:** translation fix · team logos · dark mode · past plays (MLB/NHL first) · FAQ chips ·
-soccer/rugby UI · App Store submission.
+**IN — ✅ shipped:** translation fix · team logos · dark mode · FAQ chips · soccer/rugby UI ·
+past plays (MLB/NHL/NBA/WNBA). _Bonus, beyond original scope:_ bottom-tab nav · Academy tab
+(307-question difficulty quiz + facts) · first-run scrum intro · real logo/branding.
+
+**IN — 🔜 still open (the road to launch):** Live-screen design polish (current pass) ·
+App Store submission prep — replace the `APP_ID` placeholder, real support/privacy URLs,
+native review of ja/zh/ko/ar strings + Academy content, screenshots/metadata. (See the
+mobile repo's `HANDOFF.md` §8 for the full submission checklist.)
 
 **OUT (explicitly v2.0):** TV app · GovWise · StockWise · full language
 UI (backend done, UI later) · pop-up facts system · Team Knowledge Companion mode ·
@@ -58,9 +64,13 @@ historical data · past plays for soccer.
 - ✅ Per-sport "Common Questions" FAQ — collapsed-by-default section above the games, routed through the ask path; pre-translated into all 10 languages (`lib/faqs.ts`).
   - ⚠️ **Before App Store submission:** the CJK + Arabic FAQ translations (ja / zh / ko / ar) are an AI-generated **v1 first pass** and need **native-speaker review**. (es/fr/pt/de/it are higher-confidence but a proofread wouldn't hurt.)
 
-**Active, in order:**
-1. **Past plays** — scroll back through a game's plays and tap one to explain. Start with **MLB / NHL** (`plays[]` confirmed; NBA confirmed too; NFL verify in-season; soccer uses `commentary[]`/`keyEvents[]`).
-2. **App Store submission.**
+**Shipped since:**
+- ✅ **Past plays** — scroll back through a game's plays and tap one to explain. Live for **MLB / NHL / NBA / WNBA** (`PastPlays.tsx`, wired in `LiveScreen`). NFL verify in-season; soccer (`commentary[]`/`keyEvents[]`) remains v2.
+
+**Active, in order (the road to submission):**
+1. **Live-screen design polish** — current pass: removed the redundant header settings cog, made the Academy CTA navigate, consistent section card-grouping/spacing.
+2. **TestFlight builds + on-device QA** — incl. verifying the MLR/rugby Core-API team-name/score fix on a live fixture.
+3. **App Store submission prep** — replace the `APP_ID` placeholder, real support/privacy URLs, native review of ja/zh/ko/ar + Academy content, screenshots/metadata, then submit. (Full checklist: mobile repo `HANDOFF.md` §8.)
 
 ---
 
@@ -123,6 +133,38 @@ government hearing graphic → **GovWise**. Ties into the "[Topic]Wise" family a
 
 **Priority:** post-launch **v2**. Build **after App Store submission**.
 
+### 🖼️ Images / illustrations in quizzes *(post-launch)*
+
+**Concept:** add **optional** images to Academy quiz questions — player/equipment photos,
+sketched-out plays, trophies, etc. — so some questions show a visual: *"which trophy is
+this?"*, *"name this play."* Makes the quiz richer and more game-like.
+
+**Effort:** moderate — but the **code is the easy part**. Add an optional `image` field to
+the `QuizQuestion` type and render an `<Image>` in `QuizCard` when present. The real work
+is **sourcing/creating the images**, not the wiring.
+
+**Three sourcing options:**
+1. **Bundled images** (shipped in the app) — low-moderate code effort; main cost is sourcing
+   **properly-licensed** images. Cannot use random web images (copyright + player-likeness
+   issues, especially for photos).
+2. **Remote images** (CDN/URL) — keeps app size small, but needs hosting + a live connection.
+3. **AI-generated brand illustrations** (the chibi / scrum art style) — *recommended.*
+   Sidesteps licensing (original art), fits the brand, and **reuses the illustration style
+   built for the intro animation**.
+
+**Size math:** optimized illustrations ~30–80 KB each; ~300 images ≈ **10–25 MB** added to
+the app — acceptable, though it could 2–3× current app size. AI illustrations compress
+better than photos.
+
+**Recommended approach:** don't image **every** question — only a **subset (~20–40%)** where
+a visual genuinely helps (equipment, trophies, play diagrams); skip it for text-only
+questions (*"how many strikes is a strikeout?"*). The **optional** `image` field means
+questions without images work exactly as they do now — incremental, **no migration**.
+
+**Priority:** post-launch enhancement, **not pre-launch**. The text quiz already works;
+images make it **nicer, not functional**. Pairs naturally with the **Rive / illustration
+intro-animation** work — the same art style feeds both.
+
 ---
 
 ## 🎮 Gamification / Learning progression *(v2)*
@@ -130,22 +172,30 @@ government hearing graphic → **GovWise**. Ties into the "[Topic]Wise" family a
 Duolingo-inspired learning mechanics. The point isn't game-for-game's-sake — it's making
 the core promise (**getting wiser**) visible and rewarding, and building a daily habit loop.
 
-### Priority 1 — Knowledge progression system *(most on-brand)*
+> **Quiz infrastructure is now shipped** (Academy tab): a **307-question bank** across four
+> difficulty tiers (**kid / beginner / intermediate / expert**) in `lib/facts.ts`, with an
+> on-card level picker (synced to the global app level), per-question answer shuffle, and
+> a streak mechanic. The remaining gamification work below now sits on top of this.
+
+### ✅ Streaks *(shipped — Academy tab)*
+Quiz streak counter with milestone celebrations (3 / 5 / 10) and a pinned streak bar.
+Originally scoped as "Priority 2, build this first" — **done.** (Day-over-day / habit-loop
+streaks across sessions are still a possible extension, but the in-quiz streak is live.)
+
+### ✅ Quick quiz moments *(shipped — Academy tab)*
+The "Quick Quiz" card: one multiple-choice question at a time, animated green/red reveal
+with explanation, difficulty-filtered, switchable level, no-repeat cycling. Originally
+"Priority 3" — **done.** (Surfacing a quiz inline *after a Live explanation* is still an
+open variant; the standalone Academy quiz is what shipped.)
+
+### Priority 1 (still open) — Knowledge progression system *(most on-brand)*
 Users **earn** their way through expertise levels (**Kid → Beginner → Intermediate →
 Expert**) instead of manually setting them. After engaging with X explanations at a level,
 the app prompts: *"Ready to try the next level?"* Optional, never forced. Makes the core
 product promise — getting wiser — visible and rewarding. The most on-brand gamification
-feature for SportsWise.
-
-### Priority 2 — Streaks *(lowest lift, highest habit impact)*
-Track consecutive days/games using SportsWise. *"3-day streak,"* *"explained 5 games in a
-row."* Creates a daily habit loop. Low complexity (AsyncStorage counter), high engagement
-impact. Natural fit with sports-season schedules. **Build this first.**
-
-### Priority 3 — Quick quiz moments
-After an explanation loads, **occasionally** surface a quick 3-option question about what
-was just explained. Optional / skippable. Dramatically improves retention. Core Duolingo
-mechanic in its simplest form.
+feature for SportsWise — and it now sits on **already-shipped infrastructure** (the quiz
+bank, difficulty tiers, and global level state), so this is the natural next build: gate
+level-ups on quiz performance / engagement rather than a manual Settings toggle.
 
 ### Priority 4 — Badges / achievements
 *"First rugby game explained,"* *"Asked 10 questions,"* *"5 sports explored."* AsyncStorage
@@ -166,8 +216,10 @@ The same progression system applies to **all `[Topic]Wise` verticals**. LegalWis
 Kid → Beginner → Intermediate → Expert in legal literacy. GovWise: same for civic
 knowledge. **The progression system *is* the platform's core learning promise.**
 
-**Priority:** v2, after App Store launch. Build **streaks first** (lowest lift, highest
-habit impact), then the **progression system** (highest brand alignment).
+**Priority:** streaks + quick quiz are **shipped**. The remaining on-brand build is the
+**progression system** (earn-your-way level-ups), now unblocked by the shipped quiz/
+difficulty/level infrastructure. Badges, daily challenge, and capture-user-questions
+remain v2, after App Store launch.
 
 ---
 
@@ -226,6 +278,9 @@ Brand asset: the **"[Topic]Wise"** naming pattern is clean and scalable.
 
 ## 🧊 Parked
 
-- **Cricket** — dropped for now. ESPN's public API has no usable cricket data (site API
-  404s; Core API lists the sport but exposes zero leagues/events). Revisit with ESPNcricinfo
-  or a paid source. A code comment in `route.ts` marks where it would slot in.
+- **Cricket live data** — ✅ cricket is now a **live sport in the app** (in `SPORTS`, with
+  quiz / FAQ / learn-mode content). What remains parked is **live match data**: ESPN's
+  public API still has no usable cricket feed (site API 404s; Core API lists the sport but
+  exposes zero leagues/events), so cricket runs in **learn-mode only** (no live scoreboard).
+  Revisit live data with ESPNcricinfo or a paid source; a code comment in `route.ts` marks
+  where it would slot in.
