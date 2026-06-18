@@ -45,8 +45,8 @@ yarn-error.*
 !assets/icon.png
 !assets/splash-icon.png
 !assets/adaptive-icon.png
-# Onboarding assets referenced by code (require()) — must ship in the repo so clean
-# EAS builds don't fail. onboarding-scrum.png is a navy placeholder (swap before submission).
+# Onboarding logo lockups referenced by code (require()) — must ship in the repo so
+# clean EAS builds don't fail. (onboarding-scrum.jpg is a .jpg, not caught by *.png,
+# so it needs no exception here.)
 !assets/logo-lockup-dark.png
 !assets/logo-lockup-light.png
-!assets/onboarding-scrum.png

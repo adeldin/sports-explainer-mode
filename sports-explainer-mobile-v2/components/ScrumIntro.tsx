@@ -83,13 +83,7 @@ export default function ScrumIntro({ onComplete }: Props) {
 
         {/* Scrum image */}
         <View style={styles.imageWrap}>
-          <Image source={require('../assets/onboarding-scrum.png')} style={styles.image} resizeMode="cover" />
-
-          {/* DEV PLACEHOLDER LABEL — delete this overlay block when the real scrum photo is added */}
-          <View style={styles.placeholderOverlay} pointerEvents="none">
-            <Text style={styles.placeholderText}>PLACEHOLDER{'\n'}Swap before submission</Text>
-          </View>
-          {/* END DEV PLACEHOLDER LABEL */}
+          <Image source={require('../assets/onboarding-scrum.jpg')} style={styles.image} resizeMode="cover" />
         </View>
 
         <Text style={styles.caption}>
@@ -153,16 +147,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignSelf: 'center',
   },
   image: { width: '100%', height: '100%' },
-  // DEV PLACEHOLDER LABEL styles — remove with the overlay block above.
-  placeholderOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  placeholderText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
 
   caption: {
     color: t.textSecondary,

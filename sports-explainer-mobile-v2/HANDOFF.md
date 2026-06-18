@@ -306,7 +306,6 @@ Assets & metadata:
 - [ ] App Privacy "nutrition label" (data collected: none/diagnostics? + IAP if added).
 
 Code/content gates before submission:
-- [ ] Replace assets/onboarding-scrum.png placeholder with licensed Hounds scrum photo.
 - [ ] Replace `APP_ID = 'APP_ID'` placeholder in `SettingsScreen.tsx`.
 - [ ] Confirm/replace `feedback@sportswise.app` + privacy/download URLs.
 - [ ] Native review of ja/zh/ko/ar UI strings + Academy facts/quiz translation.

@@ -53,26 +53,30 @@ export default function Onboarding({ language, onComplete }: Props) {
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle={theme.statusBar} />
         <View style={styles.container}>
-          <View style={styles.heroSection}>
-            {/* Brand lockup (mark + wordmark) — theme-aware so "Sports" stays legible
-                on both navy (dark) and light backgrounds. Replaces the old 🏆 + text. */}
-            <Image
-              source={theme.mode === 'dark'
-                ? require('../assets/logo-lockup-dark.png')
-                : require('../assets/logo-lockup-light.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <View style={styles.taglinePill}>
-              <Text style={styles.taglineText}>⚡ WATCH AND ASK WHY.</Text>
+          {/* Hero + features as one vertically-centered block so the features sit
+              right under the subtitle (no floating gap); the CTA stays pinned bottom. */}
+          <View style={styles.heroGroup}>
+            <View style={styles.heroSection}>
+              {/* Brand lockup (mark + wordmark) — theme-aware so "Sports" stays legible
+                  on both navy (dark) and light backgrounds. Replaces the old 🏆 + text. */}
+              <Image
+                source={theme.mode === 'dark'
+                  ? require('../assets/logo-lockup-dark.png')
+                  : require('../assets/logo-lockup-light.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <View style={styles.taglinePill}>
+                <Text style={styles.taglineText}>⚡ WATCH AND ASK WHY.</Text>
+              </View>
+              <Text style={styles.heroSub}>{S.heroSub}</Text>
             </View>
-            <Text style={styles.heroSub}>{S.heroSub}</Text>
-          </View>
 
-          <View style={styles.featureList}>
-            <FeatureRow emoji="📡" text={S.feat1} />
-            <FeatureRow emoji="🧠" text={S.feat2} />
-            <FeatureRow emoji="🎚️" text={S.feat3} />
+            <View style={styles.featureList}>
+              <FeatureRow emoji="📡" text={S.feat1} />
+              <FeatureRow emoji="🧠" text={S.feat2} />
+              <FeatureRow emoji="🎚️" text={S.feat3} />
+            </View>
           </View>
 
           <TouchableOpacity style={styles.primaryBtn} onPress={() => setScreen(1)}>
@@ -184,7 +188,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16, justifyContent: 'space-between' },
 
   // Welcome
-  heroSection: { alignItems: 'center', marginTop: 20 },
+  // Fills the space above the CTA and centers hero + features together as one block.
+  heroGroup: { flex: 1, justifyContent: 'center' },
+  heroSection: { alignItems: 'center' },
   // Explicit width + height (no aspectRatio): on the New Arch, width + aspectRatio
   // without a height can fall back to the source's intrinsic 1440px width and
   // overflow. 220×44 matches the cropped art's ~5:1 ratio; contain keeps it crisp.
@@ -192,7 +198,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   taglinePill: { backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 20 },
   taglineText: { color: t.warn, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
   heroSub: { color: t.textSecondary, fontSize: 16, textAlign: 'center', lineHeight: 26 },
-  featureList: { gap: 16, marginVertical: 20 },
+  featureList: { gap: 16, marginTop: 28 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   featureEmoji: { fontSize: 24, width: 32, textAlign: 'center' },
   featureText: { color: t.textSecondary, fontSize: 15, flex: 1, lineHeight: 22 },
