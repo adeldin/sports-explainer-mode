@@ -236,7 +236,43 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           seen.add(ev.id);
           return true;
         });
-        parsed = uniqueEvents.map(toGame);
+
+        // Core API competitors carry $ref pointers for team + score (the Site API
+        // inlines them). Resolve those refs so each competitor matches the Site
+        // shape and toGame needs no changes. Each fetch is bounded by a 3s timeout
+        // and falls back to '?'/'0' on failure instead of crashing the whole list.
+        const fetchRef = async (url: string): Promise<any> => {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 3000);
+          try {
+            const r = await fetch(url, { signal: ctrl.signal });
+            if (!r.ok) throw new Error(`ref ${r.status}`);
+            return await r.json();
+          } finally {
+            clearTimeout(t);
+          }
+        };
+        const expandCompetitor = async (c: any): Promise<any> => {
+          let team = c?.team;
+          let score = c?.score;
+          const jobs: Promise<void>[] = [];
+          if (team?.$ref && !team.abbreviation) {
+            jobs.push(fetchRef(team.$ref).then(t => { team = t; }).catch(() => { team = undefined; }));
+          }
+          if (score?.$ref && !score.displayValue) {
+            jobs.push(fetchRef(score.$ref).then(s => { score = s; }).catch(() => { score = undefined; }));
+          }
+          await Promise.all(jobs);
+          return { ...c, team, score };
+        };
+        const expandEvent = async (ev: any): Promise<any> => {
+          const comp = ev.competitions?.[0];
+          if (!comp?.competitors) return ev;
+          const competitors = await Promise.all(comp.competitors.map(expandCompetitor));
+          return { ...ev, competitions: [{ ...comp, competitors }, ...ev.competitions.slice(1)] };
+        };
+        const expandedEvents = await Promise.all(uniqueEvents.map(expandEvent));
+        parsed = expandedEvents.map(toGame);
       } else {
         const res = await fetch(
           `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
@@ -501,7 +537,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       <SafeAreaView style={styles.safe}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text></Text>
+          <View>
+            <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text></Text>
+            <Text style={styles.headerTagline}>Watch and ask why.</Text>
+          </View>
           <View style={styles.headerRight}>
             {learnMode ? (
               <TouchableOpacity style={styles.learnPill} onPress={() => Alert.alert('Academy', S.learnModeExplainer)} activeOpacity={0.7}>
@@ -742,6 +781,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerTitleAccent: { color: t.accent },
+  headerTagline: { color: t.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },

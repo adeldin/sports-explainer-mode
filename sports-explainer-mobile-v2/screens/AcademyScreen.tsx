@@ -1,29 +1,349 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  TextInput, KeyboardAvoidingView, Keyboard, Platform, StatusBar,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Theme } from '../lib/theme';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, runOnJS, Easing,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
-// Stage 1 placeholder. The Academy tab will host Learn Mode content
-// (lessons, drills, off-season explainers) in a later stage.
+import { askQuestion, Sport } from '../lib/api';
+import { useAppState } from '../lib/appState';
+import { useTheme, Theme } from '../lib/theme';
+import { UI_STRINGS } from '../lib/strings';
+import { SPORT_FAQS } from '../lib/faqs';
+import { SPORT_FULL_NAME } from '../lib/sports';
+
+import DidYouKnow from '../components/DidYouKnow';
+import QuizCard from '../components/QuizCard';
+
+// Localized short labels for the sport pills (acronyms fall back to s.label).
+const SPORT_NAME_KEY: Partial<Record<Sport, keyof (typeof UI_STRINGS)['en']>> = {
+  soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
+  wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
+};
+
+// Academy tab — the always-on "learn" experience: pick a sport, read a fact, take
+// a quiz (with a streak mechanic), browse common questions, and ask anything.
+// Designed to feel energetic and rewarding vs. the calm Live tab. The selected
+// sport is LOCAL to this tab (seeded from the first visible sport).
 export default function AcademyScreen() {
+  const { language, level, orderedSports, sportVisibility } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const S = UI_STRINGS[language];
+
+  const visibleSports = orderedSports.filter(s => sportVisibility[s.key] !== false);
+
+  const [sport, setSport] = useState<Sport>(() => {
+    const first = orderedSports.find(s => sportVisibility[s.key] !== false);
+    return first ? first.key : 'mlb';
+  });
+
+  // --- Streak (the addicting bit) ---
+  const [streak, setStreak] = useState(0);
+  const [milestone, setMilestone] = useState<string | null>(null);
+  const prevStreak = useRef(0);
+  const streakScale = useSharedValue(1);
+  const milestoneOpacity = useSharedValue(0);
+
+  // --- FAQ state ---
+  const [activeFaq, setActiveFaq] = useState<string | null>(null);
+  const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [faqExpanded, setFaqExpanded] = useState(false);
+
+  // --- Ask box state ---
+  const [askText, setAskText] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [askedQ, setAskedQ] = useState<string | null>(null);
+
+  const sportName = S[SPORT_FULL_NAME[sport]];
+
+  // Bounce the streak counter on each increment; bigger bounce + a milestone
+  // banner at 3 / 5 / 10.
+  useEffect(() => {
+    const prev = prevStreak.current;
+    prevStreak.current = streak;
+    if (streak <= prev || streak === 0) return;
+
+    const isMilestone = streak === 3 || streak === 5 || streak === 10;
+    streakScale.value = withSequence(
+      withTiming(isMilestone ? 1.3 : 1.15, { duration: isMilestone ? 180 : 120, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: isMilestone ? 220 : 140 }),
+    );
+
+    if (isMilestone) {
+      setMilestone(streak === 3 ? 'Hat trick! 🎉' : streak === 5 ? 'On fire! 🔥🔥' : 'Legendary! 🏆');
+      milestoneOpacity.value = withSequence(
+        withTiming(1, { duration: 200 }),
+        withDelay(1600, withTiming(0, { duration: 300 }, finished => {
+          if (finished) runOnJS(setMilestone)(null);
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streak]);
+
+  // If My Sports hides the active sport, fall back to the first visible one.
+  useEffect(() => {
+    if (sportVisibility[sport] === false) {
+      const fv = orderedSports.find(s => sportVisibility[s.key] !== false);
+      if (fv) setSport(fv.key);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sportVisibility, orderedSports]);
+
+  // Cached answers are specific to sport/level/language — reset when they change.
+  useEffect(() => {
+    setActiveFaq(null);
+    setFaqAnswers({});
+    setFaqExpanded(false);
+    setAnswer(null);
+    setAskedQ(null);
+    setAskText('');
+  }, [sport, level, language]);
+
+  const handleSportChange = async (s: Sport) => {
+    if (s === sport) return;
+    await Haptics.selectionAsync();
+    setSport(s);
+  };
+
+  // FAQ rows ask without play context — the questions are self-contained, and
+  // sport/level/language still drive a correct, level-appropriate answer.
+  const toggleFaq = async (question: string) => {
+    await Haptics.selectionAsync();
+    if (activeFaq === question) { setActiveFaq(null); return; }
+    setActiveFaq(question);
+    if (faqAnswers[question]) return; // already cached
+    setFaqLoading(true);
+    try {
+      const a = await askQuestion(question, sport, level, '', language);
+      setFaqAnswers(prev => ({ ...prev, [question]: a }));
+    } catch {
+      setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
+    } finally {
+      setFaqLoading(false);
+    }
+  };
+
+  // Sport-general ask — no play context, same path as the Live tab's off-season ask.
+  const handleAsk = async () => {
+    const q = askText.trim();
+    if (!q || asking) return;
+    Keyboard.dismiss();
+    setAskText('');
+    setAskedQ(q);
+    setAnswer(null);
+    setAsking(true);
+    try {
+      const a = await askQuestion(q, sport, level, '', language);
+      setAnswer(a);
+    } catch {
+      setAnswer(S.answerError);
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const streakStyle = useAnimatedStyle(() => ({ transform: [{ scale: streakScale.value }] }));
+  const milestoneStyle = useAnimatedStyle(() => ({ opacity: milestoneOpacity.value }));
+
+  const streakLabel =
+    streak >= 5 ? `🔥🔥 ${streak} in a row! Unstoppable!`
+    : streak >= 3 ? `🔥 ${streak} in a row!`
+    : streak >= 1 ? `🎯 ${streak} in a row!`
+    : 'Start a streak — answer correctly!';
+
+  const faqs = SPORT_FAQS[sport];
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.center}>
-        <Text style={styles.emoji}>🎓</Text>
-        <Text style={styles.title}>Academy</Text>
-        <Text style={styles.subtitle}>Coming soon</Text>
-      </View>
-    </SafeAreaView>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle={theme.statusBar} />
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        {/* Header — matches the Live tab wordmark, with "Academy 🎓" appended so the
+            "Sportswise" portion stays visually anchored when switching tabs. */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy 🎓</Text>
+        </View>
+
+        {/* Sport selector — visible sports in saved order (customize in Settings › My Sports). */}
+        <View style={styles.tabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
+            {visibleSports.map(s => (
+              <TouchableOpacity
+                key={s.key}
+                style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
+                onPress={() => handleSportChange(s.key)}>
+                <Text style={styles.sportEmoji}>{s.emoji}</Text>
+                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
+                  {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Tagline below the sport selector. */}
+        <Text style={styles.tagline}>Watch and ask why.</Text>
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+
+          {/* Streak counter */}
+          <Animated.View style={[styles.streakWrap, streakStyle]}>
+            <Text style={streak > 0 ? styles.streakActive : styles.streakIdle}>{streakLabel}</Text>
+          </Animated.View>
+
+          {/* Milestone celebration (fades out after ~2s) */}
+          {milestone && (
+            <Animated.View style={[styles.milestoneWrap, milestoneStyle]} pointerEvents="none">
+              <Text style={styles.milestoneText}>{milestone}</Text>
+            </Animated.View>
+          )}
+
+          {/* 1. Did You Know */}
+          <View style={styles.section}>
+            <DidYouKnow sport={sport} />
+          </View>
+
+          {/* 2. Quick Quiz */}
+          <View style={styles.section}>
+            <QuizCard
+              sport={sport}
+              streak={streak}
+              onCorrect={() => setStreak(s => s + 1)}
+              onWrong={() => setStreak(0)}
+            />
+          </View>
+
+          {/* 3. Common Questions — auto-expanded (Academy is always learn mode). */}
+          <View style={styles.section}>
+            <View style={styles.faqSection}>
+              <View style={styles.faqHeadingRow}>
+                <Text style={styles.faqHeading}>{faqs.label[language]}</Text>
+              </View>
+              {(faqExpanded ? faqs.questions : faqs.questions.slice(0, 4)).map(q => {
+                const text = q[language] || q.en;
+                return (
+                  <View key={q.en} style={styles.faqItem}>
+                    <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(text)} activeOpacity={0.7}>
+                      <Text style={styles.faqQ}>{text}</Text>
+                      <Text style={styles.faqChevron}>{activeFaq === text ? '−' : '+'}</Text>
+                    </TouchableOpacity>
+                    {activeFaq === text && (
+                      <View style={styles.faqAnswerBox}>
+                        {faqAnswers[text]
+                          ? <Text style={styles.faqAnswer}>{faqAnswers[text]}</Text>
+                          : <Text style={styles.faqThinking}>{S.thinking}</Text>}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              {faqs.questions.length > 4 && (
+                <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
+                  <Text style={styles.faqMoreText}>
+                    {faqExpanded ? S.showLess : `${S.showMore} (${faqs.questions.length - 4})`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* 4. Ask anything — sport-general, no play context. */}
+          <View style={styles.section}>
+            <Text style={styles.askTitle}>{S.askLearnPlaceholder.replace('{sport}', sportName).replace('…', '')}</Text>
+            <View style={styles.askRow}>
+              <TextInput
+                style={styles.askInput}
+                value={askText}
+                onChangeText={setAskText}
+                placeholder={S.askLearnPlaceholder.replace('{sport}', sportName)}
+                placeholderTextColor={theme.placeholderText}
+                returnKeyType="send"
+                onSubmitEditing={handleAsk}
+                editable={!asking}
+                blurOnSubmit
+              />
+              <TouchableOpacity
+                style={[styles.askSend, (!askText.trim() || asking) && styles.askSendDisabled]}
+                onPress={handleAsk}
+                disabled={!askText.trim() || asking}>
+                <Text style={[styles.askSendText, (!askText.trim() || asking) && { color: theme.textMuted }]}>↑</Text>
+              </TouchableOpacity>
+            </View>
+            {asking && (
+              <View style={styles.thinkingRow}>
+                <Text style={styles.thinkingText}>{S.thinking}</Text>
+              </View>
+            )}
+            {answer && (
+              <View style={styles.answerCard}>
+                {askedQ && <Text style={styles.answerHeader}>{askedQ}</Text>}
+                <Text style={styles.answerText}>{answer}</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: t.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, paddingHorizontal: 32 },
-  emoji: { fontSize: 56, marginBottom: 8 },
-  title: { color: t.textPrimary, fontSize: 24, fontWeight: '900' },
-  subtitle: { color: t.textMuted, fontSize: 15, fontWeight: '600' },
+  root: { flex: 1, backgroundColor: t.background },
+  safe: { flex: 1, backgroundColor: t.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
+  headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
+  headerTitleAccent: { color: t.accent },
+  tabsContainer: { height: 70, marginBottom: 4 },
+  tagline: { color: t.textMuted, fontSize: 12, fontStyle: 'italic', paddingHorizontal: 20, marginBottom: 4 },
+  sportTabsContent: { paddingHorizontal: 16, gap: 8 },
+  sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
+  sportTabActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
+  sportEmoji: { fontSize: 20 },
+  sportLabel: { color: t.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  sportLabelActive: { color: t.accentText },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  // Streak + milestone
+  streakWrap: { alignItems: 'center', paddingVertical: 12 },
+  streakActive: { color: t.accent, fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  streakIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  milestoneWrap: { alignItems: 'center', marginBottom: 12 },
+  milestoneText: { color: t.accentText, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  // Energetic spacing — 20px between sections.
+  section: { marginBottom: 20 },
+  // FAQ (mirrors Live tab styling)
+  faqSection: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
+  faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
+  faqHeading: { color: t.textPrimary, fontSize: 15, fontWeight: '800' },
+  faqItem: { borderTopWidth: 1, borderTopColor: t.border },
+  faqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14, gap: 10 },
+  faqQ: { color: t.textSecondary, fontSize: 14, fontWeight: '600', flex: 1, lineHeight: 19 },
+  faqChevron: { color: t.accentText, fontSize: 18, fontWeight: '800', width: 18, textAlign: 'center' },
+  faqAnswerBox: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 2 },
+  faqAnswer: { color: t.textPrimary, fontSize: 14, lineHeight: 21 },
+  faqThinking: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
+  faqMoreBtn: { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: t.border },
+  faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
+  // Ask box (mirrors Live tab styling)
+  askTitle: { color: t.textPrimary, fontSize: 17, fontWeight: '800', marginBottom: 12 },
+  askRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  askInput: { flex: 1, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: t.textPrimary, fontSize: 15 },
+  askSend: { width: 46, height: 46, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
+  askSendDisabled: { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border },
+  askSendText: { color: t.onAccent, fontSize: 18, fontWeight: '900' },
+  thinkingRow: { marginTop: 16, alignItems: 'center' },
+  thinkingText: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
+  answerCard: { marginTop: 16, padding: 16, backgroundColor: t.surfaceAlt, borderRadius: 14, borderWidth: 1, borderColor: t.border },
+  answerHeader: { color: t.accentText, fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  answerText: { color: t.textSecondary, fontSize: 15, lineHeight: 23 },
 });
