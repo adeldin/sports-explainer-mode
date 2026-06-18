@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
@@ -22,7 +21,8 @@ import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationRespo
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { SPORTS, isOffSeason, SPORT_FULL_NAME, type SportTab } from '../lib/sports';
+import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
+import { useAppState } from '../lib/appState';
 
 // SPORTS now lives in ./lib/sports (shared with the onboarding picker).
 
@@ -69,24 +69,19 @@ interface Game {
   sport: string;
 }
 
-// Shared state lives in App.tsx (Stage 1) and is passed in as props.
+// Shared state now comes from AppStateProvider via useAppState(). `initialSport`
+// (the onboarding pick) seeds the Live tab's local selection once on mount.
 // `navigation` is the bottom-tab navigation (cog opens the Settings tab).
 interface LiveScreenProps {
-  language: Language;
-  level: Level;
-  autoRefresh: boolean;
-  favorites: string[];
-  setFavorites: (f: string[]) => void;
-  orderedSports: SportTab[];
-  sportVisibility: Record<string, boolean>;
   initialSport: Sport;
   navigation: { navigate: (name: string) => void };
 }
 
-export default function LiveScreen({
-  language, level, autoRefresh, favorites, setFavorites, orderedSports, sportVisibility, initialSport, navigation,
-}: LiveScreenProps) {
-  // --- State (Live-local; shared state arrives via props) ---
+export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
+  // --- Shared state (owned by AppStateProvider) ---
+  const { language, level, autoRefresh, favorites, setFavorites, orderedSports, sportVisibility } = useAppState();
+
+  // --- State (Live-local) ---
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
@@ -377,8 +372,9 @@ export default function LiveScreen({
     const newFavs = favorites.includes(teamAbbr)
       ? favorites.filter(f => f !== teamAbbr)
       : [...favorites, teamAbbr];
+    // Persistence is handled by AppStateProvider's auto-persist effect (single
+    // source of truth for favorites) — just update shared state here.
     setFavorites(newFavs);
-    await AsyncStorage.setItem('favorite_teams', JSON.stringify(newFavs));
   };
 
   // Step 1 of the share flow: snapshot the CURRENT result into shareData, which

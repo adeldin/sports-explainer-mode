@@ -1,25 +1,28 @@
 import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Language } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
+import { useAppState } from '../lib/appState';
 import { UI_STRINGS } from '../lib/strings';
-import { SPORTS, type SportTab } from '../lib/sports';
+import { SPORTS, orderSports, type SportTab } from '../lib/sports';
 
+// Shared state comes from AppStateProvider; the only prop is the navigation hook
+// (the stack owns the back action).
 interface Props {
-  language: Language;
-  order: string[];                       // full sport-key order (visible + hidden)
-  visibility: Record<string, boolean>;   // missing key = visible
-  onChange: (order: string[], visibility: Record<string, boolean>) => void;
   navigation: { goBack: () => void };
 }
 
 const SPORT_BY_KEY = new Map<string, SportTab>(SPORTS.map(s => [s.key, s]));
 
-export default function MySportsScreen({ language, order, visibility, onChange, navigation }: Props) {
+export default function MySportsScreen({ navigation }: Props) {
+  const { language, orderedSports, sportVisibility, setOrderedSports, setSportVisibility } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
+
+  // The editor works in bare key order; orderedSports holds the resolved SportTab[].
+  const order = orderedSports.map(s => s.key);
+  const visibility = sportVisibility;
 
   const isVisible = (key: string) => visibility[key] !== false;
   const visibleCount = order.filter(isVisible).length;
@@ -29,7 +32,7 @@ export default function MySportsScreen({ language, order, visibility, onChange, 
     if (j < 0 || j >= order.length) return;
     const next = [...order];
     [next[i], next[j]] = [next[j], next[i]];
-    onChange(next, visibility);
+    setOrderedSports(orderSports(next));
   };
 
   const toggle = (key: string) => {
@@ -38,11 +41,12 @@ export default function MySportsScreen({ language, order, visibility, onChange, 
       Alert.alert(S.keepOneSport);
       return;
     }
-    onChange(order, { ...visibility, [key]: !isVisible(key) });
+    setSportVisibility({ ...visibility, [key]: !isVisible(key) });
   };
 
   const reset = () => {
-    onChange(SPORTS.map(s => s.key), Object.fromEntries(SPORTS.map(s => [s.key, true])));
+    setOrderedSports(orderSports(SPORTS.map(s => s.key)));
+    setSportVisibility(Object.fromEntries(SPORTS.map(s => [s.key, true])));
   };
 
   return (

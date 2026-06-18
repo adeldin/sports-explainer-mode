@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
+import { useAppState } from '../lib/appState';
 import { UI_STRINGS } from '../lib/strings';
 
 // TODO: replace with the real App Store ID once the app is registered.
@@ -12,16 +13,10 @@ const PRIVACY_URL = 'https://privacy.sportswise.app';
 const SHARE_MESSAGE =
   'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sportswise.app';
 
+// Shared state comes from AppStateProvider; the only prop is the navigation hook
+// to push the My Sports editor (the stack owns that route).
 interface Props {
-  level: Level;
-  language: Language;
-  autoRefresh: boolean;
-  notificationsEnabled: boolean;
   onOpenMySports: () => void;
-  onLevelChange: (l: Level) => void;
-  onLanguageChange: (l: Language) => void;
-  onAutoRefreshChange: (val: boolean) => void;
-  onNotificationsToggle: (val: boolean) => void;
 }
 
 const LEVELS: { key: Level; emoji: string }[] = [
@@ -46,17 +41,11 @@ const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'ar', label: 'العربية' },
 ];
 
-export default function SettingsScreen({
-  level,
-  language,
-  autoRefresh,
-  notificationsEnabled,
-  onOpenMySports,
-  onLevelChange,
-  onLanguageChange,
-  onAutoRefreshChange,
-  onNotificationsToggle
-}: Props) {
+export default function SettingsScreen({ onOpenMySports }: Props) {
+  const {
+    level, language, autoRefresh, notificationsEnabled,
+    setLevel, setLanguage, setAutoRefresh, setNotificationsEnabled,
+  } = useAppState();
   const { mode, theme, setMode } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -87,7 +76,7 @@ export default function SettingsScreen({
             <TouchableOpacity
               key={l.key}
               style={[styles.levelRow, level === l.key && styles.levelRowActive]}
-              onPress={() => onLevelChange(l.key)}>
+              onPress={() => setLevel(l.key)}>
               <View style={styles.levelInfo}>
                 <Text style={styles.levelLabel}>{l.emoji} {LVL[l.key].label}</Text>
                 <Text style={styles.levelDesc}>{LVL[l.key].desc}</Text>
@@ -114,7 +103,7 @@ export default function SettingsScreen({
               <TouchableOpacity
                 key={l.key}
                 style={[styles.langPill, language === l.key && styles.langPillActive]}
-                onPress={() => onLanguageChange(l.key)}>
+                onPress={() => setLanguage(l.key)}>
                 <Text style={[styles.langText, language === l.key && styles.langTextActive]}>{l.label}</Text>
               </TouchableOpacity>
             ))}
@@ -130,7 +119,7 @@ export default function SettingsScreen({
             <Switch
               style={styles.toggleSwitch}
               value={autoRefresh}
-              onValueChange={onAutoRefreshChange}
+              onValueChange={setAutoRefresh}
               trackColor={{ false: theme.borderStrong, true: theme.accent }}
               thumbColor="#fff"
             />
@@ -144,7 +133,7 @@ export default function SettingsScreen({
             <Switch
               style={styles.toggleSwitch}
               value={notificationsEnabled}
-              onValueChange={onNotificationsToggle}
+              onValueChange={setNotificationsEnabled}
               trackColor={{ false: theme.borderStrong, true: theme.accent }}
               thumbColor="#fff"
             />

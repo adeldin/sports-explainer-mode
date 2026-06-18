@@ -6,11 +6,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import App from './App';
 import { ThemeProvider } from './lib/theme';
+import { AppStateProvider } from './lib/appState';
 
 // GestureHandlerRootView must be at the very root for drag/long-press gestures
 // to register. SafeAreaProvider supplies inset data to every screen (tabs + stack).
-// ThemeProvider wraps the app so every screen can read the active theme; the
-// launch cinematic ignores it (stays dark).
+// AppStateProvider owns the persisted shared state (language/level/sports/etc.) and
+// must wrap App so even the launch gate can read it. ThemeProvider wraps the app so
+// every screen can read the active theme; the launch cinematic ignores it (stays dark).
 function Root() {
   return React.createElement(
     GestureHandlerRootView,
@@ -18,7 +20,11 @@ function Root() {
     React.createElement(
       SafeAreaProvider,
       null,
-      React.createElement(ThemeProvider, null, React.createElement(App)),
+      React.createElement(
+        AppStateProvider,
+        null,
+        React.createElement(ThemeProvider, null, React.createElement(App)),
+      ),
     ),
   );
 }
