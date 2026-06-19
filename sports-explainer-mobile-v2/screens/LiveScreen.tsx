@@ -552,12 +552,6 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
             ) : null}
-            <TouchableOpacity style={styles.cogBtn} onPress={async () => {
-              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              navigation.navigate('Settings');
-            }}>
-              <Text style={styles.cogIcon}>⚙️</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -719,12 +713,22 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             </Animated.View>
           ) : learnMode ? (
             <View style={styles.learnBlock}>
-              <View style={styles.learnBadge}><Text style={styles.learnBadgeText}>🎓 ACADEMY</Text></View>
+              <TouchableOpacity
+                style={styles.learnCtaPill}
+                onPress={async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  navigation.navigate('Academy');
+                }}
+                activeOpacity={0.7}>
+                <Text style={styles.learnCtaPillText}>Test your knowledge in the Academy →</Text>
+              </TouchableOpacity>
               <Text style={styles.learnExplainer}>{learnContext ? S.learnModeFollowAlong : S.learnModeExplainer}</Text>
-              <Text style={styles.learnPrompt}>
-                {S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]).replace('…', '')}
-              </Text>
-              {renderAskBox(S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]))}
+              <View style={styles.learnAskCard}>
+                <Text style={styles.learnPrompt}>
+                  {S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]).replace('…', '')}
+                </Text>
+                {renderAskBox(S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]))}
+              </View>
             </View>
           ) : !loading ? <EmptyState sport={sport} reason="select-game" language={language} /> : null}
 
@@ -786,8 +790,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
   livePillText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  cogBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: t.border },
-  cogIcon: { fontSize: 18 },
   tabsContainer: { height: 70, marginBottom: 10 },
   sportTabsContent: { paddingHorizontal: 16, gap: 8 },
   sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
@@ -800,23 +802,23 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   scrollContent: { paddingBottom: 40 },
   skeleton: { padding: 20, marginHorizontal: 16, backgroundColor: t.surface, borderRadius: 16 },
   skeletonLine: { backgroundColor: t.surfaceAlt, borderRadius: 6 },
-  explanationCard: { backgroundColor: t.explanationBg, borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.stripe, borderWidth: 1, borderColor: t.border },
+  explanationCard: { backgroundColor: t.explanationBg, borderRadius: 16, padding: 20, marginHorizontal: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: t.stripe, borderWidth: 1, borderColor: t.border },
   explanationLabel: { color: t.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
   explanationHeader: { flexDirection: 'column', marginBottom: 12, gap: 4 },
   explanationText: { color: t.textPrimary, fontSize: 18, fontWeight: '600', lineHeight: 26 },
   contextTime: { color: t.textMuted, fontSize: 11 },
   playPillText: { color: t.textSecondary, fontSize: 13, fontWeight: '600', lineHeight: 18 },
-  insightCard: { backgroundColor: t.insightBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.accent, borderWidth: 1, borderColor: t.insightBorder },
+  insightCard: { backgroundColor: t.insightBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: t.accent, borderWidth: 1, borderColor: t.insightBorder },
   insightLabel: { color: t.insightLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   insightText: { color: t.textPrimary, fontSize: 18, fontWeight: '600', lineHeight: 26 },
-  ruleCard: { backgroundColor: t.ruleBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: t.ruleLabel, borderWidth: 1, borderColor: t.ruleBorder },
+  ruleCard: { backgroundColor: t.ruleBg, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16, borderLeftWidth: 4, borderLeftColor: t.ruleLabel, borderWidth: 1, borderColor: t.ruleBorder },
   ruleLabel: { color: t.ruleLabel, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 },
   ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22 },
   shareBtn: { marginHorizontal: 16, marginBottom: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   shareBtnText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
   complexityBadge: { alignSelf: 'flex-start', backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
   complexityText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  faqSection: { marginHorizontal: 16, marginTop: 4, marginBottom: 12, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
+  faqSection: { marginHorizontal: 16, marginTop: 4, marginBottom: 16, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
   faqHeading: { color: t.textPrimary, fontSize: 14, fontWeight: '800' },
   faqHeadingChevron: { color: t.textSecondary, fontSize: 13, fontWeight: '800' },
@@ -829,13 +831,19 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   faqThinking: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
   faqMoreBtn: { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: t.border },
   faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
-  followUpSection: { marginTop: 8, paddingHorizontal: 16 },
+  // Carded to match the other sections (was a bare padded block that ran into Share above).
+  followUpSection: { marginHorizontal: 16, marginBottom: 16, padding: 16, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   followUpTitle: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12 },
   // Off-season educational ask block
   learnBlock: { marginTop: 8, paddingHorizontal: 16 },
-  learnPrompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'left', marginTop: 4, marginBottom: 12 },
+  learnAskCard: { marginTop: 8, padding: 16, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
+  learnPrompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 4, marginBottom: 12 },
+  // Header status chip (small).
   learnPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.accent + '22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: t.accent + '55' },
   learnPillText: { color: t.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  // Empty-state body CTA (enlarged, full-width, centered).
+  learnCtaPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch', backgroundColor: t.accent + '22', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: t.accent + '55' },
+  learnCtaPillText: { color: t.accent, fontSize: 14, fontWeight: '800', letterSpacing: 0.3, textAlign: 'center' },
   learnBadge: { alignSelf: 'flex-start', backgroundColor: t.accent, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 8 },
   learnBadgeText: { color: t.onAccent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
