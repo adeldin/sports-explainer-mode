@@ -29,10 +29,13 @@ in the conversation**, not to serve existing experts.
 past plays (MLB/NHL/NBA/WNBA). _Bonus, beyond original scope:_ bottom-tab nav · Academy tab
 (307-question difficulty quiz + facts) · first-run scrum intro · real logo/branding.
 
-**IN — 🔜 still open (the road to launch):** Live-screen design polish (current pass) ·
-App Store submission prep — replace the `APP_ID` placeholder, real support/privacy URLs,
-native review of ja/zh/ko/ar strings + Academy content, screenshots/metadata. (See the
-mobile repo's `HANDOFF.md` §8 for the full submission checklist.)
+**IN — ✅ since done:** Live-screen design pass (cog removal, Academy CTA, section cards,
+empty-state CTA) · real `APP_ID` (`6781028656`) + native in-app review · support/privacy
+URLs confirmed live (`privacy.sportswise.app`, `feedback@sportswise.app`, `sportswise.app`).
+
+**IN — 🔜 still open (the road to launch):** App Store submission prep — native review of
+ja/zh/ko/ar strings + Academy content · screenshots/metadata · TestFlight QA, then submit.
+(See the mobile repo's `HANDOFF.md` §8 for the full submission checklist.)
 
 **OUT (explicitly v2.0):** TV app · GovWise · StockWise · full language
 UI (backend done, UI later) · pop-up facts system · Team Knowledge Companion mode ·
@@ -66,11 +69,13 @@ historical data · past plays for soccer.
 
 **Shipped since:**
 - ✅ **Past plays** — scroll back through a game's plays and tap one to explain. Live for **MLB / NHL / NBA / WNBA** (`PastPlays.tsx`, wired in `LiveScreen`). NFL verify in-season; soccer (`commentary[]`/`keyEvents[]`) remains v2.
+- ✅ **Live-screen design pass** (`340fd53`) — removed the redundant header settings cog, Academy CTA now navigates to the Academy tab, consistent section card-grouping/spacing, enlarged centered empty-state CTA + carded ask area.
+- ✅ **Real `APP_ID` + native in-app review** (`fa7741e`) — App Store ID `6781028656`; Rate action uses `expo-store-review` (`requestReview`) with an `apps.apple.com?action=write-review` fallback.
+- ✅ **Support/privacy URLs confirmed live** — `privacy.sportswise.app`, `feedback@sportswise.app`, `sportswise.app` share link (all tested working).
 
 **Active, in order (the road to submission):**
-1. **Live-screen design polish** — current pass: removed the redundant header settings cog, made the Academy CTA navigate, consistent section card-grouping/spacing.
-2. **TestFlight builds + on-device QA** — incl. verifying the MLR/rugby Core-API team-name/score fix on a live fixture.
-3. **App Store submission prep** — replace the `APP_ID` placeholder, real support/privacy URLs, native review of ja/zh/ko/ar + Academy content, screenshots/metadata, then submit. (Full checklist: mobile repo `HANDOFF.md` §8.)
+1. **TestFlight builds + on-device QA** — incl. verifying the MLR/rugby Core-API team-name/score fix on a live fixture.
+2. **App Store submission prep** — native review of ja/zh/ko/ar + Academy content, screenshots/metadata, then submit. (Full checklist: mobile repo `HANDOFF.md` §8.)
 
 ---
 
@@ -164,6 +169,46 @@ questions without images work exactly as they do now — incremental, **no migra
 **Priority:** post-launch enhancement, **not pre-launch**. The text quiz already works;
 images make it **nicer, not functional**. Pairs naturally with the **Rive / illustration
 intro-animation** work — the same art style feeds both.
+
+### 🗞️ Rethink the no-games / off-season screen *(post-launch)*
+
+**Problem:** SportsWise's core value is learning **during live games** ("watch and ask
+why"). When a sport has no live game, the Live screen currently falls back to an "Ask
+anything about [sport]" box + a "Common [sport] Questions" accordion. Now that the empty
+state has a clear **"Test your knowledge in the Academy →"** CTA, that ask box +
+common-questions section is **redundant** — it duplicates what the Academy does better and
+doesn't reinforce what makes the app special. It's prime real estate filled with a generic
+fallback.
+
+**Direction:** when there are no live games, pull users toward either **(a) the Academy**,
+to learn (the CTA already does this — keep/strengthen it), or **(b) something timely** that
+keeps them connected to the sport until games return. Priority of purpose: learning during
+live games is **#1**; using the Academy when there are no games is **#2**.
+
+**Success bar — must be screenshot-worthy:** the rebuild is only worth doing if the result
+is **compelling, creative, or genuinely useful enough to feature as an App Store screenshot
+/ selling point**. A generic screen isn't worth the effort; a delightful one becomes
+marketing. Go/no-go filter: *"would we proudly screenshot this?"* (For launch, we are **NOT**
+screenshotting the no-games screen — current screenshots lead with the live "ask why" flow +
+Academy quiz, which are the real selling points.)
+
+**Options for the "timely" content** (cost / feasibility):
+- **Recent results / "last 5 games + what they meant" recap** — *cheapest / most feasible;*
+  likely reuses existing score data, no new rights. Strong first candidate, and
+  recap-with-context is on-brand ("ask why").
+- **Next-game countdown + "what to watch for" primer** — cheap, uses schedule data, builds
+  anticipation, on-brand.
+- **News feed** — needs a content source/API; licensing + quality questions. *Maybe.*
+- **Highlights / video clips** — *high friction;* leagues guard highlight rights tightly,
+  likely infeasible for an indie app without licensing. **Probably not.**
+
+**Recommended:** start with **recent-results-with-context** and/or the **next-game primer**
+(cheap, on-brand, no rights issues, and the most plausibly screenshot-worthy). News = maybe;
+highlights = likely infeasible.
+
+**Priority:** post-launch. The current no-games screen **works** (ask box + common questions
+function) — it's **suboptimal, not broken**, so **not a launch blocker**. Deserves its own
+focused design session. Don't start while build-7 / question-splice work is uncommitted.
 
 ---
 

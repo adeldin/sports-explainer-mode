@@ -163,39 +163,34 @@ add a shared `currentSport` to `AppStateProvider` that Live writes — small cha
 but revisits the "Live sport independent" decision.
 
 ### 📋 Other known TODOs
-- App Store ID placeholder: `APP_ID = 'APP_ID'` in `SettingsScreen.tsx` (rate-app
-  deep link). Replace once registered in App Store Connect.
-- Contact/links in `SettingsScreen.tsx` are placeholders: `feedback@sportswise.app`,
-  `https://privacy.sportswise.app`, download `https://sportswise.app` — confirm or
-  swap for real endpoints.
+- ✅ ~~App Store ID placeholder~~ — **done:** real ID `6781028656` set in `SettingsScreen.tsx`,
+  with native in-app review (`expo-store-review`) (`fa7741e`).
+- ✅ ~~Contact/links placeholders~~ — **done:** `feedback@sportswise.app`,
+  `https://privacy.sportswise.app`, download `https://sportswise.app` confirmed live.
 - ja/zh/ko/ar UI strings need native review before submission.
 - `react-native-sortables` + `expo-av`/`lottie` are still in deps — audit whether
   all are still used (drag-to-reorder was replaced by My Sports).
-- [ ] Remove the settings cog (⚙️) from the top-right of the Live screen header (LiveScreen.tsx) — redundant with the Settings bottom tab, and inconsistent with Academy which has no header cog. Verify the cog isn't the only entry point to any setting before removing.
+- ✅ ~~Remove the Live header settings cog~~ — **done** in the Live design pass (`340fd53`).
 
 ### Parked onboarding idea — "wall of questions"
 Concept for first-run onboarding (not yet built; alternative or precursor to the ScrumIntro screen): naive fan questions from multiple sports cascade in and overlap, piling up until the screen is deliberately overwhelming — e.g. 'What is a wicket?', 'Why did he throw a yellow handkerchief?', 'I thought nutmeg was a spice?', 'What's icing?'. Then it all clears and resolves into clarity, landing on SportsWise as the thing that makes the confusion stop. Dramatizes the feeling of being a lost fan (multi-sport = signals broad coverage) rather than explaining one play. Possible strongest flow: question-pile (the problem, felt) → resolves → ScrumIntro reveal (the proof). Note: questions must be authentically naive in phrasing but not factually wrong about each sport.
 
-### 📋 Live Screen Design Pass (next session)
-Four Live-tab UI issues to tackle **together as one focused design pass** — and pair
-this with the **Live header settings-cog removal** parked under "Other known TODOs"
-above (same screen, do both in the same session). All in `screens/LiveScreen.tsx`.
+### Live Screen Design Pass — ✅ largely shipped (`340fd53`)
+The focused pass shipped (cog removal + the four issues below), all in
+`screens/LiveScreen.tsx`. Status per item:
 
-1. **📋 Redundant Academy pill.** Now that Academy is a bottom tab, the in-body
-   "ACADEMY" pill on the Live empty/learn state (and possibly the header LIVE/ACADEMY
-   pill) is confusing/redundant. ❓ **First confirm what the header pill vs. the body
-   pill each currently do**, then decide per pill: either make the body pill clearly
-   navigate to Academy ("Take me to the Academy →") or remove it.
-2. **📋 Broken text hierarchy in the "no games" empty state.** Mixed centered
-   headline/subtext followed by a left-justified "Ask anything about [Sport]". Needs
-   consistent alignment + a clear visual hierarchy.
-3. **📋 Active-game sections blur together.** Why It Matters / Play-by-Play / Share /
-   Ask-a-follow-up / question box / Common Questions run into each other with no clear
-   separation. Add visual grouping — ❓ decide dividers vs. tighter card-grouping/
-   spacing **on device** (hairlines can add clutter).
-4. **📋 Live ↔ Academy inconsistency.** The "Common Questions" accordion and the "Ask"
-   text box are arranged differently between the two tabs. Unify them so they read as
-   the same component across Live and Academy.
+1. **✅ Redundant Academy pill.** Body CTA on the empty/learn state now navigates to the
+   Academy tab ("Test your knowledge in the Academy →", enlarged/centered). The small
+   header "🎓 ACADEMY" chip is kept as a status indicator (fires an explainer Alert).
+2. **✅ Broken text hierarchy in the "no games" empty state.** Heading centered to match
+   its neighbors; the "Ask anything" heading + ask box are now wrapped in a card.
+3. **✅ Active-game sections blur together.** Consistent card-grouping + spacing (no
+   divider lines); follow-up ask area is now its own card.
+4. **📋 Live ↔ Academy inconsistency (still partially open).** The empty-state ask box is
+   now carded to match Live's, but a full unification of the "Common Questions" accordion
+   between the two tabs is still open. NOTE: the broader "should the no-games screen even
+   keep the ask box + common-questions?" question is now a post-launch concept in
+   `FEATURE_IDEAS.md` ("Rethink the no-games / off-season screen").
 
 ---
 
@@ -335,13 +330,17 @@ Assets & metadata:
 - [ ] App icon final (1024×1024) — verify `assets/icon.png` is store-ready.
 - [ ] Screenshots for required iPhone sizes (6.7" + others as required).
 - [ ] App name, subtitle, description, keywords, category (Sports).
-- [ ] Support URL + marketing URL (placeholders today: `sportswise.app`).
-- [ ] **Privacy policy URL** live (placeholder `privacy.sportswise.app`).
+- [x] Support URL + privacy/marketing URLs confirmed live (`sportswise.app`,
+      `privacy.sportswise.app`, `feedback@sportswise.app` — all tested working).
 - [ ] App Privacy "nutrition label" (data collected: none/diagnostics? + IAP if added).
 
 Code/content gates before submission:
-- [ ] Replace `APP_ID = 'APP_ID'` placeholder in `SettingsScreen.tsx`.
-- [ ] Confirm/replace `feedback@sportswise.app` + privacy/download URLs.
+- [x] **APP_ID set** — real App Store ID `6781028656` in `SettingsScreen.tsx`; Rate action
+      now uses native in-app review (`expo-store-review`) with an
+      `apps.apple.com?action=write-review` deep-link fallback (`fa7741e`).
+- [x] Contact/links confirmed live — `feedback@sportswise.app` + privacy/download URLs tested.
+- [x] **Live design pass shipped** (`340fd53`) — header cog removed, Academy CTA navigates,
+      section cards, enlarged centered empty-state CTA + carded ask area.
 - [ ] Native review of ja/zh/ko/ar UI strings + Academy facts/quiz translation.
 - [ ] Verify FIX 4 (MLR/URC names) on a real device.
 - [ ] If IAP ships: paywall, restore purchases, subscription terms (Apple rejects
