@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { askQuestion } from '../lib/api';
+import { askQuestion, Sport } from '../lib/api';
 import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
@@ -20,21 +20,40 @@ import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
 import DidYouKnow from '../components/DidYouKnow';
 import QuizCard from '../components/QuizCard';
 
+// Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
+// the first category (MLB) when there's no sport or no match.
+function categoryForSport(sport?: Sport): AcademyCategory {
+  return (sport && ACADEMY_CATEGORIES.find(c => c.sportKeys.includes(sport))) || ACADEMY_CATEGORIES[0];
+}
+
+// Route params the Live "Test your knowledge in the Academy →" CTA passes in.
+type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
+
 // Academy tab — the always-on "learn" experience: pick a category, read a fact,
 // take a quiz (with a streak mechanic), browse common questions, and ask anything.
 // The category list is Academy-only (lib/academyCategories) and decoupled from the
 // Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
-export default function AcademyScreen() {
+export default function AcademyScreen({ route }: AcademyScreenProps) {
   const { language, level } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
 
-  // Academy-local selected category (decoupled from Live's sport list); defaults
-  // to the first category (MLB).
-  const [category, setCategory] = useState<AcademyCategory>(ACADEMY_CATEGORIES[0]);
+  // Academy-local selected category (decoupled from Live's sport list). Seeded from
+  // the sport the Live CTA passed (e.g. mlr → Rugby), else the first category (MLB).
+  const routeSport = route?.params?.sport;
+  const [category, setCategory] = useState<AcademyCategory>(() => categoryForSport(routeSport));
   // Representative sport for the FAQ + ask box, which need a single Sport key.
   const primarySport = category.sportKeys[0];
+
+  // When the Live CTA navigates here with a (possibly new) sport, open its matching
+  // category. De-duped: only updates when the resolved category actually changes, so
+  // tapping the CTA from a different sport (e.g. mlr after mlb) switches correctly.
+  useEffect(() => {
+    if (!routeSport) return;
+    const next = categoryForSport(routeSport);
+    setCategory(prev => (prev.key === next.key ? prev : next));
+  }, [routeSport]);
 
   // --- Streak (the addicting bit) ---
   const [streak, setStreak] = useState(0);

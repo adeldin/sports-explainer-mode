@@ -71,10 +71,11 @@ interface Game {
 
 // Shared state now comes from AppStateProvider via useAppState(). `initialSport`
 // (the onboarding pick) seeds the Live tab's local selection once on mount.
-// `navigation` is the bottom-tab navigation (cog opens the Settings tab).
+// `navigation` is the bottom-tab navigation (the Academy CTA jumps to the Academy
+// tab, optionally passing the current sport so it opens the matching category).
 interface LiveScreenProps {
   initialSport: Sport;
-  navigation: { navigate: (name: string) => void };
+  navigation: { navigate: (name: string, params?: { sport?: Sport }) => void };
 }
 
 export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
@@ -542,11 +543,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             <Text style={styles.headerTagline}>Watch and ask why.</Text>
           </View>
           <View style={styles.headerRight}>
-            {learnMode ? (
-              <TouchableOpacity style={styles.learnPill} onPress={() => Alert.alert('Academy', S.learnModeExplainer)} activeOpacity={0.7}>
-                <Text style={styles.learnPillText}>🎓 ACADEMY</Text>
-              </TouchableOpacity>
-            ) : games.length > 0 ? (
+            {games.length > 0 ? (
               <View style={styles.livePill}>
                 <View style={styles.liveDot} />
                 <Text style={styles.livePillText}>LIVE</Text>
@@ -717,7 +714,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 style={styles.learnCtaPill}
                 onPress={async () => {
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  navigation.navigate('Academy');
+                  navigation.navigate('Academy', { sport });
                 }}
                 activeOpacity={0.7}>
                 <Text style={styles.learnCtaPillText}>Test your knowledge in the Academy →</Text>
@@ -839,8 +836,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   learnAskCard: { marginTop: 8, padding: 16, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   learnPrompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 4, marginBottom: 12 },
   // Header status chip (small).
-  learnPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.accent + '22', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: t.accent + '55' },
-  learnPillText: { color: t.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   // Empty-state body CTA (enlarged, full-width, centered).
   learnCtaPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch', backgroundColor: t.accent + '22', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: t.accent + '55' },
   learnCtaPillText: { color: t.accent, fontSize: 14, fontWeight: '800', letterSpacing: 0.3, textAlign: 'center' },
