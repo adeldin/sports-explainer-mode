@@ -13,7 +13,7 @@ import {
 } from '@expo-google-fonts/space-grotesk';
 
 import { Sport } from './lib/api';
-import { registerForPushNotificationsAsync } from './lib/notifications';
+import { registerForPushNotificationsAsync, setupNotificationHandler } from './lib/notifications';
 import { useTheme } from './lib/theme';
 import { useAppState } from './lib/appState';
 
@@ -26,6 +26,9 @@ import SettingsTab from './screens/SettingsTab';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
+
+// Configure how notifications present (incl. while foregrounded) — once, on load.
+setupNotificationHandler();
 
 const Tab = createBottomTabNavigator();
 

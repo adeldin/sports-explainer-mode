@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as StoreReview from 'expo-store-review';
+import { scheduleQuizReminder, cancelQuizReminder } from '../lib/notifications';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { useAppState } from '../lib/appState';
@@ -143,7 +144,12 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
             <Switch
               style={styles.toggleSwitch}
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={(val) => {
+                setNotificationsEnabled(val);
+                // Off → cancel the daily reminder. On → (re)schedule (no-ops until
+                // permission is granted; a quiz will also reschedule it).
+                if (val) scheduleQuizReminder(); else cancelQuizReminder();
+              }}
               trackColor={{ false: theme.borderStrong, true: theme.accent }}
               thumbColor="#fff"
             />

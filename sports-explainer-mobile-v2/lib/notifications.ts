@@ -43,3 +43,67 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
     return undefined;
   }
 }
+
+// ── Local daily "come back" reminder ─────────────────────────────────────────
+// A single on-device scheduled notification (no backend). Identified by a fixed
+// id so rescheduling replaces it rather than stacking duplicates.
+const QUIZ_REMINDER_ID = 'quiz-daily-reminder';
+
+// Set ONCE, early (called at App module load). Controls how a notification is
+// presented — including while the app is foregrounded. expo-notifications 0.32
+// deprecated `shouldShowAlert` in favour of `shouldShowBanner` + `shouldShowList`.
+export async function setupNotificationHandler(): Promise<void> {
+  if (Constants.appOwnership === 'expo') return; // not supported in Expo Go
+  const Notifications = await import('expo-notifications');
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+// (Re)schedule the daily quiz reminder for 7:00 PM local. Called on quiz activity
+// (and toggle-on); rescheduling just refreshes the single reminder. No-ops in Expo
+// Go / on simulators / when permission isn't granted.
+export async function scheduleQuizReminder(): Promise<void> {
+  if (Constants.appOwnership === 'expo') return;
+  if (!Device.isDevice) return;
+
+  const Notifications = await import('expo-notifications');
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return; // don't schedule without permission
+
+  // Replace any existing reminder so we never stack duplicates.
+  await Notifications.cancelScheduledNotificationAsync(QUIZ_REMINDER_ID).catch(() => {});
+
+  // Next occurrence of 7:00 PM local: today if it's still before 7pm, else tomorrow.
+  // One-off (DATE) so each quiz re-arms it forward — it only fires if the user goes
+  // quiet (no quiz before the next 7pm).
+  const next = new Date();
+  next.setHours(19, 0, 0, 0);
+  if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: QUIZ_REMINDER_ID,
+    content: {
+      title: "Ready for today's quiz? 🏆",
+      body: 'Keep your game IQ sharp — take a quick quiz in SportsWise.',
+      data: { type: 'quiz-reminder' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: next,
+    },
+  });
+}
+
+// Cancel the reminder (e.g. when the Game Alerts toggle is turned off).
+export async function cancelQuizReminder(): Promise<void> {
+  if (Constants.appOwnership === 'expo') return;
+  const Notifications = await import('expo-notifications');
+  await Notifications.cancelScheduledNotificationAsync(QUIZ_REMINDER_ID).catch(() => {});
+}

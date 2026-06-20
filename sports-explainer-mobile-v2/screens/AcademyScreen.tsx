@@ -16,6 +16,7 @@ import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
 import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
+import { scheduleQuizReminder } from '../lib/notifications';
 
 import DidYouKnow from '../components/DidYouKnow';
 import QuizCard from '../components/QuizCard';
@@ -34,7 +35,7 @@ type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
 // The category list is Academy-only (lib/academyCategories) and decoupled from the
 // Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
 export default function AcademyScreen({ route }: AcademyScreenProps) {
-  const { language, level } = useAppState();
+  const { language, level, notificationsEnabled } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -154,6 +155,18 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     }
   };
 
+  // Any quiz answer counts as activity — re-arm the "come back" reminder to the next
+  // 7pm (only if Game Alerts is on). Debounced to once per mount: the target time is
+  // the same regardless of how many questions they answer, so one reschedule is
+  // enough and avoids native churn. Stays unset if alerts are off, so enabling them
+  // mid-session and answering will still arm it once.
+  const reminderArmed = useRef(false);
+  const onQuizAnswered = () => {
+    if (reminderArmed.current || !notificationsEnabled) return;
+    reminderArmed.current = true;
+    scheduleQuizReminder(); // fire-and-forget; no-ops without permission
+  };
+
   const streakStyle = useAnimatedStyle(() => ({ transform: [{ scale: streakScale.value }] }));
   const milestoneStyle = useAnimatedStyle(() => ({ opacity: milestoneOpacity.value }));
 
@@ -225,8 +238,8 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
             <QuizCard
               sportKeys={category.sportKeys}
               streak={streak}
-              onCorrect={() => setStreak(s => s + 1)}
-              onWrong={() => setStreak(0)}
+              onCorrect={() => { setStreak(s => s + 1); onQuizAnswered(); }}
+              onWrong={() => { setStreak(0); onQuizAnswered(); }}
             />
           </View>
 
