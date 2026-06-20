@@ -29,17 +29,11 @@ const LEVELS: { key: Level; emoji: string }[] = [
 
 const THEMES: ThemeMode[] = ['system', 'dark', 'light'];
 
+// Visible launch languages (en/es). The other 8 translations remain in lib/strings.ts
+// but are hidden for now — keep in sync with LAUNCH_LANGUAGES in lib/appState.tsx.
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'en', label: 'English' },
   { key: 'es', label: 'Español' },
-  { key: 'fr', label: 'Français' },
-  { key: 'pt', label: 'Português' },
-  { key: 'de', label: 'Deutsch' },
-  { key: 'it', label: 'Italiano' },
-  { key: 'ja', label: '日本語' },
-  { key: 'zh', label: '中文' },
-  { key: 'ko', label: '한국어' },
-  { key: 'ar', label: 'العربية' },
 ];
 
 export default function SettingsScreen({ onOpenMySports }: Props) {

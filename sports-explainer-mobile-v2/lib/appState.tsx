@@ -4,8 +4,11 @@ import * as Localization from 'expo-localization';
 import { Level, Language } from './api';
 import { SPORTS, orderSports, type SportTab } from './sports';
 
-// Languages we ship UI strings for — used for the first-run device-language guess.
-const SUPPORTED_LANGS = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
+// Languages shown in the picker at launch. The other 8 translations still exist in
+// lib/strings.ts (and the Language type) but are hidden for now — a stored or device
+// language outside this set falls back to English on load. Keep in sync with the
+// LANGUAGES picker array in SettingsScreen.tsx.
+const LAUNCH_LANGUAGES: Language[] = ['en', 'es'];
 
 // All AsyncStorage keys this provider owns, in one place. `level` and `autoRefresh`
 // are NEW vs. the pre-Stage-2 code (they were never persisted before) — centralizing
@@ -84,11 +87,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (auto !== null) setAutoRefresh(auto === 'true');
         if (lvl) setLevel(lvl as Level);
         if (lang) {
-          setLanguage(lang as Language);
+          // Honor a stored preference only if it's a currently-visible launch language.
+          // A tester who previously picked a now-hidden language (e.g. fr) falls back to
+          // English — and the auto-persist effect heals the stored value to 'en'.
+          setLanguage(LAUNCH_LANGUAGES.includes(lang as Language) ? (lang as Language) : 'en');
         } else {
-          // First run, no saved preference — default to the device language if supported.
+          // First run, no saved preference — default to the device language only if it's
+          // a visible launch language; otherwise the 'en' default stands.
           const code = Localization.getLocales()[0]?.languageCode;
-          if (code && SUPPORTED_LANGS.includes(code)) setLanguage(code as Language);
+          if (code && LAUNCH_LANGUAGES.includes(code as Language)) setLanguage(code as Language);
         }
       } catch (e) {
         console.warn('AppState load error:', e);
