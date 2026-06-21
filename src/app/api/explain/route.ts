@@ -66,25 +66,32 @@ const languageNames: Record<string, string> = {
   ja: 'Japanese', zh: 'Chinese', ko: 'Korean', it: 'Italian', ar: 'Arabic',
 };
 
-function buildSystemPrompt(sport: string, level: string, language: string = 'en'): string {
+export function buildSystemPrompt(sport: string, level: string, language: string = 'en'): string {
   const sportGuide = sportContext[sport] || 'a professional sport';
 
+  // Each persona teaches ONE primary lesson at a level-appropriate SUBJECT — the
+  // difficulty changes WHAT concept is taught (rule → meaning → craft → strategy),
+  // not just the tone. Every guide explicitly says: teach one thing, don't cram.
   const levelGuides: Record<string, string> = {
-    kid: `You are an enthusiastic sports commentator explaining ${sport} to an 8-year-old.
-    Rules: Use ZERO jargon. Use vivid real-world analogies that an 8-year-old would recognize (playground, school, video games, family life). Only use an analogy if it genuinely makes the concept clearer — skip it if it feels forced. 2-3 short sentences.`,
+    kid: `You are an enthusiastic ${sport} commentator teaching an 8-year-old.
+    TEACH EXACTLY ONE THING: the rule or the outcome — WHAT happened. (Shape: "He didn't swing and that's strike three — three strikes and you're out.")
+    Rules: ZERO jargon. At most ONE vivid everyday analogy (playground, school, video games, family) and only if it truly makes it clearer. Teach that single thing well — do NOT list several lessons. 2-3 short sentences.`,
 
-    beginner: `You are a friend explaining ${sport} to a new fan.
-    Rules: Explain WHAT happened and WHY it matters. Define terms simply. When a concept is abstract or confusing, use a natural everyday analogy to make it click (e.g. comparing a sports rule to something from daily life). Only use it if it fits naturally — don't force it. 2-3 sentences.`,
+    beginner: `You are a friend teaching a brand-new ${sport} fan.
+    TEACH EXACTLY ONE THING: the outcome plus its basic WHY — what it MEANS. (Shape: "A strikeout looking — the pitcher won the duel by fooling him with a pitch that dropped at the last second.")
+    Rules: Do NOT define the play type as a dictionary entry ("a home run IS WHEN...", "a ground out IS WHEN..."). Say what happened and what it MEANT in THIS game situation — the reader can tap a term for its definition; your job is the meaning here. One natural everyday analogy only if it fits. Teach that single lesson — don't cram in extra ones. 2-3 sentences.`,
 
-    intermediate: `You are a sharp analyst for a regular viewer.
-    Rules: Skip basic definitions. Focus on strategic intent and coaching decisions. If a tactical concept is genuinely complex, a brief analogy to another sport or everyday strategy (chess, military, business) can work — but only when it adds insight, not as decoration. 3-4 sentences.`,
+    intermediate: `You are a sharp ${sport} analyst for a regular viewer.
+    TEACH EXACTLY ONE THING: the craft or tactic on display — the SKILL. Assume they already know the basic outcome. (Shape: "That's a splitter — it looks like a fastball then drops out of the zone; it's his put-away pitch with two strikes.")
+    Rules: Skip basic definitions. Name the technique/tactic and what makes it work here. ONE lesson only. A brief cross-domain analogy (chess, business) only if it adds real insight. 3-4 sentences.`,
 
-    expert: `You are a former professional coach speaking to a peer. 
+    expert: `You are a former professional ${sport} coach talking to a peer.
+    TEACH EXACTLY ONE THING: the strategic layer — the WHY BEHIND THE WHY. The outcome is ASSUMED known. (Shape: "He sequenced him — fastballs up to lift the eye level, then the splitter below the zone, betting he'd chase.")
     ABSOLUTE RULES:
-    1. NEVER explain what a play IS (e.g., do not say "A strike is..."). 
-    2. Start DIRECTLY with strategic analysis: pre-play reads, scheme matchups, and game theory.
-    3. 3-4 sentences of dense, high-level insight.
-    4. If you catch yourself writing "is when" or "is a type of" — delete the entire sentence and start over.`
+    1. NEVER define or explain what something IS (no "a splitter is...", no "is when...").
+    2. Start DIRECTLY with the strategic read: intent, sequencing, scheme/matchup, game theory.
+    3. ONE strategic idea, taught well — not a list. 3-4 dense sentences.
+    4. If a sentence starts to define a term, cut it and go straight to the strategy.`
   };
 
   let prompt = `${levelGuides[level] || levelGuides['beginner']}\n\nSport context: ${sportGuide}`;
@@ -223,25 +230,47 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   return { play, gameContext, homeTeam, awayTeam };
 }
 
-function buildUserPrompt(play: string, gameContext: string, sport: string, level: string): string {
+// Per-level lesson target — the SUBJECT the primary lesson should aim at. Mirrors
+// the system-prompt personas so the rubric and persona pull in the same direction.
+const lessonTargets: Record<string, string> = {
+  kid: 'the rule or outcome — WHAT happened (the result and the basic rule behind it)',
+  beginner: 'the outcome plus its basic WHY — what it MEANS for the game',
+  intermediate: 'the craft or tactic on display — the SKILL/technique and why it worked here',
+  expert: 'the strategic layer — the WHY BEHIND THE WHY (intent, sequencing, matchup), outcome assumed',
+};
+
+export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string): string {
+  const target = lessonTargets[level] || lessonTargets['beginner'];
+
   return `Sport: ${sport.toUpperCase()}
 Game situation: ${gameContext}
 Play data: "${play}"
 
-Respond with this exact JSON structure:
+STEP 1 — Choose the lesson (reason silently; do NOT put this reasoning in the output):
+From this play, consider the concepts someone could learn — the rule, the outcome, the technique/craft, the strategy, and the situational stakes. Pick the SINGLE best PRIMARY LESSON to teach a ${level}-level viewer. Choose the one that best balances:
+- relevance: central to what actually happened;
+- level-fit: the right depth for a ${level} viewer — for this level, aim at ${target};
+- importance/novelty: worth teaching, not trivial or obvious;
+- teachability: explainable clearly in 2-3 sentences.
+Teach ONLY that one lesson. Do NOT enumerate the other candidates.
+
+STEP 2 — Confidence: State observed facts plainly. But when you infer intent or strategy, hedge honestly — say "likely," "appears to," or "the idea is usually" rather than asserting the player's exact thoughts as fact.
+
+STEP 3 — Respond with this EXACT JSON structure (content varies by level, structure does not):
 {
-  "simple": "Main explanation/analysis",
-  "whyItMatters": "Situational significance",
-  "ruleDetail": "Explanation of the rule involved (or empty string if none)",
+  "simple": "The ONE primary lesson, taught at a ${level} level",
+  "whyItMatters": "Why that lesson / this play matters in the game situation",
+  "ruleDetail": "Explanation of the specific rule involved (or empty string if none)",
   "showRule": true/false,
   "complexity": "low" | "medium" | "high"
 }
 
 Rules for JSON flags:
-- "showRule": Set to true ONLY if the play involves a specific rule that needs explaining (penalties, unusual calls, rare mechanics).
-- "showRule": If level is "expert", always set to false unless the rule is extremely obscure.
-- "complexity": "high" if the play is rare or very difficult to understand. "low" for routine plays.
-- ONLY use information provided in the play data. Do not hallucinate details.`;
+- "showRule": true ONLY if a specific rule genuinely needs explaining (penalties, unusual calls, rare mechanics). If level is "expert", set false unless the rule is extremely obscure.
+- "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
+- If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
+
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name a route type, coverage scheme, pitch count, pitch sequence, or baserunner that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
@@ -280,6 +309,50 @@ async function translatePlayText(play: string, language: string): Promise<string
     console.error('Play translation error:', e);
     return null;
   }
+}
+
+// Expert guard ("nuclear option"): if the model still slips into DEFINING what
+// something is at expert level, strip that leading definition. Made robust vs. the
+// old `.split('.')`: scan the first ~80 chars (case-insensitive) for definitional
+// trigger phrases, and when dropping the first sentence use a boundary that ignores
+// decimals/abbreviations (a terminator followed by whitespace + a capital/quote).
+// Kept as a safety net on top of the reworked expert prompt (see note below).
+export function applyExpertNuclearOption(parsed: any, level: string): any {
+  if (level !== 'expert') return parsed;
+  const triggers = ['is a type of', 'is when', 'is called', 'refers to', 'is defined as', 'is a pitch', 'is a play', 'is a foul'];
+  const text = String(parsed?.simple || '');
+  const head = text.slice(0, 80).toLowerCase();
+  if (triggers.some(t => head.includes(t))) {
+    const m = text.match(/^.*?[.!?]+["']?\s+(?=[A-Z"])/); // first real sentence boundary
+    if (m && m[0].length < text.length) {
+      parsed.simple = text.slice(m[0].length).trim() || parsed.whyItMatters || text;
+    } else {
+      // No clean second sentence to fall back to — prefer significance over a definition.
+      parsed.simple = parsed.whyItMatters || text;
+    }
+  }
+  parsed.ruleDetail = '';
+  parsed.showRule = false;
+  return parsed;
+}
+
+// The real explanation call: build the leveled prompts, run the model, parse, and
+// apply the expert guard. Shared by POST and the local lesson-test harness so the
+// harness exercises the EXACT prompts/flow (not a copy).
+export async function explainPlay(
+  play: string, gameContext: string, sport: string, level: string, language: string = 'en',
+): Promise<any> {
+  const completion = await groq.chat.completions.create({
+    model: GROQ_MODEL,
+    messages: [
+      { role: 'system', content: buildSystemPrompt(sport, level, language) },
+      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) },
+    ],
+    temperature: level === 'expert' ? 0.2 : 0.6,
+    response_format: { type: 'json_object' },
+  });
+  const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+  return applyExpertNuclearOption(parsed, level);
 }
 
 export async function OPTIONS() {
@@ -377,32 +450,12 @@ export async function POST(req: NextRequest) {
 
     // Run the explanation and the play-text translation concurrently (the
     // translation only needs `play`, already fetched) — no added latency.
-    const [completion, translatedPlay] = await Promise.all([
-      groq.chat.completions.create({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: buildSystemPrompt(sport, level, language) },
-          { role: 'user', content: buildUserPrompt(play, gameContext, sport, level) }
-        ],
-        temperature: level === 'expert' ? 0.2 : 0.6,
-        response_format: { type: 'json_object' },
-      }),
+    // explainPlay builds the leveled prompts, calls the model, and applies the
+    // expert guard (shared with the lesson-test harness).
+    const [parsed, translatedPlay] = await Promise.all([
+      explainPlay(play, gameContext, sport, level, language),
       translatePlayText(play, language),
     ]);
-
-    const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
-
-    // Expert Filter (The "Nuclear Option")
-    if (level === 'expert') {
-      const triggers = ['is a type of', 'is when', 'is called', 'refers to', 'is defined as', 'is a pitch', 'is a play', 'is a foul'];
-      const firstSentence = parsed.simple?.split('.')[0]?.toLowerCase() || '';
-      if (triggers.some(t => firstSentence.includes(t))) {
-        const sentences = parsed.simple.split('.');
-        parsed.simple = sentences.slice(1).join('.').trim() || parsed.whyItMatters;
-      }
-      parsed.ruleDetail = "";
-      parsed.showRule = false;
-    }
 
     return NextResponse.json({
       simple: parsed.simple || play,
