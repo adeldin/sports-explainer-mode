@@ -342,14 +342,35 @@ makes it land emotionally.
 
 ### 🏆 Progression rank system *(designing — Phase 1 next build)*
 
-**Core architectural decision: DIFFICULTY and PROGRESSION are SEPARATE.**
-- **Difficulty** (Kid / Beginner / Intermediate / Expert) — unchanged. A freely-chosen control:
-  "how do you want this explained / how hard should quiz questions be." Drives Live explanations
-  AND quiz difficulty. NOT earned, always changeable.
-- **Progression rank** (NEW, earned) — your status/identity, climbed through play. Independent
-  of difficulty: you can be a "Legend" rank but still choose Kid difficulty for a simple
-  explanation. This separation is the key design call — merging them would force harder
-  explanations on high-rank users who don't want them.
+**Two layers (the core model, designed to scale to ~5 games):**
+
+- **LAYER 1 — Difficulty (per-game content depth).** Each game (quiz today; later
+  diagram-match, card-stat-match, player-match, etc.) has its own Kid→Expert content range.
+  You advance through a game's difficulties by **demonstrating mastery of that game's current
+  level** — e.g. "answer N Kid quiz questions correctly → prompt to try Beginner." This is
+  **per-game** (being good at the quiz doesn't advance diagram-match difficulty) and driven by
+  performance **in that game**, NOT by rank. Difficulty stays **freely changeable anytime**
+  (never locked).
+- **LAYER 2 — Rank (global journey, ties all games together).** Rank
+  (Rookie→Starter→All-Star→Champion→Legend) is driven by **total points accumulated across ALL
+  games at ALL difficulties.** It's the umbrella over everything — the journey from "knows
+  nothing" to "Legend." A hard Expert quiz answer and a hard diagram-match both feed the **same**
+  global points→rank.
+
+**Rank and difficulty are NOT linked.** (We briefly considered "rank up → advance difficulty" —
+**rejected after on-device testing.** The right model: difficulty advances by **per-game
+mastery**; rank advances by **total points across everything**. A Legend is never forced to
+Expert difficulty; difficulty is earned per-game, separately.)
+
+**The full journey:** Rookie (just starting, playing at low difficulties) → climbing (mastering
+difficulties **within** games + breadth **across** games, points accumulate) → Legend
+(demonstrated mastery of hard content across multiple games — a real achievement, not just
+grinding easy questions).
+
+**Why this scales:** each new game plugs into the same global points→rank engine (the
+`awardPoints()` architecture already built) and brings its own per-game difficulty-mastery
+progression. Adding a game = **new content + new per-game mastery logic + the same
+`awardPoints()` hook.**
 
 **Ranks (5 tiers, from total points):** Rookie (0–99) → Starter (100–299) → All-Star (300–699)
 → Champion (700–1499) → Legend (1500+). Tuned to feel quick early, prestigious at the top.
@@ -363,18 +384,30 @@ makes it land emotionally.
 20 / Expert 40); wrong = 0 (never negative — don't punish); small combo bonus (e.g. +1 per
 combo level, capped). Tune in practice.
 
-**Display:** one rank card in the Academy — rank name + badge, progress bar to next rank,
-"X / Y to [next rank]." At Legend, show "maxed" + total points.
+**Phase 1 (build now, quiz only):**
+- ✅ Global points→rank **engine + rank card** (built — `2e11ea7`-adjacent, uncommitted): one
+  card in the Academy showing rank name + badge, progress bar to next rank, "X / Y to [next
+  rank]," "maxed" at Legend.
+- Add: **"+points" visual feedback** on correct answers (scoring is currently invisible /
+  confusing) — float a "+8 🔥" near the rank card, flame when the combo bonus applies.
+- Add: **per-game difficulty-mastery nudge for the QUIZ** — "you've answered N [level] questions
+  correctly → ready for [next level]?" — driven by quiz performance, **dismissable, never
+  forced**, difficulty still manually changeable.
+- Make the rank card clearly read as **"overall journey across the Academy,"** visually distinct
+  from the difficulty pills (resolves the rank-vs-difficulty confusion found in testing).
+- **Remove any rank→difficulty linkage.**
 
-**Phase 1 scope:** overall rank, quiz-fed only. **Deferred:** per-sport ranks ("Baseball
-Legend, Soccer Rookie") + overall profile; the other game types; richer point multipliers.
+**Phase 2+ (later):** the other 4 game types (each = content + per-game mastery + `awardPoints()`
+hook); **per-sport ranks** ("Baseball Legend, Soccer Rookie") + overall profile; richer point
+feedback.
 
 **Process for adding a future game type** (the repeatable pattern):
 1. Founder defines the game concept (what the user does, what "correct" is).
 2. Founder provides the CONTENT (diagrams / stat lines / photos + correct answers, per sport) —
    this is the real work, like the quiz questions. Engine is easy; content is the effort.
 3. Founder sets scoring intent (how many points, does difficulty scale it).
-4. Build the game UI (new card/screen).
+4. Build the game UI (new card/screen) + its **per-game difficulty-mastery logic** (advance
+   Kid→Expert by performance in this game).
 5. Wire it to `awardPoints()` — trivial, because the engine was built game-agnostic in Phase 1.
 
 ### ✅ Quick quiz moments *(shipped — Academy tab)*
