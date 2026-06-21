@@ -68,7 +68,11 @@ export async function setupNotificationHandler(): Promise<void> {
 // (Re)schedule the daily quiz reminder for 7:00 PM local. Called on quiz activity
 // (and toggle-on); rescheduling just refreshes the single reminder. No-ops in Expo
 // Go / on simulators / when permission isn't granted.
-export async function scheduleQuizReminder(): Promise<void> {
+//
+// Pass the user's current daily-streak count to personalize the copy: a streak of
+// 2+ gets a loss-aversion "keep your streak alive" message; otherwise the generic
+// nudge. Called with no arg (e.g. the Settings toggle) → generic copy.
+export async function scheduleQuizReminder(streak?: number): Promise<void> {
   if (Constants.appOwnership === 'expo') return;
   if (!Device.isDevice) return;
 
@@ -87,13 +91,22 @@ export async function scheduleQuizReminder(): Promise<void> {
   next.setHours(19, 0, 0, 0);
   if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
 
+  const hasStreak = typeof streak === 'number' && streak >= 2;
+  const content = hasStreak
+    ? {
+        title: 'Keep your streak alive! 🔥',
+        body: `Don't lose your ${streak}-day streak — take today's quiz in SportsWise.`,
+        data: { type: 'quiz-reminder' },
+      }
+    : {
+        title: "Ready for today's quiz? 🏆",
+        body: 'Keep your game IQ sharp — take a quick quiz in SportsWise.',
+        data: { type: 'quiz-reminder' },
+      };
+
   await Notifications.scheduleNotificationAsync({
     identifier: QUIZ_REMINDER_ID,
-    content: {
-      title: "Ready for today's quiz? 🏆",
-      body: 'Keep your game IQ sharp — take a quick quiz in SportsWise.',
-      data: { type: 'quiz-reminder' },
-    },
+    content,
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: next,

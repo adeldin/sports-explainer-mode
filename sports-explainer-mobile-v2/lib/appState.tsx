@@ -1,8 +1,24 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Localization from 'expo-localization';
 import { Level, Language } from './api';
 import { SPORTS, orderSports, type SportTab } from './sports';
+
+// Local YYYY-MM-DD (NOT toISOString, which is UTC and would flip the "day" across
+// timezones near midnight). Used for the daily-quiz streak's day-boundary logic.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Persisted shape of the daily streak: how many consecutive days the user took a
+// quiz, plus the local date of the most recent quiz day. `count` only changes when
+// recordQuizActivity() runs (on a quiz) — a day passing without playing never
+// mutates it on load; the reset is computed lazily on the next quiz.
+type DailyStreak = { count: number; lastDate: string };
+const DEFAULT_DAILY_STREAK: DailyStreak = { count: 0, lastDate: '' };
 
 // Languages shown in the picker at launch. The other 8 translations still exist in
 // lib/strings.ts (and the Language type) but are hidden for now — a stored or device
@@ -21,6 +37,7 @@ const KEYS = {
   visibility: 'sport_visibility',
   level: 'user_level',
   autoRefresh: 'auto_refresh',
+  dailyStreak: 'quiz_daily_streak',
 } as const;
 
 interface AppStateValue {
@@ -32,6 +49,8 @@ interface AppStateValue {
   favorites: string[];
   autoRefresh: boolean;
   notificationsEnabled: boolean;
+  // Consecutive days the user has taken a quiz (persisted; day-boundary aware).
+  dailyStreak: number;
 
   // --- Raw setters (writes auto-persist via the effects below) ---
   setLanguage: (l: Language) => void;
@@ -41,6 +60,11 @@ interface AppStateValue {
   setFavorites: (f: string[]) => void;
   setAutoRefresh: (v: boolean) => void;
   setNotificationsEnabled: (v: boolean) => void;
+
+  // Record that the user took a quiz today; updates the persisted daily streak
+  // (continue if yesterday, restart at 1 on a gap, no-op if already counted today)
+  // and returns the resulting count so callers can react synchronously.
+  recordQuizActivity: () => number;
 
   // True once the initial AsyncStorage load has completed. Consumers (the App gate)
   // should wait for this before persisting/rendering so defaults never clobber
@@ -58,13 +82,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [dailyStreakData, setDailyStreakData] = useState<DailyStreak>(DEFAULT_DAILY_STREAK);
   const [hydrated, setHydrated] = useState(false);
 
   // --- Load persisted state once on mount (moved out of App.tsx's init()) ---
   useEffect(() => {
     async function load() {
       try {
-        const [favs, notify, lang, tabOrder, visRaw, lvl, auto] = await Promise.all([
+        const [favs, notify, lang, tabOrder, visRaw, lvl, auto, streakRaw] = await Promise.all([
           AsyncStorage.getItem(KEYS.favorites),
           AsyncStorage.getItem(KEYS.notifications),
           AsyncStorage.getItem(KEYS.language),
@@ -72,6 +97,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(KEYS.visibility),
           AsyncStorage.getItem(KEYS.level),
           AsyncStorage.getItem(KEYS.autoRefresh),
+          AsyncStorage.getItem(KEYS.dailyStreak),
         ]);
 
         if (favs) { try { setFavorites(JSON.parse(favs)); } catch { /* keep [] */ } }
@@ -86,6 +112,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (notify !== null) setNotificationsEnabled(notify === 'true');
         if (auto !== null) setAutoRefresh(auto === 'true');
         if (lvl) setLevel(lvl as Level);
+        // Hydrate the stored streak as-is — no recompute on load. A missed day only
+        // resets when the next quiz runs recordQuizActivity() and sees the gap.
+        if (streakRaw) {
+          try {
+            const parsed = JSON.parse(streakRaw);
+            if (parsed && typeof parsed.count === 'number' && typeof parsed.lastDate === 'string') {
+              setDailyStreakData({ count: parsed.count, lastDate: parsed.lastDate });
+            }
+          } catch { /* keep default {0,''} */ }
+        }
         if (lang) {
           // Honor a stored preference only if it's a currently-visible launch language.
           // A tester who previously picked a now-hidden language (e.g. fr) falls back to
@@ -112,14 +148,33 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.level, level); }, [level, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.autoRefresh, autoRefresh ? 'true' : 'false'); }, [autoRefresh, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.notifications, notificationsEnabled ? 'true' : 'false'); }, [notificationsEnabled, hydrated]);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.dailyStreak, JSON.stringify(dailyStreakData)); }, [dailyStreakData, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.favorites, JSON.stringify(favorites)); }, [favorites, hydrated]);
   // Persist the order as the bare key list (the shape orderSports() reads back).
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.tabOrder, JSON.stringify(orderedSports.map(s => s.key))); }, [orderedSports, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.visibility, JSON.stringify(sportVisibility)); }, [sportVisibility, hydrated]);
 
+  // Record a quiz today and advance/restart/no-op the daily streak. Reads the
+  // current streak from the render closure (correct because the Academy calls this
+  // once per mount, after hydration) and returns the new count so the caller can
+  // pass it straight to the streak-aware reminder without waiting for a re-render.
+  const recordQuizActivity = useCallback((): number => {
+    const now = new Date();
+    const todayStr = localDateStr(now);
+    if (dailyStreakData.lastDate === todayStr) return dailyStreakData.count; // already counted today
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = localDateStr(yesterday);
+    const newCount = dailyStreakData.lastDate === yesterdayStr ? dailyStreakData.count + 1 : 1;
+    setDailyStreakData({ count: newCount, lastDate: todayStr });
+    return newCount;
+  }, [dailyStreakData]);
+
   const value: AppStateValue = {
     language, level, orderedSports, sportVisibility, favorites, autoRefresh, notificationsEnabled,
+    dailyStreak: dailyStreakData.count,
     setLanguage, setLevel, setOrderedSports, setSportVisibility, setFavorites, setAutoRefresh, setNotificationsEnabled,
+    recordQuizActivity,
     hydrated,
   };
 

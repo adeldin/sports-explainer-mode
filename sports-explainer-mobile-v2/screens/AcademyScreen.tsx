@@ -35,7 +35,7 @@ type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
 // The category list is Academy-only (lib/academyCategories) and decoupled from the
 // Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
 export default function AcademyScreen({ route }: AcademyScreenProps) {
-  const { language, level, notificationsEnabled } = useAppState();
+  const { language, level, notificationsEnabled, dailyStreak, recordQuizActivity } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -56,11 +56,13 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     setCategory(prev => (prev.key === next.key ? prev : next));
   }, [routeSport]);
 
-  // --- Streak (the addicting bit) ---
-  const [streak, setStreak] = useState(0);
+  // --- Combo (the in-session consecutive-correct counter; resets on a wrong answer
+  // or on unmount). Distinct from the persisted day-over-day `dailyStreak` from
+  // useAppState, which is shown as a chip in the header. ---
+  const [combo, setCombo] = useState(0);
   const [milestone, setMilestone] = useState<string | null>(null);
-  const prevStreak = useRef(0);
-  const streakScale = useSharedValue(1);
+  const prevCombo = useRef(0);
+  const comboScale = useSharedValue(1);
   const milestoneOpacity = useSharedValue(0);
 
   // --- FAQ state ---
@@ -77,21 +79,26 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   const sportName = S[SPORT_FULL_NAME[primarySport]];
 
-  // Bounce the streak counter on each increment; bigger bounce + a milestone
-  // banner at 3 / 5 / 10.
+  // Bounce the combo counter on each increment; bigger bounce + a milestone
+  // banner at 3 / 5 / 7 / 10.
   useEffect(() => {
-    const prev = prevStreak.current;
-    prevStreak.current = streak;
-    if (streak <= prev || streak === 0) return;
+    const prev = prevCombo.current;
+    prevCombo.current = combo;
+    if (combo <= prev || combo === 0) return;
 
-    const isMilestone = streak === 3 || streak === 5 || streak === 10;
-    streakScale.value = withSequence(
+    const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
+    comboScale.value = withSequence(
       withTiming(isMilestone ? 1.3 : 1.15, { duration: isMilestone ? 180 : 120, easing: Easing.out(Easing.quad) }),
       withTiming(1, { duration: isMilestone ? 220 : 140 }),
     );
 
     if (isMilestone) {
-      setMilestone(streak === 3 ? 'Hat trick! 🎉' : streak === 5 ? 'On fire! 🔥🔥' : 'Legendary! 🏆');
+      setMilestone(
+        combo === 3 ? 'Heating up! 🔥'
+        : combo === 5 ? 'On fire! 🔥🔥'
+        : combo === 7 ? 'Unstoppable! ⚡'
+        : 'Legendary! 🏆',
+      );
       milestoneOpacity.value = withSequence(
         withTiming(1, { duration: 200 }),
         withDelay(1600, withTiming(0, { duration: 300 }, finished => {
@@ -100,7 +107,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streak]);
+  }, [combo]);
 
   // Cached answers are specific to category/level/language — reset when they change.
   useEffect(() => {
@@ -155,26 +162,37 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     }
   };
 
-  // Any quiz answer counts as activity — re-arm the "come back" reminder to the next
-  // 7pm (only if Game Alerts is on). Debounced to once per mount: the target time is
-  // the same regardless of how many questions they answer, so one reschedule is
-  // enough and avoids native churn. Stays unset if alerts are off, so enabling them
-  // mid-session and answering will still arm it once.
+  // Any quiz answer (right OR wrong) counts as activity. Two once-per-mount concerns,
+  // tracked by separate refs so they don't interfere:
+  //  1. Daily streak — record today's quiz via recordQuizActivity(). Happens
+  //     regardless of the Game Alerts toggle (the streak is independent of
+  //     notifications). Idempotent per-day, but the ref avoids redundant calls.
+  //  2. "Come back" reminder — re-arm to the next 7pm, ONLY if Game Alerts is on.
+  //     Kept on its own ref so enabling alerts mid-session and answering still arms
+  //     it once (the original behavior), even though the streak was recorded earlier.
+  // The reminder copy uses the freshly-updated streak count from concern 1.
+  const activityRecorded = useRef(false);
   const reminderArmed = useRef(false);
   const onQuizAnswered = () => {
-    if (reminderArmed.current || !notificationsEnabled) return;
-    reminderArmed.current = true;
-    scheduleQuizReminder(); // fire-and-forget; no-ops without permission
+    let streakNow = dailyStreak;
+    if (!activityRecorded.current) {
+      activityRecorded.current = true;
+      streakNow = recordQuizActivity(); // returns today's updated count
+    }
+    if (notificationsEnabled && !reminderArmed.current) {
+      reminderArmed.current = true;
+      scheduleQuizReminder(streakNow); // fire-and-forget; no-ops without permission
+    }
   };
 
-  const streakStyle = useAnimatedStyle(() => ({ transform: [{ scale: streakScale.value }] }));
+  const comboStyle = useAnimatedStyle(() => ({ transform: [{ scale: comboScale.value }] }));
   const milestoneStyle = useAnimatedStyle(() => ({ opacity: milestoneOpacity.value }));
 
-  const streakLabel =
-    streak >= 5 ? `🔥🔥 ${streak} in a row! Unstoppable!`
-    : streak >= 3 ? `🔥 ${streak} in a row!`
-    : streak >= 1 ? `🎯 ${streak} in a row!`
-    : 'Start a streak — answer correctly!';
+  const comboLabel =
+    combo >= 5 ? `🔥🔥 ${combo} in a row!`
+    : combo >= 3 ? `🔥 ${combo} in a row!`
+    : combo >= 1 ? `🎯 ${combo} in a row!`
+    : 'Answer correctly to heat up! 🔥';
 
   const faqs = SPORT_FAQS[primarySport];
 
@@ -187,10 +205,18 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
             tagline are stacked in a column (tagline hugging the title) like Live;
             Academy has no right-side group, so there's no left/right split. */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerTextCol}>
             <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy 🎓</Text>
             <Text style={styles.tagline}>Quizzes and facts to level up your game IQ.</Text>
           </View>
+          {/* Persisted day-over-day streak (distinct from the in-session combo below).
+              Hidden at 0; shows once the user has a 1+ day streak. */}
+          {dailyStreak >= 1 && (
+            <View style={styles.dayStreakChip}>
+              <Text style={styles.dayStreakNum}>🔥 {dailyStreak}</Text>
+              <Text style={styles.dayStreakLabel}>DAY STREAK</Text>
+            </View>
+          )}
         </View>
 
         {/* Category selector — Academy-only learning categories (lib/academyCategories),
@@ -211,13 +237,14 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
           </ScrollView>
         </View>
 
-        {/* Streak + milestone — pinned below the sport pills, fixed above the scroll
-            so it stays visible while the cards scroll beneath. (Same Animated.Views as
-            before, just lifted out of the ScrollView — scale/fade wiring unchanged.) */}
-        <View style={styles.streakBar}>
-          {/* Streak counter */}
-          <Animated.View style={[styles.streakWrap, streakStyle]}>
-            <Text style={streak > 0 ? styles.streakActive : styles.streakIdle}>{streakLabel}</Text>
+        {/* Combo + milestone — pinned below the sport pills, fixed above the scroll
+            so it stays visible while the cards scroll beneath. This is the in-session
+            consecutive-correct counter (resets on a wrong answer); the day-over-day
+            streak lives in the header chip above. */}
+        <View style={styles.comboBar}>
+          {/* Combo counter */}
+          <Animated.View style={[styles.comboWrap, comboStyle]}>
+            <Text style={combo > 0 ? styles.comboActive : styles.comboIdle}>{comboLabel}</Text>
           </Animated.View>
 
           {/* Milestone celebration (fades out after ~2s) */}
@@ -237,9 +264,9 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
           <View style={styles.section}>
             <QuizCard
               sportKeys={category.sportKeys}
-              streak={streak}
-              onCorrect={() => { setStreak(s => s + 1); onQuizAnswered(); }}
-              onWrong={() => { setStreak(0); onQuizAnswered(); }}
+              streak={combo}
+              onCorrect={() => { setCombo(c => c + 1); onQuizAnswered(); }}
+              onWrong={() => { setCombo(0); onQuizAnswered(); }}
             />
           </View>
 
@@ -326,8 +353,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   safe: { flex: 1, backgroundColor: t.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 },
+  // Title column shrinks so the day-streak chip always has room on the right.
+  headerTextCol: { flex: 1, paddingRight: 12 },
   headerTitle: { fontSize: 22, fontFamily: 'SpaceGrotesk_600SemiBold', color: t.textPrimary },
   headerTitleAccent: { color: t.accent },
+  // Day-over-day streak chip (header, right side) — navy surface + orange accent.
+  dayStreakChip: { alignItems: 'center', backgroundColor: t.surface, borderWidth: 1, borderColor: t.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  dayStreakNum: { color: t.accent, fontSize: 16, fontWeight: '900' },
+  dayStreakLabel: { color: t.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.5, marginTop: 1 },
   tabsContainer: { height: 70, marginBottom: 4 },
   // Hugs the title in the header column, matching the Live tab's headerTagline.
   tagline: { color: t.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 1 },
@@ -339,12 +372,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sportLabelActive: { color: t.accentText },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
-  // Streak + milestone — fixed bar below the tagline (outside the ScrollView).
+  // Combo + milestone — fixed bar below the tagline (outside the ScrollView).
   // Opaque background + 16px horizontal padding to align with the cards below.
-  streakBar: { backgroundColor: t.background, paddingHorizontal: 16 },
-  streakWrap: { alignItems: 'center', paddingVertical: 12 },
-  streakActive: { color: t.accent, fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  streakIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  comboBar: { backgroundColor: t.background, paddingHorizontal: 16 },
+  comboWrap: { alignItems: 'center', paddingVertical: 12 },
+  comboActive: { color: t.accent, fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  comboIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   milestoneWrap: { alignItems: 'center', marginBottom: 12 },
   milestoneText: { color: t.accentText, fontSize: 22, fontWeight: '900', textAlign: 'center' },
   // Energetic spacing — 20px between sections.
