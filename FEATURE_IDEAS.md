@@ -1,5 +1,11 @@
 # Feature Ideas & Roadmap
 
+> **🚀 MILESTONE — 2026-06-21: SportsWise submitted to the App Store (in review).**
+> v1.0 launched FREE (build 11): four-level explanations, ~14 sports, Academy (579-question
+> quiz + facts + FAQs), local quiz-reminder notification, English + Spanish. Freemium is the
+> v1.1 plan (see MONETIZATION.md). Everything below marked "road to launch" is now DONE unless
+> noted; remaining items are post-launch.
+
 ## 🎯 Core audience reframe
 
 The primary audience is **"sports-curious" people** — partners, friends, and family of
@@ -27,21 +33,24 @@ in the conversation**, not to serve existing experts.
 
 **IN — ✅ shipped:** translation fix · team logos · dark mode · FAQ chips · soccer/rugby UI ·
 past plays (MLB/NHL/NBA/WNBA). _Bonus, beyond original scope:_ bottom-tab nav · Academy tab
-(307-question difficulty quiz + facts) · first-run scrum intro · real logo/branding.
+(579-question difficulty quiz + facts) · first-run scrum intro · real logo/branding.
 
 **IN — ✅ since done:** Live-screen design pass (cog removal, Academy CTA, section cards,
 empty-state CTA) · real `APP_ID` (`6781028656`) + native in-app review · support/privacy
 URLs confirmed live (`privacy.sportswise.app`, `feedback@sportswise.app`, `sportswise.app`).
 
-**IN — 🔜 still open (the road to launch):** App Store submission prep — native review of
-ja/zh/ko/ar strings + Academy content · screenshots/metadata · TestFlight QA, then submit.
-(See the mobile repo's `HANDOFF.md` §8 for the full submission checklist.)
+**IN — ✅ LAUNCHED (2026-06-21):** App Store submission complete — submitted as "SportsWise:
+Watch & Ask Why," in review. Languages trimmed to **English + Spanish** for launch (the other
+8 translations stay in code, hidden in the picker; the ja/zh/ko/ar native-review blocker is
+moot — they're not exposed). 579-question quiz bank. Local quiz-reminder notification. Five
+App Store screenshots (cream/navy/orange, built GPT Image → Canva at 1290×2796).
 
 **OUT (explicitly v2.0):** TV app · GovWise · StockWise · full language
 UI (backend done, UI later) · pop-up facts system · Team Knowledge Companion mode ·
 historical data · past plays for soccer.
 
-**Timeline:** ~6 weeks to App Store submission at 3–5 hours/night. **Mid-to-late July target.**
+**Timeline:** ✅ Submitted 2026-06-21. Now in Apple review (typically 24–48h). Post-launch
+work = v1.1 (see roadmap below).
 
 ---
 
@@ -72,10 +81,60 @@ historical data · past plays for soccer.
 - ✅ **Live-screen design pass** (`340fd53`) — removed the redundant header settings cog, Academy CTA now navigates to the Academy tab, consistent section card-grouping/spacing, enlarged centered empty-state CTA + carded ask area.
 - ✅ **Real `APP_ID` + native in-app review** (`fa7741e`) — App Store ID `6781028656`; Rate action uses `expo-store-review` (`requestReview`) with an `apps.apple.com?action=write-review` fallback.
 - ✅ **Support/privacy URLs confirmed live** — `privacy.sportswise.app`, `feedback@sportswise.app`, `sportswise.app` share link (all tested working).
+- ✅ **Local quiz-reminder notification** (`fd89f0e`) — one-off DATE local notification scheduled
+  for the next 7pm, re-armed on each quiz so it only fires if the user goes quiet; respects the
+  "Game Alerts" toggle; resolved the prior orphaned-permission App Store risk (permission is now
+  legitimate). Only fires on real device builds.
+- ✅ **Launch languages trimmed to English + Spanish** (`7730c01`) — picker shows en/es only;
+  hidden-language preferences coerce to English on load (self-healing). Other 8 translations
+  remain in code for later.
 
 **Active, in order (the road to submission):**
 1. **TestFlight builds + on-device QA** — incl. verifying the MLR/rugby Core-API team-name/score fix on a live fixture.
 2. **App Store submission prep** — native review of ja/zh/ko/ar + Academy content, screenshots/metadata, then submit. (Full checklist: mobile repo `HANDOFF.md` §8.)
+
+---
+
+## 🧭 North star: "A coach in your pocket"
+
+**The vision:** SportsWise isn't just an app that explains plays — it's the **expert access
+most people never get.** Almost nobody can sit with a head coach and have rules, terminology,
+and *strategy decisions* explained in real time. SportsWise can be that coach in your pocket.
+
+**Origin proof:** the founder has a real relationship with the head coach of the **Chicago
+Hounds** (MLR) and *still* can't follow rugby on TV — if even he can't get on-demand coaching,
+almost no fan can. That gap is the product. (Texted exchange, May 2026.)
+
+**The principle — it must THINK like a coach, not just narrate:**
+- **Anticipates**, not just reacts — "watch the weak-side defender next."
+- **Reveals intent** behind decisions — not "they punted" but *why* they punted.
+- **Teaches patterns** across a game — "third time they've run this; setting up a counter."
+- **Has informed opinions** / reads tendencies — judges calls, doesn't just describe them.
+- **Speaks insider language, then translates it** (this is what the four levels already do).
+- **Conveys feel, momentum, stakes** — "this is the moment the game turns."
+
+The current **WHY IT MATTERS** card is a start (intent/stakes, not just events). Several future
+features ladder up to this.
+
+**Use as a lens:** when evaluating any future feature, ask *"does this make it feel more like a
+coach, or just more like an info app?"*
+
+---
+
+## 🗺️ v1.1 build sequence *(agreed 2026-06-21)*
+
+Ordered to build retention first, then quality, then revenue, then the big bet — each step
+builds on the last, never blocked:
+
+1. **Gamify the Academy** — build a **real persisted daily streak** (distinct from the current
+   in-session counter), progress, badges. Retention foundation; cheap; no API cost or review
+   risk; the quiz-reminder notification already waits for this. **Do first.**
+2. **Improved AI** — better explanations + the "coach who thinks like a coach" quality; sets up
+   the free/paid model-switch (the `GROQ_MODEL` env hook already exists). Core-quality win.
+3. **Freemium / subscription** — RevenueCat + StoreKit; now calibrated with real launch usage
+   data. (See MONETIZATION.md.)
+4. **Picture / video feature** — the premium flagship; lands with the subscription; vision model.
+5. **Coach's Corner** — the biggest, most differentiating bet; do when it can get focus.
 
 ---
 
@@ -137,6 +196,28 @@ government hearing graphic → **GovWise**. Ties into the "[Topic]Wise" family a
 - Higher cost per query than text — reinforces the paid-tier positioning.
 
 **Priority:** post-launch **v2**. Build **after App Store submission**.
+
+### 🏟️ Coach's Corner *(v1.1+ — the differentiator bet)*
+
+**Concept:** a new mode (possibly a tab between **Live** and **Academy**) where the user picks a
+sport and sees **animated X's-and-O's play diagrams** — a coach's whiteboard that draws plays,
+explains strategy, and shows a couple of marquee concepts per sport. Proactive and visual:
+you go *to* it to learn strategy, vs. Live (reactive) and Academy (quiz/facts). Fills the gap —
+there's currently no place that just *teaches the game's strategy on demand*.
+
+**Build path:** **Lottie** (pre-made vector animations — best fit for a fixed library of plays)
+or **Rive** (interactive, scrub-through plays — more effort, more "drawing live" feel). Design
+frames in Figma → animate in Lottie/Rive. `lottie-react-native` is already a dependency.
+
+**The real work is content, not code** — playing a Lottie/Rive file is trivial; *creating* each
+play animation (Fiverr hire or own Rive learning) is the effort, per sport, per play.
+
+**Subset approach for v1:** 1–2 marquee plays per sport (rugby scrum, basketball pick-and-roll,
+baseball double play) — ship small, see if people love it before building a library.
+
+**Why it matters:** most *differentiating* potential feature, most screenshot-worthy, directly
+serves the "coach in your pocket" north star. Biggest lift, so do it when it can get focused
+attention — after the cheaper wins.
 
 ### 🖼️ Images / illustrations in quizzes *(post-launch)*
 
@@ -210,6 +291,21 @@ highlights = likely infeasible.
 function) — it's **suboptimal, not broken**, so **not a launch blocker**. Deserves its own
 focused design session. Don't start while build-7 / question-splice work is uncommitted.
 
+### 🏁 Post-game summary / recap *(v1.1+)*
+
+**Concept:** when a game is **over** (FT/Final), show a **recap** instead of just the last play —
+final score, how it played out, the turning point, key performances, and what it means
+(standings/stakes), at the user's level. People often open the app *after* a game to understand
+what happened.
+
+**Why it fits:** ladders up to the "coach in your pocket" north star (a coach breaks down the
+game after the whistle, not just live), and overlaps the parked **no-games-screen rethink**
+(recent-results-with-context). Screenshot-worthy. Likely an AI call on the final game state, so
+it carries the same per-request cost as other explanations — a candidate for a richer **premium**
+version (see MONETIZATION.md).
+
+**Priority:** post-launch v1.1+.
+
 ---
 
 ## 🎮 Gamification / Learning progression *(v2)*
@@ -217,15 +313,19 @@ focused design session. Don't start while build-7 / question-splice work is unco
 Duolingo-inspired learning mechanics. The point isn't game-for-game's-sake — it's making
 the core promise (**getting wiser**) visible and rewarding, and building a daily habit loop.
 
-> **Quiz infrastructure is now shipped** (Academy tab): a **307-question bank** across four
+> **Quiz infrastructure is now shipped** (Academy tab): a **579-question bank** across four
 > difficulty tiers (**kid / beginner / intermediate / expert**) in `lib/facts.ts`, with an
 > on-card level picker (synced to the global app level), per-question answer shuffle, and
 > a streak mechanic. The remaining gamification work below now sits on top of this.
 
 ### ✅ Streaks *(shipped — Academy tab)*
-Quiz streak counter with milestone celebrations (3 / 5 / 10) and a pinned streak bar.
-Originally scoped as "Priority 2, build this first" — **done.** (Day-over-day / habit-loop
-streaks across sessions are still a possible extension, but the in-quiz streak is live.)
+⚠️ **Clarification (discovered 2026-06-21):** the shipped streak is an **in-session
+consecutive-correct-answers counter only** — it resets to 0 on a wrong answer or when the
+Academy screen unmounts. It is **NOT** a persisted day-over-day habit streak. Milestone
+celebrations (3/5/10) and the pinned streak bar are live, but a **real daily streak**
+(days-played-in-a-row, persisted, with a last-played date and day-boundary logic) is still
+**to build** — see v1.1 roadmap. The quiz-reminder notification already assumes a future
+daily streak.
 
 ### ✅ Quick quiz moments *(shipped — Academy tab)*
 The "Quick Quiz" card: one multiple-choice question at a time, animated green/red reveal
@@ -329,3 +429,12 @@ Brand asset: the **"[Topic]Wise"** naming pattern is clean and scalable.
   exposes zero leagues/events), so cricket runs in **learn-mode only** (no live scoreboard).
   Revisit live data with ESPNcricinfo or a paid source; a code comment in `route.ts` marks
   where it would slot in.
+- **Cold-start empty-state flash (~0.01s)** — on cold launch the Live screen paints its
+  no-selection empty state for a split second before data loads. Sub-perceptible; fix later by
+  making **loading** and **empty** distinct states (show a loader while fetching, empty only
+  after). Very low priority.
+- **Notification deep-link** — tapping the quiz reminder currently just logs; route on
+  `data.type === 'quiz-reminder'` to the Academy tab (handler is the `responseListener` in
+  App.tsx). Trivial, low priority.
+- **Spanish native review** — es is a real translation already; a native proofread (founder has
+  a fluent contact) is polish, folds into a later build. Non-blocking.
