@@ -48,6 +48,70 @@ what cheapens the experience.
   cost** (local content). Throttling it works *against* retention. Let the free quiz drive daily
   engagement; monetize the AI-powered live experience.
 
+## 🎯 Premium AI stat/coaching layer (a PACKAGING layer — builds AFTER the free teaching loop)
+
+> **Part of a larger design — now validated & re-sequenced (2026-06-21).** The premium **"moment"**
+> layer (leverage / win-probability / quantified significance) below is **one slice** — and per two
+> independent external AI critiques, a **later** slice — of the full live-explanation learning
+> design in **FEATURE_IDEAS.md → 📚 The live explanation (AUTHORITATIVE)**. It is **Step E** there:
+> a packaging layer built **AFTER** the free teaching loop proves its value, **not the POC**. The **FREE core** — **leveled explanations** (a different *lesson* per difficulty, not
+> just tone) + **tappable glossary definitions** + the **coach's read / plain-language
+> significance** + basic numbers — is the **higher-priority build**: it improves the experience for
+> *every* user (not just payers) and is a **reusable platform engine**. The premium "moment"
+> enrichment follows.
+
+**Core reframe — expertise is per-SPORT, not per-person.** A user can be a rugby beginner AND an
+MLB expert at once. The rich, stat-dense "impress your friends" content isn't for "advanced
+users" in the abstract — it's for someone watching a sport they already know well, who wants the
+deeper stat/coaching read. This maps onto the existing two-layer model: **Layer 1 difficulty
+(per-sport) is the dial** — beginner difficulty in a sport you don't know = simple "what
+happened"; Expert difficulty in a sport you know = the deep stat/coaching layer. So GUMBO depth =
+what Expert difficulty DELIVERS for data-rich sports. It's not a separate paywall axis; it's the
+difficulty system finally having real depth to offer at the top end.
+
+**North-star check:** this still serves LEARNING. The MLB-expert watching a game genuinely learns
+from "highest-leverage at-bat of the game, win prob swung 20%" — it's an "oh, I didn't know that"
+for someone who already knows the basics. Richness teaches when matched to the right expertise
+level. **Stat quality bar:** a stat earns its place only if it makes someone go "I didn't know
+that" — surprising/teaching, not just dense. (GUMBO's leverage/drama indexes can even PICK which
+plays deserve a callout.)
+
+**The free/paid split (decision: option C).** The line is **plain-language significance = FREE;
+quantified significance = PAID** (and the **coach's read** is FREE — it's qualitative
+interpretation, part of the teaching loop, not a gated metric):
+- **Free (single GUMBO fetch — costs nothing extra):** basic supporting stats enrich the Expert
+  experience and drive word-of-mouth delight — season slash line, ERA/WHIP, today's line
+  ("0-for-4, 3 K"), team records, game situation.
+- **Paid (second fetch — the premium differentiator):** the **quantified** "moment" layer —
+  leverage index ("highest-leverage at-bat of the game"), win-probability swing ("this play moved
+  win prob 20%"), drama index, charts / historical comps. (The qualitative coach's read stays
+  free.)
+
+**Carrot-dangling mechanics (require RevenueCat — Phase B):** meter, don't block. Free users get
+N premium stats/day, then the box GREYS OUT → "upgrade for unlimited." Plus a **7-day free trial**
+of the full unlimited experience. Learning is never locked — just nudged toward more. Let them
+TASTE the premium layer (you can't sell what they haven't felt), then hit the wall while still
+wanting it.
+
+**Build sequence** *(this is the premium layer's own sub-plan — it starts only after the free
+teaching loop in FEATURE_IDEAS Steps A–D has shipped; the premium layer is Step E):*
+- **Phase A — POC (after the free teaching loop):** build the premium stat layer, **always-on, NO
+  metering yet.** Real GUMBO data, the **leverage / win-prob quantified** stats at Expert
+  difficulty for baseball, displayed in-app. Goal: validate it's a genuine "I'd pay for this"
+  moment. The whole carrot strategy only works if the carrot is delicious — prove that first.
+- **Phase B — RevenueCat + metering:** subscriptions, 7-day trial, daily free quota + greying,
+  entitlement checks.
+- **Phase C — wire together:** Expert stat layer respects quota/entitlement.
+
+**Data reality (from recon):** one GUMBO fetch
+(`statsapi.mlb.com/api/v1.1/game/{gamePk}/feed/live`) gives the play + both players' season & game
+stats + team records + live situation — joined by player ID into the boxscore (the **free** basic
+stats). The win-probability/leverage endpoint (`/api/v1/game/{gamePk}/winProbability`) is a
+**second** fetch — the **premium** differentiator. Pre-baked summary strings
+(`stats.batting.summary` → "0-4 | 3 K") mean clean numbers to feed the AI. Official free APIs
+exist for **MLB & NHL**; NFL/NBA/others rely on ESPN or paid sources — so the rich-stat layer
+rolls out **baseball & hockey first**, others later.
+
 ## Tiered AI architecture note ✅ *(shipped — 74fe7d9)*
 
 **Done.** The model name is now a **config / environment variable** in `route.ts`: all three

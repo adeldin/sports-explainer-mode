@@ -29,6 +29,26 @@ in the conversation**, not to serve existing experts.
 - **News Companion** *(new, complex)* — breaking sports news translated for non-fans.
   Proactive / push-based. Requires a notification system or feed — **later phase**.
 
+## 🎓 Founding principle — teaching, not just explaining
+
+The origin: the founder is a **professor** who got confused watching a sport he didn't
+understand, and built a way to *learn* it. The platform's real DNA is **PEDAGOGY** — taking the
+teaching principles used in a lecture hall and bringing them into an app to make any topic fun and
+educational. SportsWise is the **first instance**; the reusable engine is **"teach any topic
+well."** Every feature should be evaluable against real teaching principles:
+
+- **Scaffolding** — support the learner exactly where they need it, remove it when they don't
+  (→ tappable on-demand definitions).
+- **Differentiated instruction** — meet each learner at their level (→ the four difficulty levels
+  changing WHAT is taught, not just vocabulary).
+- **Formative assessment** — check whether learning actually happened (→ the Academy quizzes /
+  progression as the measurement loop).
+- **Learning is pull, not push** — the learner reaches for what they don't know rather than being
+  lectured at (→ tap-to-define, go-deeper opt-in).
+
+**North-star test for ANY feature:** does a user leave going *"oh, I didn't know that"* / *"that
+answered my question"* / *"I learned something today"*? If not, reconsider it.
+
 ## 🔒 V1.0 scope lock
 
 **IN — ✅ shipped:** translation fix · team logos · dark mode · FAQ chips · soccer/rugby UI ·
@@ -131,12 +151,101 @@ builds on the last, never blocked:
    counter renamed "combo." **Still open:** the broader gamification — the **progression
    system** (earn-your-way level-ups) and **badges / achievements**. Retention foundation;
    cheap; no API cost or review risk.
-2. **Improved AI** — better explanations + the "coach who thinks like a coach" quality; sets up
-   the free/paid model-switch (the `GROQ_MODEL` env hook already exists). Core-quality win.
+2. **The live explanation → a real teaching loop** *(reframe of "Improved AI")* — the MVP is a
+   **tight teaching loop on every play** (one primary lesson + tappable glossary + conditional
+   watch-next + plain-language significance), **NOT** the premium stat layer. Authoritative plan:
+   **📚 The live explanation — full learning design** (validated by two external critiques). The
+   premium GUMBO **"moment"** stats are a later **packaging** layer (Step E), not the starting
+   point. Core-quality win; the `GROQ_MODEL` hook still feeds the free/paid model split.
 3. **Freemium / subscription** — RevenueCat + StoreKit; now calibrated with real launch usage
    data. (See MONETIZATION.md.)
 4. **Picture / video feature** — the premium flagship; lands with the subscription; vision model.
 5. **Coach's Corner** — the biggest, most differentiating bet; do when it can get focus.
+
+---
+
+## 📚 The live explanation — full learning design *(FINALIZED + externally validated 2026-06-21 — AUTHORITATIVE)*
+
+> **Status:** validated by **two independent external AI critiques** (2026-06-21); the build order
+> below is their converged recommendation. **This supersedes** the earlier scattered "improved AI /
+> leveled explanation / premium stat layer" notes — it is the authoritative live-explanation plan.
+
+**The reframe:** what we called **"Improved AI"** (v1.1 item #2) is really **the live explanation
+becoming a real teaching loop.** The MVP is **NOT** the premium stat layer and **NOT** the full
+learning engine — it's a **tight teaching loop on every play.**
+
+**The core problem it solves:** any single play contains MANY possible lessons at many levels. A
+strikeout looking on a splitter could teach: what a strikeout is, what "freezes / strike looking"
+means, what a splitter is, what a "put-away pitch" is, or the pitch-sequencing strategy behind it.
+WHICH lesson matters depends entirely on who's watching and what they don't yet know. The design's
+answer is not "show all of them" — it's **pick the single best one.**
+
+**THE MVP — the minimum that delivers "I learned something":**
+- **One primary lesson per play** — not all-at-once; the app picks the **single best teachable
+  concept** for this user/play.
+- **Tappable curated-glossary definitions** for the jargon within that lesson (scaffolding).
+- **A "watch next" cue — conditional only:** show it ONLY when there's a genuinely observable next
+  signal; **never forced** (a bad/forced watch-next is worse than none).
+- **A plain-language significance sentence** *(FREE)* — "why it mattered" in words, no numbers
+  needed.
+
+That loop = *"I understood this play, I could unpack the confusing term, and I know what to watch
+for next."* **That's the product.**
+
+**CONFIRMED BUILD ORDER (both critiques converged on this).** Lettered Steps A–F to avoid
+collision with the v1.1 build-sequence's top-level numbering:
+- **Step A — One-primary-lesson explanation rework** *(foundation)* — difficulty changes the
+  **LESSON**, not just vocabulary: Kid = rule/outcome ("he didn't swing — that's a strike; three
+  you're out"); Beginner = outcome + basic why; Intermediate = the craft/tactic ("a splitter —
+  looks like a fastball then drops; his put-away pitch"); Expert = the strategy, outcome assumed
+  ("sequenced him — fastballs up to set the eye, then the splitter below the zone"). *Same play,
+  four different LESSONS.* Needs an explicit **lesson-selection rubric**: relevance + level-fit +
+  novelty + importance + teachability.
+- **Step B — Curated glossary + tappable definitions** — start with the top **~50–100
+  high-frequency terms per launch sport** (**baseball & football first**). One plain-language def
+  per term, same for all levels; tap-to-reveal inline (no hover/tooltip; dismissable). **Content
+  authoring is the real bottleneck, not code.** Reusable asset (feeds explanation + Academy + FAQs
+  + the platform engine).
+- **Step C — Watch-next** *(conditional only)* — render only when a real observable next signal
+  exists.
+- **Step D — Question-framed expansion** — instead of a generic "Go deeper," surface the **1–2
+  relevant questions** for this specific card ("Why did it work? / What's a [term]? / Why did it
+  matter?") — **dynamic, not a fixed set.**
+- **Step E — Free/paid stat layer** *(a PACKAGING layer, built AFTER teaching value is proven)* —
+  where the GUMBO premium **"moment"** stats live (leverage, win-probability swing, drama index,
+  charts / historical comps). **Demoted** from its earlier "Phase A next" priority. Free =
+  plain-language significance; paid = quantified significance. (Monetization mechanics in
+  MONETIZATION.md.)
+- **Step F — Learning engine — STAGED, not one build:**
+   - **Phase 1:** exposure tracking + **recent-exposure suppression** ("don't reteach the same
+     concept repeatedly in one game" — this alone already feels adaptive).
+   - **Phase 2:** **post-game recap** ("today you saw: X, Y, Z — 30-sec quiz?") — ties into the
+     parked **post-game summary / recap** concept below.
+   - **Phase 3:** retrieval quizzes.
+   - **Phase 4:** real mastery adaptation.
+   - ⚠️ **exposure ≠ mastery** — seeing a concept isn't understanding it; treat exposure as **weak
+     evidence only.**
+
+**KEY PRINCIPLES (surfaced by the critiques):**
+- **Don't overbuild v1.** The learning engine is the long-term **moat**, but the MVP is the tight
+  teaching loop. *"Build the part that makes every explanation better before the parts that make
+  the product look smarter."*
+- **Confidence layer.** Distinguish **observed fact** ("he struck out looking") from
+  **interpretation** ("the pitcher LIKELY wanted…"). Don't overstate certainty on intent — this
+  protects trust.
+- **Not every play deserves an explanation.** It's a **"teachable-moment feed," not a
+  play-by-play feed.** Need an **importance threshold** — explain when confusing / important /
+  unusual / strategically revealing / tied to an active learning thread.
+- **Per-card controls** ("Simpler / More strategy / I know this") may beat fixed difficulty for
+  live — captured as an **idea to consider** (not committed).
+- **Content granularity varies by sport** — play-level (baseball / football) vs.
+  possession / drive / shift-level (others); **don't force one card grammar everywhere.**
+- **Glossary governance.** As it scales across sports / terms / contexts it becomes
+  **knowledge-design work** — plan for canonical-definition standards and "when a term graduates
+  into a reusable concept card."
+- **Free/paid line.** Plain-language significance is **FREE**; quantified significance (exact
+  win-prob %, leverage, charts, historical comps) is **PAID.** Guard against premium metrics
+  becoming **necessary to understand** the free explanation.
 
 ---
 
