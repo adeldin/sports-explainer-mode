@@ -126,9 +126,11 @@ coach, or just more like an info app?"*
 Ordered to build retention first, then quality, then revenue, then the big bet — each step
 builds on the last, never blocked:
 
-1. **Gamify the Academy** — build a **real persisted daily streak** (distinct from the current
-   in-session counter), progress, badges. Retention foundation; cheap; no API cost or review
-   risk; the quiz-reminder notification already waits for this. **Do first.**
+1. **Gamify the Academy** — **daily streak ✅ shipped (2e11ea7):** a persisted day-over-day
+   streak (header chip + day-boundary logic + streak-aware reminder), with the in-session
+   counter renamed "combo." **Still open:** the broader gamification — the **progression
+   system** (earn-your-way level-ups) and **badges / achievements**. Retention foundation;
+   cheap; no API cost or review risk.
 2. **Improved AI** — better explanations + the "coach who thinks like a coach" quality; sets up
    the free/paid model-switch (the `GROQ_MODEL` env hook already exists). Core-quality win.
 3. **Freemium / subscription** — RevenueCat + StoreKit; now calibrated with real launch usage
@@ -318,14 +320,25 @@ the core promise (**getting wiser**) visible and rewarding, and building a daily
 > on-card level picker (synced to the global app level), per-question answer shuffle, and
 > a streak mechanic. The remaining gamification work below now sits on top of this.
 
-### ✅ Streaks *(shipped — Academy tab)*
-⚠️ **Clarification (discovered 2026-06-21):** the shipped streak is an **in-session
-consecutive-correct-answers counter only** — it resets to 0 on a wrong answer or when the
-Academy screen unmounts. It is **NOT** a persisted day-over-day habit streak. Milestone
-celebrations (3/5/10) and the pinned streak bar are live, but a **real daily streak**
-(days-played-in-a-row, persisted, with a last-played date and day-boundary logic) is still
-**to build** — see v1.1 roadmap. The quiz-reminder notification already assumes a future
-daily streak.
+### ✅ Streaks — daily streak now shipped *(2e11ea7)*
+**✅ Shipped (2e11ea7):** a **real persisted day-over-day streak** now exists — a header chip
+in the Academy ("🔥 N day streak"), with local-date day-boundary logic: it increments on
+**any** quiz activity (right or wrong), **once per day**, continues if the last quiz day was
+yesterday, and **resets to 1 on a 2+ day gap** (no decrement on app load — the reset is
+computed lazily on the next quiz). The former **in-session** counter (consecutive correct,
+resets on a wrong answer / unmount) was **renamed "combo"** internally, with a new callout
+ladder — **Heating up 🔥 (3) / On fire 🔥🔥 (5) / Unstoppable ⚡ (7) / Legendary 🏆 (10)**.
+The quiz-reminder notification is now **streak-aware** ("don't lose your N-day streak" copy
+at 2+ days). The earlier "in-session only, daily streak still to build" clarification is
+**resolved.**
+
+### 🎇 Richer streak / combo celebrations *(nice-to-have polish — not urgent)*
+The streak **mechanic** works (chip, day-boundary logic, combo callouts); this is about making
+it **feel** rewarding. Upgrade from the current text-popup callouts to fuller moments —
+e.g. an **animated flame that grows with the streak**, **sound**, richer milestone
+celebrations, and a **streak-history view** ("you've hit 30 days!"). Post-MVP polish: ship it
+when the cheaper retention/quality wins are in. Founder instinct — the loop is built, this
+makes it land emotionally.
 
 ### ✅ Quick quiz moments *(shipped — Academy tab)*
 The "Quick Quiz" card: one multiple-choice question at a time, animated green/red reveal
