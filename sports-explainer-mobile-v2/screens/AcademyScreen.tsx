@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { askQuestion, Sport } from '../lib/api';
+import { askQuestion, Sport, Level } from '../lib/api';
 import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
@@ -30,12 +30,21 @@ function categoryForSport(sport?: Sport): AcademyCategory {
 // Route params the Live "Test your knowledge in the Academy →" CTA passes in.
 type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
 
+// Phase 1 quiz scoring: base points per correct answer, scaled by difficulty.
+const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
+// Max combo bonus added to a correct answer (+1 per combo level, capped).
+const COMBO_BONUS_CAP = 10;
+// Rank → badge emoji for the rank card (keyed by RANKS[].name).
+const RANK_EMOJI: Record<string, string> = {
+  Rookie: '🔰', Starter: '⭐', 'All-Star': '🌟', Champion: '🏆', Legend: '👑',
+};
+
 // Academy tab — the always-on "learn" experience: pick a category, read a fact,
 // take a quiz (with a streak mechanic), browse common questions, and ask anything.
 // The category list is Academy-only (lib/academyCategories) and decoupled from the
 // Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
 export default function AcademyScreen({ route }: AcademyScreenProps) {
-  const { language, level, notificationsEnabled, dailyStreak, recordQuizActivity } = useAppState();
+  const { language, level, notificationsEnabled, dailyStreak, recordQuizActivity, points, rank, awardPoints } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -194,19 +203,24 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     : combo >= 1 ? `🎯 ${combo} in a row!`
     : 'Answer correctly to heat up! 🔥';
 
+  // Progress within the current rank tier toward the next (0–100; 100 at Legend).
+  const rankPct = rank.next
+    ? Math.min(100, Math.max(0, ((points - rank.min) / (rank.next.min - rank.min)) * 100))
+    : 100;
+
   const faqs = SPORT_FAQS[primarySport];
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle={theme.statusBar} />
       <SafeAreaView style={styles.safe} edges={['top']}>
-        {/* Header — matches the Live tab wordmark, with "Academy 🎓" appended so the
+        {/* Header — matches the Live tab wordmark, with "Academy" appended so the
             "Sportswise" portion stays visually anchored when switching tabs. Title +
             tagline are stacked in a column (tagline hugging the title) like Live;
             Academy has no right-side group, so there's no left/right split. */}
         <View style={styles.header}>
           <View style={styles.headerTextCol}>
-            <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy 🎓</Text>
+            <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy</Text>
             <Text style={styles.tagline}>Quizzes and facts to level up your game IQ.</Text>
           </View>
           {/* Persisted day-over-day streak (distinct from the in-session combo below).
@@ -260,12 +274,50 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
 
+          {/* 0. Rank card — the user's progression status (earned, separate from the
+              difficulty level). Quiz-fed in Phase 1; any future game feeds the same
+              points total. */}
+          <View style={styles.section}>
+            <View style={styles.rankCard}>
+              <View style={styles.rankTopRow}>
+                <Text style={styles.rankEmoji}>{RANK_EMOJI[rank.name] ?? '🔰'}</Text>
+                <View style={styles.rankNameCol}>
+                  <Text style={styles.rankKicker}>YOUR RANK</Text>
+                  <Text style={styles.rankName}>{rank.name}</Text>
+                </View>
+                <Text style={styles.rankPts}>{points} pts</Text>
+              </View>
+
+              {rank.next ? (
+                <>
+                  <View style={styles.rankBarTrack}>
+                    <View style={[styles.rankBarFill, { width: `${rankPct}%` }]} />
+                  </View>
+                  <Text style={styles.rankProgressText}>
+                    {points - rank.min} / {rank.next.min - rank.min} to {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.rankMaxed}>👑 Legend — maxed</Text>
+              )}
+            </View>
+          </View>
+
           {/* 1. Quick Quiz */}
           <View style={styles.section}>
             <QuizCard
               sportKeys={category.sportKeys}
               streak={combo}
-              onCorrect={() => { setCombo(c => c + 1); onQuizAnswered(); }}
+              onCorrect={() => {
+                // Score by the answered question's difficulty (the global app level,
+                // which is exactly what the quiz filters by). Combo bonus uses the
+                // pre-increment combo (+1/level, capped) — so the Nth correct in a row
+                // adds N before becoming N+1. Wrong answers award nothing.
+                const comboBonus = Math.min(combo, COMBO_BONUS_CAP);
+                awardPoints(QUIZ_POINTS[level] + comboBonus);
+                setCombo(c => c + 1);
+                onQuizAnswered();
+              }}
               onWrong={() => { setCombo(0); onQuizAnswered(); }}
             />
           </View>
@@ -382,6 +434,18 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   milestoneText: { color: t.accentText, fontSize: 22, fontWeight: '900', textAlign: 'center' },
   // Energetic spacing — 20px between sections.
   section: { marginBottom: 20 },
+  // Rank card — the progression "status" area. Navy surface, orange accents.
+  rankCard: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border, padding: 16 },
+  rankTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rankEmoji: { fontSize: 30 },
+  rankNameCol: { flex: 1 },
+  rankKicker: { color: t.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  rankName: { color: t.textPrimary, fontSize: 20, fontWeight: '900', marginTop: 1 },
+  rankPts: { color: t.accent, fontSize: 14, fontWeight: '800' },
+  rankBarTrack: { height: 10, borderRadius: 5, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border, marginTop: 14, overflow: 'hidden' },
+  rankBarFill: { height: '100%', backgroundColor: t.accent, borderRadius: 5 },
+  rankProgressText: { color: t.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 8 },
+  rankMaxed: { color: t.accent, fontSize: 14, fontWeight: '800', marginTop: 12, textAlign: 'center' },
   // FAQ (mirrors Live tab styling)
   faqSection: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },

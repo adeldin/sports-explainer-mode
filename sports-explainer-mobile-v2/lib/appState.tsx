@@ -20,6 +20,32 @@ function localDateStr(d: Date): string {
 type DailyStreak = { count: number; lastDate: string };
 const DEFAULT_DAILY_STREAK: DailyStreak = { count: 0, lastDate: '' };
 
+// --- Progression rank system (Phase 1) ---
+// Ranks are derived from a single persisted points total. The points engine is
+// deliberately GAME-AGNOSTIC: awardPoints() takes a raw amount and knows nothing
+// about quizzes — any future game (diagram-match, card-stat-match, …) feeds the
+// same total. Exported because the rank card UI needs the tiers + emoji mapping.
+export type Rank = { name: string; min: number; max: number };
+export const RANKS: Rank[] = [
+  { name: 'Rookie',   min: 0,    max: 99 },
+  { name: 'Starter',  min: 100,  max: 299 },
+  { name: 'All-Star', min: 300,  max: 699 },
+  { name: 'Champion', min: 700,  max: 1499 },
+  { name: 'Legend',   min: 1500, max: Infinity },
+];
+
+export type RankInfo = Rank & { next: Rank | null };
+// Resolve a points total to its current rank + the next rank (null at Legend).
+export function getRank(points: number): RankInfo {
+  const p = Math.max(0, points);
+  let idx = 0;
+  for (let i = 0; i < RANKS.length; i++) {
+    if (p >= RANKS[i].min) idx = i;
+  }
+  const next = idx < RANKS.length - 1 ? RANKS[idx + 1] : null;
+  return { ...RANKS[idx], next };
+}
+
 // Languages shown in the picker at launch. The other 8 translations still exist in
 // lib/strings.ts (and the Language type) but are hidden for now — a stored or device
 // language outside this set falls back to English on load. Keep in sync with the
@@ -38,6 +64,7 @@ const KEYS = {
   level: 'user_level',
   autoRefresh: 'auto_refresh',
   dailyStreak: 'quiz_daily_streak',
+  points: 'progression_points',
 } as const;
 
 interface AppStateValue {
@@ -51,6 +78,9 @@ interface AppStateValue {
   notificationsEnabled: boolean;
   // Consecutive days the user has taken a quiz (persisted; day-boundary aware).
   dailyStreak: number;
+  // Progression: persisted lifetime points total + the derived current rank.
+  points: number;
+  rank: RankInfo;
 
   // --- Raw setters (writes auto-persist via the effects below) ---
   setLanguage: (l: Language) => void;
@@ -65,6 +95,11 @@ interface AppStateValue {
   // (continue if yesterday, restart at 1 on a gap, no-op if already counted today)
   // and returns the resulting count so callers can react synchronously.
   recordQuizActivity: () => number;
+
+  // Game-agnostic points award. Adds `amount` to the lifetime total (ignores
+  // non-positive / non-finite amounts), persists it, and returns the new total.
+  // Any future game feeds this same function — it knows nothing about quizzes.
+  awardPoints: (amount: number) => number;
 
   // True once the initial AsyncStorage load has completed. Consumers (the App gate)
   // should wait for this before persisting/rendering so defaults never clobber
@@ -83,13 +118,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [dailyStreakData, setDailyStreakData] = useState<DailyStreak>(DEFAULT_DAILY_STREAK);
+  const [points, setPoints] = useState(0);
   const [hydrated, setHydrated] = useState(false);
 
   // --- Load persisted state once on mount (moved out of App.tsx's init()) ---
   useEffect(() => {
     async function load() {
       try {
-        const [favs, notify, lang, tabOrder, visRaw, lvl, auto, streakRaw] = await Promise.all([
+        const [favs, notify, lang, tabOrder, visRaw, lvl, auto, streakRaw, pointsRaw] = await Promise.all([
           AsyncStorage.getItem(KEYS.favorites),
           AsyncStorage.getItem(KEYS.notifications),
           AsyncStorage.getItem(KEYS.language),
@@ -98,6 +134,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(KEYS.level),
           AsyncStorage.getItem(KEYS.autoRefresh),
           AsyncStorage.getItem(KEYS.dailyStreak),
+          AsyncStorage.getItem(KEYS.points),
         ]);
 
         if (favs) { try { setFavorites(JSON.parse(favs)); } catch { /* keep [] */ } }
@@ -121,6 +158,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               setDailyStreakData({ count: parsed.count, lastDate: parsed.lastDate });
             }
           } catch { /* keep default {0,''} */ }
+        }
+        if (pointsRaw !== null) {
+          const n = parseInt(pointsRaw, 10);
+          if (Number.isFinite(n) && n >= 0) setPoints(n); // else keep default 0
         }
         if (lang) {
           // Honor a stored preference only if it's a currently-visible launch language.
@@ -149,6 +190,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.autoRefresh, autoRefresh ? 'true' : 'false'); }, [autoRefresh, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.notifications, notificationsEnabled ? 'true' : 'false'); }, [notificationsEnabled, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.dailyStreak, JSON.stringify(dailyStreakData)); }, [dailyStreakData, hydrated]);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.points, String(points)); }, [points, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.favorites, JSON.stringify(favorites)); }, [favorites, hydrated]);
   // Persist the order as the bare key list (the shape orderSports() reads back).
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.tabOrder, JSON.stringify(orderedSports.map(s => s.key))); }, [orderedSports, hydrated]);
@@ -170,11 +212,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return newCount;
   }, [dailyStreakData]);
 
+  // Game-agnostic: add a raw amount to the points total. Reads the current total
+  // from the render closure (correct here — awards happen one-per-answer with a
+  // re-render between) and returns the new total. Ignores non-positive / NaN /
+  // Infinity so a bad caller can't corrupt the total.
+  const awardPoints = useCallback((amount: number): number => {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return points;
+    const newTotal = Math.max(0, points + amount);
+    setPoints(newTotal);
+    return newTotal;
+  }, [points]);
+
   const value: AppStateValue = {
     language, level, orderedSports, sportVisibility, favorites, autoRefresh, notificationsEnabled,
     dailyStreak: dailyStreakData.count,
+    points, rank: getRank(points),
     setLanguage, setLevel, setOrderedSports, setSportVisibility, setFavorites, setAutoRefresh, setNotificationsEnabled,
-    recordQuizActivity,
+    recordQuizActivity, awardPoints,
     hydrated,
   };
 
