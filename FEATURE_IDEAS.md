@@ -340,20 +340,56 @@ celebrations, and a **streak-history view** ("you've hit 30 days!"). Post-MVP po
 when the cheaper retention/quality wins are in. Founder instinct — the loop is built, this
 makes it land emotionally.
 
+### 🏆 Progression rank system *(designing — Phase 1 next build)*
+
+**Core architectural decision: DIFFICULTY and PROGRESSION are SEPARATE.**
+- **Difficulty** (Kid / Beginner / Intermediate / Expert) — unchanged. A freely-chosen control:
+  "how do you want this explained / how hard should quiz questions be." Drives Live explanations
+  AND quiz difficulty. NOT earned, always changeable.
+- **Progression rank** (NEW, earned) — your status/identity, climbed through play. Independent
+  of difficulty: you can be a "Legend" rank but still choose Kid difficulty for a simple
+  explanation. This separation is the key design call — merging them would force harder
+  explanations on high-rank users who don't want them.
+
+**Ranks (5 tiers, from total points):** Rookie (0–99) → Starter (100–299) → All-Star (300–699)
+→ Champion (700–1499) → Legend (1500+). Tuned to feel quick early, prestigious at the top.
+
+**Points engine — sport-agnostic AND game-agnostic.** One persisted points total; a single
+`awardPoints()` function that ANY activity feeds. Phase 1 wires ONLY the quiz; future games
+(diagram-match, card-stat-match, player-match) call the same function — so adding a game is a
+"+points hook," never a progression rebuild. Build the engine once, right.
+
+**Phase 1 points (quiz):** correct = scaled by difficulty (Kid 5 / Beginner 10 / Intermediate
+20 / Expert 40); wrong = 0 (never negative — don't punish); small combo bonus (e.g. +1 per
+combo level, capped). Tune in practice.
+
+**Display:** one rank card in the Academy — rank name + badge, progress bar to next rank,
+"X / Y to [next rank]." At Legend, show "maxed" + total points.
+
+**Phase 1 scope:** overall rank, quiz-fed only. **Deferred:** per-sport ranks ("Baseball
+Legend, Soccer Rookie") + overall profile; the other game types; richer point multipliers.
+
+**Process for adding a future game type** (the repeatable pattern):
+1. Founder defines the game concept (what the user does, what "correct" is).
+2. Founder provides the CONTENT (diagrams / stat lines / photos + correct answers, per sport) —
+   this is the real work, like the quiz questions. Engine is easy; content is the effort.
+3. Founder sets scoring intent (how many points, does difficulty scale it).
+4. Build the game UI (new card/screen).
+5. Wire it to `awardPoints()` — trivial, because the engine was built game-agnostic in Phase 1.
+
 ### ✅ Quick quiz moments *(shipped — Academy tab)*
 The "Quick Quiz" card: one multiple-choice question at a time, animated green/red reveal
 with explanation, difficulty-filtered, switchable level, no-repeat cycling. Originally
 "Priority 3" — **done.** (Surfacing a quiz inline *after a Live explanation* is still an
 open variant; the standalone Academy quiz is what shipped.)
 
-### Priority 1 (still open) — Knowledge progression system *(most on-brand)*
-Users **earn** their way through expertise levels (**Kid → Beginner → Intermediate →
-Expert**) instead of manually setting them. After engaging with X explanations at a level,
-the app prompts: *"Ready to try the next level?"* Optional, never forced. Makes the core
-product promise — getting wiser — visible and rewarding. The most on-brand gamification
-feature for SportsWise — and it now sits on **already-shipped infrastructure** (the quiz
-bank, difficulty tiers, and global level state), so this is the natural next build: gate
-level-ups on quiz performance / engagement rather than a manual Settings toggle.
+### Knowledge progression *(superseded — see 🏆 Progression rank system above)*
+**Superseded 2026-06-21.** The original idea here was "earn your way through the difficulty
+levels (Kid→Expert) instead of setting them manually." That's been REPLACED by the agreed
+design in the 🏆 Progression rank system subsection above, which deliberately keeps **difficulty
+separate from progression** — difficulty stays freely chosen (you're never locked out of a
+simple explanation), and a separate earned **rank** (Rookie→Legend) is the progression. See
+that subsection for the live design.
 
 ### Priority 4 — Badges / achievements
 *"First rugby game explained,"* *"Asked 10 questions,"* *"5 sports explored."* AsyncStorage
@@ -375,9 +411,9 @@ Kid → Beginner → Intermediate → Expert in legal literacy. GovWise: same fo
 knowledge. **The progression system *is* the platform's core learning promise.**
 
 **Priority:** streaks + quick quiz are **shipped**. The remaining on-brand build is the
-**progression system** (earn-your-way level-ups), now unblocked by the shipped quiz/
-difficulty/level infrastructure. Badges, daily challenge, and capture-user-questions
-remain v2, after App Store launch.
+**🏆 Progression rank system** (earned rank separate from difficulty — see above), now
+unblocked by the shipped quiz/streak/level infrastructure. Badges, daily challenge, and
+capture-user-questions remain v2, after App Store launch.
 
 ---
 
