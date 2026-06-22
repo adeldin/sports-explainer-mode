@@ -197,7 +197,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   };
 
   // --- Logic Functions ---
-  const fetchGames = useCallback(async () => {
+  // `isCancelled` lets the calling effect discard this response if the user has since
+  // switched sport/context (see the effects below). Defaults to never-cancelled so
+  // non-effect callers (pull-to-refresh, auto-refresh) behave exactly as before.
+  const fetchGames = useCallback(async (isCancelled: () => boolean = () => false) => {
     const cfg = SPORT_CONFIG[sport];
     // Learn Mode (explicit tennis/golf/cricket) or an off-season Live sport: no
     // head-to-head games. Tennis/golf fetch the current tournament for the card;
@@ -211,6 +214,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         try {
           const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`);
           const data = await res.json();
+          if (isCancelled()) return; // superseded by a newer sport switch — don't commit
           const ev = data?.events?.[0];
           if (ev) {
             if (sport === 'golf') {
@@ -369,6 +373,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         return 0;
       });
 
+      if (isCancelled()) return; // superseded by a newer sport switch — discard this response
       setGames(sorted);
       setGamesFetched(true); // a real fetch completed — empty now means season ended / no games
       if (sorted.length > 0 && !selectedGameId) {
@@ -380,19 +385,27 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     }
   }, [sport, selectedGameId, favorites]);
 
-  const handleFetch = useCallback(async (isRefresh = false) => {
+  // `isCancelled` (first arg) lets the calling effect discard a superseded response.
+  // Defaults to never-cancelled so the refresh callers below behave as before.
+  const handleFetch = useCallback(async (isCancelled: () => boolean = () => false, isRefresh = false) => {
     if (!selectedGameId) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setFollowUpAnswer(null);
     setActiveChip(null);
     try {
       const data = await fetchExplanation(sport, level, selectedGameId, language);
+      if (isCancelled()) return; // superseded — don't commit a stale explanation
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       fadeIn();
     } catch (e) {
+      if (isCancelled()) return; // superseded — don't land a stale error either
       console.error(e);
     } finally {
+      // Clear loading/refreshing UNCONDITIONALLY. The isCancelled guards above already
+      // prevent stale DATA from landing; loading is owned by the effect/context (see
+      // the explanation effect's !selectedGameId branch), so a fetch always clearing
+      // its own spinner here can't strand it — even when cancelled.
       setLoading(false);
       setRefreshing(false);
     }
@@ -405,6 +418,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setSelectedGameId(null);
     setResult(null);
     setGames([]);
+    setLoading(false); // start the switch from a clean loading state (no stranded skeleton)
     setGamesFetched(false); // new sport — don't flash Academy until its fetch resolves
   };
 
@@ -547,8 +561,20 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   };
 
 // --- Effects ---
-  useEffect(() => { fetchGames(); }, [sport, favorites]);
-  useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
+  // Each fetch owns a cancellation flag: if sport/context changes before the response
+  // lands, the cleanup flips `cancelled` true and the resolved fetch bails before any
+  // setState — so a slow earlier-sport response can't overwrite the current state.
+  useEffect(() => {
+    let cancelled = false;
+    fetchGames(() => cancelled);
+    return () => { cancelled = true; };
+  }, [sport, favorites]);
+  useEffect(() => {
+    if (!selectedGameId) { setLoading(false); return; } // no game → no fetch → clear any stranded skeleton
+    let cancelled = false;
+    handleFetch(() => cancelled);
+    return () => { cancelled = true; };
+  }, [selectedGameId, level, language]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
   // Close any open glossary definition when the play context changes (new game /
@@ -558,7 +584,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
 
   useEffect(() => {
     if (autoRefresh) {
-      autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(true); }, 60000);
+      autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(() => false, true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
   }, [autoRefresh, sport, level, selectedGameId, language]);
@@ -635,7 +661,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               onRefresh={async () => {
                 await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 await fetchGames();
-                await handleFetch(true);
+                await handleFetch(() => false, true);
               }}
               tintColor={theme.textSecondary}
             />
