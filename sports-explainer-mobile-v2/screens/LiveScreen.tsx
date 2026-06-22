@@ -246,6 +246,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       const comp = e.competitions?.[0];
       const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
       const away = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+      // Core events carry status on competitions[0].status (resolved in expandEvent);
+      // site events carry it on the event. Prefer whichever is present.
+      const st = comp?.status?.type ? comp.status : e.status;
       return {
         id: String(e.id),
         homeTeam: teamName(home),
@@ -254,8 +257,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         awayScore: scoreOf(away),
         homeLogo: logoOf(home),
         awayLogo: logoOf(away),
-        status: e.status?.type?.shortDetail || '',
-        isLive: e.status?.type?.state === 'in',
+        status: st?.type?.shortDetail || st?.type?.description || '',
+        isLive: st?.type?.state === 'in',
         sport,
       };
     };
@@ -264,13 +267,23 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       let parsed: Game[] = [];
 
       if (cfg.core) {
-        // Rugby: Core-API two-step — list event $refs for the next 7 days, then
+        // Rugby: Core-API two-step — list event $refs over a date window, then
         // resolve + dedup. A single-date query misses upcoming finals (and ESPN's
         // single-day matching is unreliable); the range form is what it answers.
+        // ESPN returns its nested $ref URLs as cleartext http://, which iOS App
+        // Transport Security blocks — so normalize every $ref to https before fetch.
+        const httpsRef = (u: string) => u.replace(/^http:\/\//i, 'https://');
         const today = new Date();
-        const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
-        const start = fmt(today);
-        const end = fmt(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
+        // Build YYYYMMDD from LOCAL date parts — NOT toISOString(), which is UTC and
+        // rolls the day forward for users behind UTC (e.g. 9pm US Central = next-day
+        // UTC), pushing today's games off the front of the window.
+        const fmt = (d: Date) =>
+          `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+        const DAY = 24 * 60 * 60 * 1000;
+        // Window looks BACKWARD 3 days and forward 7: surfaces recently-finished games
+        // (like other sports) and gives margin so a TZ/clock edge can't drop today.
+        const start = fmt(new Date(today.getTime() - 3 * DAY));
+        const end = fmt(new Date(today.getTime() + 7 * DAY));
         const evRes = await fetch(
           `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${start}-${end}`,
         );
@@ -279,7 +292,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         const resolvedEvents = (await Promise.all(
           items.map(async (it: any) => {
             try {
-              const r = await fetch(it.$ref);
+              const r = await fetch(httpsRef(it.$ref));
               return await r.json();
             } catch {
               return null;
@@ -302,7 +315,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           const ctrl = new AbortController();
           const t = setTimeout(() => ctrl.abort(), 3000);
           try {
-            const r = await fetch(url, { signal: ctrl.signal });
+            const r = await fetch(httpsRef(url), { signal: ctrl.signal });
             if (!r.ok) throw new Error(`ref ${r.status}`);
             return await r.json();
           } finally {
@@ -326,10 +339,46 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           const comp = ev.competitions?.[0];
           if (!comp?.competitors) return ev;
           const competitors = await Promise.all(comp.competitors.map(expandCompetitor));
-          return { ...ev, competitions: [{ ...comp, competitors }, ...ev.competitions.slice(1)] };
+          // FIX #2: Core events store status as a $ref too — resolve it so toGame can
+          // read FT / Scheduled / LIVE. Resilient: leave undefined on failure.
+          let status = comp.status;
+          if (status?.$ref) status = await fetchRef(status.$ref).catch(() => undefined);
+          return { ...ev, competitions: [{ ...comp, competitors, status }, ...ev.competitions.slice(1)] };
         };
         const expandedEvents = await Promise.all(uniqueEvents.map(expandEvent));
-        parsed = expandedEvents.map(toGame);
+
+        // FIX #1: collapse ESPN's phantom duplicates. ESPN lists many fixtures twice — a
+        // real event (post/FT, real score) plus a pre/0-0 phantom with home/away swapped
+        // and a different ID — so the ID-dedup can't catch them. A phantom is fundamentally
+        // a pre/0-0 ghost of an already-played game, so STATUS (not date proximity) is the
+        // signal. Group by order-independent team pair; within each group:
+        //   • if any game was actually played (post/in) → keep those, drop the pre phantoms;
+        //   • multiple played games for one pair (a real home-and-away series) → keep ALL;
+        //   • only pre games (unplayed fixture + its swapped twin) → keep one (lowest ID,
+        //     the real ~60349x sequence).
+        const teamId = (c: any) => String(c?.team?.id ?? '');
+        const pairKey = (ev: any) =>
+          ((ev.competitions?.[0]?.competitors || []).map(teamId).sort()).join('-');
+        const isPlayed = (ev: any) => {
+          const s = ev.competitions?.[0]?.status?.type?.state;
+          return s === 'post' || s === 'in';
+        };
+        const groups = new Map<string, any[]>();
+        for (const ev of expandedEvents) {
+          const arr = groups.get(pairKey(ev));
+          if (arr) arr.push(ev); else groups.set(pairKey(ev), [ev]);
+        }
+        const deduped: any[] = [];
+        for (const group of groups.values()) {
+          const played = group.filter(isPlayed);
+          if (played.length > 0) {
+            deduped.push(...played); // keep every real (post/in) game; drop pre phantoms
+          } else {
+            // only pre — collapse swapped twins to the lowest-ID (real-sequence) one
+            deduped.push(group.reduce((a, b) => (Number(a.id) <= Number(b.id) ? a : b)));
+          }
+        }
+        parsed = deduped.map(toGame);
       } else {
         const res = await fetch(
           `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
