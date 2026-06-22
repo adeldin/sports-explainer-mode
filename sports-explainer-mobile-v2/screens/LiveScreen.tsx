@@ -4,6 +4,7 @@ import {
   ScrollView, SafeAreaView, StatusBar, FlatList,
   RefreshControl, Animated, Alert,
   TextInput, KeyboardAvoidingView, Keyboard, Platform,
+  StyleProp, TextStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,7 @@ import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationRespo
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
+import { segmentText } from '../lib/glossary/segment';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
 
@@ -69,6 +71,49 @@ interface Game {
   sport: string;
 }
 
+// Renders explanation text with curated glossary terms as subtly-tappable runs.
+// English-only: for any other language — and for sports with no glossary — it falls
+// back to plain text identical to before. Tapping a term toggles the shared
+// definition box (state lives in LiveScreen; onToggleTerm handles open/close/swap).
+function GlossaryText({
+  text, sport, baseStyle, language, styles, onToggleTerm,
+}: {
+  text: string;
+  sport: Sport;
+  baseStyle: StyleProp<TextStyle>;
+  language: Language;
+  styles: ReturnType<typeof makeStyles>;
+  onToggleTerm: (t: { term: string; def: string }) => void;
+}) {
+  // Memoized so toggling a definition open/closed doesn't re-segment the text.
+  const segments = useMemo(
+    () => (language === 'en' ? segmentText(text, sport) : null),
+    [text, sport, language],
+  );
+  // Non-English, or no terms matched → plain text, exactly as before.
+  if (!segments || (segments.length === 1 && segments[0].type === 'text')) {
+    return <Text style={baseStyle}>{text}</Text>;
+  }
+  return (
+    <Text style={baseStyle}>
+      {segments.map((seg, i) =>
+        seg.type === 'text' ? (
+          seg.value
+        ) : (
+          <Text
+            key={i}
+            style={styles.glossaryTerm}
+            suppressHighlighting
+            onPress={() => { Haptics.selectionAsync(); onToggleTerm({ term: seg.term, def: seg.def }); }}
+          >
+            {seg.value}
+          </Text>
+        ),
+      )}
+    </Text>
+  );
+}
+
 // Shared state now comes from AppStateProvider via useAppState(). `initialSport`
 // (the onboarding pick) seeds the Live tab's local selection once on mount.
 // `navigation` is the bottom-tab navigation (the Academy CTA jumps to the Academy
@@ -109,6 +154,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [faqLoading, setFaqLoading] = useState(false);
   const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
   const [faqExpanded, setFaqExpanded] = useState(false);
+
+  // --- Glossary (tappable definitions in the explanation) ---
+  // The single open definition shown below the explanation cards (null = none open).
+  const [openTerm, setOpenTerm] = useState<{ term: string; def: string } | null>(null);
+  // Tap a term: open it; tap the same term again: close; tap a different term: swap.
+  const toggleGlossaryTerm = (t: { term: string; def: string }) =>
+    setOpenTerm(prev => (prev && prev.term === t.term ? null : t));
 
   // --- Theme + i18n ---
   const { theme } = useTheme();
@@ -499,6 +551,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   useEffect(() => { if (selectedGameId) handleFetch(); }, [selectedGameId, level, language]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
+  // Close any open glossary definition when the play context changes (new game /
+  // sport / level / language). Deliberately NOT tied to every fetch, so a 60s
+  // auto-refresh of the same play doesn't close a definition the user is reading.
+  useEffect(() => { setOpenTerm(null); }, [selectedGameId, sport, level, language]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -647,14 +703,20 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                     <Text style={styles.complexityText}>⚡ {S.complexPlay}</Text>
                   </View>
                 )}
-                <Text style={styles.explanationText}>{result.simple}</Text>
+                <GlossaryText
+                  text={result.simple} sport={sport} baseStyle={styles.explanationText}
+                  language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
+                />
               </View>
 
               {/* Why It Matters */}
               {result.whyItMatters && (
                 <View style={styles.insightCard}>
                   <Text style={styles.insightLabel}>💡 {S.whyItMatters}</Text>
-                  <Text style={styles.insightText}>{result.whyItMatters}</Text>
+                  <GlossaryText
+                    text={result.whyItMatters} sport={sport} baseStyle={styles.insightText}
+                    language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
+                  />
                 </View>
               )}
 
@@ -662,7 +724,26 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               {result.ruleDetail && result.showRule && (
                 <View style={styles.ruleCard}>
                   <Text style={styles.ruleLabel}>📜 {S.theRule}</Text>
-                  <Text style={styles.ruleText}>{result.ruleDetail}</Text>
+                  <GlossaryText
+                    text={result.ruleDetail} sport={sport} baseStyle={styles.ruleText}
+                    language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
+                  />
+                </View>
+              )}
+
+              {/* Glossary definition — one shared box; shows the currently-open term.
+                  Mirrors the FAQ answer styling. Tap a term above to open/swap/close. */}
+              {openTerm && (
+                <View style={styles.glossaryDefBox}>
+                  <View style={styles.glossaryDefHeader}>
+                    <Text style={styles.glossaryDefTerm}>{openTerm.term}</Text>
+                    <TouchableOpacity
+                      onPress={() => { Haptics.selectionAsync(); setOpenTerm(null); }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Text style={styles.glossaryDefClose}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.glossaryDefText}>{openTerm.def}</Text>
                 </View>
               )}
 
@@ -826,6 +907,18 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   faqAnswerBox: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 2 },
   faqAnswer: { color: t.textPrimary, fontSize: 14, lineHeight: 21 },
   faqThinking: { color: t.textMuted, fontSize: 13, fontStyle: 'italic' },
+  // Glossary: clean thin SOLID underline in the accent — reads as a tappable link and
+  // renders cleanly on iOS (the dotted version looked ragged, esp. under hyphenated
+  // terms like "at-bat"). Inherits the surrounding text's size/weight/lineHeight;
+  // only color + underline are added.
+  glossaryTerm: { color: t.accent, textDecorationLine: 'underline', textDecorationStyle: 'solid' },
+  // Shared definition box below the explanation cards — mirrors the section cards /
+  // FAQ answer treatment (surface bg, rounded, bordered) with an accent left stripe.
+  glossaryDefBox: { marginHorizontal: 16, marginBottom: 16, padding: 16, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent },
+  glossaryDefHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  glossaryDefTerm: { color: t.accentText, fontSize: 15, fontWeight: '800', flex: 1 },
+  glossaryDefClose: { color: t.textMuted, fontSize: 16, fontWeight: '700', paddingHorizontal: 4 },
+  glossaryDefText: { color: t.textPrimary, fontSize: 14, lineHeight: 21 },
   faqMoreBtn: { paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: t.border },
   faqMoreText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
   // Carded to match the other sections (was a bare padded block that ran into Share above).
