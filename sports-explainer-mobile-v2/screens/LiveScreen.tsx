@@ -567,13 +567,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   };
 
   const handleFollowUp = async (question: string) => {
-    if (!result) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setActiveChip(question);
     setFollowUpLoading(true);
     setFollowUpAnswer(null);
     try {
-      const context = `${result.simple} ${result.whyItMatters || ''}`;
+      // Play-grounded when an explanation is loaded; context-less otherwise (gameless
+      // states — off-season, or rugby/MLR with no games) so general questions like
+      // "how long is a rugby match?" still get a sport+level answer, like Academy/FAQ.
+      const context = result ? `${result.simple} ${result.whyItMatters || ''}` : '';
       const answer = await askQuestion(question, sport, level, context, language);
       setFollowUpAnswer(answer);
     } catch {
