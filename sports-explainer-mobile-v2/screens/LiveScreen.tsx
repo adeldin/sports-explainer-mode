@@ -627,7 +627,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [selectedGameId, level, language]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
-  useEffect(() => { setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false); }, [sport, level, language]);
+  useEffect(() => {
+    setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false);
+    // Ask/follow-up answers are sport+level+language-specific — clear them here too so
+    // a previous sport's answer can't linger under the new sport's ask box. (Gameless
+    // switches never run handleFetch, the only other place these reset.)
+    setFollowUpAnswer(null); setActiveChip(null); setAskText(''); setFollowUpLoading(false);
+  }, [sport, level, language]);
   // Close any open glossary definition when the play context changes (new game /
   // sport / level / language). Deliberately NOT tied to every fetch, so a 60s
   // auto-refresh of the same play doesn't close a definition the user is reading.
