@@ -43,13 +43,20 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
     );
   }
 
-  // Season just ended (NBA/NHL still inside their Oct–June window): no more games
-  // this season, so point users to next season instead of "no games today".
+  // Season just ended (NBA/NHL still inside their Oct–June window): no more games this
+  // season. Use the SAME window format as the off-season branch for consistency —
+  // "No {Sport} games right now. The season runs {window} — check back then!" — with a
+  // clean generic fallback when no window is known.
   if (reason === 'no-games' && seasonEnded) {
+    const w = SEASON_WINDOWS[sport];
+    const seasonSub = w
+      ? S.seasonRuns.replace('{start}', MONTHS[w.start - 1]).replace('{end}', MONTHS[w.end - 1])
+      : S.offSeasonSub;
     return (
       <View style={styles.container}>
         <Text style={styles.emoji}>{emoji}</Text>
-        <Text style={styles.title}>{S.seasonJustEnded.replace('{sport}', sportName)}</Text>
+        <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
+        <Text style={styles.subtitle}>{seasonSub}</Text>
       </View>
     );
   }

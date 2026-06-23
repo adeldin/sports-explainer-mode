@@ -151,6 +151,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Distinguish "season just ended" (in-window Live sport, fetched empty) from
   // off-season / explicit Learn sports — drives the EmptyState message.
   const seasonEnded = gamesFetched && games.length === 0 && !offSeason && SPORT_CONFIG[sport]?.learnMode !== true;
+  // The selected game + its ESPN state. We only explain LIVE ('in') or FINAL ('post')
+  // games — a scheduled ('pre') game has no play yet, so no explanation fetch and no
+  // PlayCard (just the "hasn't started" state below). `state` is undefined until the
+  // game is in `games`.
+  const selectedGame = games.find(g => g.id === selectedGameId);
+  const selectedGameState = selectedGame?.state;
+  const isExplainable = selectedGameState === 'in' || selectedGameState === 'post';
   // Sports shown in the tab bar: ordered, minus any hidden in My Sports (missing key = visible).
   const visibleSports = orderedSports.filter(s => sportVisibility[s.key] !== false);
 
@@ -440,11 +447,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [sport, favorites]);
   useEffect(() => {
-    if (!selectedGameId) { setLoading(false); return; } // no game → no fetch → clear any stranded skeleton
+    // Only LIVE/FINAL games have a play to explain. For no selection or a scheduled
+    // ('pre') game: no fetch, and clear any prior result so a stale PlayCard from the
+    // previous (live) game/sport can't linger. Re-fires on a pre→in transition because
+    // `isExplainable` is a dep. (Game state comes from `games`, set with selectedGameId.)
+    if (!selectedGameId || !isExplainable) { setResult(null); setLoading(false); return; }
     let cancelled = false;
     handleFetch(() => cancelled);
     return () => { cancelled = true; };
-  }, [selectedGameId, level, language]);
+  }, [selectedGameId, level, language, isExplainable]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => {
     setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false);
@@ -728,6 +739,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 {renderAskBox(S.askPlaceholder)}
               </View>
             </Animated.View>
+          ) : selectedGame && selectedGameState === 'pre' ? (
+            // Scheduled game — no play yet. Matchup + start time; the always-on FAQ
+            // stays below so the user can still explore. (Future "Live Now" card slots
+            // in here too.)
+            <View style={styles.upcomingCard}>
+              <Text style={styles.upcomingLabel}>⏳ {S.gameNotStarted}</Text>
+              <Text style={styles.upcomingMatchup}>{selectedGame.awayTeam} vs {selectedGame.homeTeam}</Text>
+              {!!selectedGame.status && <Text style={styles.upcomingTime}>{selectedGame.status}</Text>}
+            </View>
           ) : learnMode ? (
             <View style={styles.learnBlock}>
               <TouchableOpacity
@@ -876,6 +896,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+  // Scheduled-game "hasn't started yet" card (Bug 1) — neutral navy surface; the future
+  // Live Now card can sit alongside this in the same slot.
+  upcomingCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  upcomingLabel: { color: t.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
+  upcomingMatchup: { color: t.textPrimary, fontSize: 18, fontWeight: '800' },
+  upcomingTime: { color: t.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 4 },
   chipsWrap: { gap: 8 },                          // column of rows; 8px gap between the two rows
   chipRow: { flexDirection: 'row', gap: 8 },      // two chips per row, 8px gap between them
   chip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center' },

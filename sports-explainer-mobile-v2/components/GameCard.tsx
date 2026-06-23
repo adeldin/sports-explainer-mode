@@ -34,7 +34,9 @@ const SPORT_COLORS: Record<string, [string, string]> = {
   nba: ['#4a2a10', '#33200c'],
   nhl: ['#1a3a6b', '#12294d'],
   mls: ['#3a1a4a', '#281236'],
-  soccer: ['#14402a', '#0e2c1d'],
+  // MLS uses the 'soccer' key — navy-blended (was off-brand pitch-green). Per-sport
+  // vs. per-state color-coding is a deliberate decision for later.
+  soccer: ['#26315e', '#1a2344'],
   worldcup: ['#3a2a5e', '#281c44'],
   rugby: ['#124449', '#0c3035'],
 };
