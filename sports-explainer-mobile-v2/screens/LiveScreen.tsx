@@ -16,7 +16,8 @@ import EmptyState from '../components/EmptyState';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
-import PlayCard from '../components/PlayCard';
+import PlayCard, { QAItem } from '../components/PlayCard';
+import { derivePlayKey } from '../lib/playKey';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from '../lib/api';
@@ -65,10 +66,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [refreshing, setRefreshing] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
-  const [followUpLoading, setFollowUpLoading] = useState(false);
-  const [activeChip, setActiveChip] = useState<string | null>(null);
+  // Live Q&A (Phase 2): an ordered list, not a single slot — chip taps + free-text asks
+  // each append an item that renders as a layer in the PlayCard (live/final), or inline
+  // under the ask box (learn-mode, where there's no card). Per-item loading/error status.
+  const [answers, setAnswers] = useState<QAItem[]>([]);
   const [askText, setAskText] = useState('');
+  const anyLoading = answers.some(a => a.status === 'loading');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Share: snapshot of the data to render into the off-screen capture card. Non-null
   // only during a capture, so the ShareCard is mounted on demand (never permanently).
@@ -123,6 +126,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // superseded gather (user switched games/sports) writes nothing.
   const watchNextForGameRef = useRef<string | null>(null);
   const watchNextReqRef = useRef(0);
+  // Live Q&A: monotonic id source (no Date.now()/random), + the play identity of the
+  // currently-loaded explanation so a 60s refresh of the SAME play keeps answers while a
+  // genuinely new play clears them ("fresh play, fresh card").
+  const qaIdRef = useRef(0);
+  const lastPlayKeyRef = useRef<string>('');
 
   // --- Animations ---
   const fadeIn = () => {
@@ -205,11 +213,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const handleFetch = useCallback(async (isCancelled: () => boolean = () => false, isRefresh = false) => {
     if (!selectedGameId) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    setFollowUpAnswer(null);
-    setActiveChip(null);
     try {
       const data = await fetchExplanation(sport, level, selectedGameId, language);
       if (isCancelled()) return; // superseded — don't commit a stale explanation
+      // Fresh play, fresh card: clear live Q&A only when the play genuinely changed. A
+      // same-play 60s refresh keeps the same key, so answers persist (matches the
+      // PlayCard context-key, which excludes result/lastUpdated and so doesn't remount).
+      const playKey = derivePlayKey(data.rawPlay, data.playType);
+      if (playKey !== lastPlayKeyRef.current) {
+        setAnswers([]);
+        lastPlayKeyRef.current = playKey;
+      }
       setResult(data);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       fadeIn();
@@ -262,9 +276,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportVisibility, orderedSports]);
 
-  // Free-text ask box (input + thinking + answer). Reused by the Live-mode
-  // play card and the off-season educational state, with a mode-specific
-  // placeholder. Routes through handleAsk (context-less when there's no play).
+  // Free-text ask box. TYPED answers (source 'ask') always render inline beneath the box —
+  // that's where the user's attention is. Chip answers (source 'chip') render as PlayCard
+  // layers instead (handled there). Routes through handleAsk (context-less when no play).
   const renderAskBox = (placeholder: string) => (
     <>
       <View style={styles.askRow}>
@@ -276,27 +290,24 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           placeholderTextColor={theme.placeholderText}
           returnKeyType="send"
           onSubmitEditing={handleAsk}
-          editable={!followUpLoading}
+          editable={!anyLoading}
           blurOnSubmit
         />
         <TouchableOpacity
-          style={[styles.askSend, (!askText.trim() || followUpLoading) && styles.askSendDisabled]}
+          style={[styles.askSend, (!askText.trim() || anyLoading) && styles.askSendDisabled]}
           onPress={handleAsk}
-          disabled={!askText.trim() || followUpLoading}>
-          <Text style={[styles.askSendText, (!askText.trim() || followUpLoading) && { color: theme.textMuted }]}>↑</Text>
+          disabled={!askText.trim() || anyLoading}>
+          <Text style={[styles.askSendText, (!askText.trim() || anyLoading) && { color: theme.textMuted }]}>↑</Text>
         </TouchableOpacity>
       </View>
-      {followUpLoading && (
-        <View style={styles.thinkingRow}>
-          <Text style={styles.thinkingText}>{S.thinking}</Text>
+      {answers.filter(a => a.source === 'ask').map(a => (
+        <View key={a.id} style={styles.answerCard}>
+          <Text style={styles.answerHeader}>{a.question}</Text>
+          {a.status === 'loading'
+            ? <Text style={styles.thinkingText}>{S.thinking}</Text>
+            : <Text style={styles.answerText}>{a.answer}</Text>}
         </View>
-      )}
-      {followUpAnswer && (
-        <View style={styles.answerCard}>
-          <Text style={styles.answerHeader}>{activeChip}</Text>
-          <Text style={styles.answerText}>{followUpAnswer}</Text>
-        </View>
-      )}
+      ))}
     </>
   );
 
@@ -347,31 +358,28 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     });
   };
 
-  const handleFollowUp = async (question: string) => {
+  const handleFollowUp = async (question: string, source: 'chip' | 'ask') => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setActiveChip(question);
-    setFollowUpLoading(true);
-    setFollowUpAnswer(null);
+    const id = ++qaIdRef.current;
+    setAnswers(prev => [...prev, { id, question, answer: null, status: 'loading', source }]);
     try {
       // Play-grounded when an explanation is loaded; context-less otherwise (gameless
       // states — off-season, or rugby/MLR with no games) so general questions like
       // "how long is a rugby match?" still get a sport+level answer, like Academy/FAQ.
       const context = result ? `${result.simple} ${result.whyItMatters || ''}` : '';
       const answer = await askQuestion(question, sport, level, context, language);
-      setFollowUpAnswer(answer);
+      setAnswers(prev => prev.map(a => (a.id === id ? { ...a, answer, status: 'done' } : a)));
     } catch {
-      setFollowUpAnswer(S.answerError);
-    } finally {
-      setFollowUpLoading(false);
+      setAnswers(prev => prev.map(a => (a.id === id ? { ...a, answer: S.answerError, status: 'error' } : a)));
     }
   };
 
   const handleAsk = async () => {
     const q = askText.trim();
-    if (!q || followUpLoading) return;
+    if (!q || anyLoading) return;
     Keyboard.dismiss();
     setAskText('');
-    await handleFollowUp(q); // reuse the same context-grounded path as the chips
+    await handleFollowUp(q, 'ask'); // same context-grounded path as chips; typed answers render inline
   };
 
   // FAQ rows ask without play context — the questions are self-contained, and
@@ -406,6 +414,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // ('pre') game: no fetch, and clear any prior result so a stale PlayCard from the
     // previous (live) game/sport can't linger. Re-fires on a pre→in transition because
     // `isExplainable` is a dep. (Game state comes from `games`, set with selectedGameId.)
+    // Fresh context (game / level / language / explainability) → clear live Q&A so a
+    // prior game's answers can't linger under a new card. The 60s same-play refresh does
+    // NOT pass through this effect (it calls handleFetch directly), so its persistence is
+    // governed solely by handleFetch's playKey gate.
+    setAnswers([]);
     if (!selectedGameId || !isExplainable) { setResult(null); setLoading(false); return; }
     let cancelled = false;
     handleFetch(() => cancelled);
@@ -416,9 +429,18 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false);
     // Ask/follow-up answers are sport+level+language-specific — clear them here too so
     // a previous sport's answer can't linger under the new sport's ask box. (Gameless
-    // switches never run handleFetch, the only other place these reset.)
-    setFollowUpAnswer(null); setActiveChip(null); setAskText(''); setFollowUpLoading(false);
+    // switches never run handleFetch, the only other place these reset.) Also drop the
+    // tracked play identity — a new sport has no prior play.
+    setAnswers([]); setAskText(''); lastPlayKeyRef.current = '';
   }, [sport, level, language]);
+  // FAQ default-open is derived from STATE, not pinned: open by default in learn-mode/
+  // no-games (it's the primary content there) but still collapsible, closed by default in
+  // game states. Keyed on [sport, learnMode] so the default re-applies on sport switch AND
+  // catches the async-settle case (URC: learnMode flips true only after the empty fetch
+  // lands). A genuine mid-session learnMode flip re-applies the default — intended, since
+  // the screen's nature changed. Within a settled sport, neither dep changes, so the user's
+  // manual toggle persists.
+  useEffect(() => { setFaqSectionOpen(learnMode); }, [sport, learnMode]);
   // (Glossary open-state + PlayCard layer state reset via PlayCard's context `key`
   // below — keyed on sport|game|level|language — so no separate effect is needed.)
 
@@ -628,6 +650,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 sport={sport}
                 language={language}
                 lastUpdated={lastUpdated}
+                answers={answers.filter(a => a.source === 'chip')}
               />
 
               {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
@@ -650,25 +673,28 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 <View style={styles.chipsWrap}>
                   {[followUps.slice(0, 2), followUps.slice(2, 4)].map((row, i) => (
                     <View key={i} style={styles.chipRow}>
-                      {row.map(q => (
-                        <TouchableOpacity
-                          key={q}
-                          style={[styles.chip, activeChip === q && styles.chipActive]}
-                          onPress={() => handleFollowUp(q)}
-                          disabled={followUpLoading}>
-                          <Text style={[styles.chipText, activeChip === q && styles.chipTextActive]} numberOfLines={1}>{q}</Text>
-                        </TouchableOpacity>
-                      ))}
+                      {row.map(q => {
+                        const qLoading = answers.some(a => a.question === q && a.status === 'loading');
+                        return (
+                          <TouchableOpacity
+                            key={q}
+                            style={[styles.chip, qLoading && styles.chipActive]}
+                            onPress={() => handleFollowUp(q, 'chip')}
+                            disabled={anyLoading}>
+                            <Text style={[styles.chipText, qLoading && styles.chipTextActive]} numberOfLines={1}>{q}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   ))}
                 </View>
 
-                {/* Discovery hint — only when the ask box is idle */}
-                {!followUpLoading && !followUpAnswer && (
+                {/* Discovery hint — only when no typed answer is present/pending under the box */}
+                {!answers.some(a => a.source === 'ask') && (
                   <Text style={styles.askHint}>{S.askHint}</Text>
                 )}
 
-                {/* Free-text ask box — grounded in THIS play's explanation */}
+                {/* Free-text ask box — typed answers render inline beneath it; chips → card layers */}
                 {renderAskBox(S.askPlaceholder)}
               </View>
             </Animated.View>
@@ -719,9 +745,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           <View style={styles.faqSection}>
             <TouchableOpacity style={styles.faqHeadingRow} onPress={() => setFaqSectionOpen(v => !v)} activeOpacity={0.7}>
               <Text style={styles.faqHeading}>{SPORT_FAQS[sport].label[language]}</Text>
-              <Text style={styles.faqHeadingChevron}>{(faqSectionOpen || learnMode) ? '▾' : '▸'}</Text>
+              <Text style={styles.faqHeadingChevron}>{faqSectionOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
-            {(faqSectionOpen || learnMode) && (
+            {faqSectionOpen && (
               <>
                 {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => {
                   const text = q[language] || q.en;

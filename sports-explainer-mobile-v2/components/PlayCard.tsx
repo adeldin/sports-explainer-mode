@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
@@ -6,6 +6,16 @@ import { Sport, Language, ExplanationResponse } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import { derivePlayHeadline } from '../lib/playHeadline';
 import GlossaryText from './GlossaryText';
+
+// A live Q&A entry (Phase 2): a chip-tap or free-text question whose answer renders as a
+// card layer. State lives in LiveScreen (which owns the ask flow); PlayCard just renders.
+export interface QAItem {
+  id: number;                          // monotonic (never reused) — stable layer key
+  question: string;                    // the layer label
+  answer: string | null;              // null while loading
+  status: 'loading' | 'done' | 'error';
+  source: 'chip' | 'ask';             // chip → in-card layer; ask (typed) → inline under the input
+}
 
 // The layered "Play Card" (Step D, Phase 1). Glanceable derived headline + the core
 // lesson + WHY (open by default) + THE RULE (collapsed), each modeled as a layer so
@@ -17,18 +27,40 @@ interface Props {
   sport: Sport;
   language: Language;
   lastUpdated: string | null;
+  answers: QAItem[];        // live Q&A — each renders as an appended, collapsible layer
 }
 
 // Layer keys + their partial default (simple + why open; rule collapsed). Modeled as a
 // Set so Phase 2's chips-as-layers slot in uniformly.
 const DEFAULT_OPEN = ['simple', 'whyItMatters'];
 
-export default function PlayCard({ result, sport, language, lastUpdated }: Props) {
+export default function PlayCard({ result, sport, language, lastUpdated, answers }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
 
   const [open, setOpen] = useState<Set<string>>(() => new Set(DEFAULT_OPEN));
+
+  // New Q&A answers open by default (the user just asked — show it). Each id is
+  // auto-opened ONCE (tracked in a ref) so a later loading→done patch, or a sibling
+  // answer arriving, doesn't re-open a layer the user has since collapsed. Both the ref
+  // and `open` reset for free when the parent remounts the card on game/sport/level/
+  // language change (its context `key`). ids are monotonic, so no cross-play collision.
+  const autoOpenedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    setOpen(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const a of answers) {
+        if (!autoOpenedRef.current.has(a.id)) {
+          autoOpenedRef.current.add(a.id);
+          next.add(`qa-${a.id}`);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [answers]);
   const toggle = (key: string) => {
     Haptics.selectionAsync();
     setOpen(prev => {
@@ -96,6 +128,25 @@ export default function PlayCard({ result, sport, language, lastUpdated }: Props
         <Layer id="rule" label={`📜 ${S.theRule}`} text={result.ruleDetail} baseStyle={styles.ruleText} />
       )}
 
+      {/* Live Q&A (Phase 2) — chip taps + free-text asks append here as layers. Each is a
+          collapsible layer: the question is the header, the answer the body (glossary works
+          inside it); a per-item spinner shows while in flight. Cleared on a genuine new play
+          (LiveScreen's playKey), persists through a same-play refresh. */}
+      {answers.map(a => (
+        <View key={a.id} style={styles.layer}>
+          <TouchableOpacity style={styles.layerHeader} onPress={() => toggle(`qa-${a.id}`)} activeOpacity={0.7}>
+            <Text style={styles.qaQuestion} numberOfLines={2}>{a.question}</Text>
+            <Text style={styles.layerChevron}>{open.has(`qa-${a.id}`) ? '▾' : '▸'}</Text>
+          </TouchableOpacity>
+          {open.has(`qa-${a.id}`) && (
+            a.status === 'loading'
+              ? <Text style={styles.qaThinking}>{S.thinking}</Text>
+              : <GlossaryText text={a.answer ?? ''} sport={sport} baseStyle={styles.qaAnswer}
+                  language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
+          )}
+        </View>
+      ))}
+
       {/* Shared glossary definition box — shows the currently-open term. */}
       {openTerm && (
         <View style={styles.glossaryDefBox}>
@@ -129,6 +180,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   layerChevron: { color: t.accentText, fontSize: 14, fontWeight: '800' },
   insightText: { color: t.textPrimary, fontSize: 16, fontWeight: '500', lineHeight: 24, marginTop: 8 },
   ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22, marginTop: 8 },
+  // Live Q&A layers — question header reads as a normal sentence (not the all-caps eyebrow
+  // styling of the fixed layers), answer body matches the insight text weight.
+  qaQuestion: { color: t.accentText, fontSize: 13, fontWeight: '700', flex: 1, marginRight: 8, lineHeight: 18 },
+  qaAnswer: { color: t.textPrimary, fontSize: 15, lineHeight: 22, marginTop: 8 },
+  qaThinking: { color: t.textMuted, fontSize: 14, fontStyle: 'italic', marginTop: 8 },
   // Glossary (mirrors the prior inline styling)
   glossaryTerm: { color: t.accent, textDecorationLine: 'underline', textDecorationStyle: 'solid' },
   glossaryDefBox: { marginTop: 14, padding: 14, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent },
