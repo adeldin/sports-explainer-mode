@@ -23,6 +23,10 @@ export interface Theme {
   accent: string;
   accentText: string;
   onAccent: string;
+  // Teal "discovery" accent — reserved for the Watch Next card so it reads as a
+  // distinct "next action," not another orange explanation card. Not used elsewhere.
+  accentCool: string;
+  accentCoolLight: string;
 
   live: string;
   liveSoftBg: string;
@@ -76,6 +80,8 @@ export const darkTheme: Theme = {
   accent: '#E87722',
   accentText: '#F5A623',
   onAccent: '#0d1b3e',
+  accentCool: '#14B8A6',
+  accentCoolLight: '#2DD4BF',
   live: '#E87722',
   liveSoftBg: '#2a1a08',
   warn: '#ff5400',
@@ -109,6 +115,8 @@ export const lightTheme: Theme = {
   accent: '#E87722',
   accentText: '#C2611A',
   onAccent: '#0d1b3e',
+  accentCool: '#14B8A6',
+  accentCoolLight: '#2DD4BF',
   live: '#E87722',
   liveSoftBg: '#fdeede',
   warn: '#d9480f',

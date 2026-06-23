@@ -16,6 +16,7 @@ import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
+import WatchNextCard from '../components/WatchNextCard';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from '../lib/api';
@@ -24,6 +25,7 @@ import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
 import { segmentText } from '../lib/glossary/segment';
 import { Game, SPORT_CONFIG, fetchScoreboard } from '../lib/scoreboard';
+import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
 
@@ -132,6 +134,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const toggleGlossaryTerm = (t: { term: string; def: string }) =>
     setOpenTerm(prev => (prev && prev.term === t.term ? null : t));
 
+  // --- Watch Next (end-of-game recommendation) ---
+  const [watchNext, setWatchNext] = useState<WatchCandidate | null>(null);
+
   // --- Theme + i18n ---
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -155,6 +160,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const shareRef = useRef<ViewShot>(null);
   // Guards the onLayout-gated capture so it fires exactly once per share session.
   const captureInProgress = useRef(false);
+  // Watch Next: the gameId we've already gathered a recommendation for (so a 60s
+  // refresh of a final game doesn't re-gather), + a bumpable request token so a
+  // superseded gather (user switched games/sports) writes nothing.
+  const watchNextForGameRef = useRef<string | null>(null);
+  const watchNextReqRef = useRef(0);
 
   // --- Animations ---
   const fadeIn = () => {
@@ -263,6 +273,21 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setGames([]);
     setLoading(false); // start the switch from a clean loading state (no stranded skeleton)
     setGamesFetched(false); // new sport — don't flash Academy until its fetch resolves
+  };
+
+  // Open a Watch Next recommendation. A cross-sport (discovery) jump reuses
+  // handleSportChange — the SAME reset path the race-condition + stale-ask fixes rely
+  // on (clears result/games/loading and the [sport,level,language] effect clears the
+  // ask answer) — so discovery can't reintroduce a stale-state bug. Same-sport just
+  // reselects. Either way setSelectedGameId drives the explanation fetch.
+  const openWatchNext = (rec: WatchCandidate) => {
+    setWatchNext(null);
+    if (rec.sport !== sport) {
+      handleSportChange(rec.sport); // async; fire-and-forget — state updates queue
+    } else {
+      Haptics.selectionAsync();
+    }
+    setSelectedGameId(rec.gameId);
   };
 
   // If My Sports (Settings tab) hides the currently-selected sport, switch to the
@@ -433,6 +458,32 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // auto-refresh of the same play doesn't close a definition the user is reading.
   useEffect(() => { setOpenTerm(null); }, [selectedGameId, sport, level, language]);
 
+  // Watch Next trigger: when the SELECTED game is final (transitions into 'post', or is
+  // opened already-final), gather candidates across sports and pick one. Gathered ONCE
+  // per final game (the ref guards re-gather on the 60s refresh — no new polling loop).
+  // Not final / no selection → clear the card. The request token makes a superseded
+  // gather (user switched games/sports) a no-op (cancellation-safe).
+  useEffect(() => {
+    const selGame = games.find(g => g.id === selectedGameId);
+    const isFinal = !!selectedGameId && selGame?.state === 'post';
+    if (!isFinal) {
+      watchNextForGameRef.current = null;
+      setWatchNext(null);
+      return;
+    }
+    if (watchNextForGameRef.current === selectedGameId) return; // already handled this game
+    watchNextForGameRef.current = selectedGameId;
+    const req = ++watchNextReqRef.current;
+    const cancelled = () => req !== watchNextReqRef.current;
+    (async () => {
+      const candidates = await gatherWatchCandidates(cancelled);
+      if (cancelled()) return;
+      const pick = selectWatchNext(candidates, sport, selectedGameId!, Date.now());
+      if (cancelled()) return;
+      setWatchNext(pick); // pick may be null → no card (correct empty state)
+    })();
+  }, [games, selectedGameId, sport]);
+
   useEffect(() => {
     if (autoRefresh) {
       autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(() => false, true); }, 60000);
@@ -560,6 +611,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>
             </View>
           ) : !loading ? <EmptyState sport={sport} reason="no-games" language={language} seasonEnded={seasonEnded} /> : null}
+
+          {/* Watch Next — directly under the score card, above THE PLAY. Shown only when
+              the selected game is final + a pick exists. Glanceable; primary tap opens
+              the game (cross-sport reuses handleSportChange's reset path). */}
+          {watchNext && (
+            <WatchNextCard
+              rec={watchNext}
+              isDiscovery={parentSport(watchNext.sport) !== parentSport(sport)}
+              onOpen={() => openWatchNext(watchNext)}
+            />
+          )}
 
           {loading && !result ? (
             <View style={styles.skeleton}>
