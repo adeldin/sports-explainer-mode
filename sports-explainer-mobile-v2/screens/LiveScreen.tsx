@@ -4,7 +4,6 @@ import {
   ScrollView, SafeAreaView, StatusBar, FlatList,
   RefreshControl, Animated, Alert,
   TextInput, KeyboardAvoidingView, Keyboard, Platform,
-  StyleProp, TextStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,13 +16,13 @@ import EmptyState from '../components/EmptyState';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
+import PlayCard from '../components/PlayCard';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { segmentText } from '../lib/glossary/segment';
 import { Game, SPORT_CONFIG, fetchScoreboard } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
@@ -42,49 +41,6 @@ const SPORT_NAME_KEY: Partial<Record<Sport, keyof (typeof UI_STRINGS)['en']>> = 
 
 // SPORT_CONFIG + the Game type + the scoreboard→Game[] fetch now live in
 // lib/scoreboard.ts (extracted so Watch Next can reuse the same fetcher).
-
-// Renders explanation text with curated glossary terms as subtly-tappable runs.
-// English-only: for any other language — and for sports with no glossary — it falls
-// back to plain text identical to before. Tapping a term toggles the shared
-// definition box (state lives in LiveScreen; onToggleTerm handles open/close/swap).
-function GlossaryText({
-  text, sport, baseStyle, language, styles, onToggleTerm,
-}: {
-  text: string;
-  sport: Sport;
-  baseStyle: StyleProp<TextStyle>;
-  language: Language;
-  styles: ReturnType<typeof makeStyles>;
-  onToggleTerm: (t: { term: string; def: string }) => void;
-}) {
-  // Memoized so toggling a definition open/closed doesn't re-segment the text.
-  const segments = useMemo(
-    () => (language === 'en' ? segmentText(text, sport) : null),
-    [text, sport, language],
-  );
-  // Non-English, or no terms matched → plain text, exactly as before.
-  if (!segments || (segments.length === 1 && segments[0].type === 'text')) {
-    return <Text style={baseStyle}>{text}</Text>;
-  }
-  return (
-    <Text style={baseStyle}>
-      {segments.map((seg, i) =>
-        seg.type === 'text' ? (
-          seg.value
-        ) : (
-          <Text
-            key={i}
-            style={styles.glossaryTerm}
-            suppressHighlighting
-            onPress={() => { Haptics.selectionAsync(); onToggleTerm({ term: seg.term, def: seg.def }); }}
-          >
-            {seg.value}
-          </Text>
-        ),
-      )}
-    </Text>
-  );
-}
 
 // Shared state now comes from AppStateProvider via useAppState(). `initialSport`
 // (the onboarding pick) seeds the Live tab's local selection once on mount.
@@ -127,12 +83,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
   const [faqExpanded, setFaqExpanded] = useState(false);
 
-  // --- Glossary (tappable definitions in the explanation) ---
-  // The single open definition shown below the explanation cards (null = none open).
-  const [openTerm, setOpenTerm] = useState<{ term: string; def: string } | null>(null);
-  // Tap a term: open it; tap the same term again: close; tap a different term: swap.
-  const toggleGlossaryTerm = (t: { term: string; def: string }) =>
-    setOpenTerm(prev => (prev && prev.term === t.term ? null : t));
+  // Glossary tap-to-define now lives inside PlayCard (which owns its open-term state).
 
   // --- Watch Next (end-of-game recommendation) ---
   const [watchNext, setWatchNext] = useState<WatchCandidate | null>(null);
@@ -464,10 +415,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // switches never run handleFetch, the only other place these reset.)
     setFollowUpAnswer(null); setActiveChip(null); setAskText(''); setFollowUpLoading(false);
   }, [sport, level, language]);
-  // Close any open glossary definition when the play context changes (new game /
-  // sport / level / language). Deliberately NOT tied to every fetch, so a 60s
-  // auto-refresh of the same play doesn't close a definition the user is reading.
-  useEffect(() => { setOpenTerm(null); }, [selectedGameId, sport, level, language]);
+  // (Glossary open-state + PlayCard layer state reset via PlayCard's context `key`
+  // below — keyed on sport|game|level|language — so no separate effect is needed.)
 
   // Watch Next trigger: when the SELECTED game is final (transitions into 'post', or is
   // opened already-final), gather candidates across sports and pick one. Gathered ONCE
@@ -641,61 +590,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
-              {/* Explanation Card */}
-              <View style={styles.explanationCard}>
-                <Text style={styles.explanationLabel}>🎙️ {S.thePlay}</Text>
-                <View style={styles.explanationHeader}>
-                  <Text style={styles.playPillText}>▶ {result.rawPlay || result.playType || S.latestPlay}</Text>
-                  {lastUpdated && <Text style={styles.contextTime}>{S.updated} {lastUpdated}</Text>}
-                </View>
-                {result.complexity === 'high' && (
-                  <View style={styles.complexityBadge}>
-                    <Text style={styles.complexityText}>⚡ {S.complexPlay}</Text>
-                  </View>
-                )}
-                <GlossaryText
-                  text={result.simple} sport={sport} baseStyle={styles.explanationText}
-                  language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
-                />
-              </View>
-
-              {/* Why It Matters */}
-              {result.whyItMatters && (
-                <View style={styles.insightCard}>
-                  <Text style={styles.insightLabel}>💡 {S.whyItMatters}</Text>
-                  <GlossaryText
-                    text={result.whyItMatters} sport={sport} baseStyle={styles.insightText}
-                    language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
-                  />
-                </View>
-              )}
-
-              {/* Rule Detail */}
-              {result.ruleDetail && result.showRule && (
-                <View style={styles.ruleCard}>
-                  <Text style={styles.ruleLabel}>📜 {S.theRule}</Text>
-                  <GlossaryText
-                    text={result.ruleDetail} sport={sport} baseStyle={styles.ruleText}
-                    language={language} styles={styles} onToggleTerm={toggleGlossaryTerm}
-                  />
-                </View>
-              )}
-
-              {/* Glossary definition — one shared box; shows the currently-open term.
-                  Mirrors the FAQ answer styling. Tap a term above to open/swap/close. */}
-              {openTerm && (
-                <View style={styles.glossaryDefBox}>
-                  <View style={styles.glossaryDefHeader}>
-                    <Text style={styles.glossaryDefTerm}>{openTerm.term}</Text>
-                    <TouchableOpacity
-                      onPress={() => { Haptics.selectionAsync(); setOpenTerm(null); }}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <Text style={styles.glossaryDefClose}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.glossaryDefText}>{openTerm.def}</Text>
-                </View>
-              )}
+              {/* Layered Play Card (Step D) — derived headline + core lesson + WHY
+                  (open) + RULE (collapsed), glossary inside. Keyed on the play context
+                  so expand/collapse + glossary state reset on game/sport/level/language. */}
+              <PlayCard
+                key={`${sport}|${selectedGameId}|${level}|${language}`}
+                result={result}
+                sport={sport}
+                language={language}
+                lastUpdated={lastUpdated}
+              />
 
               {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
                 <PastPlays
