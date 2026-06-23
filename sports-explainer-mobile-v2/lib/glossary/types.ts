@@ -1,9 +1,9 @@
 // Curated glossary — shared entry type for the tappable-definition layer (Step B).
 // Client-side only; independent of the backend / ExplanationResponse.
 
-// Sports that currently have a curated glossary. (Baseball & football first, per the
-// Step B plan; widen this union as more sports get term lists.)
-export type GlossarySport = 'mlb' | 'nfl';
+// Sports that currently have a curated glossary. (Widen this union as more sports get
+// term lists.) Note: rugby's list is shared by the 'rugby' (URC) and 'mlr' league keys.
+export type GlossarySport = 'mlb' | 'nfl' | 'rugby';
 
 export interface GlossaryEntry {
   // Display headword shown (bold) in the definition box, e.g. "splitter".
