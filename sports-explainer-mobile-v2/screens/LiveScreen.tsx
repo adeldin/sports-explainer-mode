@@ -166,6 +166,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           }
         } catch { /* leave null → EmptyState shows "no tournaments this week" */ }
       }
+      // A real fetch completed (even if there are no head-to-head games): mark fetched so
+      // the Live Now trigger's `noLiveContent` (gamesFetched && games.length === 0) can fire
+      // on offseason AND learn-mode sports. Set after the cancellation-guarded learn fetch.
+      setGamesFetched(true);
       return;
     }
     setLearnContext(null);
@@ -418,31 +422,52 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // (Glossary open-state + PlayCard layer state reset via PlayCard's context `key`
   // below — keyed on sport|game|level|language — so no separate effect is needed.)
 
-  // Watch Next trigger: when the SELECTED game is final (transitions into 'post', or is
-  // opened already-final), gather candidates across sports and pick one. Gathered ONCE
-  // per final game (the ref guards re-gather on the 60s refresh — no new polling loop).
-  // Not final / no selection → clear the card. The request token makes a superseded
-  // gather (user switched games/sports) a no-op (cancellation-safe).
+  // Dual-trigger Watch Next / Live Now. One effect, one pick. The trigger + its params
+  // are derived from the current state and folded into a composite dedup key so each
+  // distinct context gathers exactly once (the ref guards re-gather on the 60s refresh —
+  // no new polling loop):
+  //   A)  final game selected                     → "Watch Next" (👀): same-sport allowed; exclude only the finished game.
+  //   B1) scheduled game + sport HAS a live game   → "Watch Next": point at the same-sport live game.
+  //   B2) scheduled game + NO live in sport        → "Live Now" (🔴): exclude the whole sport (cross-sport).
+  //   B3) no games / off-season                    → "Live Now": exclude the whole sport (cross-sport).
+  // No trigger active (a live/explainable game) → clear the card. The request token makes
+  // a superseded gather (user switched games/sports) a no-op (cancellation-safe).
   useEffect(() => {
     const selGame = games.find(g => g.id === selectedGameId);
-    const isFinal = !!selectedGameId && selGame?.state === 'post';
-    if (!isFinal) {
+    const state = selGame?.state;
+    const hasLiveInSport = games.some(g => g.state === 'in');
+    const noLiveContent = gamesFetched && games.length === 0;
+
+    let key: string | null = null;
+    let excludeCurrentSport = false;
+    let excludeGameId = '';
+    if (selGame && state === 'post') {
+      key = `post:${selectedGameId}`; excludeGameId = selectedGameId!;            // A
+    } else if (selGame && state === 'pre' && hasLiveInSport) {
+      key = `pre-live:${selectedGameId}`; excludeGameId = selectedGameId!;        // B1
+    } else if (selGame && state === 'pre') {
+      key = `pre:${selectedGameId}`; excludeCurrentSport = true;                  // B2
+    } else if (noLiveContent) {
+      key = `empty:${sport}`; excludeCurrentSport = true;                         // B3
+    }
+
+    if (!key) {
       watchNextForGameRef.current = null;
       setWatchNext(null);
       return;
     }
-    if (watchNextForGameRef.current === selectedGameId) return; // already handled this game
-    watchNextForGameRef.current = selectedGameId;
+    if (watchNextForGameRef.current === key) return; // already handled this context
+    watchNextForGameRef.current = key;
     const req = ++watchNextReqRef.current;
     const cancelled = () => req !== watchNextReqRef.current;
     (async () => {
       const candidates = await gatherWatchCandidates(cancelled);
       if (cancelled()) return;
-      const pick = selectWatchNext(candidates, sport, selectedGameId!, Date.now());
+      const pick = selectWatchNext(candidates, sport, excludeGameId, Date.now(), excludeCurrentSport);
       if (cancelled()) return;
       setWatchNext(pick); // pick may be null → no card (correct empty state)
     })();
-  }, [games, selectedGameId, sport]);
+  }, [games, selectedGameId, sport, gamesFetched]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -572,13 +597,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             </View>
           ) : !loading ? <EmptyState sport={sport} reason="no-games" language={language} seasonEnded={seasonEnded} /> : null}
 
-          {/* Watch Next — directly under the score card, above THE PLAY. Shown only when
-              the selected game is final + a pick exists. Glanceable; primary tap opens
+          {/* Watch Next / Live Now — under the score card, above THE PLAY. Serves the
+              final-game ("Watch Next" 👀) and no-games/off-season ("Live Now" 🔴) states;
+              the scheduled-game case renders its own card beneath the "hasn't started"
+              card below (so it sits under that content). Glanceable; primary tap opens
               the game (cross-sport reuses handleSportChange's reset path). */}
-          {watchNext && (
+          {watchNext && selectedGameState !== 'pre' && (
             <WatchNextCard
               rec={watchNext}
               isDiscovery={parentSport(watchNext.sport) !== parentSport(sport)}
+              variant={selectedGameState === 'post' ? 'watch-next' : 'live-now'}
+              language={language}
               onOpen={() => openWatchNext(watchNext)}
             />
           )}
@@ -645,13 +674,25 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             </Animated.View>
           ) : selectedGame && selectedGameState === 'pre' ? (
             // Scheduled game — no play yet. Matchup + start time; the always-on FAQ
-            // stays below so the user can still explore. (Future "Live Now" card slots
-            // in here too.)
-            <View style={styles.upcomingCard}>
-              <Text style={styles.upcomingLabel}>⏳ {S.gameNotStarted}</Text>
-              <Text style={styles.upcomingMatchup}>{selectedGame.awayTeam} vs {selectedGame.homeTeam}</Text>
-              {!!selectedGame.status && <Text style={styles.upcomingTime}>{selectedGame.status}</Text>}
-            </View>
+            // stays below so the user can still explore. The Watch Next / Live Now card
+            // sits BENEATH this card: "Watch Next" 👀 when the sport has a live game to
+            // point at, else "Live Now" 🔴 (cross-sport discovery).
+            <>
+              <View style={styles.upcomingCard}>
+                <Text style={styles.upcomingLabel}>⏳ {S.gameNotStarted}</Text>
+                <Text style={styles.upcomingMatchup}>{selectedGame.awayTeam} vs {selectedGame.homeTeam}</Text>
+                {!!selectedGame.status && <Text style={styles.upcomingTime}>{selectedGame.status}</Text>}
+              </View>
+              {watchNext && (
+                <WatchNextCard
+                  rec={watchNext}
+                  isDiscovery={parentSport(watchNext.sport) !== parentSport(sport)}
+                  variant={games.some(g => g.state === 'in') ? 'watch-next' : 'live-now'}
+                  language={language}
+                  onOpen={() => openWatchNext(watchNext)}
+                />
+              )}
+            </>
           ) : learnMode ? (
             <View style={styles.learnBlock}>
               <TouchableOpacity

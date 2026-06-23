@@ -3,22 +3,33 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORTS } from '../lib/sports';
+import { Language } from '../lib/api';
+import { UI_STRINGS } from '../lib/strings';
 import { WatchCandidate } from '../lib/watchNext';
 import { WHY_YOUD_LIKE_IT } from '../lib/whyYoudLikeIt';
 
 // Glanceable "Watch Next" card (Weather-app pattern): collapsed = matchup + status +
 // sport; the whole top area is the PRIMARY tap → opens the game. A separate "Why
 // watch?" gesture expands the data-driven (same-sport) or hook (discovery) reason.
+// variant switches the eyebrow only: 'watch-next' (👀, end-of-game / same-sport-live)
+// vs 'live-now' (🔴, the current sport has nothing live → cross-sport discovery).
 interface Props {
   rec: WatchCandidate;
   isDiscovery: boolean;     // pick is a different parent sport than the just-finished game
+  variant: 'watch-next' | 'live-now';
+  language: Language;
   onOpen: () => void;       // navigate into the recommended game (parent decides reset path)
 }
 
-export default function WatchNextCard({ rec, isDiscovery, onOpen }: Props) {
+export default function WatchNextCard({ rec, isDiscovery, variant, language, onOpen }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const S = UI_STRINGS[language];
   const [expanded, setExpanded] = useState(false);
+
+  const isLiveNow = variant === 'live-now';
+  const eyebrowIcon = isLiveNow ? '🔴' : '👀';
+  const eyebrowLabel = (isLiveNow ? S.liveNowLabel : S.watchNextLabel).toUpperCase();
 
   const meta = SPORTS.find(s => s.key === rec.sport);
   const sportLabel = meta?.label ?? rec.sport;
@@ -40,7 +51,7 @@ export default function WatchNextCard({ rec, isDiscovery, onOpen }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.eyebrowRow}>
-        <Text style={styles.eyebrow}>👀 {('Watch Next').toUpperCase()}</Text>
+        <Text style={styles.eyebrow}>{eyebrowIcon} {eyebrowLabel}</Text>
         <Text style={styles.sportChip}>{sportEmoji} {sportLabel}</Text>
       </View>
 

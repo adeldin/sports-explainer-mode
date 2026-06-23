@@ -49,12 +49,17 @@ export function selectWatchNext(
   finishedSport: Sport,
   finishedGameId: string,
   now: number,
+  excludeCurrentSport: boolean = false,
 ): WatchCandidate | null {
   const finishedParent = parentSport(finishedSport);
 
   // Pool: live (any) + upcoming within the window; exclude the just-finished game.
+  // When excludeCurrentSport (Trigger B — "Live Now": the current sport has nothing
+  // live), drop the ENTIRE current parent sport so the pick is always cross-sport
+  // discovery (this is also what stops World Cup recommending World Cup).
   const pool = candidates.filter(c => {
     if (c.gameId === finishedGameId) return false;
+    if (excludeCurrentSport && parentSport(c.sport) === finishedParent) return false;
     if (c.status === 'live') return true;
     return c.startTime > now && c.startTime - now <= UPCOMING_SOON_WINDOW;
   });

@@ -91,4 +91,42 @@ console.log('=== 6. parent-sport grouping — same parent across league keys = s
     parentSport('mlb') === 'mlb');
 }
 
+console.log('=== 7. excludeCurrentSport (Trigger B "Live Now" — cross-sport discovery) ===');
+{
+  // World Cup current with nothing live in-sport: a World Cup (same parent) candidate must
+  // NOT be recommended back — the confirmed bug. excludeCurrentSport drops the whole soccer
+  // parent (worldcup/soccer/epl/laliga), leaving cross-sport discovery.
+  const fixed = selectWatchNext(
+    [c('worldcup', 'live', { id: 'wc' }), c('nba', 'live', { id: 'nba' })],
+    'worldcup', '', NOW, true);
+  check('B: World Cup current → does NOT recommend World Cup (bug fix)', fixed?.gameId === 'nba');
+  // Whole soccer parent excluded — epl/laliga dropped alongside worldcup.
+  const allSoccerGone = selectWatchNext(
+    [c('epl', 'live', { id: 'epl' }), c('laliga', 'live', { id: 'laliga' }), c('mlb', 'live', { id: 'mlb' })],
+    'worldcup', '', NOW, true);
+  check('B: entire soccer parent excluded (epl/laliga too) → picks MLB', allSoccerGone?.gameId === 'mlb');
+  // Only same-parent candidates left + excludeCurrentSport → null (no card).
+  const noneLeft = selectWatchNext([c('laliga', 'live', { id: 'laliga' })], 'epl', '', NOW, true);
+  check('B: only same-parent candidates + exclude → null (no card)', noneLeft === null);
+  // Contrast — Trigger A (excludeCurrentSport=false, the default) keeps same-sport.
+  const sameKept = selectWatchNext(
+    [c('laliga', 'live', { id: 'laliga' }), c('nba', 'live', { id: 'nba' })], 'epl', 'f', NOW, false);
+  check('A: same-parent NOT excluded (default) → La Liga still wins', sameKept?.gameId === 'laliga');
+}
+
+console.log('=== 8. Q1 split — scheduled game, sport with vs. without a live game ===');
+{
+  // B1: pre-game in a sport that HAS a live game → excludeCurrentSport=false, exclude only
+  // the scheduled game by id → the same-sport live game is the pick (most useful).
+  const withLive = selectWatchNext(
+    [c('mlb', 'live', { id: 'mlbLive' }), c('mlb', 'upcoming', { id: 'sched', startMin: 90 })],
+    'mlb', 'sched', NOW, false);
+  check('B1: pre-game + same-sport live → points at the live MLB game', withLive?.gameId === 'mlbLive');
+  // B2: pre-game in a sport with NO live game → excludeCurrentSport=true → cross-sport.
+  const noLive = selectWatchNext(
+    [c('mlb', 'upcoming', { id: 'sched', startMin: 90 }), c('nba', 'live', { id: 'nba' })],
+    'mlb', '', NOW, true);
+  check('B2: pre-game + no same-sport live → cross-sport (NBA)', noLive?.gameId === 'nba');
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'SOME FAILED'} — ${pass} passed, ${fail} failed`);
