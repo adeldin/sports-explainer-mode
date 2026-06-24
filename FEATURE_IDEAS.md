@@ -380,6 +380,25 @@ gate`). Both deliberately deferred — neither blocks anything now.
 
 ---
 
+## 📸 Vision enhancements (banked)
+
+### AI clarifying follow-up *(banked — the next vision enhancement after the core is solid)*
+
+When the model can't confidently analyze an image (unclear sport, unreadable score, ambiguous
+play), instead of fabricating OR flatly giving up, it should ask the user a **clarifying
+question** ("I can see a sports broadcast but it's dark — what sport is this, and can you read me
+the score?"), then incorporate the answer into a grounded explanation. Turns a dead-end into a
+conversation — more honest, and more "Watch and ask why," than either failure mode.
+
+**Why banked, not built now:** a real feature, not a prompt tweak. Needs (1) **UI** to render the
+model's *question* and capture the user's reply (a different flow than the current explain → ask),
+and (2) **prompt logic** for the model to decide **ask vs. answer** and return a structured "I
+need X" signal the client can branch on. Build after the core vision feature is proven solid.
+Pairs with the never-fabricate work — the prompt already hedges honestly (incl. sport/score-type);
+this turns the hedge into a productive next step instead of a stop.
+
+---
+
 ## 💡 Feature concepts
 
 ### AMC pop-up format
