@@ -105,4 +105,19 @@ console.log('=== 10. non-mutating remaining reads (for the indicators) ===');
   check('gameQARemaining: different game → full', gameQARemaining({ gameId: 'g', count: 3 }, 'h', false) === QA_FREE_PER_GAME);
 }
 
+console.log('=== 11. refresh must NOT bypass the cap (root-cause regression: nav-away/back flip) ===');
+{
+  const atCap = { date: TODAY, count: DAILY_FREE, keys: ['g|p0', 'g|p1', 'g|p2', 'g|p3', 'g|p4'] };
+  // The bug: capped + a 60s refresh of an UNCOUNTED play used to return allowed → rendered it.
+  const newPlay = evaluateDailyExplanation(atCap, TODAY, explanationKey('g', 'p9'), { isPro: false, isRefresh: true });
+  check('capped + refresh + new play → BLOCKED (no bypass)', !newPlay.allowed && newPlay.remaining === 0 && newPlay.nextState.count === DAILY_FREE);
+  // A refresh of an ALREADY-COUNTED play is still a free re-render of content the user owns.
+  const owned = evaluateDailyExplanation(atCap, TODAY, explanationKey('g', 'p2'), { isPro: false, isRefresh: true });
+  check('capped + refresh + already-counted play → allowed (free re-render)', owned.allowed);
+  // Under the limit, a refresh of a new play still renders but must NOT consume a count.
+  const under = { date: TODAY, count: 2, keys: [explanationKey('g', 'a'), explanationKey('g', 'b')] };
+  const d = evaluateDailyExplanation(under, TODAY, explanationKey('g', 'c'), { isPro: false, isRefresh: true });
+  check('under limit + refresh + new play → allowed, NOT counted', d.allowed && d.nextState.count === 2 && !d.nextState.keys.includes('g|c'));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'SOME FAILED'} — ${pass} passed, ${fail} failed`);

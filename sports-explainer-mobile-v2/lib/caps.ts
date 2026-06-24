@@ -39,12 +39,18 @@ export function evaluateDailyExplanation(
   const limit = opts.limit ?? DAILY_FREE;
   const base: DailyCapState = state.date === today ? state : { date: today, count: 0, keys: [] };
   if (opts.isPro) return { allowed: true, nextState: base, remaining: Infinity };
-  if (opts.isRefresh) return { allowed: true, nextState: base, remaining: Math.max(0, limit - base.count) };
+  // Order matters: isRefresh means "don't CONSUME a count," NOT "skip the gate." So the
+  // already-counted (free) and over-limit (block) checks come FIRST — otherwise a 60s
+  // auto-refresh would render an explanation the cap should block (the navigate-away-and-back
+  // flip bug). A refresh only earns the free pass once under the limit on a new play.
   if (base.keys.includes(key)) {
-    return { allowed: true, nextState: base, remaining: Math.max(0, limit - base.count) }; // free re-read
+    return { allowed: true, nextState: base, remaining: Math.max(0, limit - base.count) }; // already counted → free (incl. refresh of an owned play)
   }
   if (base.count >= limit) {
-    return { allowed: false, nextState: base, remaining: 0 };                              // blocked → paywall
+    return { allowed: false, nextState: base, remaining: 0 };                              // capped + uncounted key → blocked (refresh too)
+  }
+  if (opts.isRefresh) {
+    return { allowed: true, nextState: base, remaining: Math.max(0, limit - base.count) }; // under limit + refresh + new play → render, don't consume
   }
   const nextState: DailyCapState = { date: today, count: base.count + 1, keys: [...base.keys, key] };
   return { allowed: true, nextState, remaining: Math.max(0, limit - nextState.count) };
