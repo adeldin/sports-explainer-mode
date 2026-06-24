@@ -13,8 +13,10 @@
 // registry entry, no core change. Coach is the first consumer; explain/recap stay on their
 // existing fetchers (the live 1.0 path) until migrated later behind byte-identical tests.
 
-// --- Optional enrichment placeholders (typed targets for the follow-on docs; nothing populates
-//     these in this doc) ---
+import { highlightlyEnricher } from './highlightlyEnricher';
+
+// --- Optional enrichment placeholders (PitchEvent for the GUMBO follow-on; MatchEvent populated
+//     by the soccer enricher below) ---
 export interface PitchEvent {
   index?: number; pitchType?: string; velocity?: number; result?: string; location?: string;
 }
@@ -30,6 +32,7 @@ export interface NormalizedGameData {
   homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
   state: string; statusDetail: string;
   period?: number; clock?: string; lastPlay?: string;
+  startTime?: number;   // epoch ms (ESPN event.date) — used by enrichers to date-match the game
   // ESPN base — situation (only where ESPN exposes it; today NFL/MLB; NBA/others identity-only)
   situation?: {
     down?: number; distance?: number; downDistanceText?: string; possession?: string; isRedZone?: boolean;
@@ -44,8 +47,15 @@ export interface NormalizedGameData {
 
 export type Enricher = (base: NormalizedGameData, gameId: string) => Promise<Partial<NormalizedGameData>>;
 
-// EMPTY in this doc. A follow-on registers e.g. `enrichers.mlb = gumboEnricher`.
-const enrichers: Partial<Record<string, Enricher>> = {};
+// Registered enrichers, keyed by sport. The soccer family uses Highlightly (adds match events on
+// top of ESPN's soccer base). GUMBO (MLB pitch-by-pitch) registers here next. A sport with no
+// entry gets the ESPN base only (today's behavior).
+const enrichers: Partial<Record<string, Enricher>> = {
+  worldcup: highlightlyEnricher,
+  soccer: highlightlyEnricher,
+  epl: highlightlyEnricher,
+  laliga: highlightlyEnricher,
+};
 
 type EspnCfg = { sport: string; league: string; core?: boolean; learnMode?: boolean };
 // The data layer owns its sport→endpoint map (avoids a circular import with route.ts; when explain
@@ -132,7 +142,20 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
       period: typeof st?.period === 'number' ? st.period : undefined,
       clock: st?.displayClock || undefined,
       lastPlay: sit?.lastPlay?.text || undefined,
+      startTime: game.date ? Date.parse(game.date) : undefined,
     };
+
+    // Soccer family — the play text lives in the summary keyEvents/commentary (NOT the scoreboard
+    // situation), exactly as the explain path's fetchGameData pulls it. Replicated here so routing
+    // soccer-explain through getGameData is NO WORSE than today on ESPN fields (the audit fix).
+    if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
+      try {
+        const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
+        const ke: any[] = sum?.keyEvents || [];
+        const comm: any[] = sum?.commentary || [];
+        out.lastPlay = ke[ke.length - 1]?.text || comm[comm.length - 1]?.text || out.lastPlay;
+      } catch { /* keep the scoreboard lastPlay */ }
+    }
 
     // Situation — extracted identically to the original coach normalizer (byte-identical output).
     const situation: NonNullable<NormalizedGameData['situation']> = {};

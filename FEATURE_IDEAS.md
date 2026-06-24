@@ -627,6 +627,16 @@ drama without teaching. App-wide split: **Academy = Duolingo** (the practice loo
 Corner = Khan Academy** (the live explanation that makes the hard thing click) — **practice +
 comprehension**. This split generalizes to every `[Topic]Wise` vertical.
 
+**Soccer Coach's Corner *(banked — needs a timeline/momentum model)*:** the Highlightly soccer
+enricher adds an `events` TIMELINE (goals/cards/subs by minute), not the current-state `situation`
+(count/down) that `hasSufficientState` reads — so soccer correctly stays "coming soon" (it does
+NOT auto-light, by design). Lighting soccer coaching up *well* needs a soccer-specific notion:
+**man-down after a red card · chasing a goal late · momentum swings** — distinct from the
+count/down situation model. Design it when soccer events are flowing and banking is unblocked
+(the premium card can't be sold during banking processing anyway, so a weak version costs nothing
+to defer). The visible in-season win is the **better soccer explanations** (event context), which
+the enricher already delivers on the free path.
+
 ### 🖼️ Images / illustrations in quizzes *(post-launch)*
 
 **Concept:** add **optional** images to Academy quiz questions — player/equipment photos,

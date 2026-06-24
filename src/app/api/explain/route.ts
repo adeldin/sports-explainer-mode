@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
+import { getGameData } from './dataProvider';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -660,9 +661,29 @@ export async function POST(req: NextRequest) {
 
     // Fetch live game context + latest play for the requested sport. When an
     // explicit playText is supplied (a past play), use it and skip the latest-play lookup.
-    const fetched = await fetchGameData(sport, gameId, !!playText);
-    const play = playText || fetched.play;
-    const { gameContext, homeTeam, awayTeam } = fetched;
+    // Soccer family (live latest play only) routes through dataProvider → ESPN base + Highlightly
+    // event context (the in-season visible win). EVERY other sport, soccer past-plays, and the
+    // no-game edge fall to the EXISTING fetchGameData path, byte-identical. With no Highlightly
+    // events the soccer branch is also identical to today (gameContext gets no events suffix).
+    const SOCCER = ['soccer', 'worldcup', 'epl', 'laliga'];
+    const enriched = (SOCCER.includes(sport) && !playText) ? await getGameData(sport, gameId) : null;
+    let play: string, gameContext: string, homeTeam: string, awayTeam: string;
+    if (enriched) {
+      homeTeam = enriched.homeTeam;
+      awayTeam = enriched.awayTeam;
+      play = enriched.lastPlay || 'A key play just happened';
+      gameContext = `${awayTeam} vs ${homeTeam} — ${enriched.statusDetail || ''}`;
+      if (enriched.events?.length) {
+        const recent = enriched.events.slice(-6)
+          .map(e => `${e.minute ?? '?'}' ${e.type}${e.player ? ` ${e.player}` : ''}${e.detail ? ` (${e.detail})` : ''}`)
+          .join('; ');
+        gameContext += ` Recent events: ${recent}`;
+      }
+    } else {
+      const fetched = await fetchGameData(sport, gameId, !!playText);
+      play = playText || fetched.play;
+      ({ gameContext, homeTeam, awayTeam } = fetched);
+    }
 
     // Run the explanation and the play-text translation concurrently (the
     // translation only needs `play`, already fetched) — no added latency.
