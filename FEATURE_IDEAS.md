@@ -363,6 +363,23 @@ marquee-game-only benefit. Don't reflexively integrate — it's a deliberate lat
 
 ---
 
+## 💳 Caps / paywall — banked tweaks
+
+Surfaced during the daily-cap gate fix (`fix(caps): refresh must not bypass the daily cap
+gate`). Both deliberately deferred — neither blocks anything now.
+
+- **Skip the auto-refresh fetch when `explainBlocked`** — while a free user is capped, the 60s
+  auto-refresh still fires the explanation fetch and then discards it (the accepted "bounded
+  post-fetch waste" of the per-(gameId,playKey) gate). Cheap optimization: short-circuit the
+  refresh fetch when already blocked. Separate, later — correctness is already handled by the
+  gate; this is just spend.
+- **Explanation path doesn't re-fetch on `isPro` flip** — a mid-view Pro purchase won't
+  auto-lift a *blocked explanation* until the next fetch (the explanation effect's deps don't
+  include `isPro`; the **recap** effect already does this right — mirror it). Real but unrelated
+  to the gate bug. **Matters once purchases work — fix before sandbox purchase testing.**
+
+---
+
 ## 💡 Feature concepts
 
 ### AMC pop-up format
