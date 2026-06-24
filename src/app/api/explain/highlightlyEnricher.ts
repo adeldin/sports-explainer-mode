@@ -100,7 +100,10 @@ export async function highlightlyEnricher(base: NormalizedGameData, gameId: stri
 
   // Throwing here is fine — dataProvider catches it and falls back to the ESPN base.
   const detail = await (await hl(`/matches/${matchId}`)).json();
-  const events = mapEvents(detail?.events || []);
+  // Envelope-agnostic: the LIST endpoint wraps in {data:[...]} but detail returns events at the
+  // ROOT (confirmed) — inconsistent, so unwrap a {data:{...}} only if present. Cheap insurance.
+  const body = detail?.data ?? detail;
+  const events = mapEvents(body?.events || []);
   eventsCache.set(matchId, { t: Date.now(), events });
   return { events };
 }
