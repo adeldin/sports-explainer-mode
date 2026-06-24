@@ -426,6 +426,31 @@ additive; vision runs on OpenAI and consumes zero Groq tokens). Two banked follo
   affordance. Pure mobile UI; low priority, but the honest-failure surface matters once on a paid
   tier where 429s should be rare.
 
+### 🧯 LLM resilience — fallback provider + paid-primary plan *(Groq Dev Tier blocked)*
+
+Groq is currently the **single hard dependency** for ALL explanations / coach / recap (free tier
+100k tokens/day; the **Dev Tier upgrade is BLOCKED** — Groq "temporarily unavailable due to high
+demand"). One LLM outage = the core feature breaks. Resilience plan:
+
+- **(a) Swappable explanation-provider adapter** — mirror the existing `visionProvider.ts` pattern
+  (provider behind an interface, env-driven) so no single LLM outage breaks the core. (This is the
+  text-model version of what vision already has.)
+- **(b) Immediate $0 fallback — Gemini Flash FREE on 429.** Groq stays primary; Gemini fires ONLY
+  when Groq caps. Gemini 3 Flash free ≈ **10 RPM / 250k TPM / 1,500 RPD**. Acceptable because we
+  send **PUBLIC sports play text, not PII/proprietary data**. ⚠️ **Caveat:** Google's free tier may
+  **train on inputs/outputs** — fine for public sports text (conscious accept), **NOT** for
+  anything sensitive.
+- **(c) Durable fix — a PAID primary we control** instead of engineering around a free tier. **Paid
+  Gemini Flash** is a strong candidate (~**$0.15/$0.60 per M tokens** — a few $/mo at our volume,
+  **no daily cap, no data-training**); may be a better primary than Groq regardless of whether Dev
+  Tier reopens. Decide when there's a beat — **don't chain two volatile free tiers** (free-Groq +
+  free-Gemini) as the permanent architecture.
+- **(d) ⚠️ GOTCHA:** enabling billing on a Gemini project **DELETES that project's free tier
+  entirely** (every call billable from token 1) — so to run free-test + paid-prod, use **SEPARATE
+  Google Cloud projects**.
+- **(e)** Also **retry Groq Dev Tier periodically** — it has Spend Limits when it reopens; the
+  upgrade (no code change, just a higher ceiling) is still worth it if it comes back.
+
 ---
 
 ## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
@@ -455,6 +480,20 @@ important sports — including both investor-target sports, cricket + rugby — 
 This reframes the question: maybe we don't need many APIs — we need **ESPN (default) + Highlightly
 (thin-sport upgrade)** behind the adapter, with specialists/Opta only where Highlightly proves
 insufficient. Paid tiers ~**$9.49–$45.99/mo** if we outgrow free.
+
+**Highlightly tier — ✅ RESOLVED (PRO, 2026-06-24).** Subscribed to **Highlightly PRO ($9.49/mo:
+7,500 req/day, 720/min)**. Rationale: removes the BASIC 100/day constraint during the in-season
+**World Cup** window (the download driver), avoids immediate rate-limit issues, cancelable
+month-to-month.
+- **Request math (for future tier decisions):** ~**100 Highlightly requests per live match watched
+  end-to-end** (60s polling) — and it's **per-MATCH, not per-user**, thanks to the enricher's 60s
+  events-cache. So **BASIC 100/day ≈ 1 live match/day** (solo testing only); **PRO 7,500/day ≈ ~75
+  match-views** — covers real early World Cup traffic. ULTRA ($20.99/25k) / MEGA ($45.99/65k) are
+  for **thousands of concurrent users** — not needed until real scale.
+- **PRO unlocks the broader Highlightly provider** (950+ soccer leagues, **cricket**, **rugby** =
+  the best expansion targets) — but those sports still need their **own enrichers BUILT**
+  (cricket/rugby enrichers, post-1.1); only `worldcup→1635` is wired today. **EPL/LaLiga/MLS** just
+  need league IDs added to the enricher's `LEAGUE` map (**quick win**).
 
 **Per-sport specifics (alternatives to Highlightly, for reference):**
 - **Soccer:** API-Football ($19/mo, events feed updated every 15s — goals/cards/subs/lineups with
