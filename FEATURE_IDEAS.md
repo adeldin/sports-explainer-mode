@@ -162,6 +162,29 @@ builds on the last, never blocked:
 4. **Picture / video feature** — the premium flagship; lands with the subscription; vision model.
 5. **Coach's Corner** — the biggest, most differentiating bet; do when it can get focus.
 
+### 💳 Paid tier plan *(decided 2026-06-23)*
+
+**Three premium features** make up the Pro tier:
+1. **Post-game recap** — the final-whistle breakdown (see 🏁 Post-game summary / recap).
+2. **Image/video "show me what's on screen"** — vision-model explanation of a TV screenshot
+   (see 📸 Image / video upload).
+3. **Coach's Corner** — animated X's-and-O's strategy diagrams (see 🏟️ Coach's Corner).
+
+**Build order — plumbing FIRST, then easiest→hardest feature:**
+1. **Freemium / paywall plumbing** — **RevenueCat + StoreKit + entitlement gating**, built
+   **independent of any feature.** This de-risks the launch-blocking IAP integration up front,
+   and means each premium feature can be **gated as it's built** — so the app can **ship paid
+   after any single feature lands**, not only once all three are done.
+2. **Post-game recap** *(easiest hard-build)*.
+3. **Image/video** *(middle)*.
+4. **Coach's Corner** *(hardest)*.
+
+**Tier line:**
+- **Free** keeps its **felt ceiling** — **Kid + Beginner** levels, **daily cap**.
+- **Pro** unlocks **all four levels + unlimited usage + the three premium features.**
+
+(Mechanics/pricing in MONETIZATION.md.)
+
 ---
 
 ## 📚 The live explanation — full learning design *(FINALIZED + externally validated 2026-06-21 — AUTHORITATIVE)*
@@ -246,6 +269,57 @@ collision with the v1.1 build-sequence's top-level numbering:
 - **Free/paid line.** Plain-language significance is **FREE**; quantified significance (exact
   win-prob %, leverage, charts, historical comps) is **PAID.** Guard against premium metrics
   becoming **necessary to understand** the free explanation.
+
+---
+
+## 🔴 Live Now / Step D session — status + backlog *(added 2026-06-23)*
+
+**✅ Done this session (committed; owner pushes from terminal):**
+- ✅ **Step D Phase 1 — layered PlayCard** (`6d3ce94`) — derived headline + core lesson + WHY
+  (open) + RULE (collapsed), glossary inside; expand/collapse + glossary state reset via a
+  context-key remount (`sport|game|level|language`). Pure `derivePlayHeadline` + unit harness.
+- ✅ **Watch Next (Step C card) + Live Now dual-trigger** (`003e97e`) — end-of-game
+  **"Watch Next" 👀** plus a second trigger so the card also appears when the current sport has
+  nothing live: offseason / no-games / learn-mode and the scheduled "hasn't started yet" card,
+  titled **"Live Now" 🔴**. `excludeCurrentSport` threading (Trigger A false / B true via
+  `LEAGUE_TO_SPORT`) fixes the confirmed **World-Cup-recommends-World-Cup** bug. Also fixed the
+  offseason/learn-mode early-return that never set `gamesFetched`, so Live Now fires on those
+  states. Localized titles (10 locales). 21-case `selectWatchNext` harness.
+- ✅ **Step D Phase 2 — live Q&A as in-place layers** (`df3a713`) — **supersedes the earlier
+  "in progress" status; Phase 2 is shipped.** Chip answers render as PlayCard layers (about the
+  play → on the play); typed free-text answers render **under the input box** (where the user's
+  attention is); per-item loading/error; glossary works inside answers. New-play detection via a
+  pure, tested **`derivePlayKey`** (`lib/playKey.ts`): **"fresh play, fresh card"** — Q&A clears
+  on a genuine new play but **persists through the 60s same-play refresh**. Also: **FAQ now
+  collapsible in learn-mode/no-games** (removed the `|| learnMode` force-open; default-open
+  derived from `[sport, learnMode]`, still toggleable, re-applies on sport switch).
+  - Known, accepted limitation: sports with no `rawPlay` + constant `playType` (rugby/MLR) yield
+    a constant play-key, so Q&A there persists across plays. Noted, not hacked around.
+
+**🔜 Queued — near-term (decided, not yet built):**
+- **Previous Play** — store the last play in memory + a **back-arrow** to re-read a play that
+  refreshed away mid-read. Works for **ALL sports** (no data dependency — just remembers the
+  already-fetched play). **Reuses Phase 2's `derivePlayKey`** play-identity signal. Comes right
+  after Phase 2. ⚠️ Do **NOT** confuse with full play-by-play (data track below) — this is the
+  small, shippable version.
+- **Golf leaderboard** — replace the one-line tournament stub with a real leaderboard. ESPN golf
+  endpoint appears feasible.
+- **State color-coding** — deliberate design pass on coloring game cards by state (upcoming /
+  live / final). Must reconcile with the existing per-sport card tints in `GameCard`
+  (`SPORT_COLORS`) — don't let it conflict. A design decision, not a quick build.
+
+**🧊 Data track — deferred (all blocked on "ESPN free tier too thin, need a real provider"):**
+- **Rugby play-by-play** — Opta / Stats Perform. The central unlock for expert-grade rugby; ties
+  to the Hounds/MLR strategic relationship. ESPN exposes **no** MLR play-by-play.
+- **Live tennis & golf data** — ESPN gives only thin tournament context (leaderboard line), no
+  live game data. Real live data needs a non-ESPN source.
+- **Full play-by-play for sports ESPN doesn't provide it for** — the LARGE version of "Previous
+  Play." A **data-sourcing** problem, NOT a code feature. ⚠️ Do **NOT** fabricate or
+  LLM-generate play data to fill the gap — confident-but-wrong play data is the cardinal failure
+  (the same trap as the rugby placeholder).
+
+> **Note:** the three data-track items cluster into **ONE sourcing decision** when revisited
+> (which provider, cost, partnership route) — tackle together, not piecemeal.
 
 ---
 
