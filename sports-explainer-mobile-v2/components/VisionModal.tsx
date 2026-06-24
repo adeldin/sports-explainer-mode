@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, Image, TextInput, ScrollView,
-  ActivityIndicator, StyleSheet, Linking, KeyboardAvoidingView, Platform,
+  ActivityIndicator, StyleSheet, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -121,7 +121,11 @@ export default function VisionModal({ visible, onClose, isPro, sport, level, lan
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="interactive">
           {!isPro ? (
             // FREE — locked preview. Shows the value; NO capture, NO vision call.
             <View style={styles.lockedCard}>
@@ -206,24 +210,25 @@ export default function VisionModal({ visible, onClose, isPro, sport, level, lan
                     </View>
                   )}
 
-                  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                    <View style={styles.askRow}>
-                      <TextInput
-                        style={styles.askInput}
-                        value={askText}
-                        onChangeText={setAskText}
-                        placeholder={S.visionAskPlaceholder}
-                        placeholderTextColor={theme.placeholderText}
-                        returnKeyType="send"
-                        onSubmitEditing={ask}
-                        editable={!asking}
-                      />
-                      <TouchableOpacity style={[styles.askSend, (!askText.trim() || asking) && styles.askSendDisabled]}
-                        onPress={ask} disabled={!askText.trim() || asking}>
-                        <Text style={styles.askSendText}>↑</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </KeyboardAvoidingView>
+                  {/* No nested KeyboardAvoidingView — inside a ScrollView it can't lift the
+                      input. The ScrollView's automaticallyAdjustKeyboardInsets (below) scrolls
+                      the focused field above the keyboard, which also works in a pageSheet. */}
+                  <View style={styles.askRow}>
+                    <TextInput
+                      style={styles.askInput}
+                      value={askText}
+                      onChangeText={setAskText}
+                      placeholder={S.visionAskPlaceholder}
+                      placeholderTextColor={theme.placeholderText}
+                      returnKeyType="send"
+                      onSubmitEditing={ask}
+                      editable={!asking}
+                    />
+                    <TouchableOpacity style={[styles.askSend, (!askText.trim() || asking) && styles.askSendDisabled]}
+                      onPress={ask} disabled={!askText.trim() || asking}>
+                      <Text style={styles.askSendText}>↑</Text>
+                    </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity style={styles.secondaryBtn} onPress={reset}>
                     <Text style={styles.secondaryBtnText}>{S.visionRetake}</Text>
