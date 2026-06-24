@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+import { analyzeImage } from './visionProvider';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -336,6 +337,25 @@ Empty string for any field the data can't support. Do not exceed what the data s
   return { system, user };
 }
 
+// Vision (premium #2) — the LOAD-BEARING never-fabricate prompt. A vision model handed a
+// glary/angled/blurry phone photo of a TV will confidently invent formations, misread scores,
+// and name players it can't see. Bias HARD toward honest "I can't make that out." Provider/model
+// are abstracted in visionProvider.ts; this prompt is provider-agnostic.
+function buildVisionPrompt(level: string, language: string, mode: string, question: string, gameContext: any) {
+  const langName = languageNames[language] || 'English';
+  const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
+  const gc = gameContext || {};
+  const ctxLine = (gc.homeTeam || gc.awayTeam)
+    ? `\nContext — the app's selected game (use ONLY to inform what you ACTUALLY see; it is NOT permission to invent what isn't visible): ${gc.awayTeam || '?'} vs ${gc.homeTeam || '?'}${(gc.awayScore || gc.homeScore) ? `, score ${gc.awayScore}-${gc.homeScore}` : ''}${gc.status ? `, ${gc.status}` : ''}${gc.sport ? ` (${gc.sport})` : ''}.`
+    : '';
+  const system = `You are a sports broadcaster helping a ${level}-level viewer understand a PHOTO of a game — usually a phone photo of a TV, so expect glare, odd angles, blur, motion, and partial views.${langLine}
+CARDINAL RULE — NEVER DESCRIBE WHAT YOU CANNOT CLEARLY SEE. Describe ONLY what is plainly visible in THIS image. If it is blurry, glary, dark, angled, or partial, SAY SO and describe only what's legible. Do NOT name specific players, exact scores, jersey numbers, or precise tactical formations unless they are clearly readable in the image. "I can see [X] clearly, but I can't make out [Y]" is a correct, good answer — preferred over any confident guess. A general, honest situational read ("the players look set for a restart — watch the…") beats a specific invented detail every time. Never fabricate. Explain any jargon in plain terms.`;
+  const user = (mode === 'ask' && question)
+    ? `Answer this question about the image, using ONLY what you can actually see (say so if you can't tell): "${question}".${ctxLine}`
+    : `In 2-4 sentences at a ${level} level, explain what's happening on screen and what to watch for next — based ONLY on what you can clearly see.${ctxLine}`;
+  return { system, user };
+}
+
 // Per-level lesson target — the SUBJECT the primary lesson should aim at. Mirrors
 // the system-prompt personas so the rubric and persona pull in the same direction.
 const lessonTargets: Record<string, string> = {
@@ -552,6 +572,26 @@ export async function POST(req: NextRequest) {
         console.error('Recap error:', e);
         // Score is real even if the narrative call failed — still useful.
         return NextResponse.json({ score, story: '', turningPoint: '', keyPerformance: '', whyItMattered: '' }, { headers: corsHeaders });
+      }
+    }
+
+    // Vision (premium #2) — analyze a captured/picked image. The model/provider lives behind
+    // analyzeImage() (visionProvider.ts); this branch only builds the never-fabricate prompt.
+    // Pro-gating is enforced client-side (no vision call fires for free users).
+    if (action === 'vision') {
+      const imageBase64: string = typeof body.imageBase64 === 'string' ? body.imageBase64 : '';
+      if (!imageBase64) {
+        return NextResponse.json({ error: 'Missing image' }, { status: 400, headers: corsHeaders });
+      }
+      const mode = body.mode === 'ask' ? 'ask' : 'explain';
+      const question = typeof body.question === 'string' ? body.question : '';
+      try {
+        const { system, user } = buildVisionPrompt(level, language, mode, question, body.gameContext);
+        const text = await analyzeImage({ imageBase64, system, user });
+        return NextResponse.json({ text }, { headers: corsHeaders });
+      } catch (e) {
+        console.error('Vision error:', e);
+        return NextResponse.json({ error: 'Failed to analyze image' }, { status: 500, headers: corsHeaders });
       }
     }
 

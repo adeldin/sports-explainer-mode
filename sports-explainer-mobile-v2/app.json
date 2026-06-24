@@ -34,7 +34,14 @@
     "plugins": [
       "expo-splash-screen",
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SportsWise uses your photos so you can analyze a screenshot of the game.",
+          "cameraPermission": "SportsWise uses the camera so you can analyze what's on screen."
+        }
+      ]
     ],
     "extra": {
       "eas": {

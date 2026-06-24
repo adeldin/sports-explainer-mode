@@ -19,6 +19,10 @@ const RC_ENTITLEMENT = 'pro';
 // configure entirely and run as a free user; nothing crashes.
 const RC_IOS_KEY: string | undefined = (Constants.expoConfig?.extra as any)?.revenueCatIosKey || undefined;
 
+// DEV-ONLY override: flip to true to exercise Pro-gated features (caps off, full recap, vision)
+// on a dev build WITHOUT a real purchase. NO effect in production (__DEV__ is false). Off by default.
+const DEV_FORCE_PRO = false;
+
 // Derive { isPro, isTrial } from a RevenueCat CustomerInfo. isPro true while the `pro`
 // entitlement is active (INCLUDING the trial); isTrial true only during the trial period.
 function deriveEntitlement(info: CustomerInfo | null): { isPro: boolean; isTrial: boolean } {
@@ -87,7 +91,10 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
     catch (e) { console.warn('RevenueCat refresh failed:', e); }
   }, [apply]);
 
-  const value: EntitlementValue = { isPro, isTrial, loading, restorePurchases, refresh };
+  const value: EntitlementValue = {
+    isPro: isPro || (__DEV__ && DEV_FORCE_PRO),
+    isTrial, loading, restorePurchases, refresh,
+  };
   return <EntitlementContext.Provider value={value}>{children}</EntitlementContext.Provider>;
 }
 

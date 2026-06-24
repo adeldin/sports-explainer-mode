@@ -18,6 +18,7 @@ import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
 import PlayCard, { QAItem } from '../components/PlayCard';
 import RecapCard from '../components/RecapCard';
+import VisionModal from '../components/VisionModal';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
@@ -83,6 +84,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [recap, setRecap] = useState<RecapResponse | null>(null);
   const [recapLoading, setRecapLoading] = useState(false);
   const recapReqRef = useRef(0);
+  // Vision "analyze the screen" (premium #2) — full-screen capture modal (locked preview for free).
+  const [visionOpen, setVisionOpen] = useState(false);
   const anyLoading = answers.some(a => a.status === 'loading');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Share: snapshot of the data to render into the off-screen capture card. Non-null
@@ -596,6 +599,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             <Text style={styles.headerTagline}>Watch and ask why.</Text>
           </View>
           <View style={styles.headerRight}>
+            {/* Analyze-the-screen (premium #2) — always available; opens the capture modal
+                (locked preview for free, full flow for Pro). */}
+            <TouchableOpacity
+              style={styles.visionBtn}
+              onPress={() => { Haptics.selectionAsync(); setVisionOpen(true); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={S.visionTitle}>
+              <Text style={styles.visionBtnIcon}>📸</Text>
+            </TouchableOpacity>
             {games.length > 0 ? (
               <View style={styles.livePill}>
                 <View style={styles.liveDot} />
@@ -886,6 +898,27 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             )}
           </View>
         </ScrollView>
+
+        {/* Analyze-the-screen (premium #2). gameContext enriches the analysis when a game is
+            selected; the modal renders a locked preview (no vision call) for free users. */}
+        <VisionModal
+          visible={visionOpen}
+          onClose={() => setVisionOpen(false)}
+          isPro={caps.isPro}
+          sport={sport}
+          level={level}
+          language={language}
+          gameContext={selectedGame ? {
+            sport,
+            homeTeam: selectedGame.homeTeam,
+            awayTeam: selectedGame.awayTeam,
+            homeScore: selectedGame.homeScore,
+            awayScore: selectedGame.awayScore,
+            state: selectedGame.state || '',
+            status: selectedGame.status,
+          } : undefined}
+          onUnlock={() => { setVisionOpen(false); presentPaywall(); }}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -903,6 +936,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   headerTitleAccent: { color: t.accent },
   headerTagline: { color: t.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  visionBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, alignItems: 'center', justifyContent: 'center' },
+  visionBtnIcon: { fontSize: 18 },
   livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
   livePillText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },

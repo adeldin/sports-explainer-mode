@@ -1,5 +1,7 @@
 import { RecapResponse, normalizeRecap } from './recap';
+import { VisionMode, VisionGameContext, VisionResponse, buildVisionBody, normalizeVision } from './vision';
 export type { RecapResponse };
+export type { VisionMode, VisionGameContext, VisionResponse };
 
 export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'mlr' | 'tennis' | 'golf' | 'cricket';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
@@ -146,4 +148,23 @@ export async function fetchRecap(
   });
   if (!response.ok) throw new Error('Failed to fetch recap');
   return normalizeRecap(await response.json());
+}
+
+// Vision (premium #2) — analyze a captured/picked image. Pro-gated client-side, so this only
+// ever fires for Pro/trial users. mode 'explain' (auto) or 'ask' (with a question about the image).
+export async function fetchVision(
+  imageBase64: string,
+  mode: VisionMode,
+  question: string,
+  level: Level,
+  language: Language,
+  gameContext?: VisionGameContext,
+): Promise<VisionResponse> {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(buildVisionBody(imageBase64, mode, question, level, language, gameContext)),
+  });
+  if (!response.ok) throw new Error('Failed to analyze image');
+  return normalizeVision(await response.json());
 }
