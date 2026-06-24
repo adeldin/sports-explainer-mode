@@ -541,6 +541,29 @@ requiring a rebuild.
 
 ---
 
+## ⚽ Match Timeline enhancements (banked)
+
+The soccer Match Timeline shipped (`feat(soccer)` `b0e551b`) rendering Highlightly events
+(goals/cards/subs by minute). Two follow-ups surfaced on the live Bosnia–Qatar match:
+
+### 1. Unknown event-type rows — the `10' • Bono` case
+The timeline showed a neutral-dot row `10' • Bono` — `eventIcon()`'s fallback for a `type` it
+doesn't map (Bono = Morocco's GK; likely a goalkeeper/VAR-style event). **Diagnose what `type`
+strings Highlightly actually sends** beyond Goal / Yellow Card / Red Card / Substitution / Missed
+Penalty (pull `events[].type` from a few finished matches — expect GK events, VAR reviews,
+penalties-awarded, injuries, etc.). Then **decide per type: map to a meaningful icon, or filter as
+noise** — a "key moments" timeline shouldn't list every goalkeeper touch. Keep the neutral-dot
+fallback only for genuinely-unknown types; filter the noisy ones so it stays glanceable.
+
+### 2. Team identity per row — flags (soccer) → logos (later)
+Right now you see WHO (player) but not for WHICH team. The **`team` field is already in
+`MatchEvent` and flowing** — step one is just **rendering it** on each row. Polish: **country
+flags** for soccer/World Cup (reuse the existing country→flag mapping from the score cards),
+**team logos** for other sports later. Directly serves "watch and ask why" — a goal scorer means
+little without the side. Cheap (the data's there); flags/logos are the visual upgrade.
+
+---
+
 ## 💡 Feature concepts
 
 ### 🚀 First-launch onboarding flow *(banked)*
