@@ -421,6 +421,70 @@ additive; vision runs on OpenAI and consumes zero Groq tokens). Two banked follo
 
 ---
 
+## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
+
+**Core architecture move — a `sportDataProvider` abstraction** (the SAME swappable-adapter pattern
+as `visionProvider.ts`: env-driven, one file, each adapter normalizes its source's JSON into our
+internal shape). **ESPN stays the DEFAULT for all sports**; specific sports override with a richer
+source via an adapter. Because each adapter normalizes to our format, **everything downstream
+(explanation prompt, UI, difficulty levels) is unchanged**. The first adapter is the real work;
+each subsequent one is incremental.
+
+**Tiered framework across the 14 sports:**
+- **Tier 1 — rich on ESPN, keep as-is:** NFL, NBA, MLB (full play-by-play). **Coach's Corner
+  launches here**, no data change.
+- **Tier 2 — thin on ESPN, cheap/free upgrade available (the opportunity):** soccer, cricket,
+  tennis, golf, rugby.
+- **Tier 3 — thin on ESPN, expensive upgrade only, defer:** rugby **expert-grade**
+  (Opta / Stats Perform) for deep phase data; revisit when partnerships develop.
+
+**Key strategic insight — Highlightly as a consolidated second provider.** Highlightly
+(highlightly.net, also on RapidAPI) has a **FREE tier — 100 requests/day, no credit card, every
+core feature** — and covers **soccer** (950+ leagues incl. EPL/La Liga/Serie A/Bundesliga/Ligue 1/
+MLS/Champions League/World Cup), **cricket** (900+ leagues, ball-by-ball), AND **rugby** (100+
+competitions incl. World Cup, Six Nations, URC, Premiership, Top 14, Super Rugby, MLR, Sevens). So
+**ONE Highlightly account + ONE adapter could upgrade three of our thinnest, most strategically
+important sports — including both investor-target sports, cricket + rugby — in a single move.**
+This reframes the question: maybe we don't need many APIs — we need **ESPN (default) + Highlightly
+(thin-sport upgrade)** behind the adapter, with specialists/Opta only where Highlightly proves
+insufficient. Paid tiers ~**$9.49–$45.99/mo** if we outgrow free.
+
+**Per-sport specifics (alternatives to Highlightly, for reference):**
+- **Soccer:** API-Football ($19/mo, events feed updated every 15s — goals/cards/subs/lineups with
+  timestamps, the play-level data ESPN withholds; free plan exists). football-data.org free = 12
+  comps but DELAYED scores + no events (weak for live). **Biggest live-lineup impact** of any
+  upgrade (World Cup live now + 3 major leagues).
+- **Cricket:** CricketData.org (lifetime-free 100 hits/day; $5.99/mo 2k/day; $12.99/mo 10k/day;
+  ball-by-ball). Sportmonks (€29+/mo, ball-by-ball commentary). **Highest strategic value** — cheap
+  AND investor-target sport.
+- **Tennis:** point-by-point feeds (Goalserve, Enetpulse, Matchstat, api-tennis.com, many RapidAPI
+  hobby-priced) — score before/after each point, server, serve speed, break-point context; some
+  **classify the meaning of each point** (break/set point, momentum) — gold for "watch and ask
+  why." Simple structure, easy adapter.
+- **Golf:** Slash Golf (free prototyping tier, hole-by-hole real-time). Richer (OddsMatrix/
+  SportsDataIO) go to shot-by-shot/strokes-gained — more than we need; hole-by-hole + leaderboard
+  is plenty.
+- **Rugby:** Highlightly (free, all major leagues) is the easy grab. Data Sports Group (Union +
+  League, live tries + commentary). Goalserve (free trial). **OPEN QUESTION / ACTION:** unconfirmed
+  whether any free/cheap rugby API exposes **deep phase-by-phase event data** (rucks/mauls/
+  breakdown/territory) for expert-grade explanation, or just scores + tries. **Action: grab the
+  free Highlightly key, hit it during a live match (Six Nations / URC / Super Rugby), inspect the
+  event payload depth** — that one test answers whether Highlightly closes the rugby gap "enough"
+  or rugby still genuinely needs Opta. ESPN gives rugby **zero** play-by-play
+  (`playByPlayAvailable: false`), so anything is an upgrade.
+
+**Suggested build sequence (after Coach's Corner):** soccer first (biggest live-lineup impact,
+World Cup live, free to start) → cricket second (strategic + cheap) → rugby (grab free Highlightly,
+run the depth test) → tennis/golf opportunistically → Opta for rugby expert-grade only when
+partnerships develop.
+
+**Cross-link to Coach's Corner:** this roadmap directly **extends** Coach's Corner — richer data
+per sport = Coach's Corner works for **soccer/cricket/rugby, not just US sports**. Build Coach's
+Corner **data-source-agnostic with clean degradation** so the data upgrade *extends* it rather than
+requiring a rebuild.
+
+---
+
 ## 💡 Feature concepts
 
 ### 🚀 First-launch onboarding flow *(banked)*
@@ -538,6 +602,24 @@ baseball double play) — ship small, see if people love it before building a li
 serves the "coach in your pocket" north star. Biggest lift, so do it when it can get focused
 attention — after the cheaper wins.
 
+**Build note (when we write the doc):** build it **data-source-agnostic** (per the 🛰️ per-sport
+data roadmap — clean degradation when a sport's feed is thin) AND **domain-seam-aware** (per the
+🧱 governing design principle — takes a domain config, sports assumptions not hard-coded). Frame it
+as a **live-context-explainer that happens to be configured for sports**, not a sports feature with
+strategy bolted on — so it extends to soccer/cricket/rugby (and later `[Topic]Wise` verticals)
+rather than needing a rebuild.
+
+**Pedagogy pillar — teach like Khan Academy, not a hype-man.** Coach's Corner's *voice* should:
+- **meet the viewer at their level** (tie to the existing 4 difficulty levels);
+- **walk the reasoning out loud** — *"they're running here, and here's why that's smart: …"*;
+- explain the **why behind the mechanic**, not just state the rule;
+- **build understanding** so the viewer can read the *next* situation themselves.
+
+The anti-pattern is the **fortune-cookie insight** (*"big moment, watch closely!"*) — flagging
+drama without teaching. App-wide split: **Academy = Duolingo** (the practice loop) · **Coach's
+Corner = Khan Academy** (the live explanation that makes the hard thing click) — **practice +
+comprehension**. This split generalizes to every `[Topic]Wise` vertical.
+
 ### 🖼️ Images / illustrations in quizzes *(post-launch)*
 
 **Concept:** add **optional** images to Academy quiz questions — player/equipment photos,
@@ -636,6 +718,39 @@ the core promise (**getting wiser**) visible and rewarding, and building a daily
 > difficulty tiers (**kid / beginner / intermediate / expert**) in `lib/facts.ts`, with an
 > on-card level picker (synced to the global app level), per-question answer shuffle, and
 > a streak mechanic. The remaining gamification work below now sits on top of this.
+
+### 🦉 Academy → "Duolingo for sports" — game catalog *(banked)*
+
+Expands the Duolingo-inspired vision from "quiz + streak" into a **library of game types**, every
+one inheriting the four difficulty levels. Grouped by mechanic:
+
+- **Visual ID:** *who's-this-player* (photo → name, difficulty-scaled); *whose-logo/kit*
+  (crop → team); *name-the-equipment* (gear → what/why; beginner-friendly, on-mission);
+  *read-the-play* (diagram / freeze-frame → guess the play or formation; upper-level).
+- **Matching / sorting:** *term → definition* (generate from the existing **206-term glossary**);
+  *player → team* / *player → position*; *sort-the-sequence* (order the phases of a play — downs /
+  an over / a possession).
+- **Recall:** spaced-repetition **flashcards** on rules / terms / signals (referee **hand-signals**
+  = a strong ready-made visual set).
+- **Trivia / quiz — differentiated from the current quizzes by FORMAT:** *rapid-fire* timed rounds
+  (Sporcle-style "name all 30 teams"); *this-or-that* binary speed rounds (offside/onside,
+  fair/foul); *daily challenge* (one shared puzzle/day → streak/retention loop).
+- **Scenario / judgment:** *"you make the call"* (situation → reveal what the pros do + why) — the
+  off-couch twin of a Coach's Corner moment.
+
+**Content-engine insight — much of this is closer than it looks.** The existing **206-term
+glossary** + the **Kid/Beginner/Intermediate/Expert** levels are ready-made engines: matching,
+flashcards, and term-quizzes can be **generated from the glossary**, and every game inherits the
+**4-level scaling** for free (pairs with the `awardPoints()` engine + per-game difficulty-mastery
+designed below — adding a game = content + per-game mastery + the same points hook).
+
+**Characters (banked for later):** a Duolingo-style **mascot / coach character** — half of Duo's
+retention magic. Could guide the Academy AND **voice Coach's Corner insights**, unifying the app's
+personality. A big later swing.
+
+**Coach's Corner ↔ Academy bridge:** Coach's Corner spots the teachable moment **live**; a
+"learn more" tap routes **into the relevant Academy lesson**. Coach's Corner finds it in the wild;
+Academy holds the structured lesson. (See **Sporcle** for more game-format inspiration.)
 
 ### ✅ Streaks — daily streak now shipped *(2e11ea7)*
 **✅ Shipped (2e11ea7):** a **real persisted day-over-day streak** now exists — a header chip
@@ -817,6 +932,36 @@ Brand asset: the **"[Topic]Wise"** naming pattern is clean and scalable.
 
 **Sequencing:** prove SportsWise fully first, then expand — but keep the architecture
 **topic-agnostic**: no sports-specific hardcoding in the explanation layer.
+
+### 🧱 Governing design principle — generic mechanism + pluggable content + data adapters
+
+Design every feature in **three layers** so it crosses over to future `[Topic]Wise` apps
+(politics, finance/stocks/taxes, etc.):
+1. **Core engine** — topic-agnostic loop / UI / logic.
+2. **Content packs** — glossary, image sets, scenario banks, domain prompts, *per topic*.
+3. **Data adapters** — normalize any source into our internal shape.
+
+SportsWise = core + sports content + sports adapters; **app #2 = the same core + new content +
+new adapters.**
+
+- **Academy generalizes** — every game type is mechanism + pluggable content:
+  *who's-this-player → who's-this-person*, *name-the-equipment → name-the-object*,
+  *read-the-play → read-the-chart*, *term-matching → any glossary*, *you-make-the-call → any
+  decision*; daily / rapid-fire / this-or-that are already topic-neutral. **Academy is a
+  game-engine framework, not a sports feature.**
+- **Coach's Corner generalizes** — it's a **"live contextual event explainer"**: real-time feed →
+  strategic *why* + *what's-next*, at the user's level. Stocks (market moves), politics
+  (votes/hearings) fit the **same engine**; only the **data source + domain prompt** change. Build
+  it taking a **domain config**, not sports-hardcoded.
+- **`sportDataProvider` → conceptually `dataProvider`** — the adapter pattern (see the per-sport
+  data roadmap) is a **core primitive**; sports adapters are just the first set. Likely the most
+  reusable thing being built.
+
+**Discipline — anti-over-engineering:** do **NOT** build the plugin framework now (only one app
+exists). Build SportsWise **concrete and shippable, but seam-aware** — don't weave sports
+assumptions through the code; keep the "sports" parts **identifiably swappable**. **Design the
+seam now, extract when app #2 is real.** (The "audit into core / content / app-shell buckets" step,
+applied prospectively.)
 
 ---
 
