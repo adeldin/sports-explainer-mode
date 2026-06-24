@@ -3,10 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Localization from 'expo-localization';
 import { Level, Language } from './api';
 import { SPORTS, orderSports, type SportTab } from './sports';
+import { DailyCapState, GameCapState, EMPTY_DAILY, EMPTY_GAME } from './caps';
 
 // Local YYYY-MM-DD (NOT toISOString, which is UTC and would flip the "day" across
 // timezones near midnight). Used for the daily-quiz streak's day-boundary logic.
-function localDateStr(d: Date): string {
+export function localDateStr(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -65,6 +66,10 @@ const KEYS = {
   autoRefresh: 'auto_refresh',
   dailyStreak: 'quiz_daily_streak',
   points: 'progression_points',
+  // Free-tier caps (persisted so they survive a force-quit mid-day / mid-game). Dumb
+  // counters — the gating decision (isPro? limit?) lives in lib/caps.ts + useCaps, never here.
+  explainCap: 'cap_explain_daily',
+  qaCap: 'cap_qa_game',
 } as const;
 
 interface AppStateValue {
@@ -81,6 +86,10 @@ interface AppStateValue {
   // Progression: persisted lifetime points total + the derived current rank.
   points: number;
   rank: RankInfo;
+  // Free-tier cap counters (raw, isPro-agnostic). useCaps() composes these with the
+  // entitlement + the pure evaluators in lib/caps.ts.
+  explainCap: DailyCapState;
+  qaCap: GameCapState;
 
   // --- Raw setters (writes auto-persist via the effects below) ---
   setLanguage: (l: Language) => void;
@@ -90,6 +99,8 @@ interface AppStateValue {
   setFavorites: (f: string[]) => void;
   setAutoRefresh: (v: boolean) => void;
   setNotificationsEnabled: (v: boolean) => void;
+  setExplainCap: (s: DailyCapState) => void;
+  setQaCap: (s: GameCapState) => void;
 
   // Record that the user took a quiz today; updates the persisted daily streak
   // (continue if yesterday, restart at 1 on a gap, no-op if already counted today)
@@ -119,13 +130,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [dailyStreakData, setDailyStreakData] = useState<DailyStreak>(DEFAULT_DAILY_STREAK);
   const [points, setPoints] = useState(0);
+  const [explainCap, setExplainCap] = useState<DailyCapState>(EMPTY_DAILY);
+  const [qaCap, setQaCap] = useState<GameCapState>(EMPTY_GAME);
   const [hydrated, setHydrated] = useState(false);
 
   // --- Load persisted state once on mount (moved out of App.tsx's init()) ---
   useEffect(() => {
     async function load() {
       try {
-        const [favs, notify, lang, tabOrder, visRaw, lvl, auto, streakRaw, pointsRaw] = await Promise.all([
+        const [favs, notify, lang, tabOrder, visRaw, lvl, auto, streakRaw, pointsRaw, explainCapRaw, qaCapRaw] = await Promise.all([
           AsyncStorage.getItem(KEYS.favorites),
           AsyncStorage.getItem(KEYS.notifications),
           AsyncStorage.getItem(KEYS.language),
@@ -135,6 +148,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(KEYS.autoRefresh),
           AsyncStorage.getItem(KEYS.dailyStreak),
           AsyncStorage.getItem(KEYS.points),
+          AsyncStorage.getItem(KEYS.explainCap),
+          AsyncStorage.getItem(KEYS.qaCap),
         ]);
 
         if (favs) { try { setFavorites(JSON.parse(favs)); } catch { /* keep [] */ } }
@@ -162,6 +177,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (pointsRaw !== null) {
           const n = parseInt(pointsRaw, 10);
           if (Number.isFinite(n) && n >= 0) setPoints(n); // else keep default 0
+        }
+        // Caps hydrate as-is; the pure evaluators roll the day / reset the game on next use,
+        // so a stale stored date/gameId self-heals without a recompute here.
+        if (explainCapRaw) {
+          try {
+            const p = JSON.parse(explainCapRaw);
+            if (p && typeof p.date === 'string' && typeof p.count === 'number' && Array.isArray(p.keys)) {
+              setExplainCap({ date: p.date, count: p.count, keys: p.keys });
+            }
+          } catch { /* keep EMPTY_DAILY */ }
+        }
+        if (qaCapRaw) {
+          try {
+            const p = JSON.parse(qaCapRaw);
+            if (p && typeof p.gameId === 'string' && typeof p.count === 'number') {
+              setQaCap({ gameId: p.gameId, count: p.count });
+            }
+          } catch { /* keep EMPTY_GAME */ }
         }
         if (lang) {
           // Honor a stored preference only if it's a currently-visible launch language.
@@ -191,6 +224,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.notifications, notificationsEnabled ? 'true' : 'false'); }, [notificationsEnabled, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.dailyStreak, JSON.stringify(dailyStreakData)); }, [dailyStreakData, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.points, String(points)); }, [points, hydrated]);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.explainCap, JSON.stringify(explainCap)); }, [explainCap, hydrated]);
+  useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.qaCap, JSON.stringify(qaCap)); }, [qaCap, hydrated]);
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.favorites, JSON.stringify(favorites)); }, [favorites, hydrated]);
   // Persist the order as the bare key list (the shape orderSports() reads back).
   useEffect(() => { if (hydrated) AsyncStorage.setItem(KEYS.tabOrder, JSON.stringify(orderedSports.map(s => s.key))); }, [orderedSports, hydrated]);
@@ -227,7 +262,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     language, level, orderedSports, sportVisibility, favorites, autoRefresh, notificationsEnabled,
     dailyStreak: dailyStreakData.count,
     points, rank: getRank(points),
+    explainCap, qaCap,
     setLanguage, setLevel, setOrderedSports, setSportVisibility, setFavorites, setAutoRefresh, setNotificationsEnabled,
+    setExplainCap, setQaCap,
     recordQuizActivity, awardPoints,
     hydrated,
   };

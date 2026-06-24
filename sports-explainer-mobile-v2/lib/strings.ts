@@ -7,6 +7,8 @@ import { Language } from './api';
 export interface UIStrings {
   // explanation card
   thePlay: string; whyItMatters: string; theRule: string; complexPlay: string; updated: string; latestPlay: string; playHeadlineFallback: string; gameNotStarted: string; watchNextLabel: string; liveNowLabel: string;
+  // Free-tier caps — indicators ({n} = remaining), graceful "keep going" blocked states, shared CTA.
+  capLeftToday: string; capQaLeft: string; capExplainTitle: string; capExplainBody: string; capQaTitle: string; capQaBody: string; capCta: string;
   // past plays
   playByPlay: string; loadMore: string; noPlays: string; showMore: string; showLess: string; pbpHint: string;
   // follow-up + ask
@@ -39,6 +41,7 @@ export interface UIStrings {
 export const UI_STRINGS: Record<Language, UIStrings> = {
   en: {
     thePlay: `THE PLAY`, whyItMatters: `WHY IT MATTERS`, theRule: `THE RULE`, complexPlay: `COMPLEX PLAY`, updated: `Updated`, latestPlay: `Latest Play`, playHeadlineFallback: `A key play just happened`, gameNotStarted: `This game hasn't started yet`, watchNextLabel: `Watch Next`, liveNowLabel: `Live Now`,
+    capLeftToday: `{n} left today`, capQaLeft: `{n} questions left`, capExplainTitle: `{n} plays explored today 🎉`, capExplainBody: `Go Pro for unlimited plays + questions. Your free plays refresh tomorrow.`, capQaTitle: `{n} questions this game 🙌`, capQaBody: `Go Pro to keep asking — unlimited questions on every play. A new game gives you more.`, capCta: `Keep going with Pro →`,
     playByPlay: `Play-by-Play`, loadMore: `Load more`, noPlays: `No play-by-play available for this game yet.`, showMore: `Show more`, showLess: `Show less`, pbpHint: `Tap any play to explain it · ● scoring play`,
     askFollowUp: `Ask a follow-up`, fuWhy: `Why it mattered`, fuRule: `Explain the rule`, fuNew: `Explain like I'm new`, fuNext: `What's next?`,
     share: `Share`, askPlaceholder: `Ask anything about this play…`, askLearnPlaceholder: `Ask anything about {sport}…`, askHint: `Confused by something the announcer said? Ask anything.`, thinking: `Thinking…`, answerError: `Could not get an answer. Try again.`,
@@ -60,6 +63,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   es: {
     thePlay: `LA JUGADA`, whyItMatters: `POR QUÉ IMPORTA`, theRule: `LA REGLA`, complexPlay: `JUGADA COMPLEJA`, updated: `Actualizado`, latestPlay: `Última jugada`, playHeadlineFallback: `Acaba de ocurrir una jugada clave`, gameNotStarted: `Este partido aún no ha comenzado`, watchNextLabel: `Para ver`, liveNowLabel: `En vivo ahora`,
+    capLeftToday: `{n} restantes hoy`, capQaLeft: `{n} preguntas restantes`, capExplainTitle: `{n} jugadas exploradas hoy 🎉`, capExplainBody: `Hazte Pro para jugadas y preguntas ilimitadas. Tus jugadas gratis se renuevan mañana.`, capQaTitle: `{n} preguntas en este partido 🙌`, capQaBody: `Hazte Pro para seguir preguntando: preguntas ilimitadas en cada jugada. Un nuevo partido te da más.`, capCta: `Continúa con Pro →`,
     playByPlay: `Jugada a jugada`, loadMore: `Cargar más`, noPlays: `Aún no hay jugada a jugada para este partido.`, showMore: `Ver más`, showLess: `Ver menos`, pbpHint: `Toca cualquier jugada para explicarla · ● jugada de anotación`,
     askFollowUp: `Haz una pregunta de seguimiento`, fuWhy: `¿Por qué importó eso?`, fuRule: `Explica la regla`, fuNew: `Explícamelo como si fuera nuevo`, fuNext: `¿Qué viene ahora?`,
     share: `Compartir`, askPlaceholder: `Pregunta lo que quieras sobre esta jugada…`, askLearnPlaceholder: `Pregunta lo que quieras sobre {sport}…`, askHint: `¿No entendiste algo que dijo el comentarista? Pregunta lo que quieras.`, thinking: `Pensando…`, answerError: `No se pudo obtener una respuesta. Inténtalo de nuevo.`,
@@ -81,6 +85,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   fr: {
     thePlay: `L'ACTION`, whyItMatters: `POURQUOI C'EST IMPORTANT`, theRule: `LA RÈGLE`, complexPlay: `ACTION COMPLEXE`, updated: `Mis à jour`, latestPlay: `Dernière action`, playHeadlineFallback: `Une action clé vient de se produire`, gameNotStarted: `Ce match n'a pas encore commencé`, watchNextLabel: `À suivre`, liveNowLabel: `En direct`,
+    capLeftToday: `{n} restantes aujourd'hui`, capQaLeft: `{n} questions restantes`, capExplainTitle: `{n} actions explorées aujourd'hui 🎉`, capExplainBody: `Passez à Pro pour des actions et questions illimitées. Vos actions gratuites se renouvellent demain.`, capQaTitle: `{n} questions ce match 🙌`, capQaBody: `Passez à Pro pour continuer à poser des questions — illimitées sur chaque action. Un nouveau match vous en donne plus.`, capCta: `Continuer avec Pro →`,
     playByPlay: `Action par action`, loadMore: `Charger plus`, noPlays: `Pas encore d'action par action pour ce match.`, showMore: `Voir plus`, showLess: `Voir moins`, pbpHint: `Touchez une action pour l'expliquer · ● action décisive`,
     askFollowUp: `Poser une question`, fuWhy: `Pourquoi est-ce important ?`, fuRule: `Explique la règle`, fuNew: `Explique comme à un débutant`, fuNext: `Que faut-il surveiller ?`,
     share: `Partager`, askPlaceholder: `Pose une question sur cette action…`, askLearnPlaceholder: `Pose une question sur {sport}…`, askHint: `Une phrase du commentateur vous échappe ? Posez n'importe quelle question.`, thinking: `Réflexion…`, answerError: `Impossible d'obtenir une réponse. Réessaie.`,
@@ -102,6 +107,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   pt: {
     thePlay: `A JOGADA`, whyItMatters: `POR QUE IMPORTA`, theRule: `A REGRA`, complexPlay: `JOGADA COMPLEXA`, updated: `Atualizado`, latestPlay: `Última jogada`, playHeadlineFallback: `Uma jogada importante acabou de acontecer`, gameNotStarted: `Este jogo ainda não começou`, watchNextLabel: `Assista a seguir`, liveNowLabel: `Ao vivo agora`,
+    capLeftToday: `{n} restantes hoje`, capQaLeft: `{n} perguntas restantes`, capExplainTitle: `{n} jogadas exploradas hoje 🎉`, capExplainBody: `Seja Pro para jogadas e perguntas ilimitadas. Suas jogadas grátis renovam amanhã.`, capQaTitle: `{n} perguntas neste jogo 🙌`, capQaBody: `Seja Pro para continuar perguntando — perguntas ilimitadas em cada jogada. Um novo jogo dá mais.`, capCta: `Continue com o Pro →`,
     playByPlay: `Lance a lance`, loadMore: `Carregar mais`, noPlays: `Ainda não há lance a lance para este jogo.`, showMore: `Mostrar mais`, showLess: `Mostrar menos`, pbpHint: `Toque em qualquer jogada para explicá-la · ● jogada de pontuação`,
     askFollowUp: `Faça uma pergunta`, fuWhy: `Por que isso importou?`, fuRule: `Explique a regra`, fuNew: `Explique como se eu fosse novo`, fuNext: `O que observar a seguir?`,
     share: `Compartilhar`, askPlaceholder: `Pergunte qualquer coisa sobre esta jogada…`, askLearnPlaceholder: `Pergunte qualquer coisa sobre {sport}…`, askHint: `Não entendeu algo que o locutor disse? Pergunte o que quiser.`, thinking: `Pensando…`, answerError: `Não foi possível obter uma resposta. Tente novamente.`,
@@ -123,6 +129,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   de: {
     thePlay: `DER SPIELZUG`, whyItMatters: `WARUM ES ZÄHLT`, theRule: `DIE REGEL`, complexPlay: `KOMPLEXER SPIELZUG`, updated: `Aktualisiert`, latestPlay: `Letzter Spielzug`, playHeadlineFallback: `Gerade ist ein wichtiger Spielzug passiert`, gameNotStarted: `Dieses Spiel hat noch nicht begonnen`, watchNextLabel: `Als Nächstes`, liveNowLabel: `Jetzt live`,
+    capLeftToday: `Noch {n} heute`, capQaLeft: `{n} Fragen übrig`, capExplainTitle: `{n} Spielzüge heute erkundet 🎉`, capExplainBody: `Hol dir Pro für unbegrenzte Spielzüge und Fragen. Deine Gratis-Spielzüge gibt es morgen wieder.`, capQaTitle: `{n} Fragen in diesem Spiel 🙌`, capQaBody: `Hol dir Pro, um weiter zu fragen — unbegrenzte Fragen zu jedem Spielzug. Ein neues Spiel gibt dir mehr.`, capCta: `Mit Pro weitermachen →`,
     playByPlay: `Zug für Zug`, loadMore: `Mehr laden`, noPlays: `Für dieses Spiel ist noch kein Zug-für-Zug verfügbar.`, showMore: `Mehr anzeigen`, showLess: `Weniger anzeigen`, pbpHint: `Tippe auf einen Spielzug für die Erklärung · ● Punktespielzug`,
     askFollowUp: `Stell eine Nachfrage`, fuWhy: `Warum war das wichtig?`, fuRule: `Erkläre die Regel`, fuNew: `Erkläre es für Einsteiger`, fuNext: `Worauf sollte ich als Nächstes achten?`,
     share: `Teilen`, askPlaceholder: `Frag alles zu diesem Spielzug…`, askLearnPlaceholder: `Frag alles über {sport}…`, askHint: `Etwas vom Kommentator nicht verstanden? Frag einfach.`, thinking: `Denkt nach…`, answerError: `Antwort konnte nicht geladen werden. Versuch es erneut.`,
@@ -144,6 +151,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   it: {
     thePlay: `L'AZIONE`, whyItMatters: `PERCHÉ CONTA`, theRule: `LA REGOLA`, complexPlay: `AZIONE COMPLESSA`, updated: `Aggiornato`, latestPlay: `Ultima azione`, playHeadlineFallback: `È appena successa un'azione chiave`, gameNotStarted: `Questa partita non è ancora iniziata`, watchNextLabel: `Da vedere`, liveNowLabel: `Ora in diretta`,
+    capLeftToday: `{n} rimaste oggi`, capQaLeft: `{n} domande rimaste`, capExplainTitle: `{n} azioni esplorate oggi 🎉`, capExplainBody: `Passa a Pro per azioni e domande illimitate. Le tue azioni gratis si rinnovano domani.`, capQaTitle: `{n} domande in questa partita 🙌`, capQaBody: `Passa a Pro per continuare a chiedere — domande illimitate su ogni azione. Una nuova partita te ne dà altre.`, capCta: `Continua con Pro →`,
     playByPlay: `Azione per azione`, loadMore: `Carica altro`, noPlays: `Non c'è ancora l'azione per azione per questa partita.`, showMore: `Mostra altro`, showLess: `Mostra meno`, pbpHint: `Tocca un'azione per spiegarla · ● azione da punto`,
     askFollowUp: `Fai una domanda`, fuWhy: `Perché è stato importante?`, fuRule: `Spiega la regola`, fuNew: `Spiegamelo come a un principiante`, fuNext: `Cosa guardare adesso?`,
     share: `Condividi`, askPlaceholder: `Chiedi qualsiasi cosa su questa azione…`, askLearnPlaceholder: `Chiedi qualsiasi cosa su {sport}…`, askHint: `Non hai capito qualcosa detto dal telecronista? Chiedi pure.`, thinking: `Sto pensando…`, answerError: `Impossibile ottenere una risposta. Riprova.`,
@@ -165,6 +173,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ja: {
     thePlay: `プレー`, whyItMatters: `なぜ重要か`, theRule: `ルール`, complexPlay: `複雑なプレー`, updated: `更新`, latestPlay: `最新のプレー`, playHeadlineFallback: `重要なプレーがありました`, gameNotStarted: `この試合はまだ始まっていません`, watchNextLabel: `次に観る`, liveNowLabel: `今ライブ中`,
+    capLeftToday: `本日残り{n}回`, capQaLeft: `残り{n}問`, capExplainTitle: `今日は{n}プレーを確認 🎉`, capExplainBody: `Proなら無制限のプレーと質問。無料プレーは明日また使えます。`, capQaTitle: `この試合で{n}問 🙌`, capQaBody: `Proで質問を続けよう — どのプレーも質問し放題。新しい試合でさらに。`, capCta: `Proで続ける →`,
     playByPlay: `プレーバイプレー`, loadMore: `もっと見る`, noPlays: `この試合のプレーバイプレーはまだありません。`, showMore: `もっと見る`, showLess: `閉じる`, pbpHint: `プレーをタップして解説 · ● 得点プレー`,
     askFollowUp: `追加で質問する`, fuWhy: `なぜ重要だったの？`, fuRule: `ルールを説明して`, fuNew: `初心者向けに説明して`, fuNext: `次は何に注目すればいい？`,
     share: `シェア`, askPlaceholder: `このプレーについて何でも質問…`, askLearnPlaceholder: `{sport}について何でも質問…`, askHint: `アナウンサーの言葉がわからない？何でも質問できます。`, thinking: `考え中…`, answerError: `回答を取得できませんでした。もう一度お試しください。`,
@@ -186,6 +195,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   zh: {
     thePlay: `这次进攻`, whyItMatters: `为什么重要`, theRule: `规则`, complexPlay: `复杂战术`, updated: `已更新`, latestPlay: `最新进攻`, playHeadlineFallback: `刚刚发生了一次关键进攻`, gameNotStarted: `这场比赛尚未开始`, watchNextLabel: `接下来观看`, liveNowLabel: `正在直播`,
+    capLeftToday: `今日还剩 {n} 次`, capQaLeft: `还剩 {n} 个问题`, capExplainTitle: `今天已了解 {n} 个回合 🎉`, capExplainBody: `升级 Pro 畅享无限回合和提问。免费次数明天刷新。`, capQaTitle: `本场比赛 {n} 个问题 🙌`, capQaBody: `升级 Pro 继续提问 — 每个回合都能无限提问。新比赛还有更多。`, capCta: `升级 Pro 继续 →`,
     playByPlay: `逐回合`, loadMore: `加载更多`, noPlays: `本场比赛暂无逐回合记录。`, showMore: `显示更多`, showLess: `收起`, pbpHint: `点按任意回合查看解说 · ● 得分回合`,
     askFollowUp: `继续追问`, fuWhy: `这为什么重要？`, fuRule: `解释一下规则`, fuNew: `像对新手一样解释`, fuNext: `接下来该看什么？`,
     share: `分享`, askPlaceholder: `关于这次进攻，随便问…`, askLearnPlaceholder: `关于{sport}，随便问…`, askHint: `没听懂解说员说的话？随便问。`, thinking: `思考中…`, answerError: `无法获取答案，请重试。`,
@@ -207,6 +217,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ko: {
     thePlay: `플레이`, whyItMatters: `왜 중요한가`, theRule: `규칙`, complexPlay: `복잡한 플레이`, updated: `업데이트됨`, latestPlay: `최신 플레이`, playHeadlineFallback: `방금 중요한 플레이가 나왔습니다`, gameNotStarted: `이 경기는 아직 시작되지 않았습니다`, watchNextLabel: `다음 경기`, liveNowLabel: `지금 라이브`,
+    capLeftToday: `오늘 {n}회 남음`, capQaLeft: `질문 {n}개 남음`, capExplainTitle: `오늘 {n}개 플레이 살펴봄 🎉`, capExplainBody: `Pro로 무제한 플레이와 질문을 즐기세요. 무료 플레이는 내일 다시 채워집니다.`, capQaTitle: `이 경기에서 질문 {n}개 🙌`, capQaBody: `Pro로 계속 질문하세요 — 모든 플레이에 무제한 질문. 새 경기엔 더 많이.`, capCta: `Pro로 계속하기 →`,
     playByPlay: `플레이별 기록`, loadMore: `더 보기`, noPlays: `이 경기의 플레이별 기록이 아직 없습니다.`, showMore: `더 보기`, showLess: `접기`, pbpHint: `플레이를 탭하면 설명이 나와요 · ● 득점 플레이`,
     askFollowUp: `추가 질문하기`, fuWhy: `그게 왜 중요했나요?`, fuRule: `규칙을 설명해 줘`, fuNew: `초보자처럼 설명해 줘`, fuNext: `다음엔 무엇을 봐야 하나요?`,
     share: `공유`, askPlaceholder: `이 플레이에 대해 무엇이든 물어보세요…`, askLearnPlaceholder: `{sport}에 대해 무엇이든 물어보세요…`, askHint: `해설자가 한 말이 헷갈리나요? 무엇이든 물어보세요.`, thinking: `생각 중…`, answerError: `답변을 가져오지 못했습니다. 다시 시도하세요.`,
@@ -228,6 +239,7 @@ export const UI_STRINGS: Record<Language, UIStrings> = {
 
   ar: {
     thePlay: `اللعبة`, whyItMatters: `لماذا تهم`, theRule: `القاعدة`, complexPlay: `لعبة معقدة`, updated: `تم التحديث`, latestPlay: `آخر لعبة`, playHeadlineFallback: `حدثت لحظة حاسمة للتو`, gameNotStarted: `لم تبدأ هذه المباراة بعد`, watchNextLabel: `شاهد التالي`, liveNowLabel: `مباشر الآن`,
+    capLeftToday: `متبقٍ {n} اليوم`, capQaLeft: `متبقٍ {n} أسئلة`, capExplainTitle: `استكشفت {n} لقطات اليوم 🎉`, capExplainBody: `اشترك في Pro للقطات وأسئلة غير محدودة. لقطاتك المجانية تتجدد غدًا.`, capQaTitle: `{n} أسئلة في هذه المباراة 🙌`, capQaBody: `اشترك في Pro لمواصلة السؤال — أسئلة غير محدودة على كل لقطة. مباراة جديدة تمنحك المزيد.`, capCta: `تابع مع Pro ←`,
     playByPlay: `لعبة بلعبة`, loadMore: `تحميل المزيد`, noPlays: `لا يتوفر بعد سرد لعبة بلعبة لهذه المباراة.`, showMore: `عرض المزيد`, showLess: `عرض أقل`, pbpHint: `اضغط على أي لعبة لشرحها · ● لعبة تسجيل`,
     askFollowUp: `اطرح سؤالاً للمتابعة`, fuWhy: `لماذا كان ذلك مهماً؟`, fuRule: `اشرح القاعدة`, fuNew: `اشرح لي وكأنني مبتدئ`, fuNext: `ما الذي يجب أن أنتبه له تالياً؟`,
     share: `مشاركة`, askPlaceholder: `اسأل أي شيء عن هذه اللعبة…`, askLearnPlaceholder: `اسأل أي شيء عن {sport}…`, askHint: `لم تفهم شيئًا قاله المعلّق؟ اسأل أي شيء.`, thinking: `جارٍ التفكير…`, answerError: `تعذّر الحصول على إجابة. حاول مرة أخرى.`,

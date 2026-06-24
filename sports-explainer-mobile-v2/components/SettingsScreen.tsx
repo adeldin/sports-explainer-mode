@@ -6,6 +6,7 @@ import { scheduleQuizReminder, cancelQuizReminder } from '../lib/notifications';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { useAppState } from '../lib/appState';
+import { useEntitlement, presentPaywall } from '../lib/entitlement';
 import { UI_STRINGS } from '../lib/strings';
 
 const APP_ID = '6781028656'; // SportsWise App Store ID (App Store Connect)
@@ -42,6 +43,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
     setLevel, setLanguage, setAutoRefresh, setNotificationsEnabled,
   } = useAppState();
   const { mode, theme, setMode } = useTheme();
+  const { isPro, isTrial, restorePurchases } = useEntitlement();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
   const LVL: Record<Level, { label: string; desc: string }> = {
@@ -70,7 +72,25 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.sectionLabel}>{S.mySports}</Text>
+          {/* SportsWise Pro — Go Pro presents the RevenueCat drop-in paywall; Restore is
+              Apple-required. (Labels English for now — localization is a small follow-up.) */}
+          <Text style={styles.sectionLabel}>SportsWise Pro</Text>
+          {isPro ? (
+            <View style={styles.linkRow}>
+              <Text style={styles.linkLabel}>{isTrial ? '✨ Pro — free trial active' : '✨ Pro active'}</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.linkRow} onPress={presentPaywall}>
+              <Text style={styles.linkLabel}>Go Pro — unlimited explanations & questions</Text>
+              <Text style={styles.linkChevron}>›</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={restorePurchases}>
+            <Text style={styles.linkLabel}>Restore Purchases</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.mySports}</Text>
           <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
             <Text style={styles.linkLabel}>{S.customizeSports}</Text>
             <Text style={styles.linkChevron}>›</Text>

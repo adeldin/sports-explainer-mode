@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import App from './App';
 import { ThemeProvider } from './lib/theme';
 import { AppStateProvider } from './lib/appState';
+import { EntitlementProvider } from './lib/entitlement';
 
 // GestureHandlerRootView must be at the very root for drag/long-press gestures
 // to register. SafeAreaProvider supplies inset data to every screen (tabs + stack).
@@ -23,7 +24,14 @@ function Root() {
       React.createElement(
         AppStateProvider,
         null,
-        React.createElement(ThemeProvider, null, React.createElement(App)),
+        // EntitlementProvider supplies the central `isPro` gate (caps + future premium
+        // features). Inside AppState (so useCaps can read the persisted counters), above
+        // Theme/App so every screen can gate on it.
+        React.createElement(
+          EntitlementProvider,
+          null,
+          React.createElement(ThemeProvider, null, React.createElement(App)),
+        ),
       ),
     ),
   );

@@ -18,6 +18,7 @@ import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
 import PlayCard, { QAItem } from '../components/PlayCard';
 import { derivePlayKey } from '../lib/playKey';
+import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
 import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from '../lib/api';
@@ -71,6 +72,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // under the ask box (learn-mode, where there's no card). Per-item loading/error status.
   const [answers, setAnswers] = useState<QAItem[]>([]);
   const [askText, setAskText] = useState('');
+  // Free-tier caps. capBlocked surfaces a graceful, brand-matched "keep going" state when a
+  // cap is hit (NOT an error wall); the RC drop-in paywall is one tap away from there.
+  const caps = useCaps();
+  const [explainBlocked, setExplainBlocked] = useState(false);
+  const [qaBlocked, setQaBlocked] = useState(false);
   const anyLoading = answers.some(a => a.status === 'loading');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Share: snapshot of the data to render into the off-screen capture card. Non-null
@@ -220,6 +226,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // same-play 60s refresh keeps the same key, so answers persist (matches the
       // PlayCard context-key, which excludes result/lastUpdated and so doesn't remount).
       const playKey = derivePlayKey(data.rawPlay, data.playType);
+      // Free-tier daily cap. Enforced HERE (post-fetch) because the per-(gameId,playKey)
+      // unit needs playKey to tell a re-read (free) from a genuinely new play. The 60s
+      // auto-refresh (isRefresh) and re-reads don't consume. On block: don't commit the
+      // result — show the graceful "keep going" state instead (the paywall is one tap away).
+      const allowed = caps.recordExplanation(selectedGameId, playKey, isRefresh);
+      if (!allowed) {
+        setExplainBlocked(true);
+        setResult(null);
+        return;
+      }
+      setExplainBlocked(false);
       if (playKey !== lastPlayKeyRef.current) {
         setAnswers([]);
         lastPlayKeyRef.current = playKey;
@@ -237,8 +254,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // its own spinner here can't strand it — even when cancelled.
       setLoading(false);
       setRefreshing(false);
+      // (cap state handled above — see the recordExplanation gate)
     }
-  }, [sport, level, selectedGameId, language]);
+  }, [sport, level, selectedGameId, language, caps.recordExplanation]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -359,6 +377,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   };
 
   const handleFollowUp = async (question: string, source: 'chip' | 'ask') => {
+    // Per-game Q&A cap — gated BEFORE the fetch, and ONLY for real games (a live/final
+    // selectedGameId). Learn-mode / gameless asks (selectedGameId null) stay ungated.
+    // Counts chip + typed equally (both arrive here). On block: graceful "keep going" row,
+    // no fetch.
+    if (selectedGameId && !caps.recordQA(selectedGameId)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setQaBlocked(true);
+      return;
+    }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const id = ++qaIdRef.current;
     setAnswers(prev => [...prev, { id, question, answer: null, status: 'loading', source }]);
@@ -419,6 +446,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // NOT pass through this effect (it calls handleFetch directly), so its persistence is
     // governed solely by handleFetch's playKey gate.
     setAnswers([]);
+    // Fresh context → clear the cap-blocked states too (the Q&A counter itself resets
+    // per-game in caps.ts; this just drops the UI flags so a new game/play starts clean).
+    setExplainBlocked(false); setQaBlocked(false);
     if (!selectedGameId || !isExplainable) { setResult(null); setLoading(false); return; }
     let cancelled = false;
     handleFetch(() => cancelled);
@@ -639,6 +669,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
               <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 12 }]} />
             </View>
+          ) : explainBlocked ? (
+            // Daily free-explanation cap hit — a graceful "keep going" moment (leads with what
+            // they got, frames Pro as continuation, notes the free refresh — NOT an error wall).
+            <View style={styles.capCard}>
+              <Text style={styles.capTitle}>{S.capExplainTitle.replace('{n}', String(caps.DAILY_FREE))}</Text>
+              <Text style={styles.capBody}>{S.capExplainBody}</Text>
+              <TouchableOpacity style={styles.capBtn} onPress={presentPaywall} activeOpacity={0.85}>
+                <Text style={styles.capBtnText}>{S.capCta}</Text>
+              </TouchableOpacity>
+            </View>
           ) : result ? (
             <Animated.View style={{ opacity: fadeAnim }}>
               {/* Layered Play Card (Step D) — derived headline + core lesson + WHY
@@ -652,6 +692,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 lastUpdated={lastUpdated}
                 answers={answers.filter(a => a.source === 'chip')}
               />
+
+              {/* Free-tier indicator — subtle, informational, hidden for Pro/trial (∞). */}
+              {caps.explanationsLeft !== Infinity && (
+                <Text style={styles.capIndicator}>{S.capLeftToday.replace('{n}', String(caps.explanationsLeft))}</Text>
+              )}
 
               {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
                 <PastPlays
@@ -689,13 +734,29 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   ))}
                 </View>
 
-                {/* Discovery hint — only when no typed answer is present/pending under the box */}
-                {!answers.some(a => a.source === 'ask') && (
-                  <Text style={styles.askHint}>{S.askHint}</Text>
+                {qaBlocked ? (
+                  // Per-game Q&A cap hit — graceful "keep going" row in place of the ask box.
+                  <View style={styles.capInline}>
+                    <Text style={styles.capInlineTitle}>{S.capQaTitle.replace('{n}', String(caps.QA_FREE_PER_GAME))}</Text>
+                    <Text style={styles.capInlineBody}>{S.capQaBody}</Text>
+                    <TouchableOpacity style={styles.capBtn} onPress={presentPaywall} activeOpacity={0.85}>
+                      <Text style={styles.capBtnText}>{S.capCta}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <>
+                    {/* Free-tier Q&A indicator — hidden for Pro/trial (∞). */}
+                    {selectedGameId && caps.qaLeft(selectedGameId) !== Infinity && (
+                      <Text style={styles.capIndicator}>{S.capQaLeft.replace('{n}', String(caps.qaLeft(selectedGameId)))}</Text>
+                    )}
+                    {/* Discovery hint — only when no typed answer is present/pending under the box */}
+                    {!answers.some(a => a.source === 'ask') && (
+                      <Text style={styles.askHint}>{S.askHint}</Text>
+                    )}
+                    {/* Free-text ask box — typed answers render inline beneath it; chips → card layers */}
+                    {renderAskBox(S.askPlaceholder)}
+                  </>
                 )}
-
-                {/* Free-text ask box — typed answers render inline beneath it; chips → card layers */}
-                {renderAskBox(S.askPlaceholder)}
               </View>
             </Animated.View>
           ) : selectedGame && selectedGameState === 'pre' ? (
@@ -880,6 +941,17 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chipText: { color: t.textPrimary, fontSize: 13, fontWeight: '500' },
   chipTextActive: { color: t.accentText },
   askHint: { color: t.textMuted, fontSize: 12, lineHeight: 16, marginTop: 12 },
+  // Free-tier caps — subtle indicator + the graceful "keep going" blocked states (brand
+  // navy/orange; celebratory, not error-toned). Shared orange CTA → RC drop-in paywall.
+  capIndicator: { color: t.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginTop: 10 },
+  capCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent, alignItems: 'flex-start' },
+  capTitle: { color: t.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 24, marginBottom: 8 },
+  capBody: { color: t.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 16 },
+  capInline: { marginTop: 12, padding: 14, backgroundColor: t.explanationBg, borderRadius: 12, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent },
+  capInlineTitle: { color: t.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: 6 },
+  capInlineBody: { color: t.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  capBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, alignSelf: 'stretch', alignItems: 'center' },
+  capBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   askInput: { flex: 1, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: t.textPrimary, fontSize: 14 },
   askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },

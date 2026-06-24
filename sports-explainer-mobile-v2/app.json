@@ -39,7 +39,8 @@
     "extra": {
       "eas": {
         "projectId": "5019919d-136b-46ec-8cf7-259dd6259e8f"
-      }
+      },
+      "revenueCatIosKey": ""
     },
     "owner": "adeldin"
   }
