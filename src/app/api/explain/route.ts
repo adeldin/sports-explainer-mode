@@ -275,16 +275,23 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
         if (game.id) {
           try {
             const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
-            for (const p of (sum?.scoringPlays || []).slice(-6)) { if (p?.text) out.summaryFacts.push(String(p.text)); }
+            // Order facts by SIGNIFICANCE, not recency, so the model leads with what mattered:
+            // leaders (the "who dominated" signal) first, then scoring events earliest-first
+            // (an opening burst precedes late/garbage-time scores, which fall last and get
+            // trimmed first by the cap). Behavior-identical when both buckets are empty.
+            const leaderFacts: string[] = [];
+            const scoringFacts: string[] = [];
             for (const grp of (sum?.leaders || [])) {
               for (const cat of (grp?.leaders || []).slice(0, 2)) {
                 const l = cat?.leaders?.[0];
-                if (l?.athlete?.displayName && l?.displayValue) out.summaryFacts.push(`${l.athlete.displayName}: ${l.displayValue}${cat?.displayName ? ` (${cat.displayName})` : ''}`);
+                if (l?.athlete?.displayName && l?.displayValue) leaderFacts.push(`${l.athlete.displayName}: ${l.displayValue}${cat?.displayName ? ` (${cat.displayName})` : ''}`);
               }
             }
+            for (const p of (sum?.scoringPlays || [])) { if (p?.text) scoringFacts.push(String(p.text)); }
             if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
-              for (const e of (sum?.keyEvents || []).slice(-8)) { if (e?.text) out.summaryFacts.push(String(e.text)); }
+              for (const e of (sum?.keyEvents || [])) { if (e?.text) scoringFacts.push(String(e.text)); }
             }
+            out.summaryFacts.push(...leaderFacts, ...scoringFacts);
           } catch { /* no summary → thin (honest) recap */ }
         }
       }
@@ -306,7 +313,7 @@ function buildRecapPrompt(data: RecapData, sport: string, level: string, languag
   const fields = isPro ? `"story", "turningPoint", "keyPerformance", "whyItMattered"` : `"story"`;
   // STORY leads with the lede — the single most significant fact AMONG THE DATA (ordering, not
   // invention). Hoisted into one shared const so the Pro/free story guidance can't drift.
-  const storyLine = `- "story": Lead with the SINGLE most newsworthy thing IN THE DATA below — e.g. a decisive individual performance, a late or winning goal, a comeback, the cause of a lopsided result, or a record/milestone ONLY if the data explicitly states one. Ask "what's the headline of this game?" and write toward it, using the stats as SUPPORT for that storyline rather than as the opening. 2-4 sentences at a ${level} level. Pick the lede ONLY from the facts provided — do NOT manufacture significance or add "historic"/"record"/"milestone" framing the data does not contain. If the facts are thin and nothing clearly stands out, say so plainly (e.g. note the detail isn't available) rather than inflating a minor stat into a headline.`;
+  const storyLine = `- "story": Lead with the SINGLE most CONSEQUENTIAL storyline IN THE DATA below — what actually DROVE the result: a dominant individual performance, an early scoring burst that broke the game open, a comeback, a late goal that DECIDED a close game, or a record/milestone ONLY if the data explicitly states one. "Most significant" means most consequential to the OUTCOME, NOT the most recent event — in a one-sided result do NOT lead with the final or latest score (a late goal in a 5-0 game is immaterial once the result is decided; the dominant performance or the early burst is the story). Ask "what's the headline of this game?" and write toward it, using the other stats as SUPPORT rather than as the opening. 2-4 sentences at a ${level} level. Pick the lede ONLY from the facts provided — do NOT manufacture significance or add "historic"/"record"/"milestone" framing the data does not contain. If the facts are thin and nothing clearly stands out, say so plainly (e.g. note the detail isn't available) rather than inflating a minor stat into a headline.`;
   const guide = isPro
     ? `${storyLine}
 - "turningPoint": the single moment the game shifted — ONLY if the data shows one, else "".
