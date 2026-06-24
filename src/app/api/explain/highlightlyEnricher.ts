@@ -59,6 +59,8 @@ function mapEvents(raw: any[]): MatchEvent[] {
 // (±1 day for the UTC/local edge), match on the normalized home+away pair (order-independent).
 async function reconcile(base: NormalizedGameData, leagueId: number): Promise<string | null> {
   const h = norm(base.homeTeam), a = norm(base.awayTeam);
+  // TEMP DEBUG (remove after diagnosis): what ESPN gives vs what Highlightly returns.
+  console.log(`[hl-debug] ESPN teams: "${base.homeTeam}"/"${base.awayTeam}" → norm home=${h} away=${a} | leagueId=${leagueId} startTime=${base.startTime}`);
   if (!h || !a) return null;
   const day = (d: Date) => d.toISOString().slice(0, 10);
   const seed = base.startTime ? new Date(base.startTime) : new Date();
@@ -68,17 +70,25 @@ async function reconcile(base: NormalizedGameData, leagueId: number): Promise<st
   for (const date of dates) {
     try {
       const res = await hl(`/matches?leagueId=${leagueId}&date=${date}`);
-      if (!res.ok) continue;
+      if (!res.ok) { console.log(`[hl-debug] /matches date=${date} → HTTP ${res.status}`); continue; }
       const data = await res.json();
       const matches: any[] = Array.isArray(data) ? data : (data?.data || data?.matches || []);
+      // TEMP DEBUG: the candidates Highlightly returned + their normalized names.
+      console.log(`[hl-debug] date=${date} matches=${matches.length} candidates=` +
+        JSON.stringify(matches.map((m: any) => {
+          const hn = m?.homeTeam?.name || m?.home?.name || m?.homeTeam || '';
+          const an = m?.awayTeam?.name || m?.away?.name || m?.awayTeam || '';
+          return { id: m?.id, home: hn, away: an, normHome: norm(hn), normAway: norm(an) };
+        })));
       const hit = matches.find((m: any) => {
         const mh = norm(m?.homeTeam?.name || m?.home?.name || m?.homeTeam || '');
         const ma = norm(m?.awayTeam?.name || m?.away?.name || m?.awayTeam || '');
         return (mh === h && ma === a) || (mh === a && ma === h);
       });
-      if (hit?.id != null) return String(hit.id);
-    } catch { /* try next date */ }
+      if (hit?.id != null) { console.log(`[hl-debug] RECONCILED → matchId=${hit.id}`); return String(hit.id); }
+    } catch (e) { console.log(`[hl-debug] /matches date=${date} threw:`, (e as Error).message); }
   }
+  console.log(`[hl-debug] NO MATCH for ${h}/${a} across dates ${dates.join(',')}`);
   return null;
 }
 
@@ -104,6 +114,8 @@ export async function highlightlyEnricher(base: NormalizedGameData, gameId: stri
   // ROOT (confirmed) — inconsistent, so unwrap a {data:{...}} only if present. Cheap insurance.
   const body = detail?.data ?? detail;
   const events = mapEvents(body?.events || []);
+  // TEMP DEBUG (remove after diagnosis): did the detail fetch yield events?
+  console.log(`[hl-debug] matchId=${matchId} detailEvents=${(body?.events || []).length} mapped=${events.length} detailKeys=${Object.keys(detail || {}).join(',')}`);
   eventsCache.set(matchId, { t: Date.now(), events });
   return { events };
 }
