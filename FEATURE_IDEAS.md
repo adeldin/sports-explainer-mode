@@ -450,6 +450,16 @@ demand"). One LLM outage = the core feature breaks. Resilience plan:
   Google Cloud projects**.
 - **(e)** Also **retry Groq Dev Tier periodically** — it has Spend Limits when it reopens; the
   upgrade (no code change, just a higher ceiling) is still worth it if it comes back.
+- **(f) ✅ SHIPPED + PROVEN (`feat(llm)` `60e5fb8`):** the swappable adapter (`llmProvider.ts`,
+  `createChatCompletion` drop-in, all 7 Groq sites routed, env-toggled via `LLM_FALLBACK_PROVIDER`)
+  is live, and the Groq→Gemini fallback was verified end-to-end locally (forced a Groq bad-model
+  404 → caught → Gemini served a valid same-shape explanation).
+  - **GAP found during that test — Gemini fallback isn't retried on a transient 503.** Gemini
+    occasionally returns **503 "overloaded"** (seen once, cleared immediately on retry). Today a
+    single 503 → the adapter throws → both-failed → user sees the error. Compound failure (Groq
+    capped AND Gemini 503 on the same call) is rare, but the fix is cheap: **one retry / short
+    backoff on the Gemini fallback call before giving up.** Hardening, not correctness — bank and
+    add when convenient.
 
 ---
 
