@@ -399,7 +399,65 @@ this turns the hedge into a productive next step instead of a stop.
 
 ---
 
+## ⚙️ Backend cost / reliability (banked)
+
+Surfaced during the 2026-06-24 triage of intermittent "Failed to fetch explanation" — root cause
+was the **Groq free tier's 100,000 tokens/day (TPD) cap** being hit (`llama-3.3-70b-versatile`,
+99,574/100,000 used → HTTP 429 → 500). NOT a code regression (the vision deploy was purely
+additive; vision runs on OpenAI and consumes zero Groq tokens). Two banked follow-ups:
+
+- **Token-burn reduction.** The explain action fires **two Groq calls** per request —
+  `explainPlay` + `translatePlayText`. `translatePlayText` early-returns for English, so **en users
+  pay one call**; **non-English** (two calls) **and the 60s auto-refresh** (per open game) are the
+  multipliers that burn the daily budget. Levers: **upgrade Groq to Dev Tier** (account/billing
+  change, no code — the direct fix), and/or **throttle or cache the auto-refresh** and revisit
+  per-request call count. Banked; revisit if quota pressure recurs after a tier upgrade.
+- **Production silent-failure UX.** A real 429/500 on `/api/explain` currently shows the user
+  **nothing** in production — there is **no explanation error banner** (handleFetch's `catch` only
+  `console.error`s; what looked like a banner in testing was the **dev LogBox**). In prod the user
+  just sees a stale/non-updating card. Someday: a lightweight **"couldn't refresh — tap to retry"**
+  affordance. Pure mobile UI; low priority, but the honest-failure surface matters once on a paid
+  tier where 429s should be rare.
+
+---
+
 ## 💡 Feature concepts
+
+### 🚀 First-launch onboarding flow *(banked)*
+
+**Primary job — ACTIVATION, not a sales pitch.** Teach the core loop (pick a game → get an
+explanation) and **set the user's difficulty level to their actual knowledge**. Feature-discovery
+— especially the **📸 camera/vision** feature, which is invisible until you know to tap it — is a
+secondary but real win: surface that the camera exists and what it does.
+
+**Format:** swipeable intro screens — low friction, **skippable**, NOT a forced interactive
+tutorial. A few screens:
+1. What SportsWise does ("Watch and ask why").
+2. The four difficulty levels + **ask the user to pick their level**.
+3. The core loop (tap a live game → plain-language explanation).
+4. The camera feature (point at the screen → get it explained).
+
+Land them in the app with their **level pre-set**.
+
+**The standout element — difficulty-setting up front.** Ask *"how well do you know this sport /
+how much do you want explained?"* → pre-set their level (Kid / Beginner / Intermediate / Expert).
+Directly serves the founding mission (help fans who feel like outsiders **meet the game at their
+level**) and teaches the four-level concept in the process.
+
+**OPEN DESIGN QUESTION — who sees it / when it triggers (decide at build time, intentionally
+deferred — Anthony unsure):**
+- (a) all first-time users, once, on first launch;
+- (b) first-timers **+ a separate Pro-specific tour** when someone upgrades (Pro unlocks
+  camera/recap — a "here's what you just got" moment);
+- (c) everyone, but tailored free vs Pro.
+
+**Dependencies / notes:**
+- Pure **UI + one persisted `hasOnboarded` flag** (reuse the `appState` persistence pattern). No
+  backend. The Pro-tour variant (b) would also key off the **`isPro` flip**.
+- Could fold in **camera-permission priming** — explain *why* we need the camera before the iOS
+  permission prompt → better grant rates (pairs with the vision feature's permission flow).
+- **Topic-agnostic engine candidate:** onboarding (teach-the-loop + set-the-level) is a
+  **core-package** feature for the future `[Topic]Wise` extraction, not SportsWise-specific.
 
 ### AMC pop-up format
 While a game is selected, small contextual **fact-cards float up periodically**
