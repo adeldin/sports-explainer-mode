@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData } from './dataProvider';
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+import { createChatCompletion } from './llmProvider';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
@@ -421,7 +419,7 @@ async function translatePlayText(play: string, language: string): Promise<string
   if (!language || language === 'en' || !play) return null;
   const langName = languageNames[language] || language;
   try {
-    const c = await groq.chat.completions.create({
+    const c = await createChatCompletion({
       model: GROQ_MODEL,
       messages: [
         {
@@ -470,7 +468,7 @@ export function applyExpertNuclearOption(parsed: any, level: string): any {
 export async function explainPlay(
   play: string, gameContext: string, sport: string, level: string, language: string = 'en',
 ): Promise<any> {
-  const completion = await groq.chat.completions.create({
+  const completion = await createChatCompletion({
     model: GROQ_MODEL,
     messages: [
       { role: 'system', content: buildSystemPrompt(sport, level, language) },
@@ -502,7 +500,7 @@ export async function POST(req: NextRequest) {
       }
       const langName = languageNames[language] || language;
       try {
-        const c = await groq.chat.completions.create({
+        const c = await createChatCompletion({
           model: GROQ_MODEL,
           messages: [
             {
@@ -529,7 +527,7 @@ export async function POST(req: NextRequest) {
     if (action === 'ask' && question) {
       const langName = languageNames[language] || 'English';
       const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
-      const completion = await groq.chat.completions.create({
+      const completion = await createChatCompletion({
         model: GROQ_MODEL,
         messages: [
           { role: 'system', content: `Helpful sports expert. Level: ${level}.${langLine} Answer clearly and concisely in 2-3 sentences.` },
@@ -555,7 +553,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         const { system, user } = buildRecapPrompt(data, sport, level, language, isProReq);
-        const completion = await groq.chat.completions.create({
+        const completion = await createChatCompletion({
           model: GROQ_MODEL,
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
           temperature: 0.5,
@@ -612,7 +610,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         const { system, user } = buildCoachPrompt(state, sport, level, language);
-        const completion = await groq.chat.completions.create({
+        const completion = await createChatCompletion({
           model: GROQ_MODEL,
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
           temperature: 0.4,
@@ -638,7 +636,7 @@ export async function POST(req: NextRequest) {
       const langLine = language && language !== 'en'
         ? ` Respond entirely in ${languageNames[language] || language}.`
         : '';
-      const completion = await groq.chat.completions.create({
+      const completion = await createChatCompletion({
         model: GROQ_MODEL,
         messages: [
           { role: 'system', content: buildSystemPrompt(sport, level, language) },
@@ -704,7 +702,11 @@ export async function POST(req: NextRequest) {
       playType: translatedPlay || play,
       homeTeam,
       awayTeam,
-      gameContext
+      gameContext,
+      // Soccer-only passthrough for the Match Timeline UI. `enriched` is null for every other
+      // sport (and soccer past-plays) → undefined → JSON.stringify OMITS the key → non-soccer
+      // responses are byte-identical. The app reads this to render the timeline.
+      events: enriched?.events,
     }, { headers: corsHeaders });
 
   } catch (error) {
