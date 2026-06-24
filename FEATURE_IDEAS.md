@@ -323,6 +323,46 @@ collision with the v1.1 build-sequence's top-level numbering:
 
 ---
 
+## 🏁 Recap enhancements (banked)
+
+### News-API "lede signal" for recap news-judgment *(banked — revisit post-core)*
+
+**Problem:** the recap generates from ESPN box-score data, which has the stats but not the
+editorial context — it knows Ronaldo took 7 shots but not that the goal was historic. So the
+recap can lead with secondary stats and miss the real storyline. The prompt-fix (lead with the
+most significant thing in the data) addresses **ordering**, but can't surface context that
+isn't in the data at all (records, milestones, narrative stakes).
+
+**Idea:** before generating a recap, query a news API (e.g. **TheNewsAPI**, **GNews** — both
+have free tiers returning title + description + snippet, **NOT** full article text) for the game
+("Portugal Uzbekistan World Cup"), and feed the top 2–3 headlines/descriptions to the model as a
+"here's what the press considered the story" **signal**. The model writes its own original recap
+led by the real storyline. **Headlines as a signal, not reproduced content** — sidesteps
+copyright (we never display their text).
+
+**Why banked, not built:**
+- Adds an API dependency, free-tier rate limits, latency (extra call before every recap), and
+  fuzzy game→headline matching.
+- Helps marquee games (lots of coverage) but does **NOTHING** for thin-data wedge sports
+  (MLR/rugby have ~no news coverage) — so it improves exactly the games that need help least,
+  which is backwards from our strategic focus.
+- The cheap prompt-fix captures most of the perceived improvement (story-first ordering) for
+  none of the complexity.
+
+**Related higher tiers (the data-partnership path, already tracked):**
+- **Sportmonks / Statorium (United Robots):** licensable pre-written AI recap articles via API —
+  solves recap-generation outright, but paid + soccer-centric (doesn't cover our 14 sports) +
+  displays their content rather than ours. Revisit at revenue.
+- **Sportradar / Opta / Stats Perform:** richer stats (deeper play-by-play, key moments) — but
+  even rich stats may lack editorial context like records. Already our ~1,000-paying-user data
+  move.
+
+**Decision:** ship the **prompt-fix now** (free, fixes ordering); revisit the news-API signal
+once the core recap is solid and we've weighed the extra API/latency/complexity against the
+marquee-game-only benefit. Don't reflexively integrate — it's a deliberate later upgrade.
+
+---
+
 ## 💡 Feature concepts
 
 ### AMC pop-up format
