@@ -1,7 +1,9 @@
 import { RecapResponse, normalizeRecap } from './recap';
 import { VisionMode, VisionGameContext, VisionResponse, buildVisionBody, normalizeVision } from './vision';
+import { CoachSituation, CoachFull, normalizeCoachFull } from './coach';
 export type { RecapResponse };
 export type { VisionMode, VisionGameContext, VisionResponse };
+export type { CoachSituation, CoachFull };
 
 export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'mlr' | 'tennis' | 'golf' | 'cricket';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
@@ -167,4 +169,29 @@ export async function fetchVision(
   });
   if (!response.ok) throw new Error('Failed to analyze image');
   return normalizeVision(await response.json());
+}
+
+// Coach's Corner (premium #3). Two calls:
+//   • fetchCoachState — cheap, NO Groq; returns the normalized situation (the only call free users
+//     make → client derives the hook + data-sufficiency gate). null = coming-soon for this sport.
+//   • fetchCoachFull — the Groq strategic read; fired ONLY for Pro, ONLY on expand.
+export async function fetchCoachState(sport: Sport, gameId: string): Promise<CoachSituation | null> {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'coach', mode: 'state', sport, gameId }),
+  });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return (data?.situation as CoachSituation) ?? null;
+}
+
+export async function fetchCoachFull(sport: Sport, gameId: string, level: Level, language: Language): Promise<CoachFull> {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'coach', mode: 'full', sport, gameId, level, language }),
+  });
+  if (!response.ok) throw new Error('Failed to fetch coach insight');
+  return normalizeCoachFull(await response.json());
 }

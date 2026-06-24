@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { analyzeImage } from './visionProvider';
+import { normalizeCoachState, buildCoachPrompt } from './coachState';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -592,6 +593,38 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error('Vision error:', e);
         return NextResponse.json({ error: 'Failed to analyze image' }, { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // Coach's Corner (premium #3). Two modes: 'state' (cheap, NO Groq — returns the normalized
+    // situation so the client derives the hook + data-sufficiency gate; the only call free users
+    // make) and 'full' (Groq — the strategic read, fired ONLY for Pro on expand). Pro-gating is
+    // client-side; the free 'state' response carries only public situational facts, never the read.
+    if (action === 'coach') {
+      const state = await normalizeCoachState(sport, gameId);
+      if (!state) {
+        // Non-rich sport / no live game → client shows "coming soon" (never a fabricated insight).
+        return NextResponse.json({ situation: null }, { headers: corsHeaders });
+      }
+      if (body.mode !== 'full') {
+        return NextResponse.json({ situation: state }, { headers: corsHeaders });
+      }
+      try {
+        const { system, user } = buildCoachPrompt(state, sport, level, language);
+        const completion = await groq.chat.completions.create({
+          model: GROQ_MODEL,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+        });
+        const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+        return NextResponse.json({
+          strategicRead: String(parsed.strategicRead || ''),
+          whatItSetsUp: String(parsed.whatItSetsUp || ''),
+        }, { headers: corsHeaders });
+      } catch (e) {
+        console.error('Coach error:', e);
+        return NextResponse.json({ strategicRead: '', whatItSetsUp: '' }, { status: 500, headers: corsHeaders });
       }
     }
 

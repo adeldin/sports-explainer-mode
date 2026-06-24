@@ -412,6 +412,13 @@ additive; vision runs on OpenAI and consumes zero Groq tokens). Two banked follo
   multipliers that burn the daily budget. Levers: **upgrade Groq to Dev Tier** (account/billing
   change, no code — the direct fix), and/or **throttle or cache the auto-refresh** and revisit
   per-request call count. Banked; revisit if quota pressure recurs after a tier upgrade.
+- **Fold Coach's Corner `state` into the explain response.** Coach's Corner v1 makes a separate
+  cheap (no-Groq) `coach:state` call per live play to get the normalized situation for the hook +
+  data-sufficiency gate. `explain` already hits ESPN every live play — so `explain` could extract
+  the same `situation` and return it, letting `CoachCard` read it from the explanation result and
+  dropping the extra per-play fetch. Deferred because it touches the shared `explain` path (v1 kept
+  `coach` strictly additive). Pairs with the auto-refresh throttle / token-burn note above — same
+  "fewer per-play calls" theme. (The Groq `coach:full` read stays a separate on-expand call.)
 - **Production silent-failure UX.** A real 429/500 on `/api/explain` currently shows the user
   **nothing** in production — there is **no explanation error banner** (handleFetch's `catch` only
   `console.error`s; what looked like a banner in testing was the **dev LogBox**). In prod the user
@@ -751,6 +758,8 @@ personality. A big later swing.
 **Coach's Corner ↔ Academy bridge:** Coach's Corner spots the teachable moment **live**; a
 "learn more" tap routes **into the relevant Academy lesson**. Coach's Corner finds it in the wild;
 Academy holds the structured lesson. (See **Sporcle** for more game-format inspiration.)
+**Deferred from Coach's Corner v1** — the routing needs Academy lessons indexed by situation-type
+(the quiz bank isn't lesson-structured yet); build the bridge once that structure exists.
 
 ### ✅ Streaks — daily streak now shipped *(2e11ea7)*
 **✅ Shipped (2e11ea7):** a **real persisted day-over-day streak** now exists — a header chip

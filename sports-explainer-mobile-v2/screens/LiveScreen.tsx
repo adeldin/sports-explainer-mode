@@ -18,6 +18,7 @@ import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
 import PlayCard, { QAItem } from '../components/PlayCard';
 import RecapCard from '../components/RecapCard';
+import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
@@ -755,6 +756,21 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               {/* Free-tier indicator — subtle, informational, hidden for Pro/trial (∞). */}
               {caps.explanationsLeft !== Infinity && (
                 <Text style={styles.capIndicator}>{S.capLeftToday.replace('{n}', String(caps.explanationsLeft))}</Text>
+              )}
+
+              {/* Coach's Corner (premium #3) — the live strategic layer, below THE PLAY. Keyed on
+                  the play context so it resets/refetches per game/level/language. Renders
+                  coming-soon for thin-data sports; the Groq read fires only on Pro expand. */}
+              {selectedGameId && (
+                <CoachCard
+                  key={`coach|${sport}|${selectedGameId}|${level}|${language}`}
+                  sport={sport}
+                  gameId={selectedGameId}
+                  level={level}
+                  language={language}
+                  isPro={caps.isPro}
+                  onUnlock={presentPaywall}
+                />
               )}
 
               {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
