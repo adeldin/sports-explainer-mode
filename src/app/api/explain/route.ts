@@ -304,14 +304,17 @@ function buildRecapPrompt(data: RecapData, sport: string, level: string, languag
   const langName = languageNames[language] || 'English';
   const langLine = language && language !== 'en' ? ` Write entirely in ${langName}.` : '';
   const fields = isPro ? `"story", "turningPoint", "keyPerformance", "whyItMattered"` : `"story"`;
+  // STORY leads with the lede — the single most significant fact AMONG THE DATA (ordering, not
+  // invention). Hoisted into one shared const so the Pro/free story guidance can't drift.
+  const storyLine = `- "story": Lead with the SINGLE most newsworthy thing IN THE DATA below — e.g. a decisive individual performance, a late or winning goal, a comeback, the cause of a lopsided result, or a record/milestone ONLY if the data explicitly states one. Ask "what's the headline of this game?" and write toward it, using the stats as SUPPORT for that storyline rather than as the opening. 2-4 sentences at a ${level} level. Pick the lede ONLY from the facts provided — do NOT manufacture significance or add "historic"/"record"/"milestone" framing the data does not contain. If the facts are thin and nothing clearly stands out, say so plainly (e.g. note the detail isn't available) rather than inflating a minor stat into a headline.`;
   const guide = isPro
-    ? `- "story": how the game unfolded — 2-4 sentences at a ${level} level.
+    ? `${storyLine}
 - "turningPoint": the single moment the game shifted — ONLY if the data shows one, else "".
 - "keyPerformance": the standout player or unit — ONLY if the data names one, else "".
 - "whyItMattered": the significance/stakes in plain language — ONLY if supported, else "".`
-    : `- "story": how the game unfolded — 2-4 sentences at a ${level} level.`;
+    : storyLine;
   const system = `You are a sports broadcaster writing a post-game recap for a ${level}-level viewer (someone newer to ${sport}).${langLine}
-CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Explain any jargon in plain terms.`;
+CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.`;
   const facts = data.summaryFacts.length ? data.summaryFacts.map(f => `- ${f}`).join('\n') : '(no detailed play/stat data available for this game)';
   const winnerName = data.winner === 'home' ? data.homeTeam : data.winner === 'away' ? data.awayTeam : '';
   const user = `DATA (the ONLY facts you may use):
