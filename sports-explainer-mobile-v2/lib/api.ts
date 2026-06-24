@@ -1,3 +1,6 @@
+import { RecapResponse, normalizeRecap } from './recap';
+export type { RecapResponse };
+
 export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'mlr' | 'tennis' | 'golf' | 'cricket';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
 export type Language = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja' | 'zh' | 'ko' | 'it' | 'ar';
@@ -124,4 +127,23 @@ export async function askQuestion(
   if (!response.ok) throw new Error('Failed to ask question');
   const data = await response.json();
   return data.answer;
+}
+
+// Post-Game Recap (premium #1) — for a FINAL game. `isPro` is passed so the backend sends
+// only score + story to free users (cheaper + no content leak); Pro gets all narrative fields.
+// Returns a normalized RecapResponse (empty strings for unsupported / withheld sections).
+export async function fetchRecap(
+  sport: Sport,
+  gameId: string,
+  level: Level,
+  language: Language,
+  isPro: boolean,
+): Promise<RecapResponse> {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'recap', sport, gameId, level, language, isPro }),
+  });
+  if (!response.ok) throw new Error('Failed to fetch recap');
+  return normalizeRecap(await response.json());
 }

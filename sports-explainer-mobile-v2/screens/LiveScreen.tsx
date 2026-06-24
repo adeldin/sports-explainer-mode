@@ -17,11 +17,13 @@ import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
 import PlayCard, { QAItem } from '../components/PlayCard';
+import RecapCard from '../components/RecapCard';
+import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
-import { fetchExplanation, askQuestion, Sport, Level, Language, ExplanationResponse } from '../lib/api';
+import { fetchExplanation, askQuestion, fetchRecap, Sport, Level, Language, ExplanationResponse } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
@@ -77,6 +79,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const caps = useCaps();
   const [explainBlocked, setExplainBlocked] = useState(false);
   const [qaBlocked, setQaBlocked] = useState(false);
+  // Post-Game Recap (premium #1) — fetched for FINAL games, replaces the PlayCard.
+  const [recap, setRecap] = useState<RecapResponse | null>(null);
+  const [recapLoading, setRecapLoading] = useState(false);
+  const recapReqRef = useRef(0);
   const anyLoading = answers.some(a => a.status === 'loading');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Share: snapshot of the data to render into the off-screen capture card. Non-null
@@ -117,7 +123,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // game is in `games`.
   const selectedGame = games.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
-  const isExplainable = selectedGameState === 'in' || selectedGameState === 'post';
+  // A LIVE game gets the play explanation (PlayCard); a FINAL game gets the Post-Game Recap
+  // (RecapCard) instead — "what happened in this play" no longer fits a finished game.
+  const isLive = selectedGameState === 'in';
+  const isFinal = selectedGameState === 'post';
   // Sports shown in the tab bar: ordered, minus any hidden in My Sports (missing key = visible).
   const visibleSports = orderedSports.filter(s => sportVisibility[s.key] !== false);
 
@@ -437,23 +446,46 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [sport, favorites]);
   useEffect(() => {
-    // Only LIVE/FINAL games have a play to explain. For no selection or a scheduled
-    // ('pre') game: no fetch, and clear any prior result so a stale PlayCard from the
-    // previous (live) game/sport can't linger. Re-fires on a pre→in transition because
-    // `isExplainable` is a dep. (Game state comes from `games`, set with selectedGameId.)
-    // Fresh context (game / level / language / explainability) → clear live Q&A so a
-    // prior game's answers can't linger under a new card. The 60s same-play refresh does
-    // NOT pass through this effect (it calls handleFetch directly), so its persistence is
-    // governed solely by handleFetch's playKey gate.
+    // Only LIVE games have a play to explain (PlayCard). FINAL games take the recap path
+    // below; pre/no-selection → no fetch, and clear any prior result so a stale PlayCard
+    // from the previous (live) game/sport can't linger.
+    // Fresh context (game / level / language / state) → clear live Q&A so a prior game's
+    // answers can't linger under a new card. The 60s same-play refresh does NOT pass through
+    // this effect (it calls handleFetch directly), so its persistence is governed solely by
+    // handleFetch's playKey gate.
     setAnswers([]);
     // Fresh context → clear the cap-blocked states too (the Q&A counter itself resets
     // per-game in caps.ts; this just drops the UI flags so a new game/play starts clean).
     setExplainBlocked(false); setQaBlocked(false);
-    if (!selectedGameId || !isExplainable) { setResult(null); setLoading(false); return; }
+    if (!selectedGameId || !isLive) { setResult(null); setLoading(false); return; }
     let cancelled = false;
     handleFetch(() => cancelled);
     return () => { cancelled = true; };
-  }, [selectedGameId, level, language, isExplainable]);
+  }, [selectedGameId, level, language, isLive]);
+  // Post-Game Recap (premium #1) — fetch for FINAL games (replaces the explanation). Mirrors
+  // the explanation effect's cancellation + fresh-context reset; refetches on sport/game/level/
+  // language AND on isPro (so buying Pro mid-view upgrades the teaser → full recap). Recap does
+  // NOT touch the daily explanation cap — final games never call handleFetch/recordExplanation.
+  useEffect(() => {
+    if (!selectedGameId || !isFinal) { setRecap(null); setRecapLoading(false); return; }
+    const req = ++recapReqRef.current;
+    const cancelled = () => req !== recapReqRef.current;
+    setRecap(null); setRecapLoading(true);
+    (async () => {
+      try {
+        const r = await fetchRecap(sport, selectedGameId, level, language, caps.isPro);
+        if (cancelled()) return;
+        setRecap(r);
+      } catch (e) {
+        if (cancelled()) return;
+        console.error('Recap fetch error:', e);
+        setRecap({ score: '', story: '', turningPoint: '', keyPerformance: '', whyItMattered: '' });
+      } finally {
+        if (!cancelled()) setRecapLoading(false);
+      }
+    })();
+    return () => { recapReqRef.current++; };
+  }, [selectedGameId, sport, level, language, isFinal, caps.isPro]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => {
     setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false);
@@ -664,7 +696,22 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             />
           )}
 
-          {loading && !result ? (
+          {isFinal ? (
+            // FINAL game → Post-Game Recap (premium #1) replaces the PlayCard. Skeleton while
+            // fetching, the card when it has content, a graceful "not available" when ESPN had
+            // no usable data for this final game.
+            recapLoading && !recap ? (
+              <View style={styles.skeleton}>
+                <View style={[styles.skeletonLine, { width: '50%', height: 24 }]} />
+                <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 14 }]} />
+                <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
+              </View>
+            ) : recap && hasRecapContent(recap) ? (
+              <RecapCard recap={recap} isPro={caps.isPro} sport={sport} language={language} onUnlock={presentPaywall} />
+            ) : !recapLoading ? (
+              <View style={styles.capCard}><Text style={styles.capBody}>{S.recapNoData}</Text></View>
+            ) : null
+          ) : loading && !result ? (
             <View style={styles.skeleton}>
               <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
               <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 12 }]} />

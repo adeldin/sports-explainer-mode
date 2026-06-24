@@ -230,6 +230,102 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   return { play, gameContext, homeTeam, awayTeam };
 }
 
+// Post-Game Recap (premium #1) — gather the FINAL-game facts the recap is allowed to use.
+// Returns ONLY what ESPN actually exposes (score always; richer summaryFacts where a summary
+// endpoint exists). Thin sports (rugby/MLR core) come back with empty summaryFacts → the
+// prompt produces a shorter recap rather than inventing one. Never synthesizes data.
+type RecapData = {
+  homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
+  winner: string; statusDetail: string; summaryFacts: string[];
+};
+async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData> {
+  const out: RecapData = { homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', winner: '', statusDetail: '', summaryFacts: [] };
+  const cfg = espnConfig[sport];
+  if (!cfg || cfg.learnMode) return out;
+  const teamName = (comp: any, side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
+  const scoreOf = (comp: any, side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.score ?? '');
+  try {
+    if (cfg.core) {
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const evRes = await fetch(`https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`, { cache: 'no-store' });
+      const evData = await evRes.json();
+      const items: any[] = (evData.items || []).slice(0, 20);
+      const events = (await Promise.all(items.map(async (it: any) => {
+        try { return await (await fetch(it.$ref, { cache: 'no-store' })).json(); } catch { return null; }
+      }))).filter(Boolean);
+      const game = gameId ? events.find((e: any) => String(e.id) === String(gameId)) : events[0];
+      if (game) {
+        const comp = game.competitions?.[0];
+        out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
+        out.homeScore = scoreOf(comp, 'home'); out.awayScore = scoreOf(comp, 'away');
+        out.statusDetail = game.status?.type?.shortDetail || game.status?.type?.detail || '';
+      }
+    } else {
+      const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
+      const data = await res.json();
+      const game = gameId ? data?.events?.find((e: any) => e.id === gameId) : data?.events?.[0];
+      if (game) {
+        const comp = game.competitions?.[0];
+        out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
+        out.homeScore = scoreOf(comp, 'home'); out.awayScore = scoreOf(comp, 'away');
+        const hc = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+        const ac = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+        out.winner = hc?.winner ? 'home' : ac?.winner ? 'away' : '';
+        out.statusDetail = game.status?.type?.shortDetail || '';
+        if (game.id) {
+          try {
+            const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
+            for (const p of (sum?.scoringPlays || []).slice(-6)) { if (p?.text) out.summaryFacts.push(String(p.text)); }
+            for (const grp of (sum?.leaders || [])) {
+              for (const cat of (grp?.leaders || []).slice(0, 2)) {
+                const l = cat?.leaders?.[0];
+                if (l?.athlete?.displayName && l?.displayValue) out.summaryFacts.push(`${l.athlete.displayName}: ${l.displayValue}${cat?.displayName ? ` (${cat.displayName})` : ''}`);
+              }
+            }
+            if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
+              for (const e of (sum?.keyEvents || []).slice(-8)) { if (e?.text) out.summaryFacts.push(String(e.text)); }
+            }
+          } catch { /* no summary → thin (honest) recap */ }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Recap data fetch error:', e);
+  }
+  out.summaryFacts = [...new Set(out.summaryFacts.filter(Boolean))].slice(0, 10);
+  return out;
+}
+
+// Build the never-fabricate recap prompt. Free users get ONLY score + story (cheaper, and
+// the teaser's locked rows need no body); Pro/trial get all four narrative fields. The model
+// is told to EMIT EMPTY STRINGS for anything the data doesn't support — graceful degradation,
+// never invention.
+function buildRecapPrompt(data: RecapData, sport: string, level: string, language: string, isPro: boolean) {
+  const langName = languageNames[language] || 'English';
+  const langLine = language && language !== 'en' ? ` Write entirely in ${langName}.` : '';
+  const fields = isPro ? `"story", "turningPoint", "keyPerformance", "whyItMattered"` : `"story"`;
+  const guide = isPro
+    ? `- "story": how the game unfolded — 2-4 sentences at a ${level} level.
+- "turningPoint": the single moment the game shifted — ONLY if the data shows one, else "".
+- "keyPerformance": the standout player or unit — ONLY if the data names one, else "".
+- "whyItMattered": the significance/stakes in plain language — ONLY if supported, else "".`
+    : `- "story": how the game unfolded — 2-4 sentences at a ${level} level.`;
+  const system = `You are a sports broadcaster writing a post-game recap for a ${level}-level viewer (someone newer to ${sport}).${langLine}
+CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Explain any jargon in plain terms.`;
+  const facts = data.summaryFacts.length ? data.summaryFacts.map(f => `- ${f}`).join('\n') : '(no detailed play/stat data available for this game)';
+  const winnerName = data.winner === 'home' ? data.homeTeam : data.winner === 'away' ? data.awayTeam : '';
+  const user = `DATA (the ONLY facts you may use):
+Final: ${data.awayTeam} ${data.awayScore} — ${data.homeTeam} ${data.homeScore}${data.statusDetail ? ` (${data.statusDetail})` : ''}
+${winnerName ? `Winner: ${winnerName}` : 'Winner: see score'}
+Key facts:
+${facts}
+
+Respond with JSON containing EXACTLY these fields: { ${fields} }.
+${guide}
+Empty string for any field the data can't support. Do not exceed what the data shows.`;
+  return { system, user };
+}
+
 // Per-level lesson target — the SUBJECT the primary lesson should aim at. Mirrors
 // the system-prompt personas so the rubric and persona pull in the same direction.
 const lessonTargets: Record<string, string> = {
@@ -410,6 +506,43 @@ export async function POST(req: NextRequest) {
         temperature: 0.7,
       });
       return NextResponse.json({ answer: completion.choices[0]?.message?.content?.trim() }, { headers: corsHeaders });
+    }
+
+    // Post-Game Recap (premium #1). `score` is built server-side from the real data (never
+    // the model) so it can't be hallucinated. Free (isPro !== true) → only score + story
+    // generated; Pro → all four narrative fields. Empty string = the data didn't support it.
+    if (action === 'recap') {
+      const isProReq = body.isPro === true;
+      const data = await fetchRecapData(sport, gameId);
+      const score = (data.homeTeam || data.awayTeam)
+        ? `${data.awayTeam} ${data.awayScore} — ${data.homeTeam} ${data.homeScore}`.trim()
+        : '';
+      // No usable game data → empty recap; the client renders a graceful "not available" state.
+      if (!data.homeTeam && !data.awayTeam) {
+        return NextResponse.json({ score: '', story: '', turningPoint: '', keyPerformance: '', whyItMattered: '' }, { headers: corsHeaders });
+      }
+      try {
+        const { system, user } = buildRecapPrompt(data, sport, level, language, isProReq);
+        const completion = await groq.chat.completions.create({
+          model: GROQ_MODEL,
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+          temperature: 0.5,
+          response_format: { type: 'json_object' },
+        });
+        const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+        return NextResponse.json({
+          score,
+          story: String(parsed.story || ''),
+          // Pro-only narrative fields — never sent to free users (cheaper + no content leak).
+          turningPoint: isProReq ? String(parsed.turningPoint || '') : '',
+          keyPerformance: isProReq ? String(parsed.keyPerformance || '') : '',
+          whyItMattered: isProReq ? String(parsed.whyItMattered || '') : '',
+        }, { headers: corsHeaders });
+      } catch (e) {
+        console.error('Recap error:', e);
+        // Score is real even if the narrative call failed — still useful.
+        return NextResponse.json({ score, story: '', turningPoint: '', keyPerformance: '', whyItMattered: '' }, { headers: corsHeaders });
+      }
     }
 
     // Learn Mode (tennis/golf, or any request with learnMode): no specific play —
