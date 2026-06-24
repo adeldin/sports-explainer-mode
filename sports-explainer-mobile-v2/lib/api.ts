@@ -1,9 +1,11 @@
 import { RecapResponse, normalizeRecap } from './recap';
 import { VisionMode, VisionGameContext, VisionResponse, buildVisionBody, normalizeVision } from './vision';
 import { CoachSituation, CoachFull, normalizeCoachFull } from './coach';
+import { MatchEvent } from './matchTimeline';
 export type { RecapResponse };
 export type { VisionMode, VisionGameContext, VisionResponse };
 export type { CoachSituation, CoachFull };
+export type { MatchEvent };
 
 export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'mlr' | 'tennis' | 'golf' | 'cricket';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
@@ -20,6 +22,7 @@ export interface ExplanationResponse {
   awayTeam: string;
   gameContext: string;
   rawPlay?: string;
+  events?: MatchEvent[];   // soccer-only — Highlightly match events for the Match Timeline
 }
 
 export interface Play {

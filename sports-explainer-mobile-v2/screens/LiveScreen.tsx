@@ -18,6 +18,7 @@ import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
 import PlayCard, { QAItem } from '../components/PlayCard';
 import RecapCard from '../components/RecapCard';
+import MatchTimeline from '../components/MatchTimeline';
 import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
@@ -781,6 +782,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   level={level}
                   language={language}
                 />
+              )}
+
+              {/* Soccer Match Timeline (Highlightly events from the explain response). Soccer-only;
+                  renders the no-events state intentionally when the match is early/goalless. Free. */}
+              {['soccer', 'worldcup', 'epl', 'laliga'].includes(sport) && (
+                <MatchTimeline events={result.events || []} language={language} />
               )}
 
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
