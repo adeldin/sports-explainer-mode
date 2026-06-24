@@ -29,12 +29,30 @@ function hl(path: string): Promise<Response> {
   return fetch(`${BASE}${path}`, { headers: { 'X-RapidAPI-Key': KEY || '' }, cache: 'no-store' });
 }
 
-// Normalize team names for ESPN↔Highlightly matching (case/accents/club-suffix/punctuation).
-function norm(s: string): string {
-  return (s || '')
+// Team-name matching is ORDER-INDEPENDENT (token-sort) so "Congo DR" and "DR Congo" match — plus a
+// small ALIAS map for nations ESPN and Highlightly name differently (token-sort can't bridge those).
+// Extend ALIAS_GROUPS as we hit more: each group is equivalent raw names, the first is canonical.
+const STOP = new Set(['fc', 'cf', 'sc', 'afc', 'ac', 'club', 'de', 'cd']);
+function tokenSort(name: string): string {
+  return (name || '')
     .toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/\b(fc|cf|sc|afc|ac|club|de|cd)\b/g, '')
-    .replace(/[^a-z0-9]/g, '').trim();
+    .split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t))
+    .sort().join('');
+}
+const ALIAS_GROUPS: string[][] = [
+  ['South Korea', 'Korea Republic'],
+  ['Iran', 'IR Iran'],
+  ['Ivory Coast', "Côte d'Ivoire"],
+  ['United States', 'USA'],
+  ['China', 'China PR'],
+];
+const ALIAS: Record<string, string> = {};
+for (const g of ALIAS_GROUPS) { const canon = tokenSort(g[0]); for (const n of g) ALIAS[tokenSort(n)] = canon; }
+
+// Canonical match key: token-sorted, then mapped through the alias table.
+function teamKey(name: string): string {
+  const ts = tokenSort(name);
+  return ALIAS[ts] || ts;
 }
 
 function toMinute(time: unknown): number | undefined {
@@ -56,11 +74,10 @@ function mapEvents(raw: any[]): MatchEvent[] {
 }
 
 // Find the Highlightly matchId for an ESPN game: query the league's matches on the game's date
-// (±1 day for the UTC/local edge), match on the normalized home+away pair (order-independent).
+// (±1 day for the UTC/local edge), match the home+away pair by canonical team key (order-independent
+// + aliases). Can't-find → null → enricher returns {} (normal "no enrichment", not an error).
 async function reconcile(base: NormalizedGameData, leagueId: number): Promise<string | null> {
-  const h = norm(base.homeTeam), a = norm(base.awayTeam);
-  // TEMP DEBUG (remove after diagnosis): what ESPN gives vs what Highlightly returns.
-  console.log(`[hl-debug] ESPN teams: "${base.homeTeam}"/"${base.awayTeam}" → norm home=${h} away=${a} | leagueId=${leagueId} startTime=${base.startTime}`);
+  const h = teamKey(base.homeTeam), a = teamKey(base.awayTeam);
   if (!h || !a) return null;
   const day = (d: Date) => d.toISOString().slice(0, 10);
   const seed = base.startTime ? new Date(base.startTime) : new Date();
@@ -70,25 +87,17 @@ async function reconcile(base: NormalizedGameData, leagueId: number): Promise<st
   for (const date of dates) {
     try {
       const res = await hl(`/matches?leagueId=${leagueId}&date=${date}`);
-      if (!res.ok) { console.log(`[hl-debug] /matches date=${date} → HTTP ${res.status}`); continue; }
+      if (!res.ok) continue;
       const data = await res.json();
       const matches: any[] = Array.isArray(data) ? data : (data?.data || data?.matches || []);
-      // TEMP DEBUG: the candidates Highlightly returned + their normalized names.
-      console.log(`[hl-debug] date=${date} matches=${matches.length} candidates=` +
-        JSON.stringify(matches.map((m: any) => {
-          const hn = m?.homeTeam?.name || m?.home?.name || m?.homeTeam || '';
-          const an = m?.awayTeam?.name || m?.away?.name || m?.awayTeam || '';
-          return { id: m?.id, home: hn, away: an, normHome: norm(hn), normAway: norm(an) };
-        })));
       const hit = matches.find((m: any) => {
-        const mh = norm(m?.homeTeam?.name || m?.home?.name || m?.homeTeam || '');
-        const ma = norm(m?.awayTeam?.name || m?.away?.name || m?.awayTeam || '');
+        const mh = teamKey(m?.homeTeam?.name || m?.home?.name || m?.homeTeam || '');
+        const ma = teamKey(m?.awayTeam?.name || m?.away?.name || m?.awayTeam || '');
         return (mh === h && ma === a) || (mh === a && ma === h);
       });
-      if (hit?.id != null) { console.log(`[hl-debug] RECONCILED → matchId=${hit.id}`); return String(hit.id); }
-    } catch (e) { console.log(`[hl-debug] /matches date=${date} threw:`, (e as Error).message); }
+      if (hit?.id != null) return String(hit.id);
+    } catch { /* try next date */ }
   }
-  console.log(`[hl-debug] NO MATCH for ${h}/${a} across dates ${dates.join(',')}`);
   return null;
 }
 
@@ -110,12 +119,11 @@ export async function highlightlyEnricher(base: NormalizedGameData, gameId: stri
 
   // Throwing here is fine — dataProvider catches it and falls back to the ESPN base.
   const detail = await (await hl(`/matches/${matchId}`)).json();
-  // Envelope-agnostic: the LIST endpoint wraps in {data:[...]} but detail returns events at the
-  // ROOT (confirmed) — inconsistent, so unwrap a {data:{...}} only if present. Cheap insurance.
-  const body = detail?.data ?? detail;
-  const events = mapEvents(body?.events || []);
-  // TEMP DEBUG (remove after diagnosis): did the detail fetch yield events?
-  console.log(`[hl-debug] matchId=${matchId} detailEvents=${(body?.events || []).length} mapped=${events.length} detailKeys=${Object.keys(detail || {}).join(',')}`);
+  // Highlightly's detail endpoint returns a single-element ARRAY [{…, events:[…]}] (the LIST wraps
+  // in {data:[…]}, the DETAIL in […] — inconsistent). Unwrap the array → its element; also tolerate
+  // a {data:{…}} wrapper or a plain root object.
+  const match = Array.isArray(detail) ? detail[0] : (detail?.data ?? detail);
+  const events = mapEvents(match?.events || []);
   eventsCache.set(matchId, { t: Date.now(), events });
   return { events };
 }
