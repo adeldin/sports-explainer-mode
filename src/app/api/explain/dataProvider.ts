@@ -1,0 +1,158 @@
+// dataProvider — the adapter layer. ESPN is ALWAYS the base for every sport; a registered
+// per-sport enricher OPTIONALLY merges its depth on top, into ONE normalized shape. Enrichment is
+// best-effort: a missing / failing / rate-limited enricher is caught + logged and the ESPN base
+// returns UNCHANGED — a sport degrades to "still good," never "broken." Generalizes Coach's
+// Corner's normalizeCoachState seam.
+//
+// Topic-agnostic primitive (per the platform-vision bank): the registry + merge + normalized
+// shape are generic; sport-specific parsing lives inside each enricher. A future [Topic]Wise app
+// registers its own enrichers. NOT a plugin framework — just registry + merge + shape.
+//
+// SCOPE (this doc): the layer + the ESPN base only. NO enrichers are registered yet — GUMBO (MLB
+// pitch-by-pitch) and a soccer API (events/lineups) plug in via follow-on docs with a one-line
+// registry entry, no core change. Coach is the first consumer; explain/recap stay on their
+// existing fetchers (the live 1.0 path) until migrated later behind byte-identical tests.
+
+// --- Optional enrichment placeholders (typed targets for the follow-on docs; nothing populates
+//     these in this doc) ---
+export interface PitchEvent {
+  index?: number; pitchType?: string; velocity?: number; result?: string; location?: string;
+}
+export interface MatchEvent {
+  minute?: number; type?: string; team?: string; player?: string; detail?: string;
+}
+
+// The normalized shape — the contract. ESPN base fields everyone uses + OPTIONAL enrichment
+// fields (absent on ESPN-only). Consumers unaware of enrichment fields are unaffected.
+export interface NormalizedGameData {
+  // ESPN base — identity (all sports)
+  sport: string; gameId: string;
+  homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
+  state: string; statusDetail: string;
+  period?: number; clock?: string; lastPlay?: string;
+  // ESPN base — situation (only where ESPN exposes it; today NFL/MLB; NBA/others identity-only)
+  situation?: {
+    down?: number; distance?: number; downDistanceText?: string; possession?: string; isRedZone?: boolean;
+    balls?: number; strikes?: number; outs?: number; onBase?: string;
+  };
+  // OPTIONAL enrichment — populated only by a registered enricher
+  pitchSequence?: PitchEvent[];                 // GUMBO (MLB)
+  events?: MatchEvent[];                         // soccer (goals/cards/subs w/ minute)
+  lineups?: { home: string[]; away: string[] }; // soccer
+  enrichedBy?: string;                          // which enricher ran (telemetry)
+}
+
+export type Enricher = (base: NormalizedGameData, gameId: string) => Promise<Partial<NormalizedGameData>>;
+
+// EMPTY in this doc. A follow-on registers e.g. `enrichers.mlb = gumboEnricher`.
+const enrichers: Partial<Record<string, Enricher>> = {};
+
+type EspnCfg = { sport: string; league: string; core?: boolean; learnMode?: boolean };
+// The data layer owns its sport→endpoint map (avoids a circular import with route.ts; when explain
+// migrates here later, route's espnConfig collapses into this one).
+const ESPN_CONFIG: Record<string, EspnCfg> = {
+  nfl: { sport: 'football', league: 'nfl' },
+  nba: { sport: 'basketball', league: 'nba' },
+  wnba: { sport: 'basketball', league: 'wnba' },
+  mlb: { sport: 'baseball', league: 'mlb' },
+  soccer: { sport: 'soccer', league: 'usa.1' },
+  worldcup: { sport: 'soccer', league: 'fifa.world' },
+  epl: { sport: 'soccer', league: 'eng.1' },
+  laliga: { sport: 'soccer', league: 'esp.1' },
+  rugby: { sport: 'rugby', league: '270557', core: true },
+  mlr: { sport: 'rugby', league: '289262', core: true },
+  tennis: { sport: 'tennis', league: 'atp', learnMode: true },
+  golf: { sport: 'golf', league: 'pga', learnMode: true },
+};
+
+// THE entry point. ESPN base (always) → optional enricher merge (best-effort) → normalized shape.
+export async function getGameData(sport: string, gameId?: string): Promise<NormalizedGameData | null> {
+  const base = await fetchEspnBase(sport, gameId);
+  if (!base) return null;
+  const enricher = enrichers[sport];
+  if (!enricher) return base;
+  try {
+    const depth = await enricher(base, gameId || base.gameId);
+    return { ...base, ...depth, enrichedBy: sport };
+  } catch (e) {
+    // Enrichment is never a hard dependency — degrade to the ESPN base.
+    console.error(`dataProvider: enricher(${sport}) failed — using ESPN base:`, e);
+    return base;
+  }
+}
+
+// The ESPN base normalizer. Identity for every sport; situation only where ESPN exposes per-play
+// fields (NFL down/distance, MLB count/outs/bases). This is the coach extraction (moved verbatim)
+// generalized to the normalized shape. Learn-mode / no-config sports → null (no head-to-head base).
+async function fetchEspnBase(sport: string, gameId?: string): Promise<NormalizedGameData | null> {
+  const cfg = ESPN_CONFIG[sport];
+  if (!cfg || cfg.learnMode) return null;
+  const teamName = (comp: any, side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
+  const scoreOf = (comp: any, side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.score ?? '');
+  const teamAbbr = (comp: any, id: string) => comp?.competitors?.find((c: any) => String(c.id) === String(id))?.team?.abbreviation || '';
+  try {
+    if (cfg.core) {
+      // Core-API sports (rugby/MLR): identity only — ESPN exposes no per-play situation.
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const evRes = await fetch(`https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`, { cache: 'no-store' });
+      const evData = await evRes.json();
+      const items: any[] = (evData.items || []).slice(0, 20);
+      const events = (await Promise.all(items.map(async (it: any) => {
+        try { return await (await fetch(it.$ref, { cache: 'no-store' })).json(); } catch { return null; }
+      }))).filter(Boolean);
+      const game = gameId ? events.find((e: any) => String(e.id) === String(gameId)) : events[0];
+      if (!game) return null;
+      const comp = game.competitions?.[0];
+      return {
+        sport, gameId: String(game.id),
+        homeTeam: teamName(comp, 'home'), awayTeam: teamName(comp, 'away'),
+        homeScore: scoreOf(comp, 'home'), awayScore: scoreOf(comp, 'away'),
+        state: game.status?.type?.state || '', statusDetail: game.status?.type?.shortDetail || game.status?.type?.detail || '',
+        lastPlay: comp?.situation?.lastPlay?.text || undefined,
+      };
+    }
+
+    // Site-API sports: identity + (where present) situation.
+    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
+    const data = await res.json();
+    const game = gameId
+      ? data?.events?.find((e: any) => e.id === gameId)
+      : data?.events?.find((e: any) => e.status?.type?.state === 'in');
+    if (!game) return null;
+    const comp = game.competitions?.[0];
+    const sit = comp?.situation || {};
+    const st = game.status || {};
+
+    const out: NormalizedGameData = {
+      sport, gameId: String(game.id),
+      homeTeam: teamName(comp, 'home'), awayTeam: teamName(comp, 'away'),
+      homeScore: scoreOf(comp, 'home'), awayScore: scoreOf(comp, 'away'),
+      state: st?.type?.state || '',
+      statusDetail: st?.type?.shortDetail || '',
+      period: typeof st?.period === 'number' ? st.period : undefined,
+      clock: st?.displayClock || undefined,
+      lastPlay: sit?.lastPlay?.text || undefined,
+    };
+
+    // Situation — extracted identically to the original coach normalizer (byte-identical output).
+    const situation: NonNullable<NormalizedGameData['situation']> = {};
+    if (sport === 'nfl') {
+      if (typeof sit.down === 'number') situation.down = sit.down;
+      if (typeof sit.distance === 'number') situation.distance = sit.distance;
+      if (sit.shortDownDistanceText || sit.downDistanceText) situation.downDistanceText = sit.shortDownDistanceText || sit.downDistanceText;
+      if (sit.possession) situation.possession = teamAbbr(comp, sit.possession);
+      if (typeof sit.isRedZone === 'boolean') situation.isRedZone = sit.isRedZone;
+    } else if (sport === 'mlb') {
+      if (typeof sit.balls === 'number') situation.balls = sit.balls;
+      if (typeof sit.strikes === 'number') situation.strikes = sit.strikes;
+      if (typeof sit.outs === 'number') situation.outs = sit.outs;
+      const bases = [sit.onFirst && '1st', sit.onSecond && '2nd', sit.onThird && '3rd'].filter(Boolean);
+      if (bases.length) situation.onBase = bases.join(' & ');
+    }
+    if (Object.keys(situation).length) out.situation = situation;
+    return out;
+  } catch (e) {
+    console.error('dataProvider: fetchEspnBase error:', e);
+    return null;
+  }
+}

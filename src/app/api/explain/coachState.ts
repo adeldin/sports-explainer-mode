@@ -2,11 +2,12 @@
 // never-platitude coaching prompt (Pillar 3). The vision/recap pattern: a sibling module the
 // route imports; the route's shared explain/ask path is untouched.
 //
-// Pillar 1/2: Coach's Corner reads THIS normalized shape, never ESPN fields directly. Today it's
-// populated from ESPN's competitions[].situation; when the future dataProvider adapter lands it
-// populates the SAME shape and Coach's Corner lights up for more sports with no rebuild. The
-// v1 rich set is the sports whose ESPN feed exposes real per-play situation: NFL / NBA / WNBA /
-// MLB. Everything else → normalizeCoachState returns null → the client renders "coming soon".
+// Pillar 1/2: Coach's Corner reads the normalized shape from the dataProvider adapter (ESPN base +
+// any registered enrichment), never ESPN fields directly — so when GUMBO/soccer enrichers land,
+// Coach's Corner gets richer for those sports with no change here. The v1 rich set is the sports
+// whose ESPN feed exposes real per-play situation: NFL / NBA / WNBA / MLB. Everything else →
+// normalizeCoachState returns null → the client renders "coming soon".
+import { getGameData } from './dataProvider';
 
 // v1 rich sports only (all site-API). Absence here → null → client coming-soon. NOT a buried
 // allowlist in the gating logic — it's the input to "which fields to read"; sufficiency itself
@@ -28,52 +29,23 @@ export interface CoachSituation {
   balls?: number; strikes?: number; outs?: number; onBase?: string;
 }
 
-// Normalize ESPN's situation into our shape. Returns null for non-rich sports / no live game →
-// the client shows the coming-soon state (never a fabricated insight).
+// Read the normalized game-state through dataProvider (ESPN base + any registered enrichment) and
+// map identity + situation into CoachSituation. The RICH gate stays coach POLICY (which sports
+// Coach's Corner supports today). Output is byte-identical to the prior direct-fetch version — the
+// ESPN extraction moved verbatim into dataProvider's fetchEspnBase. Returns null for non-rich
+// sports / no live game → the client shows coming-soon (never a fabricated insight).
 export async function normalizeCoachState(sport: string, gameId?: string): Promise<CoachSituation | null> {
-  const cfg = RICH[sport];
-  if (!cfg) return null;
-  try {
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
-    const data = await res.json();
-    const game = gameId
-      ? data?.events?.find((e: any) => e.id === gameId)
-      : data?.events?.find((e: any) => e.status?.type?.state === 'in');
-    if (!game) return null;
-    const comp = game.competitions?.[0];
-    const sit = comp?.situation || {};
-    const st = game.status || {};
-    const teamName = (side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
-    const teamAbbr = (id: string) => comp?.competitors?.find((c: any) => String(c.id) === String(id))?.team?.abbreviation || '';
-
-    const out: CoachSituation = {
-      sport,
-      homeTeam: teamName('home'), awayTeam: teamName('away'),
-      homeScore: String(comp?.competitors?.find((c: any) => c.homeAway === 'home')?.score ?? ''),
-      awayScore: String(comp?.competitors?.find((c: any) => c.homeAway === 'away')?.score ?? ''),
-      statusDetail: st?.type?.shortDetail || '',
-      period: typeof st?.period === 'number' ? st.period : undefined,
-      clock: st?.displayClock || undefined,
-      lastPlay: sit?.lastPlay?.text || undefined,
-    };
-    if (sport === 'nfl') {
-      if (typeof sit.down === 'number') out.down = sit.down;
-      if (typeof sit.distance === 'number') out.distance = sit.distance;
-      if (sit.shortDownDistanceText || sit.downDistanceText) out.downDistanceText = sit.shortDownDistanceText || sit.downDistanceText;
-      if (sit.possession) out.possession = teamAbbr(sit.possession);
-      if (typeof sit.isRedZone === 'boolean') out.isRedZone = sit.isRedZone;
-    } else if (sport === 'mlb') {
-      if (typeof sit.balls === 'number') out.balls = sit.balls;
-      if (typeof sit.strikes === 'number') out.strikes = sit.strikes;
-      if (typeof sit.outs === 'number') out.outs = sit.outs;
-      const bases = [sit.onFirst && '1st', sit.onSecond && '2nd', sit.onThird && '3rd'].filter(Boolean);
-      if (bases.length) out.onBase = bases.join(' & ');
-    }
-    return out;
-  } catch (e) {
-    console.error('Coach state fetch error:', e);
-    return null;
-  }
+  if (!RICH[sport]) return null;
+  const d = await getGameData(sport, gameId);
+  if (!d || (!d.homeTeam && !d.awayTeam)) return null;
+  const s = d.situation || {};
+  return {
+    sport,
+    homeTeam: d.homeTeam, awayTeam: d.awayTeam, homeScore: d.homeScore, awayScore: d.awayScore,
+    statusDetail: d.statusDetail, period: d.period, clock: d.clock, lastPlay: d.lastPlay,
+    down: s.down, distance: s.distance, downDistanceText: s.downDistanceText, possession: s.possession, isRedZone: s.isRedZone,
+    balls: s.balls, strikes: s.strikes, outs: s.outs, onBase: s.onBase,
+  };
 }
 
 const levelGuide: Record<string, string> = {
