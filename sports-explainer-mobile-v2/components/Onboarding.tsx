@@ -20,7 +20,7 @@ interface Props {
 }
 
 const LEVELS: { key: Level; emoji: string }[] = [
-  { key: 'kid', emoji: '🧒' },
+  { key: 'kid', emoji: '🧢' },
   { key: 'beginner', emoji: '👋' },
   { key: 'intermediate', emoji: '📺' },
   { key: 'expert', emoji: '📋' },

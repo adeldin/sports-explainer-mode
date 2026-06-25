@@ -34,7 +34,7 @@ const WRONG_MESSAGES = [
 ];
 
 const LEVELS: Array<{ key: 'kid' | 'beginner' | 'intermediate' | 'expert'; label: string }> = [
-  { key: 'kid', label: 'Kid' },
+  { key: 'kid', label: 'Rookie' },
   { key: 'beginner', label: 'Beginner' },
   { key: 'intermediate', label: 'Intermediate' },
   { key: 'expert', label: 'Expert' },
