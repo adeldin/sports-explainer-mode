@@ -47,6 +47,12 @@ export function getRank(points: number): RankInfo {
   return { ...RANKS[idx], next };
 }
 
+// Rank → badge emoji (keyed by RANKS[].name). Presentation only — shared by the
+// Academy home rank card and the in-game rank-up beat so they never drift.
+export const RANK_EMOJI: Record<string, string> = {
+  Rookie: '🔰', Starter: '⭐', 'All-Star': '🌟', Champion: '🏆', Legend: '👑',
+};
+
 // Languages shown in the picker at launch. The other 8 translations still exist in
 // lib/strings.ts (and the Language type) but are hidden for now — a stored or device
 // language outside this set falls back to English on load. Keep in sync with the

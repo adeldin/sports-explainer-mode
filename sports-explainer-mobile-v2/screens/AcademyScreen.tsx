@@ -1,26 +1,25 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, KeyboardAvoidingView, Keyboard, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, runOnJS, Easing,
-  interpolateColor,
+  useSharedValue, useAnimatedStyle, withTiming, Easing, FadeIn, SlideInRight,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { askQuestion, Sport, Level } from '../lib/api';
-import { useAppState, getRank } from '../lib/appState';
+import { askQuestion, Sport } from '../lib/api';
+import { useAppState, RANK_EMOJI } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
 import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
-import { scheduleQuizReminder } from '../lib/notifications';
+import { ACADEMY_GAMES, AcademyGameId, getAcademyGame } from '../lib/academyGames';
 
 import DidYouKnow from '../components/DidYouKnow';
-import QuizCard from '../components/QuizCard';
+import GameHost from '../components/academy/GameHost';
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
 // the first category (MLB) when there's no sport or no match.
@@ -31,21 +30,15 @@ function categoryForSport(sport?: Sport): AcademyCategory {
 // Route params the Live "Test your knowledge in the Academy →" CTA passes in.
 type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
 
-// Phase 1 quiz scoring: base points per correct answer, scaled by difficulty.
-const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
-// Max combo bonus added to a correct answer (+1 per combo level, capped).
-const COMBO_BONUS_CAP = 10;
-// Rank → badge emoji for the rank card (keyed by RANKS[].name).
-const RANK_EMOJI: Record<string, string> = {
-  Rookie: '🔰', Starter: '⭐', 'All-Star': '🌟', Champion: '🏆', Legend: '👑',
-};
-
-// Academy tab — the always-on "learn" experience: pick a category, read a fact,
-// take a quiz (with a streak mechanic), browse common questions, and ask anything.
-// The category list is Academy-only (lib/academyCategories) and decoupled from the
-// Live tab's sport settings; some categories (Soccer, Rugby) pool several leagues.
+// Academy tab — a Duolingo-style home shell. The identity strip (rank card + streak +
+// sport selector) sits at the top; a hero features a game; a grid surfaces the game
+// library (read from the lib/academyGames registry — the shell never names a game).
+// Tapping a game opens it full-screen via GameHost; `activeGameId` swaps the home for
+// the game (a local-state full-screen, NOT a nav stack — so the Live CTA's
+// route.params.sport keeps working untouched). Did You Know + FAQ + Ask live on the
+// home below the grid.
 export default function AcademyScreen({ route }: AcademyScreenProps) {
-  const { language, level, notificationsEnabled, dailyStreak, recordQuizActivity, points, rank, awardPoints } = useAppState();
+  const { language, level, dailyStreak, points, rank } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -57,6 +50,9 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   // Representative sport for the FAQ + ask box, which need a single Sport key.
   const primarySport = category.sportKeys[0];
 
+  // Which game is open full-screen (null = the home). Local state, no nav stack.
+  const [activeGameId, setActiveGameId] = useState<AcademyGameId | null>(null);
+
   // When the Live CTA navigates here with a (possibly new) sport, open its matching
   // category. De-duped: only updates when the resolved category actually changes, so
   // tapping the CTA from a different sport (e.g. mlr after mlb) switches correctly.
@@ -65,32 +61,6 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     const next = categoryForSport(routeSport);
     setCategory(prev => (prev.key === next.key ? prev : next));
   }, [routeSport]);
-
-  // --- Combo (the in-session consecutive-correct counter; resets on a wrong answer
-  // or on unmount). Distinct from the persisted day-over-day `dailyStreak` from
-  // useAppState, which is shown as a chip in the header. ---
-  const [combo, setCombo] = useState(0);
-  const [milestone, setMilestone] = useState<string | null>(null);
-  const prevCombo = useRef(0);
-  const comboScale = useSharedValue(1);
-  const milestoneOpacity = useSharedValue(0);
-
-  // --- Points-gain feedback (Stage 1): a floating "+N" micro-reward on a correct
-  // answer, plus a pulse on the rank card's points number. The float text holds the
-  // exact gained amount (with 🔥 when a combo bonus applies). ---
-  const [pointsFloat, setPointsFloat] = useState<string | null>(null);
-  const pointsFloatOpacity = useSharedValue(0);
-  const pointsFloatY = useSharedValue(0);
-  const pointsPulse = useSharedValue(1);
-
-  // --- Rank card (Stage 2): the progress bar animates smoothly to its new fill on a
-  // point gain, the card border briefly highlights, and crossing a rank threshold
-  // fires a one-time celebratory beat overlaid on the card. ---
-  const [rankUp, setRankUp] = useState<string | null>(null);
-  const barWidth = useSharedValue(0);       // 0–100, drives the bar fill width%
-  const cardHighlight = useSharedValue(0);  // 0→1→0 border-color flash on a gain
-  const rankUpOpacity = useSharedValue(0);
-  const rankUpScale = useSharedValue(0.8);
 
   // --- FAQ state ---
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
@@ -106,36 +76,6 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   const sportName = S[SPORT_FULL_NAME[primarySport]];
 
-  // Bounce the combo counter on each increment; bigger bounce + a milestone
-  // banner at 3 / 5 / 7 / 10.
-  useEffect(() => {
-    const prev = prevCombo.current;
-    prevCombo.current = combo;
-    if (combo <= prev || combo === 0) return;
-
-    const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
-    comboScale.value = withSequence(
-      withTiming(isMilestone ? 1.3 : 1.15, { duration: isMilestone ? 180 : 120, easing: Easing.out(Easing.quad) }),
-      withTiming(1, { duration: isMilestone ? 220 : 140 }),
-    );
-
-    if (isMilestone) {
-      setMilestone(
-        combo === 3 ? 'Heating up! 🔥'
-        : combo === 5 ? 'On fire! 🔥🔥'
-        : combo === 7 ? 'Unstoppable! ⚡'
-        : 'Legendary! 🏆',
-      );
-      milestoneOpacity.value = withSequence(
-        withTiming(1, { duration: 200 }),
-        withDelay(1600, withTiming(0, { duration: 300 }, finished => {
-          if (finished) runOnJS(setMilestone)(null);
-        })),
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [combo]);
-
   // Cached answers are specific to category/level/language — reset when they change.
   useEffect(() => {
     setActiveFaq(null);
@@ -150,6 +90,11 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     if (c.key === category.key) return;
     await Haptics.selectionAsync();
     setCategory(c);
+  };
+
+  const openGame = async (id: AcademyGameId) => {
+    await Haptics.selectionAsync();
+    setActiveGameId(id);
   };
 
   // FAQ rows ask without play context — the questions are self-contained, and
@@ -189,327 +134,215 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     }
   };
 
-  // Any quiz answer (right OR wrong) counts as activity. Two once-per-mount concerns,
-  // tracked by separate refs so they don't interfere:
-  //  1. Daily streak — record today's quiz via recordQuizActivity(). Happens
-  //     regardless of the Game Alerts toggle (the streak is independent of
-  //     notifications). Idempotent per-day, but the ref avoids redundant calls.
-  //  2. "Come back" reminder — re-arm to the next 7pm, ONLY if Game Alerts is on.
-  //     Kept on its own ref so enabling alerts mid-session and answering still arms
-  //     it once (the original behavior), even though the streak was recorded earlier.
-  // The reminder copy uses the freshly-updated streak count from concern 1.
-  const activityRecorded = useRef(false);
-  const reminderArmed = useRef(false);
-  const onQuizAnswered = () => {
-    let streakNow = dailyStreak;
-    if (!activityRecorded.current) {
-      activityRecorded.current = true;
-      streakNow = recordQuizActivity(); // returns today's updated count
-    }
-    if (notificationsEnabled && !reminderArmed.current) {
-      reminderArmed.current = true;
-      scheduleQuizReminder(streakNow); // fire-and-forget; no-ops without permission
-    }
-  };
-
-  // Stage 1: fire the "+N" micro-reward. The amount is computed at the award site
-  // (onCorrect) and passed straight in — no plumbing. The float rises + fades via an
-  // absolute overlay (never blocks taps / shifts layout), and the rank points number
-  // pulses so the running total visibly ticks up even if the card is partly off-screen.
-  const flashPointsGain = (amount: number, hasCombo: boolean) => {
-    setPointsFloat(`+${amount}${hasCombo ? ' 🔥' : ''}`);
-    pointsFloatOpacity.value = 0;
-    pointsFloatY.value = 0;
-    pointsFloatOpacity.value = withSequence(
-      withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) }),
-      withDelay(450, withTiming(0, { duration: 350 }, finished => {
-        if (finished) runOnJS(setPointsFloat)(null);
-      })),
-    );
-    pointsFloatY.value = withTiming(-46, { duration: 960, easing: Easing.out(Easing.quad) });
-    pointsPulse.value = withSequence(
-      withTiming(1.22, { duration: 150, easing: Easing.out(Easing.quad) }),
-      withTiming(1, { duration: 220 }),
-    );
-    // Stage 2: briefly highlight the rank card border so the gain ties to the card.
-    cardHighlight.value = withSequence(
-      withTiming(1, { duration: 180 }),
-      withDelay(280, withTiming(0, { duration: 520 })),
-    );
-  };
-
-  // Stage 2: a tasteful one-time rank-up beat — an orange overlay pops on the rank
-  // card with the new badge + name, then fades. Fired only when a correct answer
-  // crosses a rank threshold (detected at the award site).
-  const celebrateRankUp = (newRankName: string) => {
-    setRankUp(`${RANK_EMOJI[newRankName] ?? '🎉'} ${newRankName}`);
-    rankUpScale.value = 0.8;
-    rankUpScale.value = withSequence(
-      withTiming(1.1, { duration: 220, easing: Easing.out(Easing.quad) }),
-      withTiming(1, { duration: 180 }),
-    );
-    rankUpOpacity.value = withSequence(
-      withTiming(1, { duration: 220 }),
-      withDelay(1700, withTiming(0, { duration: 400 }, finished => {
-        if (finished) runOnJS(setRankUp)(null);
-      })),
-    );
-  };
-
-  const comboStyle = useAnimatedStyle(() => ({ transform: [{ scale: comboScale.value }] }));
-  const milestoneStyle = useAnimatedStyle(() => ({ opacity: milestoneOpacity.value }));
-  const pointsFloatStyle = useAnimatedStyle(() => ({
-    opacity: pointsFloatOpacity.value,
-    transform: [{ translateY: pointsFloatY.value }],
-  }));
-  const pointsPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pointsPulse.value }] }));
-  // Bar fill animates via a 0–100 shared value → width%; card border flashes on a gain.
-  const rankBarFillStyle = useAnimatedStyle(() => ({ width: `${barWidth.value}%` }));
-  const rankCardStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(cardHighlight.value, [0, 1], [theme.border, theme.accent]),
-  }));
-  const rankUpStyle = useAnimatedStyle(() => ({
-    opacity: rankUpOpacity.value,
-    transform: [{ scale: rankUpScale.value }],
-  }));
-
-  const comboLabel =
-    combo >= 5 ? `🔥🔥 ${combo} in a row!`
-    : combo >= 3 ? `🔥 ${combo} in a row!`
-    : combo >= 1 ? `🎯 ${combo} in a row!`
-    : 'Answer correctly to heat up! 🔥';
-
-  // Progress within the current rank tier toward the next (0–100; 100 at Legend).
-  // Drives the VISUAL bar fill (the text numbers below show absolute totals instead).
+  // --- Home rank card: ease the bar fill to its current width on mount / point change
+  // (the user returns from a game with more points → the bar fills in on the home). ---
+  const barWidth = useSharedValue(0);
   const rankPct = rank.next
     ? Math.min(100, Math.max(0, ((points - rank.min) / (rank.next.min - rank.min)) * 100))
     : 100;
-
-  // Stage 2: ease the bar fill to its new width whenever the fraction changes (point
-  // gain, rank cross, or first mount) instead of snapping. Crossing into a new tier
-  // sweeps the bar to the new (lower) fraction — read together with the rank-up beat.
   useEffect(() => {
     barWidth.value = withTiming(rankPct, { duration: 600, easing: Easing.out(Easing.quad) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rankPct]);
+  const rankBarFillStyle = useAnimatedStyle(() => ({ width: `${barWidth.value}%` }));
 
   const faqs = SPORT_FAQS[primarySport];
 
+  // --- Full-screen game view (swaps the home; back returns here) ---
+  const activeGame = activeGameId ? getAcademyGame(activeGameId) : undefined;
+  if (activeGame) {
+    return (
+      <Animated.View key={activeGame.id} style={styles.root} entering={SlideInRight.duration(220)}>
+        <GameHost game={activeGame} sportKeys={category.sportKeys} onBack={() => setActiveGameId(null)} />
+      </Animated.View>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle={theme.statusBar} />
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        {/* Header — matches the Live tab wordmark, with "Academy" appended so the
-            "Sportswise" portion stays visually anchored when switching tabs. Title +
-            tagline are stacked in a column (tagline hugging the title) like Live;
-            Academy has no right-side group, so there's no left/right split. */}
-        <View style={styles.header}>
-          <View style={styles.headerTextCol}>
-            <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy</Text>
-            <Text style={styles.tagline}>Quizzes and facts to level up your game IQ.</Text>
-          </View>
-          {/* Persisted day-over-day streak (distinct from the in-session combo below).
-              Hidden at 0; shows once the user has a 1+ day streak. */}
-          {dailyStreak >= 1 && (
-            <View style={styles.dayStreakChip}>
-              <Text style={styles.dayStreakNum}>🔥 {dailyStreak}</Text>
-              <Text style={styles.dayStreakLabel}>DAY STREAK</Text>
+    <Animated.View style={styles.root} entering={FadeIn.duration(200)}>
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <StatusBar barStyle={theme.statusBar} />
+        <SafeAreaView style={styles.safe} edges={['top']}>
+          {/* ── Identity strip: header (title + streak chip) + sport selector ── */}
+          <View style={styles.header}>
+            <View style={styles.headerTextCol}>
+              <Text style={styles.headerTitle}>Sports<Text style={styles.headerTitleAccent}>wise</Text> Academy</Text>
+              <Text style={styles.tagline}>Quizzes and facts to level up your game IQ.</Text>
             </View>
-          )}
-        </View>
-
-        {/* Category selector — Academy-only learning categories (lib/academyCategories),
-            independent of the Live tab's My Sports settings. */}
-        <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
-            {ACADEMY_CATEGORIES.map(c => (
-              <TouchableOpacity
-                key={c.key}
-                style={[styles.sportTab, category.key === c.key && styles.sportTabActive]}
-                onPress={() => handleCategoryChange(c)}>
-                <Text style={styles.sportEmoji}>{c.emoji}</Text>
-                <Text style={[styles.sportLabel, category.key === c.key && styles.sportLabelActive]}>
-                  {c.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Combo + milestone — pinned below the sport pills, fixed above the scroll
-            so it stays visible while the cards scroll beneath. This is the in-session
-            consecutive-correct counter (resets on a wrong answer); the day-over-day
-            streak lives in the header chip above. */}
-        <View style={styles.comboBar}>
-          {/* Combo counter */}
-          <Animated.View style={[styles.comboWrap, comboStyle]}>
-            <Text style={combo > 0 ? styles.comboActive : styles.comboIdle}>{comboLabel}</Text>
-          </Animated.View>
-
-          {/* Stage 1: floating "+N" points reward — absolute overlay at the top-right of
-              the FIXED combo bar, so it's always on-screen even when the rank card has
-              scrolled away. pointerEvents none so it never blocks a tap. */}
-          {pointsFloat && (
-            <Animated.View style={[styles.pointsFloat, pointsFloatStyle]} pointerEvents="none">
-              <Text style={styles.pointsFloatText}>{pointsFloat}</Text>
-            </Animated.View>
-          )}
-
-          {/* Milestone celebration (fades out after ~2s) */}
-          {milestone && (
-            <Animated.View style={[styles.milestoneWrap, milestoneStyle]} pointerEvents="none">
-              <Text style={styles.milestoneText}>{milestone}</Text>
-            </Animated.View>
-          )}
-        </View>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled">
-
-          {/* 0. Rank card — the user's progression status (earned, separate from the
-              difficulty level). Quiz-fed in Phase 1; any future game feeds the same
-              points total. */}
-          <View style={styles.section}>
-            <Animated.View style={[styles.rankCard, rankCardStyle]}>
-              <View style={styles.rankTopRow}>
-                <Text style={styles.rankEmoji}>{RANK_EMOJI[rank.name] ?? '🔰'}</Text>
-                <View style={styles.rankNameCol}>
-                  <Text style={styles.rankKicker}>YOUR ACADEMY RANK</Text>
-                  <Text style={styles.rankName}>{rank.name}</Text>
-                </View>
-                <Animated.Text style={[styles.rankPts, pointsPulseStyle]}>{points} pts</Animated.Text>
+            {/* Persisted day-over-day streak. Hidden at 0; shows at a 1+ day streak. */}
+            {dailyStreak >= 1 && (
+              <View style={styles.dayStreakChip}>
+                <Text style={styles.dayStreakNum}>🔥 {dailyStreak}</Text>
+                <Text style={styles.dayStreakLabel}>DAY STREAK</Text>
               </View>
-
-              {rank.next ? (
-                <>
-                  <View style={styles.rankBarTrack}>
-                    <Animated.View style={[styles.rankBarFill, rankBarFillStyle]} />
-                  </View>
-                  {/* Absolute totals so the numbers match the big "{points} pts" above
-                      (was within-rank: points - rank.min). Bar FILL stays within-rank. */}
-                  <Text style={styles.rankProgressText}>
-                    {points} / {rank.next.min} → {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.rankMaxed}>👑 Legend — maxed</Text>
-              )}
-            </Animated.View>
-
-            {/* Stage 2: rank-up beat — a tasteful orange overlay on the card (not a
-                screen takeover), fading after ~2s. pointerEvents none. */}
-            {rankUp && (
-              <Animated.View style={[styles.rankUpOverlay, rankUpStyle]} pointerEvents="none">
-                <Text style={styles.rankUpKicker}>RANK UP!</Text>
-                <Text style={styles.rankUpName}>{rankUp}</Text>
-              </Animated.View>
             )}
           </View>
 
-          {/* 1. Quick Quiz */}
-          <View style={styles.section}>
-            <QuizCard
-              sportKeys={category.sportKeys}
-              streak={combo}
-              onCorrect={() => {
-                // Score by the answered question's difficulty (the global app level,
-                // which is exactly what the quiz filters by). Combo bonus uses the
-                // pre-increment combo (+1/level, capped) — so the Nth correct in a row
-                // adds N before becoming N+1. Wrong answers award nothing.
-                const comboBonus = Math.min(combo, COMBO_BONUS_CAP);
-                const gained = QUIZ_POINTS[level] + comboBonus;
-                // Stage 2: detect a rank cross BEFORE applying the award (points here is
-                // the pre-award total from this render's closure). No math change.
-                const beforeRank = getRank(points).name;
-                const afterRank = getRank(points + gained).name;
-                awardPoints(gained);
-                flashPointsGain(gained, comboBonus > 0);   // Stage 1: visible "+N"
-                if (beforeRank !== afterRank) celebrateRankUp(afterRank);
-                setCombo(c => c + 1);
-                onQuizAnswered();
-              }}
-              onWrong={() => { setCombo(0); onQuizAnswered(); }}
-            />
-          </View>
-
-          {/* 2. Did You Know */}
-          <View style={styles.section}>
-            <DidYouKnow sportKeys={category.sportKeys} />
-          </View>
-
-          {/* 3. Common Questions — auto-expanded (Academy is always learn mode). */}
-          <View style={styles.section}>
-            <View style={styles.faqSection}>
-              <View style={styles.faqHeadingRow}>
-                <Text style={styles.faqHeading}>{faqs.label[language]}</Text>
-              </View>
-              {(faqExpanded ? faqs.questions : faqs.questions.slice(0, 4)).map(q => {
-                const text = q[language] || q.en;
-                return (
-                  <View key={q.en} style={styles.faqItem}>
-                    <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(text)} activeOpacity={0.7}>
-                      <Text style={styles.faqQ}>{text}</Text>
-                      <Text style={styles.faqChevron}>{activeFaq === text ? '−' : '+'}</Text>
-                    </TouchableOpacity>
-                    {activeFaq === text && (
-                      <View style={styles.faqAnswerBox}>
-                        {faqAnswers[text]
-                          ? <Text style={styles.faqAnswer}>{faqAnswers[text]}</Text>
-                          : <Text style={styles.faqThinking}>{S.thinking}</Text>}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-              {faqs.questions.length > 4 && (
-                <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
-                  <Text style={styles.faqMoreText}>
-                    {faqExpanded ? S.showLess : `${S.showMore} (${faqs.questions.length - 4})`}
+          {/* Category selector — Academy-only categories, independent of My Sports. */}
+          <View style={styles.tabsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
+              {ACADEMY_CATEGORIES.map(c => (
+                <TouchableOpacity
+                  key={c.key}
+                  style={[styles.sportTab, category.key === c.key && styles.sportTabActive]}
+                  onPress={() => handleCategoryChange(c)}>
+                  <Text style={styles.sportEmoji}>{c.emoji}</Text>
+                  <Text style={[styles.sportLabel, category.key === c.key && styles.sportLabelActive]}>
+                    {c.label}
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              ))}
+            </ScrollView>
           </View>
 
-          {/* 4. Ask anything — sport-general, no play context. */}
-          <View style={styles.section}>
-            <Text style={styles.askTitle}>{S.askLearnPlaceholder.replace('{sport}', sportName).replace('…', '')}</Text>
-            <View style={styles.askRow}>
-              <TextInput
-                style={styles.askInput}
-                value={askText}
-                onChangeText={setAskText}
-                placeholder={S.askLearnPlaceholder.replace('{sport}', sportName)}
-                placeholderTextColor={theme.placeholderText}
-                returnKeyType="send"
-                onSubmitEditing={handleAsk}
-                editable={!asking}
-                blurOnSubmit
-              />
-              <TouchableOpacity
-                style={[styles.askSend, (!askText.trim() || asking) && styles.askSendDisabled]}
-                onPress={handleAsk}
-                disabled={!askText.trim() || asking}>
-                <Text style={[styles.askSendText, (!askText.trim() || asking) && { color: theme.textMuted }]}>↑</Text>
-              </TouchableOpacity>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled">
+
+            {/* ── Identity: the full rank card (overall journey across the Academy) ── */}
+            <View style={styles.section}>
+              <View style={styles.rankCard}>
+                <View style={styles.rankTopRow}>
+                  <Text style={styles.rankEmoji}>{RANK_EMOJI[rank.name] ?? '🔰'}</Text>
+                  <View style={styles.rankNameCol}>
+                    <Text style={styles.rankKicker}>YOUR ACADEMY RANK</Text>
+                    <Text style={styles.rankName}>{rank.name}</Text>
+                  </View>
+                  <Text style={styles.rankPts}>{points} pts</Text>
+                </View>
+
+                {rank.next ? (
+                  <>
+                    <View style={styles.rankBarTrack}>
+                      <Animated.View style={[styles.rankBarFill, rankBarFillStyle]} />
+                    </View>
+                    {/* Absolute totals so the numbers match the big "{points} pts" above. */}
+                    <Text style={styles.rankProgressText}>
+                      {points} / {rank.next.min} → {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.rankMaxed}>👑 Legend — maxed</Text>
+                )}
+              </View>
             </View>
-            {asking && (
-              <View style={styles.thinkingRow}>
-                <Text style={styles.thinkingText}>{S.thinking}</Text>
+
+            {/* ── Hero: the featured game (registry-driven; a Daily Challenge can replace
+                 this later without restructuring) ── */}
+            {ACADEMY_GAMES.length > 0 && (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={styles.heroCard}
+                  activeOpacity={0.85}
+                  onPress={() => openGame(ACADEMY_GAMES[0].id)}>
+                  <Text style={styles.heroKicker}>FEATURED</Text>
+                  <View style={styles.heroRow}>
+                    <Text style={styles.heroIcon}>{ACADEMY_GAMES[0].icon}</Text>
+                    <View style={styles.heroTextCol}>
+                      <Text style={styles.heroTitle}>{ACADEMY_GAMES[0].title}</Text>
+                      <Text style={styles.heroBlurb}>{ACADEMY_GAMES[0].blurb}</Text>
+                    </View>
+                    <Text style={styles.heroPlay}>▶</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             )}
-            {answer && (
-              <View style={styles.answerCard}>
-                {askedQ && <Text style={styles.answerHeader}>{askedQ}</Text>}
-                <Text style={styles.answerText}>{answer}</Text>
+
+            {/* ── Game library: a grid of tiles, rendered from the registry ── */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>GAMES</Text>
+              <View style={styles.gameGrid}>
+                {ACADEMY_GAMES.map(g => (
+                  <TouchableOpacity
+                    key={g.id}
+                    style={styles.gameTile}
+                    activeOpacity={0.8}
+                    onPress={() => openGame(g.id)}>
+                    <Text style={styles.gameTileIcon}>{g.icon}</Text>
+                    <Text style={styles.gameTileTitle} numberOfLines={1}>{g.title}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+            </View>
+
+            {/* ── Did You Know (below the grid, home content) ── */}
+            <View style={styles.section}>
+              <DidYouKnow sportKeys={category.sportKeys} />
+            </View>
+
+            {/* ── Common Questions — auto-expanded (Academy is always learn mode) ── */}
+            <View style={styles.section}>
+              <View style={styles.faqSection}>
+                <View style={styles.faqHeadingRow}>
+                  <Text style={styles.faqHeading}>{faqs.label[language]}</Text>
+                </View>
+                {(faqExpanded ? faqs.questions : faqs.questions.slice(0, 4)).map(q => {
+                  const text = q[language] || q.en;
+                  return (
+                    <View key={q.en} style={styles.faqItem}>
+                      <TouchableOpacity style={styles.faqRow} onPress={() => toggleFaq(text)} activeOpacity={0.7}>
+                        <Text style={styles.faqQ}>{text}</Text>
+                        <Text style={styles.faqChevron}>{activeFaq === text ? '−' : '+'}</Text>
+                      </TouchableOpacity>
+                      {activeFaq === text && (
+                        <View style={styles.faqAnswerBox}>
+                          {faqAnswers[text]
+                            ? <Text style={styles.faqAnswer}>{faqAnswers[text]}</Text>
+                            : <Text style={styles.faqThinking}>{S.thinking}</Text>}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+                {faqs.questions.length > 4 && (
+                  <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
+                    <Text style={styles.faqMoreText}>
+                      {faqExpanded ? S.showLess : `${S.showMore} (${faqs.questions.length - 4})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* ── Ask anything — sport-general, no play context ── */}
+            <View style={styles.section}>
+              <Text style={styles.askTitle}>{S.askLearnPlaceholder.replace('{sport}', sportName).replace('…', '')}</Text>
+              <View style={styles.askRow}>
+                <TextInput
+                  style={styles.askInput}
+                  value={askText}
+                  onChangeText={setAskText}
+                  placeholder={S.askLearnPlaceholder.replace('{sport}', sportName)}
+                  placeholderTextColor={theme.placeholderText}
+                  returnKeyType="send"
+                  onSubmitEditing={handleAsk}
+                  editable={!asking}
+                  blurOnSubmit
+                />
+                <TouchableOpacity
+                  style={[styles.askSend, (!askText.trim() || asking) && styles.askSendDisabled]}
+                  onPress={handleAsk}
+                  disabled={!askText.trim() || asking}>
+                  <Text style={[styles.askSendText, (!askText.trim() || asking) && { color: theme.textMuted }]}>↑</Text>
+                </TouchableOpacity>
+              </View>
+              {asking && (
+                <View style={styles.thinkingRow}>
+                  <Text style={styles.thinkingText}>{S.thinking}</Text>
+                </View>
+              )}
+              {answer && (
+                <View style={styles.answerCard}>
+                  {askedQ && <Text style={styles.answerHeader}>{askedQ}</Text>}
+                  <Text style={styles.answerText}>{answer}</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
@@ -536,19 +369,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sportLabelActive: { color: t.accentText },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
-  // Combo + milestone — fixed bar below the tagline (outside the ScrollView).
-  // Opaque background + 16px horizontal padding to align with the cards below.
-  comboBar: { backgroundColor: t.background, paddingHorizontal: 16 },
-  comboWrap: { alignItems: 'center', paddingVertical: 12 },
-  comboActive: { color: t.accent, fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  comboIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  milestoneWrap: { alignItems: 'center', marginBottom: 12 },
-  milestoneText: { color: t.accentText, fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  // Stage 1: the "+N" points float — top-right of the combo bar, rises + fades.
-  pointsFloat: { position: 'absolute', top: 6, right: 20 },
-  pointsFloatText: { color: t.accent, fontSize: 20, fontWeight: '900' },
   // Energetic spacing — 20px between sections.
   section: { marginBottom: 20 },
+  sectionLabel: { color: t.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.2, marginBottom: 10 },
   // Rank card — the progression "status" area. Navy surface, orange accents.
   rankCard: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border, padding: 16 },
   rankTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -561,15 +384,23 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rankBarFill: { height: '100%', backgroundColor: t.accent, borderRadius: 5 },
   rankProgressText: { color: t.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 8 },
   rankMaxed: { color: t.accent, fontSize: 14, fontWeight: '800', marginTop: 12, textAlign: 'center' },
-  // Stage 2: rank-up beat — orange overlay covering the card, navy text (on-brand,
-  // theme-safe via accent/onAccent). Absolute-fills the section (= the card bounds).
-  rankUpOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: t.accent, borderRadius: 16,
+  // Hero — the featured game. Orange-accented, prominent.
+  heroCard: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.accent, padding: 16 },
+  heroKicker: { color: t.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroIcon: { fontSize: 34 },
+  heroTextCol: { flex: 1 },
+  heroTitle: { color: t.textPrimary, fontSize: 18, fontWeight: '900' },
+  heroBlurb: { color: t.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 2 },
+  heroPlay: { color: t.accent, fontSize: 20, fontWeight: '900' },
+  // Game library grid — compact tiles, two per row.
+  gameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  gameTile: {
+    width: '47%', flexGrow: 1, minHeight: 92, borderRadius: 14, backgroundColor: t.surface,
+    borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12,
   },
-  rankUpKicker: { color: t.onAccent, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
-  rankUpName: { color: t.onAccent, fontSize: 24, fontWeight: '900', marginTop: 4 },
+  gameTileIcon: { fontSize: 28 },
+  gameTileTitle: { color: t.textPrimary, fontSize: 13, fontWeight: '800', textAlign: 'center' },
   // FAQ (mirrors Live tab styling)
   faqSection: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
