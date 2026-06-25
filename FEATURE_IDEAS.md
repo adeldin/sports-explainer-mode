@@ -564,6 +564,25 @@ little without the side. Cheap (the data's there); flags/logos are the visual up
 
 ---
 
+## 🎨 UI polish — queued (next session)
+
+Three concrete LiveScreen/Coach's-Corner/empty-state fixes:
+
+1. **Coach's Corner header overflow.** The state tag (`3-1 · 1 out · runners on 1st & 2nd`)
+   currently sits **inline** with the `🧠 COACH'S CORNER` label (`CoachCard.tsx` `headerRow`,
+   `justifyContent: space-between`) and runs off-screen on long MLB situations. Fix: move the tag
+   to its **own line below** the label (stack instead of inline).
+2. **"N left today" cap counter → prominent scarcity pill.** `styles.capIndicator` in
+   `LiveScreen.tsx` is a muted, near-invisible (and clipped) line. Make it a **high-contrast pill**
+   — bigger, padded, **amber accent**, more urgent as the count drops (it's
+   conversion-relevant scarcity UX — should draw the eye, not hide). Same treatment for the per-game
+   Q&A "N questions left" indicator.
+3. **Standardize empty-states to the La Liga template.** `EmptyState.tsx` — **La Liga is the
+   reference design** (short headline + calm subtitle + breathing-room spacing). **Cricket is too
+   crowded**; bring every sport's empty/off-season state to that same calm template.
+
+---
+
 ## 💡 Feature concepts
 
 ### 🚀 First-launch onboarding flow *(banked)*
