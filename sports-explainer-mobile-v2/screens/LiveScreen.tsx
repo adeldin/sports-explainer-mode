@@ -754,16 +754,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 answers={answers.filter(a => a.source === 'chip')}
               />
 
-              {/* Free-tier scarcity pill — amber, prominent, hidden for Pro/trial (∞). */}
-              {caps.explanationsLeft !== Infinity && (
-                <View style={styles.capPill}>
-                  <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(caps.explanationsLeft))}</Text>
-                </View>
-              )}
-
               {/* Coach's Corner (premium #3) — the live strategic layer, below THE PLAY. Keyed on
                   the play context so it resets/refetches per game/level/language. Renders
-                  coming-soon for thin-data sports; the Groq read fires only on Pro expand. */}
+                  coming-soon for thin-data sports; the Groq read fires only on Pro expand. The
+                  daily-explanation cap pill now lives in this card's header (top-right). */}
               {selectedGameId && (
                 <CoachCard
                   key={`coach|${sport}|${selectedGameId}|${level}|${language}`}
@@ -773,6 +767,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   language={language}
                   isPro={caps.isPro}
                   onUnlock={presentPaywall}
+                  capLeft={caps.explanationsLeft === Infinity ? undefined : caps.explanationsLeft}
                 />
               )}
 

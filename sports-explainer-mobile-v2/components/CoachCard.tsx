@@ -20,9 +20,10 @@ interface Props {
   language: Language;
   isPro: boolean;
   onUnlock: () => void;
+  capLeft?: number;            // free-tier daily-explanation count; undefined for Pro/trial (no pill)
 }
 
-export default function CoachCard({ sport, gameId, level, language, isPro, onUnlock }: Props) {
+export default function CoachCard({ sport, gameId, level, language, isPro, onUnlock, capLeft }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -86,7 +87,14 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+          {capLeft != null && (
+            <View style={styles.capPill}>
+              <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(capLeft))}</Text>
+            </View>
+          )}
+        </View>
         {!!tag && <Text style={styles.tag}>{tag}</Text>}
       </View>
 
@@ -147,11 +155,20 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
 const makeStyles = (t: Theme) => StyleSheet.create({
   // Teal "Coach's Corner" accent — distinct from the orange play card; the live teaching layer.
   card: { backgroundColor: t.surface, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accentCool },
-  // Stacked (column): the game-state tag sits BELOW the eyebrow and wraps freely, so long
+  // Stacked (column): the game-state tag sits BELOW the top row and wraps freely, so long
   // MLB situations ("3-1 · 1 out · runners on 1st & 2nd") no longer run off-screen.
   headerRow: { gap: 3 },
+  // Top row: eyebrow on the left, the free-tier cap pill on the right (the game-state tag stays
+  // on its own line below, preserving the overflow fix).
+  headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { color: t.accentCool, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
   tag: { color: t.textMuted, fontSize: 12, fontWeight: '800' },
+  // Amber scarcity pill — same vivid amber as LiveScreen, sized down to fit the header.
+  capPill: {
+    paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999,
+    backgroundColor: 'rgba(245,166,35,0.14)', borderWidth: 1, borderColor: 'rgba(245,166,35,0.40)',
+  },
+  capPillText: { color: '#F5A623', fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
   comingSoon: { color: t.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 8 },
   hook: { color: t.textPrimary, fontSize: 15, fontWeight: '600', lineHeight: 22, marginTop: 10 },
   unlockBtn: { marginTop: 14, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
