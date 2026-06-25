@@ -74,6 +74,14 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const comboScale = useSharedValue(1);
   const milestoneOpacity = useSharedValue(0);
 
+  // --- Points-gain feedback (Stage 1): a floating "+N" micro-reward on a correct
+  // answer, plus a pulse on the rank card's points number. The float text holds the
+  // exact gained amount (with 🔥 when a combo bonus applies). ---
+  const [pointsFloat, setPointsFloat] = useState<string | null>(null);
+  const pointsFloatOpacity = useSharedValue(0);
+  const pointsFloatY = useSharedValue(0);
+  const pointsPulse = useSharedValue(1);
+
   // --- FAQ state ---
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
   const [faqAnswers, setFaqAnswers] = useState<Record<string, string>>({});
@@ -194,8 +202,34 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     }
   };
 
+  // Stage 1: fire the "+N" micro-reward. The amount is computed at the award site
+  // (onCorrect) and passed straight in — no plumbing. The float rises + fades via an
+  // absolute overlay (never blocks taps / shifts layout), and the rank points number
+  // pulses so the running total visibly ticks up even if the card is partly off-screen.
+  const flashPointsGain = (amount: number, hasCombo: boolean) => {
+    setPointsFloat(`+${amount}${hasCombo ? ' 🔥' : ''}`);
+    pointsFloatOpacity.value = 0;
+    pointsFloatY.value = 0;
+    pointsFloatOpacity.value = withSequence(
+      withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) }),
+      withDelay(450, withTiming(0, { duration: 350 }, finished => {
+        if (finished) runOnJS(setPointsFloat)(null);
+      })),
+    );
+    pointsFloatY.value = withTiming(-46, { duration: 960, easing: Easing.out(Easing.quad) });
+    pointsPulse.value = withSequence(
+      withTiming(1.22, { duration: 150, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 220 }),
+    );
+  };
+
   const comboStyle = useAnimatedStyle(() => ({ transform: [{ scale: comboScale.value }] }));
   const milestoneStyle = useAnimatedStyle(() => ({ opacity: milestoneOpacity.value }));
+  const pointsFloatStyle = useAnimatedStyle(() => ({
+    opacity: pointsFloatOpacity.value,
+    transform: [{ translateY: pointsFloatY.value }],
+  }));
+  const pointsPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pointsPulse.value }] }));
 
   const comboLabel =
     combo >= 5 ? `🔥🔥 ${combo} in a row!`
@@ -261,6 +295,15 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
             <Text style={combo > 0 ? styles.comboActive : styles.comboIdle}>{comboLabel}</Text>
           </Animated.View>
 
+          {/* Stage 1: floating "+N" points reward — absolute overlay at the top-right of
+              the FIXED combo bar, so it's always on-screen even when the rank card has
+              scrolled away. pointerEvents none so it never blocks a tap. */}
+          {pointsFloat && (
+            <Animated.View style={[styles.pointsFloat, pointsFloatStyle]} pointerEvents="none">
+              <Text style={styles.pointsFloatText}>{pointsFloat}</Text>
+            </Animated.View>
+          )}
+
           {/* Milestone celebration (fades out after ~2s) */}
           {milestone && (
             <Animated.View style={[styles.milestoneWrap, milestoneStyle]} pointerEvents="none">
@@ -285,7 +328,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
                   <Text style={styles.rankKicker}>YOUR RANK</Text>
                   <Text style={styles.rankName}>{rank.name}</Text>
                 </View>
-                <Text style={styles.rankPts}>{points} pts</Text>
+                <Animated.Text style={[styles.rankPts, pointsPulseStyle]}>{points} pts</Animated.Text>
               </View>
 
               {rank.next ? (
@@ -314,7 +357,9 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
                 // pre-increment combo (+1/level, capped) — so the Nth correct in a row
                 // adds N before becoming N+1. Wrong answers award nothing.
                 const comboBonus = Math.min(combo, COMBO_BONUS_CAP);
-                awardPoints(QUIZ_POINTS[level] + comboBonus);
+                const gained = QUIZ_POINTS[level] + comboBonus;
+                awardPoints(gained);
+                flashPointsGain(gained, comboBonus > 0);   // Stage 1: visible "+N"
                 setCombo(c => c + 1);
                 onQuizAnswered();
               }}
@@ -432,6 +477,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   comboIdle: { color: t.textMuted, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   milestoneWrap: { alignItems: 'center', marginBottom: 12 },
   milestoneText: { color: t.accentText, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  // Stage 1: the "+N" points float — top-right of the combo bar, rises + fades.
+  pointsFloat: { position: 'absolute', top: 6, right: 20 },
+  pointsFloatText: { color: t.accent, fontSize: 20, fontWeight: '900' },
   // Energetic spacing — 20px between sections.
   section: { marginBottom: 20 },
   // Rank card — the progression "status" area. Navy surface, orange accents.
