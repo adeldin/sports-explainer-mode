@@ -78,6 +78,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
       <View style={styles.container}>
         <Text style={styles.emoji}>🏏</Text>
         <Text style={styles.title}>{S.noCricketData}</Text>
+        <Text style={styles.subtitle}>{S.noCricketDataSub}</Text>
       </View>
     );
   }
@@ -86,6 +87,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
       <View style={styles.container}>
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.title}>{S.noTournaments}</Text>
+        <Text style={styles.subtitle}>{S.noTournamentsSub}</Text>
       </View>
     );
   }
