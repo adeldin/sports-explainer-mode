@@ -754,9 +754,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 answers={answers.filter(a => a.source === 'chip')}
               />
 
-              {/* Free-tier indicator — subtle, informational, hidden for Pro/trial (∞). */}
+              {/* Free-tier scarcity pill — amber, prominent, hidden for Pro/trial (∞). */}
               {caps.explanationsLeft !== Infinity && (
-                <Text style={styles.capIndicator}>{S.capLeftToday.replace('{n}', String(caps.explanationsLeft))}</Text>
+                <View style={styles.capPill}>
+                  <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(caps.explanationsLeft))}</Text>
+                </View>
               )}
 
               {/* Coach's Corner (premium #3) — the live strategic layer, below THE PLAY. Keyed on
@@ -827,9 +829,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   </View>
                 ) : (
                   <>
-                    {/* Free-tier Q&A indicator — hidden for Pro/trial (∞). */}
+                    {/* Free-tier Q&A scarcity pill — amber, prominent, hidden for Pro/trial (∞). */}
                     {selectedGameId && caps.qaLeft(selectedGameId) !== Infinity && (
-                      <Text style={styles.capIndicator}>{S.capQaLeft.replace('{n}', String(caps.qaLeft(selectedGameId)))}</Text>
+                      <View style={styles.capPill}>
+                        <Text style={styles.capPillText}>{S.capQaLeft.replace('{n}', String(caps.qaLeft(selectedGameId)))}</Text>
+                      </View>
                     )}
                     {/* Discovery hint — only when no typed answer is present/pending under the box */}
                     {!answers.some(a => a.source === 'ask') && (
@@ -1048,7 +1052,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   askHint: { color: t.textMuted, fontSize: 12, lineHeight: 16, marginTop: 12 },
   // Free-tier caps — subtle indicator + the graceful "keep going" blocked states (brand
   // navy/orange; celebratory, not error-toned). Shared orange CTA → RC drop-in paywall.
-  capIndicator: { color: t.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginTop: 10 },
+  // Scarcity pill — amber, padded, self-aligned so it hugs its content (not full-width). Static
+  // for now; count-aware urgency (color shift as N→0) is banked for a later pass.
+  capPill: {
+    alignSelf: 'center', marginTop: 12,
+    paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999,
+    backgroundColor: 'rgba(245,166,35,0.14)', borderWidth: 1, borderColor: 'rgba(245,166,35,0.40)',
+  },
+  capPillText: { color: '#F5A623', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
   capCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent, alignItems: 'flex-start' },
   capTitle: { color: t.textPrimary, fontSize: 18, fontWeight: '800', lineHeight: 24, marginBottom: 8 },
   capBody: { color: t.textSecondary, fontSize: 14, lineHeight: 21, marginBottom: 16 },
