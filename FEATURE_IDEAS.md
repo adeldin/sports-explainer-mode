@@ -564,22 +564,24 @@ little without the side. Cheap (the data's there); flags/logos are the visual up
 
 ---
 
-## 🎨 UI polish — queued (next session)
+## 🎨 UI polish — ✅ SHIPPED 2026-06-25 (1.1 batch)
 
-Three concrete LiveScreen/Coach's-Corner/empty-state fixes:
+All four 1.1 UI fixes shipped (commits `305db42`, `2998a9a`, `38e6059`, `aee1c87`):
 
-1. **Coach's Corner header overflow.** The state tag (`3-1 · 1 out · runners on 1st & 2nd`)
-   currently sits **inline** with the `🧠 COACH'S CORNER` label (`CoachCard.tsx` `headerRow`,
-   `justifyContent: space-between`) and runs off-screen on long MLB situations. Fix: move the tag
-   to its **own line below** the label (stack instead of inline).
-2. **"N left today" cap counter → prominent scarcity pill.** `styles.capIndicator` in
-   `LiveScreen.tsx` is a muted, near-invisible (and clipped) line. Make it a **high-contrast pill**
-   — bigger, padded, **amber accent**, more urgent as the count drops (it's
-   conversion-relevant scarcity UX — should draw the eye, not hide). Same treatment for the per-game
-   Q&A "N questions left" indicator.
-3. **Standardize empty-states to the La Liga template.** `EmptyState.tsx` — **La Liga is the
-   reference design** (short headline + calm subtitle + breathing-room spacing). **Cricket is too
-   crowded**; bring every sport's empty/off-season state to that same calm template.
+1. ✅ **Kid → "Rookie" rename** — display-only across 10 locales + the hardcoded QuizCard label;
+   level emoji → 🧢. Internal `'kid'` value untouched (Level type, AsyncStorage, backend prompt
+   keys, picker keys, 164 facts.ts quiz tags) → explain contract + stored user level unaffected.
+2. ✅ **Coach's Corner header overflow** — `CoachCard.tsx headerRow` switched from row/space-between
+   to a column (`gap`), so the state tag drops below the label and wraps.
+3. ✅ **Cap counter → amber scarcity pill** — `LiveScreen.tsx` `capPill`/`capPillText`, both the
+   daily-explanation and per-game Q&A counters. **Static amber for now.**
+4. ✅ **Empty-states → La Liga template** — cricket headline shortened + subtitle added; tennis/golf
+   got a subtitle too (new `noCricketDataSub` / `noTournamentsSub`, ×10 locales).
+
+### Banked follow-up — count-aware scarcity urgency *(deferred from #3)*
+The cap pill is static amber. Next pass: make it **more urgent as the count drops** (e.g. amber → red
+at N≤1, optional pulse/shake on the last one) — conversion-relevant scarcity UX. Single shared
+`capPill` style, so it's a one-place change keyed on `explanationsLeft` / `qaLeft`.
 
 ---
 
