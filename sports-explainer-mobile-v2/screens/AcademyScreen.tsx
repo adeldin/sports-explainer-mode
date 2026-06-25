@@ -6,11 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, runOnJS, Easing,
+  interpolateColor,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { askQuestion, Sport, Level } from '../lib/api';
-import { useAppState } from '../lib/appState';
+import { useAppState, getRank } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
@@ -81,6 +82,15 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const pointsFloatOpacity = useSharedValue(0);
   const pointsFloatY = useSharedValue(0);
   const pointsPulse = useSharedValue(1);
+
+  // --- Rank card (Stage 2): the progress bar animates smoothly to its new fill on a
+  // point gain, the card border briefly highlights, and crossing a rank threshold
+  // fires a one-time celebratory beat overlaid on the card. ---
+  const [rankUp, setRankUp] = useState<string | null>(null);
+  const barWidth = useSharedValue(0);       // 0–100, drives the bar fill width%
+  const cardHighlight = useSharedValue(0);  // 0→1→0 border-color flash on a gain
+  const rankUpOpacity = useSharedValue(0);
+  const rankUpScale = useSharedValue(0.8);
 
   // --- FAQ state ---
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
@@ -221,6 +231,29 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
       withTiming(1.22, { duration: 150, easing: Easing.out(Easing.quad) }),
       withTiming(1, { duration: 220 }),
     );
+    // Stage 2: briefly highlight the rank card border so the gain ties to the card.
+    cardHighlight.value = withSequence(
+      withTiming(1, { duration: 180 }),
+      withDelay(280, withTiming(0, { duration: 520 })),
+    );
+  };
+
+  // Stage 2: a tasteful one-time rank-up beat — an orange overlay pops on the rank
+  // card with the new badge + name, then fades. Fired only when a correct answer
+  // crosses a rank threshold (detected at the award site).
+  const celebrateRankUp = (newRankName: string) => {
+    setRankUp(`${RANK_EMOJI[newRankName] ?? '🎉'} ${newRankName}`);
+    rankUpScale.value = 0.8;
+    rankUpScale.value = withSequence(
+      withTiming(1.1, { duration: 220, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 180 }),
+    );
+    rankUpOpacity.value = withSequence(
+      withTiming(1, { duration: 220 }),
+      withDelay(1700, withTiming(0, { duration: 400 }, finished => {
+        if (finished) runOnJS(setRankUp)(null);
+      })),
+    );
   };
 
   const comboStyle = useAnimatedStyle(() => ({ transform: [{ scale: comboScale.value }] }));
@@ -230,6 +263,15 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     transform: [{ translateY: pointsFloatY.value }],
   }));
   const pointsPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pointsPulse.value }] }));
+  // Bar fill animates via a 0–100 shared value → width%; card border flashes on a gain.
+  const rankBarFillStyle = useAnimatedStyle(() => ({ width: `${barWidth.value}%` }));
+  const rankCardStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(cardHighlight.value, [0, 1], [theme.border, theme.accent]),
+  }));
+  const rankUpStyle = useAnimatedStyle(() => ({
+    opacity: rankUpOpacity.value,
+    transform: [{ scale: rankUpScale.value }],
+  }));
 
   const comboLabel =
     combo >= 5 ? `🔥🔥 ${combo} in a row!`
@@ -238,9 +280,18 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     : 'Answer correctly to heat up! 🔥';
 
   // Progress within the current rank tier toward the next (0–100; 100 at Legend).
+  // Drives the VISUAL bar fill (the text numbers below show absolute totals instead).
   const rankPct = rank.next
     ? Math.min(100, Math.max(0, ((points - rank.min) / (rank.next.min - rank.min)) * 100))
     : 100;
+
+  // Stage 2: ease the bar fill to its new width whenever the fraction changes (point
+  // gain, rank cross, or first mount) instead of snapping. Crossing into a new tier
+  // sweeps the bar to the new (lower) fraction — read together with the rank-up beat.
+  useEffect(() => {
+    barWidth.value = withTiming(rankPct, { duration: 600, easing: Easing.out(Easing.quad) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankPct]);
 
   const faqs = SPORT_FAQS[primarySport];
 
@@ -321,11 +372,11 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
               difficulty level). Quiz-fed in Phase 1; any future game feeds the same
               points total. */}
           <View style={styles.section}>
-            <View style={styles.rankCard}>
+            <Animated.View style={[styles.rankCard, rankCardStyle]}>
               <View style={styles.rankTopRow}>
                 <Text style={styles.rankEmoji}>{RANK_EMOJI[rank.name] ?? '🔰'}</Text>
                 <View style={styles.rankNameCol}>
-                  <Text style={styles.rankKicker}>YOUR RANK</Text>
+                  <Text style={styles.rankKicker}>YOUR ACADEMY RANK</Text>
                   <Text style={styles.rankName}>{rank.name}</Text>
                 </View>
                 <Animated.Text style={[styles.rankPts, pointsPulseStyle]}>{points} pts</Animated.Text>
@@ -334,16 +385,27 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
               {rank.next ? (
                 <>
                   <View style={styles.rankBarTrack}>
-                    <View style={[styles.rankBarFill, { width: `${rankPct}%` }]} />
+                    <Animated.View style={[styles.rankBarFill, rankBarFillStyle]} />
                   </View>
+                  {/* Absolute totals so the numbers match the big "{points} pts" above
+                      (was within-rank: points - rank.min). Bar FILL stays within-rank. */}
                   <Text style={styles.rankProgressText}>
-                    {points - rank.min} / {rank.next.min - rank.min} to {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
+                    {points} / {rank.next.min} → {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
                   </Text>
                 </>
               ) : (
                 <Text style={styles.rankMaxed}>👑 Legend — maxed</Text>
               )}
-            </View>
+            </Animated.View>
+
+            {/* Stage 2: rank-up beat — a tasteful orange overlay on the card (not a
+                screen takeover), fading after ~2s. pointerEvents none. */}
+            {rankUp && (
+              <Animated.View style={[styles.rankUpOverlay, rankUpStyle]} pointerEvents="none">
+                <Text style={styles.rankUpKicker}>RANK UP!</Text>
+                <Text style={styles.rankUpName}>{rankUp}</Text>
+              </Animated.View>
+            )}
           </View>
 
           {/* 1. Quick Quiz */}
@@ -358,8 +420,13 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
                 // adds N before becoming N+1. Wrong answers award nothing.
                 const comboBonus = Math.min(combo, COMBO_BONUS_CAP);
                 const gained = QUIZ_POINTS[level] + comboBonus;
+                // Stage 2: detect a rank cross BEFORE applying the award (points here is
+                // the pre-award total from this render's closure). No math change.
+                const beforeRank = getRank(points).name;
+                const afterRank = getRank(points + gained).name;
                 awardPoints(gained);
                 flashPointsGain(gained, comboBonus > 0);   // Stage 1: visible "+N"
+                if (beforeRank !== afterRank) celebrateRankUp(afterRank);
                 setCombo(c => c + 1);
                 onQuizAnswered();
               }}
@@ -494,6 +561,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rankBarFill: { height: '100%', backgroundColor: t.accent, borderRadius: 5 },
   rankProgressText: { color: t.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 8 },
   rankMaxed: { color: t.accent, fontSize: 14, fontWeight: '800', marginTop: 12, textAlign: 'center' },
+  // Stage 2: rank-up beat — orange overlay covering the card, navy text (on-brand,
+  // theme-safe via accent/onAccent). Absolute-fills the section (= the card bounds).
+  rankUpOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: t.accent, borderRadius: 16,
+  },
+  rankUpKicker: { color: t.onAccent, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+  rankUpName: { color: t.onAccent, fontSize: 24, fontWeight: '900', marginTop: 4 },
   // FAQ (mirrors Live tab styling)
   faqSection: { backgroundColor: t.surface, borderRadius: 16, borderWidth: 1, borderColor: t.border },
   faqHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 14 },
