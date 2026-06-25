@@ -147,7 +147,9 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
 const makeStyles = (t: Theme) => StyleSheet.create({
   // Teal "Coach's Corner" accent — distinct from the orange play card; the live teaching layer.
   card: { backgroundColor: t.surface, borderRadius: 16, padding: 16, marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accentCool },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // Stacked (column): the game-state tag sits BELOW the eyebrow and wraps freely, so long
+  // MLB situations ("3-1 · 1 out · runners on 1st & 2nd") no longer run off-screen.
+  headerRow: { gap: 3 },
   eyebrow: { color: t.accentCool, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
   tag: { color: t.textMuted, fontSize: 12, fontWeight: '800' },
   comingSoon: { color: t.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 8 },
