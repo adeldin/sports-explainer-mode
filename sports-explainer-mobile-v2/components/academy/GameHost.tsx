@@ -10,8 +10,8 @@ import type { AcademyGame } from '../../lib/academyGames';
 // holds NO game-specific logic — that's the seam: the host is the same for every game,
 // so adding a game is "register a descriptor," never "edit the host."
 export default function GameHost({
-  game, sportKeys, onBack,
-}: { game: AcademyGame; sportKeys: Sport[]; onBack: () => void }) {
+  game, sportKeys, categoryEmoji, onBack,
+}: { game: AcademyGame; sportKeys: Sport[]; categoryEmoji?: string; onBack: () => void }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const Game = game.Component;
@@ -27,7 +27,7 @@ export default function GameHost({
         {/* Spacer to keep the title visually centered against the back button. */}
         <View style={styles.backBtn} />
       </View>
-      <Game sportKeys={sportKeys} />
+      <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
     </SafeAreaView>
   );
 }

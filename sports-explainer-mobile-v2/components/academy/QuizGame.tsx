@@ -26,7 +26,7 @@ const COMBO_BONUS_CAP = 10;
 // discards `combo` (it ends naturally) — no points are lost, because each correct
 // answer already called awardPoints() into the persisted global total. The home rank
 // card reads that global total, so it reflects whatever was earned.
-export default function QuizGame({ sportKeys }: AcademyGameProps) {
+export default function QuizGame({ sportKeys, categoryEmoji }: AcademyGameProps) {
   const { level, notificationsEnabled, dailyStreak, recordQuizActivity, points, rank, awardPoints } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -160,7 +160,7 @@ export default function QuizGame({ sportKeys }: AcademyGameProps) {
           "+N" float, combo, milestone, and rank-up beat have something to animate against. */}
       <View style={styles.statHeader}>
         <Animated.Text style={[styles.statPts, pointsPulseStyle]} numberOfLines={1}>
-          {RANK_EMOJI[rank.name] ?? '🔰'} {rank.name} · {points} pts
+          {categoryEmoji ? `${categoryEmoji}  ` : ''}{RANK_EMOJI[rank.name] ?? '🔰'} {rank.name} · {points} pts
         </Animated.Text>
         <Animated.View style={comboStyle}>
           <Text style={combo > 0 ? styles.comboActive : styles.comboIdle} numberOfLines={1}>{comboLabel}</Text>

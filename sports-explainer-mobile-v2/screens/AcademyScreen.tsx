@@ -153,7 +153,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   if (activeGame) {
     return (
       <Animated.View key={activeGame.id} style={styles.root} entering={SlideInRight.duration(220)}>
-        <GameHost game={activeGame} sportKeys={category.sportKeys} onBack={() => setActiveGameId(null)} />
+        <GameHost game={activeGame} sportKeys={category.sportKeys} categoryEmoji={category.emoji} onBack={() => setActiveGameId(null)} />
       </Animated.View>
     );
   }
@@ -368,7 +368,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sportLabel: { color: t.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
   sportLabelActive: { color: t.accentText },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  // paddingTop un-crowds the rank card from the sport-category selector above it.
+  scrollContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 48 },
   // Energetic spacing — 20px between sections.
   section: { marginBottom: 20 },
   sectionLabel: { color: t.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.2, marginBottom: 10 },
