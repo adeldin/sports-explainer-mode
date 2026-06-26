@@ -25,6 +25,10 @@ export interface AcademyGame {
   icon: string;   // emoji is fine for now
   blurb: string;  // short subtitle for the hero / tile
   Component: React.ComponentType<AcademyGameProps>;
+  // Optional allow-list of sportKeys this game can run on. If PRESENT, the game shows
+  // ONLY for categories whose sportKeys intersect this list; if ABSENT, the game shows
+  // for ALL sports (default). Lets a sport surface only the games it can actually run.
+  supportedSports?: Sport[];
 }
 
 export const ACADEMY_GAMES: AcademyGame[] = [
@@ -41,10 +45,25 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     icon: '🔤',
     blurb: 'Match the term to its definition.',
     Component: TermMatchGame,
+    // Every sportKey that resolves to a curated glossary (lib/glossary index BY_SPORT).
+    // All 10 Academy categories qualify today; set explicitly so the field is exercised
+    // and a future sport WITHOUT a glossary correctly won't surface this game.
+    supportedSports: [
+      'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
+      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+    ],
   },
 ];
 
 // Lookup helper for the GameHost (id → descriptor). Returns undefined for an unknown id.
 export function getAcademyGame(id: AcademyGameId): AcademyGame | undefined {
   return ACADEMY_GAMES.find(g => g.id === id);
+}
+
+// Games available for a category's sportKeys: a game with NO supportedSports works
+// everywhere; otherwise it shows only when its allow-list intersects the category's keys.
+export function gamesForSportKeys(sportKeys: Sport[]): AcademyGame[] {
+  return ACADEMY_GAMES.filter(
+    g => !g.supportedSports || g.supportedSports.some(s => sportKeys.includes(s)),
+  );
 }

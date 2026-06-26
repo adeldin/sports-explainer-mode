@@ -16,7 +16,7 @@ import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
 import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
-import { ACADEMY_GAMES, AcademyGameId, getAcademyGame } from '../lib/academyGames';
+import { AcademyGameId, getAcademyGame, gamesForSportKeys } from '../lib/academyGames';
 
 import DidYouKnow from '../components/DidYouKnow';
 import GameHost from '../components/academy/GameHost';
@@ -148,6 +148,9 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   const faqs = SPORT_FAQS[primarySport];
 
+  // Games available for the current category (filters by each game's supportedSports).
+  const visibleGames = gamesForSportKeys(category.sportKeys);
+
   // --- Full-screen game view (swaps the home; back returns here) ---
   const activeGame = activeGameId ? getAcademyGame(activeGameId) : undefined;
   if (activeGame) {
@@ -230,18 +233,18 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
             {/* ── Hero: the featured game (registry-driven; a Daily Challenge can replace
                  this later without restructuring) ── */}
-            {ACADEMY_GAMES.length > 0 && (
+            {visibleGames.length > 0 && (
               <View style={styles.section}>
                 <TouchableOpacity
                   style={styles.heroCard}
                   activeOpacity={0.85}
-                  onPress={() => openGame(ACADEMY_GAMES[0].id)}>
+                  onPress={() => openGame(visibleGames[0].id)}>
                   <Text style={styles.heroKicker}>FEATURED</Text>
                   <View style={styles.heroRow}>
-                    <Text style={styles.heroIcon}>{ACADEMY_GAMES[0].icon}</Text>
+                    <Text style={styles.heroIcon}>{visibleGames[0].icon}</Text>
                     <View style={styles.heroTextCol}>
-                      <Text style={styles.heroTitle}>{ACADEMY_GAMES[0].title}</Text>
-                      <Text style={styles.heroBlurb}>{ACADEMY_GAMES[0].blurb}</Text>
+                      <Text style={styles.heroTitle}>{visibleGames[0].title}</Text>
+                      <Text style={styles.heroBlurb}>{visibleGames[0].blurb}</Text>
                     </View>
                     <Text style={styles.heroPlay}>▶</Text>
                   </View>
@@ -253,7 +256,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>GAMES</Text>
               <View style={styles.gameGrid}>
-                {ACADEMY_GAMES.map(g => (
+                {visibleGames.map(g => (
                   <TouchableOpacity
                     key={g.id}
                     style={styles.gameTile}
