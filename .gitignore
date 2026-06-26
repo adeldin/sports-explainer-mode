@@ -52,3 +52,4 @@ sports-explainer-v1.zip
 *.png
 *.mov
 *.mp4
+.rapidapi.env

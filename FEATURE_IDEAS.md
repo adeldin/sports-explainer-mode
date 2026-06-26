@@ -465,6 +465,8 @@ demand"). One LLM outage = the core feature breaks. Resilience plan:
 
 ## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
 
+> ⚠️ SUPERSEDED (2026-06-25) by evidence-based recon → see DATA_SOURCES.md. That doc reorders priority: MLB GUMBO (upgrades already-shipped baseball) outranks adding tennis/golf; full build sequence + endpoint shapes there.
+
 **Core architecture move — a `sportDataProvider` abstraction** (the SAME swappable-adapter pattern
 as `visionProvider.ts`: env-driven, one file, each adapter normalizes its source's JSON into our
 internal shape). **ESPN stays the DEFAULT for all sports**; specific sports override with a richer
