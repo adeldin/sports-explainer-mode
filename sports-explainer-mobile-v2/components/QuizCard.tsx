@@ -250,8 +250,6 @@ export default function QuizCard({ sportKeys, streak, onCorrect, onWrong }: Prop
 
   return (
     <Animated.View style={[styles.card, cardStyle]}>
-      <Text style={styles.label}>🎯 QUICK QUIZ</Text>
-
       {/* Level picker — tapping re-pools/re-picks via the level-dependent reset effect.
           The highlighted pill doubles as the "what level am I on" indicator. */}
       <View style={styles.levelRow}>
@@ -327,7 +325,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
-  label: { color: t.accentText, fontSize: 11, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
   // Level picker — four equal-width pills forced onto a single row (no wrap).
   levelRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
   levelPill: { flex: 1, minHeight: 34, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 8, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },

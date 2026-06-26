@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sport } from './api';
 import QuizGame from '../components/academy/QuizGame';
-import TermMatchGame from '../components/academy/TermMatchGame';
+import MatchGame from '../components/academy/MatchGame';
 
 // The Academy game registry — the single source of truth for "what games exist."
 // The home shell renders the hero + grid by iterating ACADEMY_GAMES; it never names a
@@ -40,11 +40,13 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     Component: QuizGame,
   },
   {
+    // id kept as 'term-match' so nothing else (lookups, supportedSports) changes; the
+    // game is now the tap-to-pair Match Up board, not the old quiz-like term→def picker.
     id: 'term-match',
-    title: 'Term Match',
-    icon: '🔤',
-    blurb: 'Match the term to its definition.',
-    Component: TermMatchGame,
+    title: 'Match Up',
+    icon: '🧩',
+    blurb: 'Pair the terms to their meanings.',
+    Component: MatchGame,
     // Every sportKey that resolves to a curated glossary (lib/glossary index BY_SPORT).
     // All 10 Academy categories qualify today; set explicitly so the field is exercised
     // and a future sport WITHOUT a glossary correctly won't surface this game.
