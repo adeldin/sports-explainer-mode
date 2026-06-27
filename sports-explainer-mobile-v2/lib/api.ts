@@ -65,6 +65,8 @@ export interface Leaderboard {
   status: string;
   currentRound?: number;
   roundStatus?: string;
+  isLive: boolean;      // schedule-window derived: true = live, false = most-recent FINAL board
+  endDate?: number;     // tournament end (epoch ms) — for the "Final · {date}" header label
   rows: LeaderboardRow[];
 }
 

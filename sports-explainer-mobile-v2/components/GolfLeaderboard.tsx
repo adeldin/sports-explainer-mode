@@ -15,13 +15,20 @@ import { Leaderboard } from '../lib/api';
 // Under-par reads positive — "-4", "-20" start with a minus. Even ("E"/"0") and over ("+3") are neutral.
 const isUnderPar = (s: string): boolean => typeof s === 'string' && s.trim().startsWith('-');
 
+// Format the tournament end date for the "Final · {Mon D}" label. UTC getters (the schedule's end is
+// midnight-UTC) so the date doesn't shift a day in US timezones with local formatting.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtFinalDate = (ms: number): string => { const d = new Date(ms); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+
 export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const roundLine = board.currentRound
-    ? `Round ${board.currentRound}${board.status ? ` · ${board.status}` : ''}`
-    : board.status;
+  // Live → today's "Round N · {status}". Final (most-recent-ended fallback) → an honest "Final · {Mon D}"
+  // from the schedule endDate, so a finished board reads as intentional, not stale.
+  const roundLine = board.isLive
+    ? (board.currentRound ? `Round ${board.currentRound}${board.status ? ` · ${board.status}` : ''}` : board.status)
+    : `Final${board.endDate ? ` · ${fmtFinalDate(board.endDate)}` : ''}`;
 
   return (
     <View style={styles.card}>

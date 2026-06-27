@@ -39,6 +39,11 @@ export interface Leaderboard {
   status: string;         // "In Progress" / "Official" …
   currentRound?: number;
   roundStatus?: string;
+  // Authoritative live-vs-final flag, derived from the SCHEDULE window (not the leaderboard's status
+  // string). isLive=true → a tournament is currently in its (padded) window; false → this is the
+  // most-recently-ended tournament, shown as a "Final · {date}" board. endDate = date.end (epoch ms).
+  isLive: boolean;
+  endDate?: number;
   rows: LeaderboardRow[];
 }
 
@@ -74,38 +79,52 @@ function golfFetch(path: string): Promise<Response> {
 
 // --- Caches (no framework): the live tournId is stable for a tournament window (5 min TTL is plenty);
 //     the leaderboard is cached ~45s so a polling client doesn't burn the 250-request budget. ---
-let tournCache: { t: number; id: string | null; name?: string } | null = null;
+let tournCache: { t: number; id: string | null; name?: string; isLive: boolean; endDate?: number } | null = null;
 const TOURN_TTL = 5 * 60_000;
 const lbCache = new Map<string, { t: number; data: Leaderboard }>();
 const LB_TTL = 45_000;
 
-// Derive the LIVE tournId from the schedule by matching today's date to a tournament's start/end
-// window (end is the final-day START, so pad +1 day to cover the final round). NEVER hardcode an
-// example id — they're perishable. Returns null when nothing is live.
-export async function getCurrentTournId(): Promise<{ id: string; name?: string } | null> {
+// Resolve the tournament to show from the schedule: LIVE first (window spans now, padded +1 day to
+// cover the final round), else fall back to the MOST-RECENTLY-ENDED (latest date.end <= now) so golf
+// shows a rich board year-round instead of dropping to the thin line. NEVER hardcode an example id —
+// they're perishable. Returns null only when the schedule is empty/unfetchable (→ ESPN thin line).
+export async function getCurrentTournId(): Promise<{ id: string; name?: string; isLive: boolean; endDate?: number } | null> {
   if (!KEY) return null;
   const now = Date.now();
   if (tournCache && now - tournCache.t < TOURN_TTL) {
-    return tournCache.id ? { id: tournCache.id, name: tournCache.name } : null;
+    return tournCache.id ? { id: tournCache.id, name: tournCache.name, isLive: tournCache.isLive, endDate: tournCache.endDate } : null;
   }
   try {
     const year = new Date().getFullYear();
     const res = await golfFetch(`/schedule?orgId=1&year=${year}`);
-    if (!res.ok) { tournCache = { t: now, id: null }; return null; }
+    if (!res.ok) { tournCache = { t: now, id: null, isLive: false }; return null; }
     const data = unwrap(await res.json());
     const sched: any[] = Array.isArray(data?.schedule) ? data.schedule : [];
     const DAY = 86_400_000;
-    const live = sched.find((t: any) => {
-      const start = t?.date?.start, end = t?.date?.end;
-      return typeof start === 'number' && typeof end === 'number' && start <= now && now <= end + DAY;
-    });
-    if (!live?.tournId) { tournCache = { t: now, id: null }; return null; }
-    const id = String(live.tournId);
-    tournCache = { t: now, id, name: live.name ? String(live.name) : undefined };
-    return { id, name: tournCache.name };
+    const hasWindow = (t: any) => typeof t?.date?.start === 'number' && typeof t?.date?.end === 'number';
+
+    // PRIMARY (unchanged behavior when something IS live): window spans now (padded final round).
+    const live = sched.find((t: any) => hasWindow(t) && t.date.start <= now && now <= t.date.end + DAY && t?.tournId);
+
+    // FALLBACK: most-recently-ENDED tournament (latest date.end past the padded live window).
+    const recent = !live
+      ? sched
+          .filter((t: any) => hasWindow(t) && t.date.end + DAY < now && t?.tournId)
+          .sort((a: any, b: any) => b.date.end - a.date.end)[0]
+      : undefined;
+
+    const chosen = live || recent;
+    if (!chosen?.tournId) { tournCache = { t: now, id: null, isLive: false }; return null; }
+
+    const id = String(chosen.tournId);
+    const name = chosen.name ? String(chosen.name) : undefined;
+    const endDate = typeof chosen?.date?.end === 'number' ? chosen.date.end : undefined;
+    const isLive = !!live;
+    tournCache = { t: now, id, name, isLive, endDate };
+    return { id, name, isLive, endDate };
   } catch {
-    // Best-effort: a schedule failure means "no live leaderboard" → the app keeps the ESPN thin line.
-    tournCache = { t: now, id: null };
+    // Best-effort: a schedule failure means "no leaderboard" → the app keeps the ESPN thin line.
+    tournCache = { t: now, id: null, isLive: false };
     return null;
   }
 }
@@ -158,6 +177,8 @@ export async function fetchGolfLeaderboard(): Promise<Leaderboard | null> {
       status: asStr(data?.status),
       currentRound: data?.roundId != null ? asNum(data.roundId) : undefined,
       roundStatus: data?.roundStatus != null ? asStr(data.roundStatus) : undefined,
+      isLive: tourn.isLive,                        // schedule-derived live-vs-final (authoritative)
+      endDate: tourn.endDate,                      // for the "Final · {date}" label
       rows: rawRows.map(mapRow),                   // rows arrive PRE-SORTED (leader first) — no sort
     };
     lbCache.set(tourn.id, { t: Date.now(), data: board });
