@@ -6,11 +6,20 @@
 > v1.1 plan (see MONETIZATION.md). Everything below marked "road to launch" is now DONE unless
 > noted; remaining items are post-launch.
 
+---
+
+## 📐 VISION & PRINCIPLES (reference)
+> Stable identity & strategy — the "who / why" that doesn't change build-to-build. Reference, not a build queue. The next section (🗂️ PRIORITIZED ROADMAP) is the "what to build next" map.
+
+---
+
 ## 🎯 Core audience reframe
 
 The primary audience is **"sports-curious" people** — partners, friends, and family of
 fans who want to feel included. The app's job is to make someone **feel like they belong
 in the conversation**, not to serve existing experts.
+
+---
 
 ## ⭐ North star use case
 
@@ -18,6 +27,8 @@ in the conversation**, not to serve existing experts.
 > She opens the app, gets a **Kid-level** explanation of *what* happened **and** *why* it's
 > historically significant (the Babe Ruth comparison), and can now **participate in the
 > conversation**.
+
+---
 
 ## 🧭 Three product modes
 
@@ -28,6 +39,8 @@ in the conversation**, not to serve existing experts.
   Use case: *"I just started dating a Bears fan, teach me about the Bears."*
 - **News Companion** *(new, complex)* — breaking sports news translated for non-fans.
   Proactive / push-based. Requires a notification system or feed — **later phase**.
+
+---
 
 ## 🎓 Founding principle — teaching, not just explaining
 
@@ -48,6 +61,8 @@ well."** Every feature should be evaluable against real teaching principles:
 
 **North-star test for ANY feature:** does a user leave going *"oh, I didn't know that"* / *"that
 answered my question"* / *"I learned something today"*? If not, reconsider it.
+
+---
 
 ## 🔒 V1.0 scope lock
 
@@ -84,6 +99,8 @@ work = v1.1 (see roadmap below).
 - ✅ **Debug instrumentation** — added to diagnose translation, then removed cleanly (`eb019ca`).
 
 **Remaining backend: nothing — the backend expansion is complete.**
+
+---
 
 ## 🔜 Next phase — Mobile UI
 
@@ -187,139 +204,101 @@ builds on the last, never blocked:
 
 ---
 
-## 📚 The live explanation — full learning design *(FINALIZED + externally validated 2026-06-21 — AUTHORITATIVE)*
+## 🗂️ PRIORITIZED ROADMAP
+> The "what do I build next?" map. One line per item; full detail lives in the tiered sections further down (pointers say where).
 
-> **Status:** validated by **two independent external AI critiques** (2026-06-21); the build order
-> below is their converged recommendation. **This supersedes** the earlier scattered "improved AI /
-> leveled explanation / premium stat layer" notes — it is the authoritative live-explanation plan.
+### 🥇 TIER 1 — DO NOW *(unblocked, in-season, high-value)*
+1. **GUMBO / MLB data upgrade** — **TOP priority.** Highest-value; baseball is LIVE + testable daily; unlocks the strike-zone visual. → detail in *Per-sport data upgrade roadmap* + *STRATEGY — visuals* (Tier 4 / Reference).
+2. **Soccer formation diagram** — first data-driven visual; verifiable on finished-game data; no AI cost. → detail in *STRATEGY — visuals* (Tier 4 / Reference).
+3. **Tappable stat glossary** — cheap, static, on-mission (stats as teaching, zero per-game AI cost). → detail in *FEATURE — Tappable Stat Glossary* (Active Build Detail).
 
-**The reframe:** what we called **"Improved AI"** (v1.1 item #2) is really **the live explanation
-becoming a real teaching loop.** The MVP is **NOT** the premium stat layer and **NOT** the full
-learning engine — it's a **tight teaching loop on every play.**
+### 🥈 TIER 2 — DO SOON
+1. **Situation-keyed cache** — HIGH: saves money (the 100k/day Groq wall); reuse reads for recurring situations. → detail in *FEATURE — Feedback button + situation-keyed explanation CACHE* (Active Build Detail).
+2. **Gate D-1 live test + commit** — built + parked; needs live soccer to verify the possession/shots-enriched read. → context in *🧹 CLEANUP — soccerPulse knownLimitations* and *🔌 LLM PROVIDER*; the Gate D-1 code itself is committed-pending.
+3. **Rugby / cricket Coach's Corner** — strategic expansion; reuses the team-state pulse engine; underserved/global markets. → detail in *Coach's Corner — team sports vs. individual sports* (Active Build Detail) + *Per-sport data upgrade roadmap* (Tier 4).
+4. **Stale PLAY-card bug fix** — recon now; fix needs live games to verify. → detail in *BUG (OPEN) — stale "THE PLAY" card on soccer* (Active Build Detail).
+5. **Recap polish (sparse "Key Performance")** — testable on finished games; costs tokens. → detail in *Recap enhancements* (Active Build Detail).
 
-**The core problem it solves:** any single play contains MANY possible lessons at many levels. A
-strikeout looking on a splitter could teach: what a strikeout is, what "freezes / strike looking"
-means, what a splitter is, what a "put-away pitch" is, or the pitch-sequencing strategy behind it.
-WHICH lesson matters depends entirely on who's watching and what they don't yet know. The design's
-answer is not "show all of them" — it's **pick the single best one.**
+### 🥉 TIER 3 — QUEUED
+1. **Feedback button** — pairs with the cache (validates which reads land). → detail in *FEATURE — Feedback button + …CACHE* (Active Build Detail).
+2. **Per-sport live indicators in the picker** — surfacing job; the cross-sport machinery already exists. → detail in *Per-sport live indicators in the sport picker* (Active Build Detail).
+3. **First-launch onboarding** — activation + set difficulty up front. → detail in *Feature concepts → First-launch onboarding flow* (Feature Concepts).
+4. **Individual-sport Coach's Corner fork (tennis/golf)** — a DIFFERENT archetype (situational-decision, not team-state). → detail in *Coach's Corner — team sports vs. individual sports* (Active Build Detail).
 
-**THE MVP — the minimum that delivers "I learned something":**
-- **One primary lesson per play** — not all-at-once; the app picks the **single best teachable
-  concept** for this user/play.
-- **Tappable curated-glossary definitions** for the jargon within that lesson (scaffolding).
-- **A "watch next" cue — conditional only:** show it ONLY when there's a genuinely observable next
-  signal; **never forced** (a bad/forced watch-next is worse than none).
-- **A plain-language significance sentence** *(FREE)* — "why it mattered" in words, no numbers
-  needed.
-
-That loop = *"I understood this play, I could unpack the confusing term, and I know what to watch
-for next."* **That's the product.**
-
-**CONFIRMED BUILD ORDER (both critiques converged on this).** Lettered Steps A–F to avoid
-collision with the v1.1 build-sequence's top-level numbering:
-- **Step A — One-primary-lesson explanation rework** *(foundation)* — difficulty changes the
-  **LESSON**, not just vocabulary: Kid = rule/outcome ("he didn't swing — that's a strike; three
-  you're out"); Beginner = outcome + basic why; Intermediate = the craft/tactic ("a splitter —
-  looks like a fastball then drops; his put-away pitch"); Expert = the strategy, outcome assumed
-  ("sequenced him — fastballs up to set the eye, then the splitter below the zone"). *Same play,
-  four different LESSONS.* Needs an explicit **lesson-selection rubric**: relevance + level-fit +
-  novelty + importance + teachability.
-- **Step B — Curated glossary + tappable definitions** — start with the top **~50–100
-  high-frequency terms per launch sport** (**baseball & football first**). One plain-language def
-  per term, same for all levels; tap-to-reveal inline (no hover/tooltip; dismissable). **Content
-  authoring is the real bottleneck, not code.** Reusable asset (feeds explanation + Academy + FAQs
-  + the platform engine).
-- **Step C — Watch-next** *(conditional only)* — render only when a real observable next signal
-  exists.
-- **Step D — Question-framed expansion** — instead of a generic "Go deeper," surface the **1–2
-  relevant questions** for this specific card ("Why did it work? / What's a [term]? / Why did it
-  matter?") — **dynamic, not a fixed set.**
-- **Step E — Free/paid stat layer** *(a PACKAGING layer, built AFTER teaching value is proven)* —
-  where the GUMBO premium **"moment"** stats live (leverage, win-probability swing, drama index,
-  charts / historical comps). **Demoted** from its earlier "Phase A next" priority. Free =
-  plain-language significance; paid = quantified significance. (Monetization mechanics in
-  MONETIZATION.md.)
-- **Step F — Learning engine — STAGED, not one build:**
-   - **Phase 1:** exposure tracking + **recent-exposure suppression** ("don't reteach the same
-     concept repeatedly in one game" — this alone already feels adaptive).
-   - **Phase 2:** **post-game recap** ("today you saw: X, Y, Z — 30-sec quiz?") — ties into the
-     parked **post-game summary / recap** concept below.
-   - **Phase 3:** retrieval quizzes.
-   - **Phase 4:** real mastery adaptation.
-   - ⚠️ **exposure ≠ mastery** — seeing a concept isn't understanding it; treat exposure as **weak
-     evidence only.**
-
-**KEY PRINCIPLES (surfaced by the critiques):**
-- **Don't overbuild v1.** The learning engine is the long-term **moat**, but the MVP is the tight
-  teaching loop. *"Build the part that makes every explanation better before the parts that make
-  the product look smarter."*
-- **Confidence layer.** Distinguish **observed fact** ("he struck out looking") from
-  **interpretation** ("the pitcher LIKELY wanted…"). Don't overstate certainty on intent — this
-  protects trust.
-- **Not every play deserves an explanation.** It's a **"teachable-moment feed," not a
-  play-by-play feed.** Need an **importance threshold** — explain when confusing / important /
-  unusual / strategically revealing / tied to an active learning thread.
-- **Per-card controls** ("Simpler / More strategy / I know this") may beat fixed difficulty for
-  live — captured as an **idea to consider** (not committed).
-- **Content granularity varies by sport** — play-level (baseball / football) vs.
-  possession / drive / shift-level (others); **don't force one card grammar everywhere.**
-- **Glossary governance.** As it scales across sports / terms / contexts it becomes
-  **knowledge-design work** — plan for canonical-definition standards and "when a term graduates
-  into a reusable concept card."
-- **Free/paid line.** Plain-language significance is **FREE**; quantified significance (exact
-  win-prob %, leverage, charts, historical comps) is **PAID.** Guard against premium metrics
-  becoming **necessary to understand** the free explanation.
+### 🏛️ TIER 4 — STRATEGY / REFERENCE *(know this, not "to build")*
+- **Visuals + "don't become a scoreboard" guardrail** → *STRATEGY — visuals, data, and the "don't become a scoreboard" line*.
+- **LLM provider strategy (consolidated + decided)** → *🔌 LLM PROVIDER (decided)*.
+- **Platform / [Topic]Wise vision** → *Platform vision — the "[Topic]Wise" family*.
+- **TV app vision** → *TV app vision*.
+- **Gamification / progression** → *Gamification / Learning progression*.
+- **Per-sport data-upgrade roadmap** → *Per-sport data upgrade roadmap*.
+- **Authoritative plans & status** → *The live explanation — full learning design*, *Live Now / Step D backlog*.
 
 ---
 
-## 🔴 Live Now / Step D session — status + backlog *(added 2026-06-23)*
+## ▓▓▓ ACTIVE BUILD DETAIL — Tiers 1–3 ▓▓▓
 
-**✅ Done this session (committed; owner pushes from terminal):**
-- ✅ **Step D Phase 1 — layered PlayCard** (`6d3ce94`) — derived headline + core lesson + WHY
-  (open) + RULE (collapsed), glossary inside; expand/collapse + glossary state reset via a
-  context-key remount (`sport|game|level|language`). Pure `derivePlayHeadline` + unit harness.
-- ✅ **Watch Next (Step C card) + Live Now dual-trigger** (`003e97e`) — end-of-game
-  **"Watch Next" 👀** plus a second trigger so the card also appears when the current sport has
-  nothing live: offseason / no-games / learn-mode and the scheduled "hasn't started yet" card,
-  titled **"Live Now" 🔴**. `excludeCurrentSport` threading (Trigger A false / B true via
-  `LEAGUE_TO_SPORT`) fixes the confirmed **World-Cup-recommends-World-Cup** bug. Also fixed the
-  offseason/learn-mode early-return that never set `gamesFetched`, so Live Now fires on those
-  states. Localized titles (10 locales). 21-case `selectWatchNext` harness.
-- ✅ **Step D Phase 2 — live Q&A as in-place layers** (`df3a713`) — **supersedes the earlier
-  "in progress" status; Phase 2 is shipped.** Chip answers render as PlayCard layers (about the
-  play → on the play); typed free-text answers render **under the input box** (where the user's
-  attention is); per-item loading/error; glossary works inside answers. New-play detection via a
-  pure, tested **`derivePlayKey`** (`lib/playKey.ts`): **"fresh play, fresh card"** — Q&A clears
-  on a genuine new play but **persists through the 60s same-play refresh**. Also: **FAQ now
-  collapsible in learn-mode/no-games** (removed the `|| learnMode` force-open; default-open
-  derived from `[sport, learnMode]`, still toggleable, re-applies on sport switch).
-  - Known, accepted limitation: sports with no `rawPlay` + constant `playType` (rugby/MLR) yield
-    a constant play-key, so Q&A there persists across plays. Noted, not hacked around.
+---
 
-**🔜 Queued — near-term (decided, not yet built):**
-- **Previous Play** — store the last play in memory + a **back-arrow** to re-read a play that
-  refreshed away mid-read. Works for **ALL sports** (no data dependency — just remembers the
-  already-fetched play). **Reuses Phase 2's `derivePlayKey`** play-identity signal. Comes right
-  after Phase 2. ⚠️ Do **NOT** confuse with full play-by-play (data track below) — this is the
-  small, shippable version.
-- **Golf leaderboard** — replace the one-line tournament stub with a real leaderboard. ESPN golf
-  endpoint appears feasible.
-- **State color-coding** — deliberate design pass on coloring game cards by state (upcoming /
-  live / final). Must reconcile with the existing per-sport card tints in `GameCard`
-  (`SPORT_COLORS`) — don't let it conflict. A design decision, not a quick build.
+## 💡 FEATURE — Tappable Stat Glossary (stats as teaching, not a scoreboard)
 
-**🧊 Data track — deferred (all blocked on "ESPN free tier too thin, need a real provider"):**
-- **Rugby play-by-play** — Opta / Stats Perform. The central unlock for expert-grade rugby; ties
-  to the Hounds/MLR strategic relationship. ESPN exposes **no** MLR play-by-play.
-- **Live tennis & golf data** — ESPN gives only thin tournament context (leaderboard line), no
-  live game data. Real live data needs a non-ESPN source.
-- **Full play-by-play for sports ESPN doesn't provide it for** — the LARGE version of "Previous
-  Play." A **data-sourcing** problem, NOT a code feature. ⚠️ Do **NOT** fabricate or
-  LLM-generate play data to fill the gap — confident-but-wrong play data is the cardinal failure
-  (the same trap as the rugby placeholder).
+The mission-aligned way to use the rich stat data (boxscore possession/shots, baseball RISP, etc.): present the stat AND teach what it means, at the user's difficulty level. ESPN shows "RISP 2-for-7" and assumes you know it; we make RISP tappable → a definition that teaches. Same data, but where ESPN assumes knowledge, we build it. This is the wedge ("watch and ask why") applied to statistics.
 
-> **Note:** the three data-track items cluster into **ONE sourcing decision** when revisited
-> (which provider, cost, partnership route) — tackle together, not piecemeal.
+### The mechanic
+- A curated list of meaningful stats per sport (in-game + end-of-game). CURATED, not a firehose — pick stats that TEACH (RISP, OPS, possession%, shots on target, pace, etc.), skip noise (total clearances, longball%). The selectivity IS the editorial product — it's what keeps us a learning app, not a stats dump.
+- Each stat term is tappable → reveals a definition at the user's CURRENT difficulty level (Rookie/Beginner/Intermediate/Expert), reusing the existing level system. Example RISP:
+  - Rookie: "how well they hit when a hit would score a run"
+  - Expert: "situational hitting with runners on 2nd/3rd; ~.250 league avg, noisy in-game sample"
+- Definitions can be CONTEXTUAL where useful ("2-for-7 is middling — good teams convert more of these").
+
+### Why it's architecturally great
+- CHEAP: stat definitions are STATIC (RISP means the same every game) → build a GLOSSARY (data file: term × 4 levels), authored ONCE, looked up on tap. ZERO per-game AI cost. Could have Claude Code draft the whole glossary.
+- Reuses the existing difficulty-level system end-to-end.
+- Turns the "unused ESPN boxscore data" + "GUMBO stats" into teaching surface area instead of a scoreboard.
+- Selectivity solves "don't become ESPN" — a hand-picked list of stats-worth-understanding is editorial judgment, not a data firehose.
+
+### Build sketch (future)
+- A glossary module: { sport: { statKey: { rookie, beginner, intermediate, expert, contextualHint? } } }.
+- Stats rendered anywhere (recap, Coach's Corner, a future stats strip) link into the glossary.
+- Start with one sport's curated list (baseball RISP/OPS/ERA or soccer possession/xG-concepts/shots) as the pattern, then extend.
+- Pairs naturally with the visuals (tap a strike-zone pitch → what's a "paint the corner"; tap possession% → what possession really tells you).
+
+---
+
+## 🧭 Coach's Corner — team sports vs. individual sports (architectural fork)
+
+Insight: the SoccerMatchPulse model works because TEAM-sport strategy = "the game state (score + time + manpower) FORCES both teams into collective postures" (protect lead / chase / drop a defender after a red). The coaching read = reading that forced posture.
+
+### Fits the pulse model (team-state read) — same engine, sport-specific pulse:
+- Soccer (built), Rugby, Cricket. All have: a score, a clock/innings structure, and TWO teams making strategic choices in response to shared state. Cricket especially (run rate vs required rate, wickets in hand, overs left, attack vs consolidate). Rugby (territory, phases, bonus-point math, kick vs go).
+
+### Breaks the pulse model (individual sports) — needs a DIFFERENT archetype:
+- Tennis, Golf. No "two teams forced into collective postures." 
+  - Tennis: strategy is within the point / serve-return patterns / matchups / momentum — about ONE player's shot selection, not a forced collective posture.
+  - Golf: players don't even directly interact; it's player vs course vs field over hours. Strategy = club selection, risk/reward per hole, course management.
+- Tell: tennis/golf are ALREADY learn-mode sports (no live play-by-play) — the app already treats them differently.
+
+### Proposed fork — TWO Coach's Corner archetypes:
+1. **Team-state read** (soccer/rugby/cricket): forced collective posture from game state. The pulse engine.
+2. **Situational-decision read** (tennis/golf): the tactical tension / risk-reward of a key INDIVIDUAL moment.
+   - Tennis: "what's the play at break point / second serve at 30-40 / tiebreak" — the tactical tension in THIS point situation.
+   - Golf: "risk/reward on this shot/hole given position vs the field" — individual decision under tournament pressure.
+   - Different engine, different triggers (key moments, not game-state changes).
+
+Decision: build the team-state version fully first (soccer Gates C/D → rugby → cricket). The individual-sport "situational-decision" archetype is a SEPARATE future design, not a forced fit onto the pulse engine. Don't try to make tennis/golf use the team model.
+
+---
+
+## 🐛 BUG (OPEN — Tier 2) — stale "THE PLAY" card on soccer (sits frozen for long stretches)
+Observed live: Belgium-NZL at 47', but THE PLAY card still showed Trossard's goal from the 28th minute — 19 minutes of a live game with no new play explanation. The user sees/learns nothing new for that whole stretch. Coach's Corner updated correctly (showed 45'+3'); it's THE PLAY card specifically that's stale.
+
+Hypothesis (NOT yet confirmed — needs recon): soccer's "current play" pulls the last ESPN keyEvent/commentary entry, and likely only refreshes on a SIGNIFICANT event (goal/card/sub). Between sparse soccer events, the play card sits frozen — fine for baseball/football (every play is an event) but bad for soccer (notable events are minutes apart). 
+
+Possible fixes to investigate:
+- Pull from the full commentary[] feed (minute-by-minute), not just keyEvents, so the play updates on more frequent beats (shots, fouls, chances) — gives the explainer fresh material between goals.
+- Or: when no new keyEvent, fall back to the latest commentary[] entry for "the play."
+- Tradeoff: more frequent updates = more Groq calls (each new play explanation is an AI call). Balance freshness vs cost — maybe update the play on meaningful commentary beats only (shots/big chances), not every routine pass.
+Separate from the Coach's Corner gates. Worth a dedicated recon of how soccer's "last play" is selected + how often it should refresh.
 
 ---
 
@@ -360,6 +339,79 @@ copyright (we never display their text).
 **Decision:** ship the **prompt-fix now** (free, fixes ordering); revisit the news-API signal
 once the core recap is solid and we've weighed the extra API/latency/complexity against the
 marquee-game-only benefit. Don't reflexively integrate — it's a deliberate later upgrade.
+
+---
+
+## 💡 FEATURE — Feedback button + situation-keyed explanation CACHE ("the app learns, not the model")
+
+IMPORTANT FRAMING: the LLM (Groq/Gemini/Llama) is STATIC — it does NOT learn from user feedback. Feedback cannot flow back into the model. So "the AI learns over time" must be built as CACHING + feedback, not model-learning. (Fine-tuning is a heavy, expensive, separate undertaking — not what a feedback button enables.)
+
+### Part 1 — Feedback button (build-worthy on its own)
+A lightweight "was this helpful / I learned something" tap on each read — e.g. a greyed-out lightbulb that lights up when tapped. Fits the learning/Academy identity, low-friction. Gives us data we have ZERO of today: which explanations actually land. Thumbs/heart/lightbulb — pick the on-brand one.
+
+### Part 2 — Situation-keyed explanation cache (the REAL "learning" mechanism)
+Recurring situations (e.g. "3-2 full count, 2 outs, bottom 9th, game on the line") have essentially the SAME strategic explanation every time (players change; the situational teaching is constant). So:
+- Compute a SITUATION KEY (we already do this — derivePlayKey + count/outs/inning state = a situation fingerprint).
+- First time a situation appears → generate (Groq) + STORE the read keyed by situation.
+- Next time a similar situation appears → SERVE THE CACHED read instantly (DB lookup, no AI call), optionally light-template the current player names in.
+Benefits = exactly the intuition: FASTER (no AI call), CHEAPER (no tokens on repeats — directly eases the 100k/day Groq limit), and BETTER over time as the cache of validated reads grows.
+
+### Part 3 — Feedback feeds the cache (how the SYSTEM gets smarter)
+- Thumbs-up / lightbulb on a read → promote it as "good enough to reuse" in the cache.
+- Thumbs-down → don't cache; regenerate next time.
+- The system improves not because the model learns, but because the cache of human-validated explanations grows.
+
+### Part 4 — Caching removes speed pressure → enables a slower/better model for novel situations
+If cached reads serve instantly, the speed problem disappears for repeat situations. That frees us to use a slower-but-maybe-better model (e.g. Gemini) for the RARE first-generation of a novel situation (happens once, then cached forever). Connects to the "Gemini may write better but is too slow for live" finding — caching is what could make Gemini's quality affordable on the latency budget.
+
+### Open design questions
+- Situation-key granularity: too coarse = generic reads; too fine = never cache-hits. Tune (e.g. count+outs+inning+score-state, NOT exact players).
+- Per-difficulty-level caching (4 levels × situations).
+- Staleness/variety: serving the identical read every time may feel repetitive — maybe cache 2-3 variants per situation, or light-template.
+- Storage: where the cache lives (backend DB). 
+- This is a bigger architectural feature — significant, but high-value (cost + speed + the feedback loop). Future, well after the current Coach's Corner gates.
+
+---
+
+## 🔴 Per-sport live indicators in the sport picker (1.3/1.4)
+
+**Problem:** With ~14 sports in the picker, users must tap through every sport tab to discover which have live games — lots of dead taps, makes the app feel emptier than it is, and scales WORSE as more sports are added. The single global "LIVE" pill in the header tells you something is live but not WHAT.
+
+**Fix:** Show a live indicator (dot, or live-count badge) on each individual sport tab that currently has a live event — turns the picker into a map of where the action is.
+
+**Buildability (recon-confirmed, FAVORABLE):** The cross-sport machinery already exists. `gatherWatchCandidates()` (lib/watchNext.ts) already fetches ALL non-learn-mode sports' live status in parallel (Promise.allSettled over fetchScoreboard) and returns WatchCandidate[] each carrying sport + status ('live'/'upcoming'). It's what powers Watch Next / Live Now. So this is mostly a SURFACING job, not new fetching architecture. Effort: MEDIUM-small for the dot v1.
+
+**v1 approach:** Add a top-level effect that calls gatherWatchCandidates() eagerly on mount; derive a Set<parentSport> (via the already-exported parentSport(), so a "Soccer" tab lights when EPL/LaLiga/WorldCup is live, "Rugby" covers rugby/mlr) from candidates where status==='live'; render a dot (reuse existing liveDot style) on each visibleSports tab in that set.
+
+**Scoping notes:**
+- Learn-mode sports (tennis/golf/cricket) correctly never light up — no live ESPN scoreboard source. Accurate, not a bug.
+- Polling cost: eager cross-sport = ~10-11 parallel ESPN calls/cycle. Live status changes slowly — use a GENTLER cadence (every 2-3 min, or only while Live tab focused), NOT the verbatim 60s play-refresh interval.
+- Extension (float live sports to front of picker): flag a tension — it conflicts with the user's deliberate My Sports order set in Settings. Dots/badges are less disorienting than reordering tabs under them. Prefer dots over reordering for v1; if reordering, make it opt-in.
+
+**RELATED BUG to fix as part of this work:** The global "LIVE" header pill (LiveScreen.tsx ~612) currently renders on `games.length > 0` — i.e. it shows "LIVE" whenever the selected sport has ANY games including scheduled/final, NOT only live ones. So it's inaccurate today (over-shows "LIVE"). The correct check is `games.some(g => g.state === 'in')` (already computed elsewhere as hasLiveInSport, ~527). When building the per-tab dots, either RETIRE the global pill (the dots are the better map) or FIX it to the accurate check so it stops lying.
+
+---
+
+## ⚽ Match Timeline enhancements (banked)
+
+The soccer Match Timeline shipped (`feat(soccer)` `b0e551b`) rendering Highlightly events
+(goals/cards/subs by minute). Two follow-ups surfaced on the live Bosnia–Qatar match:
+
+### 1. Unknown event-type rows — the `10' • Bono` case
+The timeline showed a neutral-dot row `10' • Bono` — `eventIcon()`'s fallback for a `type` it
+doesn't map (Bono = Morocco's GK; likely a goalkeeper/VAR-style event). **Diagnose what `type`
+strings Highlightly actually sends** beyond Goal / Yellow Card / Red Card / Substitution / Missed
+Penalty (pull `events[].type` from a few finished matches — expect GK events, VAR reviews,
+penalties-awarded, injuries, etc.). Then **decide per type: map to a meaningful icon, or filter as
+noise** — a "key moments" timeline shouldn't list every goalkeeper touch. Keep the neutral-dot
+fallback only for genuinely-unknown types; filter the noisy ones so it stays glanceable.
+
+### 2. Team identity per row — flags (soccer) → logos (later)
+Right now you see WHO (player) but not for WHICH team. The **`team` field is already in
+`MatchEvent` and flowing** — step one is just **rendering it** on each row. Polish: **country
+flags** for soccer/World Cup (reuse the existing country→flag mapping from the score cards),
+**team logos** for other sports later. Directly serves "watch and ask why" — a goal scorer means
+little without the side. Cheap (the data's there); flags/logos are the visual upgrade.
 
 ---
 
@@ -426,162 +478,9 @@ additive; vision runs on OpenAI and consumes zero Groq tokens). Two banked follo
   affordance. Pure mobile UI; low priority, but the honest-failure surface matters once on a paid
   tier where 429s should be rare.
 
-### 🧯 LLM resilience — fallback provider + paid-primary plan *(Groq Dev Tier blocked)*
-
-Groq is currently the **single hard dependency** for ALL explanations / coach / recap (free tier
-100k tokens/day; the **Dev Tier upgrade is BLOCKED** — Groq "temporarily unavailable due to high
-demand"). One LLM outage = the core feature breaks. Resilience plan:
-
-- **(a) Swappable explanation-provider adapter** — mirror the existing `visionProvider.ts` pattern
-  (provider behind an interface, env-driven) so no single LLM outage breaks the core. (This is the
-  text-model version of what vision already has.)
-- **(b) Immediate $0 fallback — Gemini Flash FREE on 429.** Groq stays primary; Gemini fires ONLY
-  when Groq caps. Gemini 3 Flash free ≈ **10 RPM / 250k TPM / 1,500 RPD**. Acceptable because we
-  send **PUBLIC sports play text, not PII/proprietary data**. ⚠️ **Caveat:** Google's free tier may
-  **train on inputs/outputs** — fine for public sports text (conscious accept), **NOT** for
-  anything sensitive.
-- **(c) Durable fix — a PAID primary we control** instead of engineering around a free tier. **Paid
-  Gemini Flash** is a strong candidate (~**$0.15/$0.60 per M tokens** — a few $/mo at our volume,
-  **no daily cap, no data-training**); may be a better primary than Groq regardless of whether Dev
-  Tier reopens. Decide when there's a beat — **don't chain two volatile free tiers** (free-Groq +
-  free-Gemini) as the permanent architecture.
-- **(d) ⚠️ GOTCHA:** enabling billing on a Gemini project **DELETES that project's free tier
-  entirely** (every call billable from token 1) — so to run free-test + paid-prod, use **SEPARATE
-  Google Cloud projects**.
-- **(e)** Also **retry Groq Dev Tier periodically** — it has Spend Limits when it reopens; the
-  upgrade (no code change, just a higher ceiling) is still worth it if it comes back.
-- **(f) ✅ SHIPPED + PROVEN (`feat(llm)` `60e5fb8`):** the swappable adapter (`llmProvider.ts`,
-  `createChatCompletion` drop-in, all 7 Groq sites routed, env-toggled via `LLM_FALLBACK_PROVIDER`)
-  is live, and the Groq→Gemini fallback was verified end-to-end locally (forced a Groq bad-model
-  404 → caught → Gemini served a valid same-shape explanation).
-  - **GAP found during that test — Gemini fallback isn't retried on a transient 503.** Gemini
-    occasionally returns **503 "overloaded"** (seen once, cleared immediately on retry). Today a
-    single 503 → the adapter throws → both-failed → user sees the error. Compound failure (Groq
-    capped AND Gemini 503 on the same call) is rare, but the fix is cheap: **one retry / short
-    backoff on the Gemini fallback call before giving up.** Hardening, not correctness — bank and
-    add when convenient.
-
 ---
 
-## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
-
-**Core architecture move — a `sportDataProvider` abstraction** (the SAME swappable-adapter pattern
-as `visionProvider.ts`: env-driven, one file, each adapter normalizes its source's JSON into our
-internal shape). **ESPN stays the DEFAULT for all sports**; specific sports override with a richer
-source via an adapter. Because each adapter normalizes to our format, **everything downstream
-(explanation prompt, UI, difficulty levels) is unchanged**. The first adapter is the real work;
-each subsequent one is incremental.
-
-**Tiered framework across the 14 sports:**
-- **Tier 1 — rich on ESPN, keep as-is:** NFL, NBA, MLB (full play-by-play). **Coach's Corner
-  launches here**, no data change.
-- **Tier 2 — thin on ESPN, cheap/free upgrade available (the opportunity):** soccer, cricket,
-  tennis, golf, rugby.
-- **Tier 3 — thin on ESPN, expensive upgrade only, defer:** rugby **expert-grade**
-  (Opta / Stats Perform) for deep phase data; revisit when partnerships develop.
-
-**Key strategic insight — Highlightly as a consolidated second provider.** Highlightly
-(highlightly.net, also on RapidAPI) has a **FREE tier — 100 requests/day, no credit card, every
-core feature** — and covers **soccer** (950+ leagues incl. EPL/La Liga/Serie A/Bundesliga/Ligue 1/
-MLS/Champions League/World Cup), **cricket** (900+ leagues, ball-by-ball), AND **rugby** (100+
-competitions incl. World Cup, Six Nations, URC, Premiership, Top 14, Super Rugby, MLR, Sevens). So
-**ONE Highlightly account + ONE adapter could upgrade three of our thinnest, most strategically
-important sports — including both investor-target sports, cricket + rugby — in a single move.**
-This reframes the question: maybe we don't need many APIs — we need **ESPN (default) + Highlightly
-(thin-sport upgrade)** behind the adapter, with specialists/Opta only where Highlightly proves
-insufficient. Paid tiers ~**$9.49–$45.99/mo** if we outgrow free.
-
-**Highlightly tier — ✅ RESOLVED (PRO, 2026-06-24).** Subscribed to **Highlightly PRO ($9.49/mo:
-7,500 req/day, 720/min)**. Rationale: removes the BASIC 100/day constraint during the in-season
-**World Cup** window (the download driver), avoids immediate rate-limit issues, cancelable
-month-to-month.
-- **Request math (for future tier decisions):** ~**100 Highlightly requests per live match watched
-  end-to-end** (60s polling) — and it's **per-MATCH, not per-user**, thanks to the enricher's 60s
-  events-cache. So **BASIC 100/day ≈ 1 live match/day** (solo testing only); **PRO 7,500/day ≈ ~75
-  match-views** — covers real early World Cup traffic. ULTRA ($20.99/25k) / MEGA ($45.99/65k) are
-  for **thousands of concurrent users** — not needed until real scale.
-- **PRO unlocks the broader Highlightly provider** (950+ soccer leagues, **cricket**, **rugby** =
-  the best expansion targets) — but those sports still need their **own enrichers BUILT**
-  (cricket/rugby enrichers, post-1.1); only `worldcup→1635` is wired today. **EPL/LaLiga/MLS** just
-  need league IDs added to the enricher's `LEAGUE` map (**quick win**).
-
-**Per-sport specifics (alternatives to Highlightly, for reference):**
-- **Soccer:** API-Football ($19/mo, events feed updated every 15s — goals/cards/subs/lineups with
-  timestamps, the play-level data ESPN withholds; free plan exists). football-data.org free = 12
-  comps but DELAYED scores + no events (weak for live). **Biggest live-lineup impact** of any
-  upgrade (World Cup live now + 3 major leagues).
-- **Cricket:** CricketData.org (lifetime-free 100 hits/day; $5.99/mo 2k/day; $12.99/mo 10k/day;
-  ball-by-ball). Sportmonks (€29+/mo, ball-by-ball commentary). **Highest strategic value** — cheap
-  AND investor-target sport.
-- **Tennis:** point-by-point feeds (Goalserve, Enetpulse, Matchstat, api-tennis.com, many RapidAPI
-  hobby-priced) — score before/after each point, server, serve speed, break-point context; some
-  **classify the meaning of each point** (break/set point, momentum) — gold for "watch and ask
-  why." Simple structure, easy adapter.
-- **Golf:** Slash Golf (free prototyping tier, hole-by-hole real-time). Richer (OddsMatrix/
-  SportsDataIO) go to shot-by-shot/strokes-gained — more than we need; hole-by-hole + leaderboard
-  is plenty.
-- **Rugby:** Highlightly (free, all major leagues) is the easy grab. Data Sports Group (Union +
-  League, live tries + commentary). Goalserve (free trial). **OPEN QUESTION / ACTION:** unconfirmed
-  whether any free/cheap rugby API exposes **deep phase-by-phase event data** (rucks/mauls/
-  breakdown/territory) for expert-grade explanation, or just scores + tries. **Action: grab the
-  free Highlightly key, hit it during a live match (Six Nations / URC / Super Rugby), inspect the
-  event payload depth** — that one test answers whether Highlightly closes the rugby gap "enough"
-  or rugby still genuinely needs Opta. ESPN gives rugby **zero** play-by-play
-  (`playByPlayAvailable: false`), so anything is an upgrade.
-
-**Suggested build sequence (after Coach's Corner):** soccer first (biggest live-lineup impact,
-World Cup live, free to start) → cricket second (strategic + cheap) → rugby (grab free Highlightly,
-run the depth test) → tennis/golf opportunistically → Opta for rugby expert-grade only when
-partnerships develop.
-
-**Cross-link to Coach's Corner:** this roadmap directly **extends** Coach's Corner — richer data
-per sport = Coach's Corner works for **soccer/cricket/rugby, not just US sports**. Build Coach's
-Corner **data-source-agnostic with clean degradation** so the data upgrade *extends* it rather than
-requiring a rebuild.
-
----
-
-## ⚽ Match Timeline enhancements (banked)
-
-The soccer Match Timeline shipped (`feat(soccer)` `b0e551b`) rendering Highlightly events
-(goals/cards/subs by minute). Two follow-ups surfaced on the live Bosnia–Qatar match:
-
-### 1. Unknown event-type rows — the `10' • Bono` case
-The timeline showed a neutral-dot row `10' • Bono` — `eventIcon()`'s fallback for a `type` it
-doesn't map (Bono = Morocco's GK; likely a goalkeeper/VAR-style event). **Diagnose what `type`
-strings Highlightly actually sends** beyond Goal / Yellow Card / Red Card / Substitution / Missed
-Penalty (pull `events[].type` from a few finished matches — expect GK events, VAR reviews,
-penalties-awarded, injuries, etc.). Then **decide per type: map to a meaningful icon, or filter as
-noise** — a "key moments" timeline shouldn't list every goalkeeper touch. Keep the neutral-dot
-fallback only for genuinely-unknown types; filter the noisy ones so it stays glanceable.
-
-### 2. Team identity per row — flags (soccer) → logos (later)
-Right now you see WHO (player) but not for WHICH team. The **`team` field is already in
-`MatchEvent` and flowing** — step one is just **rendering it** on each row. Polish: **country
-flags** for soccer/World Cup (reuse the existing country→flag mapping from the score cards),
-**team logos** for other sports later. Directly serves "watch and ask why" — a goal scorer means
-little without the side. Cheap (the data's there); flags/logos are the visual upgrade.
-
----
-
-## 🎨 UI polish — ✅ SHIPPED 2026-06-25 (1.1 batch)
-
-All four 1.1 UI fixes shipped (commits `305db42`, `2998a9a`, `38e6059`, `aee1c87`):
-
-1. ✅ **Kid → "Rookie" rename** — display-only across 10 locales + the hardcoded QuizCard label;
-   level emoji → 🧢. Internal `'kid'` value untouched (Level type, AsyncStorage, backend prompt
-   keys, picker keys, 164 facts.ts quiz tags) → explain contract + stored user level unaffected.
-2. ✅ **Coach's Corner header overflow** — `CoachCard.tsx headerRow` switched from row/space-between
-   to a column (`gap`), so the state tag drops below the label and wraps.
-3. ✅ **Cap counter → amber scarcity pill** — `LiveScreen.tsx` `capPill`/`capPillText`, both the
-   daily-explanation and per-game Q&A counters. **Static amber for now.**
-4. ✅ **Empty-states → La Liga template** — cricket headline shortened + subtitle added; tennis/golf
-   got a subtitle too (new `noCricketDataSub` / `noTournamentsSub`, ×10 locales).
-
-### Banked follow-up — count-aware scarcity urgency *(deferred from #3)*
-The cap pill is static amber. Next pass: make it **more urgent as the count drops** (e.g. amber → red
-at N≤1, optional pulse/shake on the last one) — conversion-relevant scarcity UX. Single shared
-`capPill` style, so it's a one-place change keyed on `explanationsLeft` / `qaLeft`.
+## ▓▓▓ FEATURE CONCEPTS & GAMIFICATION (banked) ▓▓▓
 
 ---
 
@@ -994,31 +893,272 @@ capture-user-questions remain v2, after App Store launch.
 
 ---
 
-## 🧲 Yahoo Sports features to steal
-
-- **Team logos on game cards** — already on the list; **reprioritize as a fast win.**
-- **Recent games (last 5) per team** — W/L and scores for context.
-- **More Info section per game** — venue, broadcast channel, weather.
-- **Compact pill-style game cards** — more important as the sport count grows.
-- **Team stats / rankings bar chart** — context before explaining plays.
-- **SKIP:** pick-your-winner/odds (conflicts with brand), community/discuss (too complex),
-  generic banner ads (see `MONETIZATION.md`).
+## ▓▓▓ AUTHORITATIVE PLANS & STATUS (reference) ▓▓▓
 
 ---
 
-## 📺 TV app vision
+## 📚 The live explanation — full learning design *(FINALIZED + externally validated 2026-06-21 — AUTHORITATIVE)*
 
-- A **true overlay** over another app is **OS-level impossible** on all TV platforms.
-- **Streaming live sports** is a **legal wall** (broadcast rights), not a technical one.
-- **Buildable:** an **Apple TV app (tvOS)** via the **Expo TV target** — same codebase,
-  different build. The user watches the game through their own service; the app runs alongside.
-- **Picture-in-Picture:** user puts YouTube TV in a PiP corner, SportsWise fills the
-  main screen — the closest thing to the overlay vision, and it **works today on tvOS**.
-- **TV provider integration** *(longer term)*: user signs in with YouTube TV/cable, the app
-  knows what game they're watching = more relevant explanations.
-- **Living-room use case:** family watching together; non-fans see explanations without
-  picking up a phone.
-- **Priority:** after the mobile App Store launch.
+> **Status:** validated by **two independent external AI critiques** (2026-06-21); the build order
+> below is their converged recommendation. **This supersedes** the earlier scattered "improved AI /
+> leveled explanation / premium stat layer" notes — it is the authoritative live-explanation plan.
+
+**The reframe:** what we called **"Improved AI"** (v1.1 item #2) is really **the live explanation
+becoming a real teaching loop.** The MVP is **NOT** the premium stat layer and **NOT** the full
+learning engine — it's a **tight teaching loop on every play.**
+
+**The core problem it solves:** any single play contains MANY possible lessons at many levels. A
+strikeout looking on a splitter could teach: what a strikeout is, what "freezes / strike looking"
+means, what a splitter is, what a "put-away pitch" is, or the pitch-sequencing strategy behind it.
+WHICH lesson matters depends entirely on who's watching and what they don't yet know. The design's
+answer is not "show all of them" — it's **pick the single best one.**
+
+**THE MVP — the minimum that delivers "I learned something":**
+- **One primary lesson per play** — not all-at-once; the app picks the **single best teachable
+  concept** for this user/play.
+- **Tappable curated-glossary definitions** for the jargon within that lesson (scaffolding).
+- **A "watch next" cue — conditional only:** show it ONLY when there's a genuinely observable next
+  signal; **never forced** (a bad/forced watch-next is worse than none).
+- **A plain-language significance sentence** *(FREE)* — "why it mattered" in words, no numbers
+  needed.
+
+That loop = *"I understood this play, I could unpack the confusing term, and I know what to watch
+for next."* **That's the product.**
+
+**CONFIRMED BUILD ORDER (both critiques converged on this).** Lettered Steps A–F to avoid
+collision with the v1.1 build-sequence's top-level numbering:
+- **Step A — One-primary-lesson explanation rework** *(foundation)* — difficulty changes the
+  **LESSON**, not just vocabulary: Kid = rule/outcome ("he didn't swing — that's a strike; three
+  you're out"); Beginner = outcome + basic why; Intermediate = the craft/tactic ("a splitter —
+  looks like a fastball then drops; his put-away pitch"); Expert = the strategy, outcome assumed
+  ("sequenced him — fastballs up to set the eye, then the splitter below the zone"). *Same play,
+  four different LESSONS.* Needs an explicit **lesson-selection rubric**: relevance + level-fit +
+  novelty + importance + teachability.
+- **Step B — Curated glossary + tappable definitions** — start with the top **~50–100
+  high-frequency terms per launch sport** (**baseball & football first**). One plain-language def
+  per term, same for all levels; tap-to-reveal inline (no hover/tooltip; dismissable). **Content
+  authoring is the real bottleneck, not code.** Reusable asset (feeds explanation + Academy + FAQs
+  + the platform engine).
+- **Step C — Watch-next** *(conditional only)* — render only when a real observable next signal
+  exists.
+- **Step D — Question-framed expansion** — instead of a generic "Go deeper," surface the **1–2
+  relevant questions** for this specific card ("Why did it work? / What's a [term]? / Why did it
+  matter?") — **dynamic, not a fixed set.**
+- **Step E — Free/paid stat layer** *(a PACKAGING layer, built AFTER teaching value is proven)* —
+  where the GUMBO premium **"moment"** stats live (leverage, win-probability swing, drama index,
+  charts / historical comps). **Demoted** from its earlier "Phase A next" priority. Free =
+  plain-language significance; paid = quantified significance. (Monetization mechanics in
+  MONETIZATION.md.)
+- **Step F — Learning engine — STAGED, not one build:**
+   - **Phase 1:** exposure tracking + **recent-exposure suppression** ("don't reteach the same
+     concept repeatedly in one game" — this alone already feels adaptive).
+   - **Phase 2:** **post-game recap** ("today you saw: X, Y, Z — 30-sec quiz?") — ties into the
+     parked **post-game summary / recap** concept below.
+   - **Phase 3:** retrieval quizzes.
+   - **Phase 4:** real mastery adaptation.
+   - ⚠️ **exposure ≠ mastery** — seeing a concept isn't understanding it; treat exposure as **weak
+     evidence only.**
+
+**KEY PRINCIPLES (surfaced by the critiques):**
+- **Don't overbuild v1.** The learning engine is the long-term **moat**, but the MVP is the tight
+  teaching loop. *"Build the part that makes every explanation better before the parts that make
+  the product look smarter."*
+- **Confidence layer.** Distinguish **observed fact** ("he struck out looking") from
+  **interpretation** ("the pitcher LIKELY wanted…"). Don't overstate certainty on intent — this
+  protects trust.
+- **Not every play deserves an explanation.** It's a **"teachable-moment feed," not a
+  play-by-play feed.** Need an **importance threshold** — explain when confusing / important /
+  unusual / strategically revealing / tied to an active learning thread.
+- **Per-card controls** ("Simpler / More strategy / I know this") may beat fixed difficulty for
+  live — captured as an **idea to consider** (not committed).
+- **Content granularity varies by sport** — play-level (baseball / football) vs.
+  possession / drive / shift-level (others); **don't force one card grammar everywhere.**
+- **Glossary governance.** As it scales across sports / terms / contexts it becomes
+  **knowledge-design work** — plan for canonical-definition standards and "when a term graduates
+  into a reusable concept card."
+- **Free/paid line.** Plain-language significance is **FREE**; quantified significance (exact
+  win-prob %, leverage, charts, historical comps) is **PAID.** Guard against premium metrics
+  becoming **necessary to understand** the free explanation.
+
+---
+
+## 🔴 Live Now / Step D session — status + backlog *(added 2026-06-23)*
+
+**✅ Done this session (committed; owner pushes from terminal):**
+- ✅ **Step D Phase 1 — layered PlayCard** (`6d3ce94`) — derived headline + core lesson + WHY
+  (open) + RULE (collapsed), glossary inside; expand/collapse + glossary state reset via a
+  context-key remount (`sport|game|level|language`). Pure `derivePlayHeadline` + unit harness.
+- ✅ **Watch Next (Step C card) + Live Now dual-trigger** (`003e97e`) — end-of-game
+  **"Watch Next" 👀** plus a second trigger so the card also appears when the current sport has
+  nothing live: offseason / no-games / learn-mode and the scheduled "hasn't started yet" card,
+  titled **"Live Now" 🔴**. `excludeCurrentSport` threading (Trigger A false / B true via
+  `LEAGUE_TO_SPORT`) fixes the confirmed **World-Cup-recommends-World-Cup** bug. Also fixed the
+  offseason/learn-mode early-return that never set `gamesFetched`, so Live Now fires on those
+  states. Localized titles (10 locales). 21-case `selectWatchNext` harness.
+- ✅ **Step D Phase 2 — live Q&A as in-place layers** (`df3a713`) — **supersedes the earlier
+  "in progress" status; Phase 2 is shipped.** Chip answers render as PlayCard layers (about the
+  play → on the play); typed free-text answers render **under the input box** (where the user's
+  attention is); per-item loading/error; glossary works inside answers. New-play detection via a
+  pure, tested **`derivePlayKey`** (`lib/playKey.ts`): **"fresh play, fresh card"** — Q&A clears
+  on a genuine new play but **persists through the 60s same-play refresh**. Also: **FAQ now
+  collapsible in learn-mode/no-games** (removed the `|| learnMode` force-open; default-open
+  derived from `[sport, learnMode]`, still toggleable, re-applies on sport switch).
+  - Known, accepted limitation: sports with no `rawPlay` + constant `playType` (rugby/MLR) yield
+    a constant play-key, so Q&A there persists across plays. Noted, not hacked around.
+
+**🔜 Queued — near-term (decided, not yet built):**
+- **Previous Play** — store the last play in memory + a **back-arrow** to re-read a play that
+  refreshed away mid-read. Works for **ALL sports** (no data dependency — just remembers the
+  already-fetched play). **Reuses Phase 2's `derivePlayKey`** play-identity signal. Comes right
+  after Phase 2. ⚠️ Do **NOT** confuse with full play-by-play (data track below) — this is the
+  small, shippable version.
+- **Golf leaderboard** — replace the one-line tournament stub with a real leaderboard. ESPN golf
+  endpoint appears feasible.
+- **State color-coding** — deliberate design pass on coloring game cards by state (upcoming /
+  live / final). Must reconcile with the existing per-sport card tints in `GameCard`
+  (`SPORT_COLORS`) — don't let it conflict. A design decision, not a quick build.
+
+**🧊 Data track — deferred (all blocked on "ESPN free tier too thin, need a real provider"):**
+- **Rugby play-by-play** — Opta / Stats Perform. The central unlock for expert-grade rugby; ties
+  to the Hounds/MLR strategic relationship. ESPN exposes **no** MLR play-by-play.
+- **Live tennis & golf data** — ESPN gives only thin tournament context (leaderboard line), no
+  live game data. Real live data needs a non-ESPN source.
+- **Full play-by-play for sports ESPN doesn't provide it for** — the LARGE version of "Previous
+  Play." A **data-sourcing** problem, NOT a code feature. ⚠️ Do **NOT** fabricate or
+  LLM-generate play data to fill the gap — confident-but-wrong play data is the cardinal failure
+  (the same trap as the rugby placeholder).
+
+> **Note:** the three data-track items cluster into **ONE sourcing decision** when revisited
+> (which provider, cost, partnership route) — tackle together, not piecemeal.
+
+---
+
+## 🎨 UI polish — ✅ SHIPPED 2026-06-25 (1.1 batch)
+
+All four 1.1 UI fixes shipped (commits `305db42`, `2998a9a`, `38e6059`, `aee1c87`):
+
+1. ✅ **Kid → "Rookie" rename** — display-only across 10 locales + the hardcoded QuizCard label;
+   level emoji → 🧢. Internal `'kid'` value untouched (Level type, AsyncStorage, backend prompt
+   keys, picker keys, 164 facts.ts quiz tags) → explain contract + stored user level unaffected.
+2. ✅ **Coach's Corner header overflow** — `CoachCard.tsx headerRow` switched from row/space-between
+   to a column (`gap`), so the state tag drops below the label and wraps.
+3. ✅ **Cap counter → amber scarcity pill** — `LiveScreen.tsx` `capPill`/`capPillText`, both the
+   daily-explanation and per-game Q&A counters. **Static amber for now.**
+4. ✅ **Empty-states → La Liga template** — cricket headline shortened + subtitle added; tennis/golf
+   got a subtitle too (new `noCricketDataSub` / `noTournamentsSub`, ×10 locales).
+
+### Banked follow-up — count-aware scarcity urgency *(deferred from #3)*
+The cap pill is static amber. Next pass: make it **more urgent as the count drops** (e.g. amber → red
+at N≤1, optional pulse/shake on the last one) — conversion-relevant scarcity UX. Single shared
+`capPill` style, so it's a one-place change keyed on `explanationsLeft` / `qaLeft`.
+
+---
+
+## ▓▓▓ STRATEGY / REFERENCE — Tier 4 ▓▓▓
+
+---
+
+## 🧭 STRATEGY — visuals, data, and the "don't become a scoreboard" line
+
+### The identity guardrail (decided)
+SportsWise's wedge is EXPLANATION ("watch and ask why"), not scores/stats as a destination. ESPN/Yahoo/TheScore own "check scores + stats" — we can't out-ESPN them and shouldn't try. 
+- ✅ Use stats/data IN SERVICE OF teaching (possession data → smarter Coach's Corner).
+- ❌ Do NOT reposition as a scores-and-stats destination (blurs the wedge, competes where we have no edge).
+- The filter for every data/feature question: "does this make our EXPLANATION better?" Yes → on-mission. "Is this just a thing to check?" → off-mission, leave it to ESPN.
+
+### Visuals — the app is too text-heavy, and that's a LEARNING weakness
+Much of sports understanding is SPATIAL (zone location, positioning, shot origin) — text teaches it poorly. Visuals are pedagogically core, not just polish.
+Key insight: the teaching-valuable visuals are DATA-DRIVEN DIAGRAMS (geometry + coordinates), NOT artwork — so they can be built in code (SVG) with NO designer. The blocker is whether free data provides the COORDINATES, not whether we have an artist.
+- Strike zone (MLB): box + pitch dots at (x,z) coords. GUMBO is Statcast-grade → almost certainly has pitch coordinates. STRONG candidate once GUMBO lands. Pitch comes in → plotted in the zone → one-line explanation of why that location matters.
+- Soccer formation diagram: 11 numbered circles at formation positions. ESPN summary already returns rosters + formation strings (4-3-3, 4-2-3-1). Feasible NOW. Pair with Coach's Corner EXPLAINING the formation = perfect mission fit (visual + teaching together).
+- NBA shot chart: half-court + shot dots. Needs shot x/y coords — curl ESPN play-by-play to confirm availability before committing.
+- Principle: render visuals deterministically (SVG, code-drawn), spend the AI call ONLY on the teaching sentence. Visuals REDUCE reliance on generated text → cheaper AND better.
+
+### AI-call cost discipline (ties it together)
+Deterministic engine does max work (free); LLM only for genuine language. Visuals = free (pure SVG). Stats = free (already fetched). Pulse = free (deterministic). Only the explanation sentence costs a call. This architecture is cheaper than a text-heavy app AND teaches better.
+
+### Open questions to resolve before building visuals
+- Confirm GUMBO pitch coordinates (when integrating GUMBO).
+- Curl ESPN NBA play-by-play for shot x/y.
+- Decide visual priority: soccer formation (feasible now, World Cup timing) vs. strike zone (waits for GUMBO).
+
+---
+
+## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
+
+**Core architecture move — a `sportDataProvider` abstraction** (the SAME swappable-adapter pattern
+as `visionProvider.ts`: env-driven, one file, each adapter normalizes its source's JSON into our
+internal shape). **ESPN stays the DEFAULT for all sports**; specific sports override with a richer
+source via an adapter. Because each adapter normalizes to our format, **everything downstream
+(explanation prompt, UI, difficulty levels) is unchanged**. The first adapter is the real work;
+each subsequent one is incremental.
+
+**Tiered framework across the 14 sports:**
+- **Tier 1 — rich on ESPN, keep as-is:** NFL, NBA, MLB (full play-by-play). **Coach's Corner
+  launches here**, no data change.
+- **Tier 2 — thin on ESPN, cheap/free upgrade available (the opportunity):** soccer, cricket,
+  tennis, golf, rugby.
+- **Tier 3 — thin on ESPN, expensive upgrade only, defer:** rugby **expert-grade**
+  (Opta / Stats Perform) for deep phase data; revisit when partnerships develop.
+
+**Key strategic insight — Highlightly as a consolidated second provider.** Highlightly
+(highlightly.net, also on RapidAPI) has a **FREE tier — 100 requests/day, no credit card, every
+core feature** — and covers **soccer** (950+ leagues incl. EPL/La Liga/Serie A/Bundesliga/Ligue 1/
+MLS/Champions League/World Cup), **cricket** (900+ leagues, ball-by-ball), AND **rugby** (100+
+competitions incl. World Cup, Six Nations, URC, Premiership, Top 14, Super Rugby, MLR, Sevens). So
+**ONE Highlightly account + ONE adapter could upgrade three of our thinnest, most strategically
+important sports — including both investor-target sports, cricket + rugby — in a single move.**
+This reframes the question: maybe we don't need many APIs — we need **ESPN (default) + Highlightly
+(thin-sport upgrade)** behind the adapter, with specialists/Opta only where Highlightly proves
+insufficient. Paid tiers ~**$9.49–$45.99/mo** if we outgrow free.
+
+**Highlightly tier — ✅ RESOLVED (PRO, 2026-06-24).** Subscribed to **Highlightly PRO ($9.49/mo:
+7,500 req/day, 720/min)**. Rationale: removes the BASIC 100/day constraint during the in-season
+**World Cup** window (the download driver), avoids immediate rate-limit issues, cancelable
+month-to-month.
+- **Request math (for future tier decisions):** ~**100 Highlightly requests per live match watched
+  end-to-end** (60s polling) — and it's **per-MATCH, not per-user**, thanks to the enricher's 60s
+  events-cache. So **BASIC 100/day ≈ 1 live match/day** (solo testing only); **PRO 7,500/day ≈ ~75
+  match-views** — covers real early World Cup traffic. ULTRA ($20.99/25k) / MEGA ($45.99/65k) are
+  for **thousands of concurrent users** — not needed until real scale.
+- **PRO unlocks the broader Highlightly provider** (950+ soccer leagues, **cricket**, **rugby** =
+  the best expansion targets) — but those sports still need their **own enrichers BUILT**
+  (cricket/rugby enrichers, post-1.1); only `worldcup→1635` is wired today. **EPL/LaLiga/MLS** just
+  need league IDs added to the enricher's `LEAGUE` map (**quick win**).
+
+**Per-sport specifics (alternatives to Highlightly, for reference):**
+- **Soccer:** API-Football ($19/mo, events feed updated every 15s — goals/cards/subs/lineups with
+  timestamps, the play-level data ESPN withholds; free plan exists). football-data.org free = 12
+  comps but DELAYED scores + no events (weak for live). **Biggest live-lineup impact** of any
+  upgrade (World Cup live now + 3 major leagues).
+- **Cricket:** CricketData.org (lifetime-free 100 hits/day; $5.99/mo 2k/day; $12.99/mo 10k/day;
+  ball-by-ball). Sportmonks (€29+/mo, ball-by-ball commentary). **Highest strategic value** — cheap
+  AND investor-target sport.
+- **Tennis:** point-by-point feeds (Goalserve, Enetpulse, Matchstat, api-tennis.com, many RapidAPI
+  hobby-priced) — score before/after each point, server, serve speed, break-point context; some
+  **classify the meaning of each point** (break/set point, momentum) — gold for "watch and ask
+  why." Simple structure, easy adapter.
+- **Golf:** Slash Golf (free prototyping tier, hole-by-hole real-time). Richer (OddsMatrix/
+  SportsDataIO) go to shot-by-shot/strokes-gained — more than we need; hole-by-hole + leaderboard
+  is plenty.
+- **Rugby:** Highlightly (free, all major leagues) is the easy grab. Data Sports Group (Union +
+  League, live tries + commentary). Goalserve (free trial). **OPEN QUESTION / ACTION:** unconfirmed
+  whether any free/cheap rugby API exposes **deep phase-by-phase event data** (rucks/mauls/
+  breakdown/territory) for expert-grade explanation, or just scores + tries. **Action: grab the
+  free Highlightly key, hit it during a live match (Six Nations / URC / Super Rugby), inspect the
+  event payload depth** — that one test answers whether Highlightly closes the rugby gap "enough"
+  or rugby still genuinely needs Opta. ESPN gives rugby **zero** play-by-play
+  (`playByPlayAvailable: false`), so anything is an upgrade.
+
+**Suggested build sequence (after Coach's Corner):** soccer first (biggest live-lineup impact,
+World Cup live, free to start) → cricket second (strategic + cheap) → rugby (grab free Highlightly,
+run the depth test) → tennis/golf opportunistically → Opta for rugby expert-grade only when
+partnerships develop.
+
+**Cross-link to Coach's Corner:** this roadmap directly **extends** Coach's Corner — richer data
+per sport = Coach's Corner works for **soccer/cricket/rugby, not just US sports**. Build Coach's
+Corner **data-source-agnostic with clean degradation** so the data upgrade *extends* it rather than
+requiring a rebuild.
 
 ---
 
@@ -1077,134 +1217,139 @@ applied prospectively.)
 
 ---
 
-## 🧊 Parked
+## 📺 TV app vision
 
-- **Cricket live data** — ✅ cricket is now a **live sport in the app** (in `SPORTS`, with
-  quiz / FAQ / learn-mode content). What remains parked is **live match data**: ESPN's
-  public API still has no usable cricket feed (site API 404s; Core API lists the sport but
-  exposes zero leagues/events), so cricket runs in **learn-mode only** (no live scoreboard).
-  Revisit live data with ESPNcricinfo or a paid source; a code comment in `route.ts` marks
-  where it would slot in.
-- **Cold-start empty-state flash (~0.01s)** — on cold launch the Live screen paints its
-  no-selection empty state for a split second before data loads. Sub-perceptible; fix later by
-  making **loading** and **empty** distinct states (show a loader while fetching, empty only
-  after). Very low priority.
-- **Notification deep-link** — tapping the quiz reminder currently just logs; route on
-  `data.type === 'quiz-reminder'` to the Academy tab (handler is the `responseListener` in
-  App.tsx). Trivial, low priority.
-- **Spanish native review** — es is a real translation already; a native proofread (founder has
-  a fluent contact) is polish, folds into a later build. Non-blocking.
+- A **true overlay** over another app is **OS-level impossible** on all TV platforms.
+- **Streaming live sports** is a **legal wall** (broadcast rights), not a technical one.
+- **Buildable:** an **Apple TV app (tvOS)** via the **Expo TV target** — same codebase,
+  different build. The user watches the game through their own service; the app runs alongside.
+- **Picture-in-Picture:** user puts YouTube TV in a PiP corner, SportsWise fills the
+  main screen — the closest thing to the overlay vision, and it **works today on tvOS**.
+- **TV provider integration** *(longer term)*: user signs in with YouTube TV/cable, the app
+  knows what game they're watching = more relevant explanations.
+- **Living-room use case:** family watching together; non-fans see explanations without
+  picking up a phone.
+- **Priority:** after the mobile App Store launch.
 
 ---
 
-## 🔴 Per-sport live indicators in the sport picker (1.3/1.4)
+## 🧲 Yahoo Sports features to steal
 
-**Problem:** With ~14 sports in the picker, users must tap through every sport tab to discover which have live games — lots of dead taps, makes the app feel emptier than it is, and scales WORSE as more sports are added. The single global "LIVE" pill in the header tells you something is live but not WHAT.
-
-**Fix:** Show a live indicator (dot, or live-count badge) on each individual sport tab that currently has a live event — turns the picker into a map of where the action is.
-
-**Buildability (recon-confirmed, FAVORABLE):** The cross-sport machinery already exists. `gatherWatchCandidates()` (lib/watchNext.ts) already fetches ALL non-learn-mode sports' live status in parallel (Promise.allSettled over fetchScoreboard) and returns WatchCandidate[] each carrying sport + status ('live'/'upcoming'). It's what powers Watch Next / Live Now. So this is mostly a SURFACING job, not new fetching architecture. Effort: MEDIUM-small for the dot v1.
-
-**v1 approach:** Add a top-level effect that calls gatherWatchCandidates() eagerly on mount; derive a Set<parentSport> (via the already-exported parentSport(), so a "Soccer" tab lights when EPL/LaLiga/WorldCup is live, "Rugby" covers rugby/mlr) from candidates where status==='live'; render a dot (reuse existing liveDot style) on each visibleSports tab in that set.
-
-**Scoping notes:**
-- Learn-mode sports (tennis/golf/cricket) correctly never light up — no live ESPN scoreboard source. Accurate, not a bug.
-- Polling cost: eager cross-sport = ~10-11 parallel ESPN calls/cycle. Live status changes slowly — use a GENTLER cadence (every 2-3 min, or only while Live tab focused), NOT the verbatim 60s play-refresh interval.
-- Extension (float live sports to front of picker): flag a tension — it conflicts with the user's deliberate My Sports order set in Settings. Dots/badges are less disorienting than reordering tabs under them. Prefer dots over reordering for v1; if reordering, make it opt-in.
-
-**RELATED BUG to fix as part of this work:** The global "LIVE" header pill (LiveScreen.tsx ~612) currently renders on `games.length > 0` — i.e. it shows "LIVE" whenever the selected sport has ANY games including scheduled/final, NOT only live ones. So it's inaccurate today (over-shows "LIVE"). The correct check is `games.some(g => g.state === 'in')` (already computed elsewhere as hasLiveInSport, ~527). When building the per-tab dots, either RETIRE the global pill (the dots are the better map) or FIX it to the accurate check so it stops lying.
+- **Team logos on game cards** — already on the list; **reprioritize as a fast win.**
+- **Recent games (last 5) per team** — W/L and scores for context.
+- **More Info section per game** — venue, broadcast channel, weather.
+- **Compact pill-style game cards** — more important as the sport count grows.
+- **Team stats / rankings bar chart** — context before explaining plays.
+- **SKIP:** pick-your-winner/odds (conflicts with brand), community/discuss (too complex),
+  generic banner ads (see `MONETIZATION.md`).
 
 ---
 
-## 💡 FEATURE — Tappable Stat Glossary (stats as teaching, not a scoreboard)
-
-The mission-aligned way to use the rich stat data (boxscore possession/shots, baseball RISP, etc.): present the stat AND teach what it means, at the user's difficulty level. ESPN shows "RISP 2-for-7" and assumes you know it; we make RISP tappable → a definition that teaches. Same data, but where ESPN assumes knowledge, we build it. This is the wedge ("watch and ask why") applied to statistics.
-
-### The mechanic
-- A curated list of meaningful stats per sport (in-game + end-of-game). CURATED, not a firehose — pick stats that TEACH (RISP, OPS, possession%, shots on target, pace, etc.), skip noise (total clearances, longball%). The selectivity IS the editorial product — it's what keeps us a learning app, not a stats dump.
-- Each stat term is tappable → reveals a definition at the user's CURRENT difficulty level (Rookie/Beginner/Intermediate/Expert), reusing the existing level system. Example RISP:
-  - Rookie: "how well they hit when a hit would score a run"
-  - Expert: "situational hitting with runners on 2nd/3rd; ~.250 league avg, noisy in-game sample"
-- Definitions can be CONTEXTUAL where useful ("2-for-7 is middling — good teams convert more of these").
-
-### Why it's architecturally great
-- CHEAP: stat definitions are STATIC (RISP means the same every game) → build a GLOSSARY (data file: term × 4 levels), authored ONCE, looked up on tap. ZERO per-game AI cost. Could have Claude Code draft the whole glossary.
-- Reuses the existing difficulty-level system end-to-end.
-- Turns the "unused ESPN boxscore data" + "GUMBO stats" into teaching surface area instead of a scoreboard.
-- Selectivity solves "don't become ESPN" — a hand-picked list of stats-worth-understanding is editorial judgment, not a data firehose.
-
-### Build sketch (future)
-- A glossary module: { sport: { statKey: { rookie, beginner, intermediate, expert, contextualHint? } } }.
-- Stats rendered anywhere (recap, Coach's Corner, a future stats strip) link into the glossary.
-- Start with one sport's curated list (baseball RISP/OPS/ERA or soccer possession/xG-concepts/shots) as the pattern, then extend.
-- Pairs naturally with the visuals (tap a strike-zone pitch → what's a "paint the corner"; tap possession% → what possession really tells you).
+## 🔌 LLM PROVIDER (decided)
+> **Consolidates four earlier notes** — the resilience plan, the provider strategy, the "Gemini-may-be-better" observation, and the Groq-primary decision — into one. **The Groq→Gemini fallback is BUILT, ARMED, and VERIFIED in production** (it caught a real maxed-Groq 429 and kept the app live); this supersedes any older framing that treated the fallback as unproven.
+>
+> **THE DECISION — Groq PRIMARY (speed) · Gemini FALLBACK (resilience), both armed + verified.** For LIVE reads, speed wins: a fast good-enough read beats a slow great one. Gemini is the safety net (slower, but a slow working app beats a broken one when Groq caps/outages). Quality-over-speed (Gemini) may win later for NON-live / pre-generated features. Full reasoning + the supporting notes & history are preserved verbatim below.
 
 ---
 
-## 🧭 STRATEGY — visuals, data, and the "don't become a scoreboard" line
+### ✅ DECISION — Groq primary (speed), Gemini fallback only. Speed wins for live.
+Tested Gemini live (Groq maxed): its reads MAY be slightly better in quality, but it's SO slow in comparison it almost feels unusable for a LIVE app. 
 
-### The identity guardrail (decided)
-SportsWise's wedge is EXPLANATION ("watch and ask why"), not scores/stats as a destination. ESPN/Yahoo/TheScore own "check scores + stats" — we can't out-ESPN them and shouldn't try. 
-- ✅ Use stats/data IN SERVICE OF teaching (possession data → smarter Coach's Corner).
-- ❌ Do NOT reposition as a scores-and-stats destination (blurs the wedge, competes where we have no edge).
-- The filter for every data/feature question: "does this make our EXPLANATION better?" Yes → on-mission. "Is this just a thing to check?" → off-mission, leave it to ESPN.
+Decision: SPEED WINS for live reads. For "watch and ask why" in the moment, a fast good-enough read beats a slow great read — a read that arrives after the play has moved on defeats the purpose. Groq's low latency is a real product feature for a live app, not just a benchmark.
 
-### Visuals — the app is too text-heavy, and that's a LEARNING weakness
-Much of sports understanding is SPATIAL (zone location, positioning, shot origin) — text teaches it poorly. Visuals are pedagogically core, not just polish.
-Key insight: the teaching-valuable visuals are DATA-DRIVEN DIAGRAMS (geometry + coordinates), NOT artwork — so they can be built in code (SVG) with NO designer. The blocker is whether free data provides the COORDINATES, not whether we have an artist.
-- Strike zone (MLB): box + pitch dots at (x,z) coords. GUMBO is Statcast-grade → almost certainly has pitch coordinates. STRONG candidate once GUMBO lands. Pitch comes in → plotted in the zone → one-line explanation of why that location matters.
-- Soccer formation diagram: 11 numbered circles at formation positions. ESPN summary already returns rosters + formation strings (4-3-3, 4-2-3-1). Feasible NOW. Pair with Coach's Corner EXPLAINING the formation = perfect mission fit (visual + teaching together).
-- NBA shot chart: half-court + shot dots. Needs shot x/y coords — curl ESPN play-by-play to confirm availability before committing.
-- Principle: render visuals deterministically (SVG, code-drawn), spend the AI call ONLY on the teaching sentence. Visuals REDUCE reliance on generated text → cheaper AND better.
+- Groq = PRIMARY (speed). 
+- Gemini = FALLBACK only (slow, but a slow working app beats a broken one when Groq maxes — verified it does this job).
+- The "Gemini writes better" signal stays banked but SECONDARY — quality delta doesn't beat the latency cost for live use.
 
-### AI-call cost discipline (ties it together)
-Deterministic engine does max work (free); LLM only for genuine language. Visuals = free (pure SVG). Stats = free (already fetched). Pulse = free (deterministic). Only the explanation sentence costs a call. This architecture is cheaper than a text-heavy app AND teaches better.
+REFRAME for the future: it's not "pick one provider" — it's "the right provider depends on whether the call is latency-sensitive." Live play reads → Groq (speed). Any FUTURE non-live / pre-generated feature (post-game deep-dive, Academy content generated ahead of time, a recap that can take its time) → Gemini's quality-over-speed tradeoff might win there. The llmProvider switch makes this a per-use-case choice. But everything live today = Groq primary.
 
-### Open questions to resolve before building visuals
-- Confirm GUMBO pitch coordinates (when integrating GUMBO).
-- Curl ESPN NBA play-by-play for shot x/y.
-- Decide visual priority: soccer formation (feasible now, World Cup timing) vs. strike zone (waits for GUMBO).
+Supersedes the open question in the earlier provider note: for live, speed is decided.
 
 ---
 
-## 🧭 Coach's Corner — team sports vs. individual sports (architectural fork)
+### 🔌 LLM provider strategy — Groq Dev (when available) + KEEP Gemini fallback
+Verified live: Gemini fallback works end-to-end (caught a real maxed-Groq 429, kept the app working) — but it's noticeably SLOWER than Groq.
 
-Insight: the SoccerMatchPulse model works because TEAM-sport strategy = "the game state (score + time + manpower) FORCES both teams into collective postures" (protect lead / chase / drop a defender after a red). The coaching read = reading that forced posture.
+DECISION (reasoning): when Groq Dev/paid tier becomes purchasable (currently NOT available), upgrade Groq to paid as PRIMARY — but DO NOT drop Gemini. Keep it as the fallback.
+- Paid Groq raises the LIMIT; it does NOT provide a fallback. Any single provider is a single point of failure (rate limits even on paid, outages, key/API issues, regional problems).
+- Tonight proved the value: Groq went unavailable, Gemini kept the app alive. Removing the only safety net = total outage the next time Groq has a bad hour, paid tier or not.
+- Cost of keeping Gemini fallback ≈ zero when rarely hit (only pay for the rare fallback calls). Cheap insurance.
+- Architecture already supports this: llmProvider.ts provider switch + LLM_FALLBACK_PROVIDER=gemini stays set; just upgrade the Groq key. Nothing structural changes.
 
-### Fits the pulse model (team-state read) — same engine, sport-specific pulse:
-- Soccer (built), Rugby, Cricket. All have: a score, a clock/innings structure, and TWO teams making strategic choices in response to shared state. Cricket especially (run rate vs required rate, wickets in hand, overs left, attack vs consolidate). Rugby (territory, phases, bonus-point math, kick vs go).
+ALSO:
+- Track Groq Dev tier availability/pricing (currently can't purchase). Upgrade = swap key, keep everything else.
+- The llmProvider abstraction means NOT locked to Groq/Gemini — can swap primary to any OpenAI-compatible provider if a better/cheaper/faster one emerges. Don't trade away that flexibility by hard-committing to one vendor.
+- Operational: Groq free = 100k tokens/DAY (burned it in one heavy test day). Plan for paid tier before user growth; monitor token usage.
 
-### Breaks the pulse model (individual sports) — needs a DIFFERENT archetype:
-- Tennis, Golf. No "two teams forced into collective postures." 
-  - Tennis: strategy is within the point / serve-return patterns / matchups / momentum — about ONE player's shot selection, not a forced collective posture.
-  - Golf: players don't even directly interact; it's player vs course vs field over hours. Strategy = club selection, risk/reward per hole, course management.
-- Tell: tennis/golf are ALREADY learn-mode sports (no live play-by-play) — the app already treats them differently.
-
-### Proposed fork — TWO Coach's Corner archetypes:
-1. **Team-state read** (soccer/rugby/cricket): forced collective posture from game state. The pulse engine.
-2. **Situational-decision read** (tennis/golf): the tactical tension / risk-reward of a key INDIVIDUAL moment.
-   - Tennis: "what's the play at break point / second serve at 30-40 / tiebreak" — the tactical tension in THIS point situation.
-   - Golf: "risk/reward on this shot/hole given position vs the field" — individual decision under tournament pressure.
-   - Different engine, different triggers (key moments, not game-state changes).
-
-Decision: build the team-state version fully first (soccer Gates C/D → rugby → cricket). The individual-sport "situational-decision" archetype is a SEPARATE future design, not a forced fit onto the pulse engine. Don't try to make tennis/golf use the team model.
+NOTE: the 3 Gemini-fallback vars in Vercel (LLM_FALLBACK_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL) are Production-ONLY scope, not "Production and Preview" — fallback wouldn't arm on Preview deployments. Minor; extend to Preview if you ever test against Preview builds.
 
 ---
 
-## 🐛 BUG — stale "THE PLAY" card on soccer (sits frozen for long stretches)
-Observed live: Belgium-NZL at 47', but THE PLAY card still showed Trossard's goal from the 28th minute — 19 minutes of a live game with no new play explanation. The user sees/learns nothing new for that whole stretch. Coach's Corner updated correctly (showed 45'+3'); it's THE PLAY card specifically that's stale.
+### 🔬 OBSERVATION — Gemini reads may be BETTER than Groq (worth a head-to-head)
+While running on the Gemini fallback (Groq maxed), the reads looked noticeably strong — e.g. a baseball 0-2/9th Coach's Corner: "expand the strike zone or throw a waste pitch... batter in pure survival mode... next pitch a put-away pitch... induce a chase." Genuinely good, specific, correct baseball vocabulary.
 
-Hypothesis (NOT yet confirmed — needs recon): soccer's "current play" pulls the last ESPN keyEvent/commentary entry, and likely only refreshes on a SIGNIFICANT event (goal/card/sub). Between sparse soccer events, the play card sits frozen — fine for baseball/football (every play is an event) but bad for soccer (notable events are minutes apart). 
+CAVEATS before concluding "Gemini is better":
+- Confounded: the strong Gemini read was BASEBALL on a HIGH-ANGLE state (0-2, 9th); the "just OK" Groq reads were mostly SOCCER on LOW-ANGLE states (level-early). Quality diff may be situation, not model.
+- One sample ≠ a pattern.
+- Gemini is noticeably SLOWER than Groq (confirmed). Better-but-slower is a real tradeoff, not an obvious win.
 
-Possible fixes to investigate:
-- Pull from the full commentary[] feed (minute-by-minute), not just keyEvents, so the play updates on more frequent beats (shots, fouls, chances) — gives the explainer fresh material between goals.
-- Or: when no new keyEvent, fall back to the latest commentary[] entry for "the play."
-- Tradeoff: more frequent updates = more Groq calls (each new play explanation is an AI call). Balance freshness vs cost — maybe update the play on meaningful commentary beats only (shots/big chances), not every routine pass.
-Separate from the Coach's Corner gates. Worth a dedicated recon of how soccer's "last play" is selected + how often it should refresh.
+TO TEST PROPERLY (future): head-to-head on IDENTICAL inputs — force the same play/situation through Groq vs Gemini via the llmProvider abstraction, compare reads side by side. Removes the situation confound. Do it across a few sports + difficulty levels.
+
+STRATEGIC IMPLICATION if Gemini really is better: flips the provider question. Instead of "Groq primary, Gemini fallback," might be "Gemini primary for quality, Groq for speed/fallback" — or rethink which is primary. Worth resolving before committing to Groq Dev tier. The llmProvider switch makes either config trivial.
+
+ALSO NOTED: the Coach's Corner refresh/collapse bug fix is now VERIFIED working — baseball Coach's Corner header showed live "0-2 · 1 out" (tracking the play, not frozen) + the ▾ collapse chevron present. Both halves of the fix confirmed.
 
 ---
 
-## 🐛 BUG (pre-existing, all sports) — Coach's Corner frozen to the game, not the play
+### 🧯 LLM resilience — fallback provider + paid-primary plan *(Groq Dev Tier blocked)*
+
+Groq is currently the **single hard dependency** for ALL explanations / coach / recap (free tier
+100k tokens/day; the **Dev Tier upgrade is BLOCKED** — Groq "temporarily unavailable due to high
+demand"). One LLM outage = the core feature breaks. Resilience plan:
+
+- **(a) Swappable explanation-provider adapter** — mirror the existing `visionProvider.ts` pattern
+  (provider behind an interface, env-driven) so no single LLM outage breaks the core. (This is the
+  text-model version of what vision already has.)
+- **(b) Immediate $0 fallback — Gemini Flash FREE on 429.** Groq stays primary; Gemini fires ONLY
+  when Groq caps. Gemini 3 Flash free ≈ **10 RPM / 250k TPM / 1,500 RPD**. Acceptable because we
+  send **PUBLIC sports play text, not PII/proprietary data**. ⚠️ **Caveat:** Google's free tier may
+  **train on inputs/outputs** — fine for public sports text (conscious accept), **NOT** for
+  anything sensitive.
+- **(c) Durable fix — a PAID primary we control** instead of engineering around a free tier. **Paid
+  Gemini Flash** is a strong candidate (~**$0.15/$0.60 per M tokens** — a few $/mo at our volume,
+  **no daily cap, no data-training**); may be a better primary than Groq regardless of whether Dev
+  Tier reopens. Decide when there's a beat — **don't chain two volatile free tiers** (free-Groq +
+  free-Gemini) as the permanent architecture.
+- **(d) ⚠️ GOTCHA:** enabling billing on a Gemini project **DELETES that project's free tier
+  entirely** (every call billable from token 1) — so to run free-test + paid-prod, use **SEPARATE
+  Google Cloud projects**.
+- **(e)** Also **retry Groq Dev Tier periodically** — it has Spend Limits when it reopens; the
+  upgrade (no code change, just a higher ceiling) is still worth it if it comes back.
+- **(f) ✅ SHIPPED + PROVEN (`feat(llm)` `60e5fb8`):** the swappable adapter (`llmProvider.ts`,
+  `createChatCompletion` drop-in, all 7 Groq sites routed, env-toggled via `LLM_FALLBACK_PROVIDER`)
+  is live, and the Groq→Gemini fallback was verified end-to-end locally (forced a Groq bad-model
+  404 → caught → Gemini served a valid same-shape explanation).
+  - **GAP found during that test — Gemini fallback isn't retried on a transient 503.** Gemini
+    occasionally returns **503 "overloaded"** (seen once, cleared immediately on retry). Today a
+    single 503 → the adapter throws → both-failed → user sees the error. Compound failure (Groq
+    capped AND Gemini 503 on the same call) is rare, but the fix is cheap: **one retry / short
+    backoff on the Gemini fallback call before giving up.** Hardening, not correctness — bank and
+    add when convenient.
+
+---
+
+## 🧹 CLEANUP (minor) — soccerPulse knownLimitations stale after Gate D-1
+The pure engine hardcodes knownLimitations: ["No possession or pass data", "No shots or xG"] (soccerPulse.ts ~66-71). After Gate D-1 threads real possession/shots into pulse.teamStats, those two lines are inaccurate when teamStats is present. NOT a bug today (knownLimitations isn't fed to any prompt → no output impact), left untouched per the no-engine-math rule. Fix later for code cleanliness: make knownLimitations reflect what's actually available (drop "no possession/shots" when teamStats present; keep "no xG/formations/pressing" always). Low priority.
+
+---
+
+## ▓▓▓ DONE / RESOLVED (kept as record) ▓▓▓
+
+---
+
+## ✅ RESOLVED — Coach's Corner frozen to the game, not the play *(was a pre-existing all-sports BUG)*
+> ✅ **DONE last session — fixed, verified & committed.** Play-keyed CoachCard remount + collapse toggle; verified live in baseball (header tracked the play; ▾ collapse present). Kept below as a record — NOT an active item.
+
 Confirmed via recon: NOT caused by Gate C. The expand/full-read machinery is from the original Coach's Corner commit d378a20; reproduces in baseball (untouched sport). Live since launch.
 
 ROOT CAUSE (one issue, three symptoms): CoachCard's lifecycle is keyed to the GAME, not the PLAY.
@@ -1223,80 +1368,24 @@ SCOPE NOTE: this touches the SHARED CoachCard (all 5 sports) — test across bas
 
 ---
 
-## 🔌 LLM provider strategy — Groq Dev (when available) + KEEP Gemini fallback
-Verified live: Gemini fallback works end-to-end (caught a real maxed-Groq 429, kept the app working) — but it's noticeably SLOWER than Groq.
-
-DECISION (reasoning): when Groq Dev/paid tier becomes purchasable (currently NOT available), upgrade Groq to paid as PRIMARY — but DO NOT drop Gemini. Keep it as the fallback.
-- Paid Groq raises the LIMIT; it does NOT provide a fallback. Any single provider is a single point of failure (rate limits even on paid, outages, key/API issues, regional problems).
-- Tonight proved the value: Groq went unavailable, Gemini kept the app alive. Removing the only safety net = total outage the next time Groq has a bad hour, paid tier or not.
-- Cost of keeping Gemini fallback ≈ zero when rarely hit (only pay for the rare fallback calls). Cheap insurance.
-- Architecture already supports this: llmProvider.ts provider switch + LLM_FALLBACK_PROVIDER=gemini stays set; just upgrade the Groq key. Nothing structural changes.
-
-ALSO:
-- Track Groq Dev tier availability/pricing (currently can't purchase). Upgrade = swap key, keep everything else.
-- The llmProvider abstraction means NOT locked to Groq/Gemini — can swap primary to any OpenAI-compatible provider if a better/cheaper/faster one emerges. Don't trade away that flexibility by hard-committing to one vendor.
-- Operational: Groq free = 100k tokens/DAY (burned it in one heavy test day). Plan for paid tier before user growth; monitor token usage.
-
-NOTE: the 3 Gemini-fallback vars in Vercel (LLM_FALLBACK_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL) are Production-ONLY scope, not "Production and Preview" — fallback wouldn't arm on Preview deployments. Minor; extend to Preview if you ever test against Preview builds.
+## ▓▓▓ PARKED ▓▓▓
 
 ---
 
-## 🔬 OBSERVATION — Gemini reads may be BETTER than Groq (worth a head-to-head)
-While running on the Gemini fallback (Groq maxed), the reads looked noticeably strong — e.g. a baseball 0-2/9th Coach's Corner: "expand the strike zone or throw a waste pitch... batter in pure survival mode... next pitch a put-away pitch... induce a chase." Genuinely good, specific, correct baseball vocabulary.
+## 🧊 Parked
 
-CAVEATS before concluding "Gemini is better":
-- Confounded: the strong Gemini read was BASEBALL on a HIGH-ANGLE state (0-2, 9th); the "just OK" Groq reads were mostly SOCCER on LOW-ANGLE states (level-early). Quality diff may be situation, not model.
-- One sample ≠ a pattern.
-- Gemini is noticeably SLOWER than Groq (confirmed). Better-but-slower is a real tradeoff, not an obvious win.
-
-TO TEST PROPERLY (future): head-to-head on IDENTICAL inputs — force the same play/situation through Groq vs Gemini via the llmProvider abstraction, compare reads side by side. Removes the situation confound. Do it across a few sports + difficulty levels.
-
-STRATEGIC IMPLICATION if Gemini really is better: flips the provider question. Instead of "Groq primary, Gemini fallback," might be "Gemini primary for quality, Groq for speed/fallback" — or rethink which is primary. Worth resolving before committing to Groq Dev tier. The llmProvider switch makes either config trivial.
-
-ALSO NOTED: the Coach's Corner refresh/collapse bug fix is now VERIFIED working — baseball Coach's Corner header showed live "0-2 · 1 out" (tracking the play, not frozen) + the ▾ collapse chevron present. Both halves of the fix confirmed.
-
----
-
-## 💡 FEATURE — Feedback button + situation-keyed explanation CACHE ("the app learns, not the model")
-
-IMPORTANT FRAMING: the LLM (Groq/Gemini/Llama) is STATIC — it does NOT learn from user feedback. Feedback cannot flow back into the model. So "the AI learns over time" must be built as CACHING + feedback, not model-learning. (Fine-tuning is a heavy, expensive, separate undertaking — not what a feedback button enables.)
-
-### Part 1 — Feedback button (build-worthy on its own)
-A lightweight "was this helpful / I learned something" tap on each read — e.g. a greyed-out lightbulb that lights up when tapped. Fits the learning/Academy identity, low-friction. Gives us data we have ZERO of today: which explanations actually land. Thumbs/heart/lightbulb — pick the on-brand one.
-
-### Part 2 — Situation-keyed explanation cache (the REAL "learning" mechanism)
-Recurring situations (e.g. "3-2 full count, 2 outs, bottom 9th, game on the line") have essentially the SAME strategic explanation every time (players change; the situational teaching is constant). So:
-- Compute a SITUATION KEY (we already do this — derivePlayKey + count/outs/inning state = a situation fingerprint).
-- First time a situation appears → generate (Groq) + STORE the read keyed by situation.
-- Next time a similar situation appears → SERVE THE CACHED read instantly (DB lookup, no AI call), optionally light-template the current player names in.
-Benefits = exactly the intuition: FASTER (no AI call), CHEAPER (no tokens on repeats — directly eases the 100k/day Groq limit), and BETTER over time as the cache of validated reads grows.
-
-### Part 3 — Feedback feeds the cache (how the SYSTEM gets smarter)
-- Thumbs-up / lightbulb on a read → promote it as "good enough to reuse" in the cache.
-- Thumbs-down → don't cache; regenerate next time.
-- The system improves not because the model learns, but because the cache of human-validated explanations grows.
-
-### Part 4 — Caching removes speed pressure → enables a slower/better model for novel situations
-If cached reads serve instantly, the speed problem disappears for repeat situations. That frees us to use a slower-but-maybe-better model (e.g. Gemini) for the RARE first-generation of a novel situation (happens once, then cached forever). Connects to the "Gemini may write better but is too slow for live" finding — caching is what could make Gemini's quality affordable on the latency budget.
-
-### Open design questions
-- Situation-key granularity: too coarse = generic reads; too fine = never cache-hits. Tune (e.g. count+outs+inning+score-state, NOT exact players).
-- Per-difficulty-level caching (4 levels × situations).
-- Staleness/variety: serving the identical read every time may feel repetitive — maybe cache 2-3 variants per situation, or light-template.
-- Storage: where the cache lives (backend DB). 
-- This is a bigger architectural feature — significant, but high-value (cost + speed + the feedback loop). Future, well after the current Coach's Corner gates.
-
----
-
-## ✅ DECISION — Groq primary (speed), Gemini fallback only. Speed wins for live.
-Tested Gemini live (Groq maxed): its reads MAY be slightly better in quality, but it's SO slow in comparison it almost feels unusable for a LIVE app. 
-
-Decision: SPEED WINS for live reads. For "watch and ask why" in the moment, a fast good-enough read beats a slow great read — a read that arrives after the play has moved on defeats the purpose. Groq's low latency is a real product feature for a live app, not just a benchmark.
-
-- Groq = PRIMARY (speed). 
-- Gemini = FALLBACK only (slow, but a slow working app beats a broken one when Groq maxes — verified it does this job).
-- The "Gemini writes better" signal stays banked but SECONDARY — quality delta doesn't beat the latency cost for live use.
-
-REFRAME for the future: it's not "pick one provider" — it's "the right provider depends on whether the call is latency-sensitive." Live play reads → Groq (speed). Any FUTURE non-live / pre-generated feature (post-game deep-dive, Academy content generated ahead of time, a recap that can take its time) → Gemini's quality-over-speed tradeoff might win there. The llmProvider switch makes this a per-use-case choice. But everything live today = Groq primary.
-
-Supersedes the open question in the earlier provider note: for live, speed is decided.
+- **Cricket live data** — ✅ cricket is now a **live sport in the app** (in `SPORTS`, with
+  quiz / FAQ / learn-mode content). What remains parked is **live match data**: ESPN's
+  public API still has no usable cricket feed (site API 404s; Core API lists the sport but
+  exposes zero leagues/events), so cricket runs in **learn-mode only** (no live scoreboard).
+  Revisit live data with ESPNcricinfo or a paid source; a code comment in `route.ts` marks
+  where it would slot in.
+- **Cold-start empty-state flash (~0.01s)** — on cold launch the Live screen paints its
+  no-selection empty state for a split second before data loads. Sub-perceptible; fix later by
+  making **loading** and **empty** distinct states (show a loader while fetching, empty only
+  after). Very low priority.
+- **Notification deep-link** — tapping the quiz reminder currently just logs; route on
+  `data.type === 'quiz-reminder'` to the Academy tab (handler is the `responseListener` in
+  App.tsx). Trivial, low priority.
+- **Spanish native review** — es is a real translation already; a native proofread (founder has
+  a fluent contact) is polish, folds into a later build. Non-blocking.
