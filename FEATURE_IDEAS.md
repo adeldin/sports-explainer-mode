@@ -207,32 +207,44 @@ builds on the last, never blocked:
 ## 🗂️ PRIORITIZED ROADMAP
 > The "what do I build next?" map. One line per item; full detail lives in the tiered sections further down (pointers say where).
 
-### 🥇 TIER 1 — DO NOW *(unblocked, in-season, high-value)*
-1. **GUMBO / MLB data upgrade** — **TOP priority.** Highest-value; baseball is LIVE + testable daily; unlocks the strike-zone visual. → detail in *Per-sport data upgrade roadmap* + *STRATEGY — visuals* (Tier 4 / Reference).
-2. **Soccer formation diagram** — first data-driven visual; verifiable on finished-game data; no AI cost. → detail in *STRATEGY — visuals* (Tier 4 / Reference).
-3. **Tappable stat glossary** — cheap, static, on-mission (stats as teaching, zero per-game AI cost). → detail in *FEATURE — Tappable Stat Glossary* (Active Build Detail).
+### 🥇 TIER 1 — DO NOW *(unblocked, in-season, high-value)* — in build order:
+1. **Soccer formation diagram** — **FIRST build.** Data-driven visual; verifiable on finished-game data; no AI cost. → detail in *STRATEGY — visuals* (Tier 4 / Reference).
+2. **Tennis live-data adapter + Coach's Corner** — in-season NOW (Wimbledon); point-by-point feeds classify point-meaning (break/set point) = gold for watch-and-ask-why; seize the window. → detail in *Per-sport data upgrade roadmap* (Tier 4) + *Coach's Corner — team sports vs. individual sports* (Active Build Detail).
+3. **Golf live-data adapter** — in-season (tournaments most weeks); Slash Golf free hole-by-hole. → detail in *Per-sport data upgrade roadmap* (Tier 4).
+4. **Tappable stat glossary** — cheap, static, on-mission; generatable from the 206-term glossary. → detail in *FEATURE — Tappable Stat Glossary* (Active Build Detail).
+5. **GUMBO / MLB Statcast** — **LAST Tier-1 (biggest build).** Baseball live daily; enables the strike-zone visual. → detail in *Per-sport data upgrade roadmap* + *STRATEGY — visuals* (Tier 4 / Reference).
 
 ### 🥈 TIER 2 — DO SOON
-1. **Situation-keyed cache** — HIGH: saves money (the 100k/day Groq wall); reuse reads for recurring situations. → detail in *FEATURE — Feedback button + situation-keyed explanation CACHE* (Active Build Detail).
-2. **Gate D-1 live test + commit** — built + parked; needs live soccer to verify the possession/shots-enriched read. → context in *🧹 CLEANUP — soccerPulse knownLimitations* and *🔌 LLM PROVIDER*; the Gate D-1 code itself is committed-pending.
-3. **Rugby / cricket Coach's Corner** — strategic expansion; reuses the team-state pulse engine; underserved/global markets. → detail in *Coach's Corner — team sports vs. individual sports* (Active Build Detail) + *Per-sport data upgrade roadmap* (Tier 4).
-4. **Stale PLAY-card bug fix** — recon now; fix needs live games to verify. → detail in *BUG (OPEN) — stale "THE PLAY" card on soccer* (Active Build Detail).
-5. **Recap polish (sparse "Key Performance")** — testable on finished games; costs tokens. → detail in *Recap enhancements* (Active Build Detail).
+1. **Situation-keyed cache** — HIGH: saves money (hit the 100k/day Groq wall). → detail in *FEATURE — Feedback button + situation-keyed explanation CACHE* (Active Build Detail).
+2. **Gate D-1 live test + commit** — built/parked; needs live soccer. → context in *🧹 CLEANUP — soccerPulse knownLimitations* and *🔌 LLM PROVIDER*; the Gate D-1 code itself is committed-pending.
+3. **Rugby + cricket Coach's Corner** — Highlightly PRO data already subscribed; needs enrichers BUILT (cricket/rugby); investor-target sports. → detail in *Coach's Corner — team sports vs. individual sports* (Active Build Detail) + *Per-sport data upgrade roadmap* (Tier 4).
+4. **Stale PLAY-card bug fix** — recon now; fix needs live verify. → detail in *BUG (OPEN) — stale "THE PLAY" card on soccer* (Active Build Detail).
+5. **More Academy games** — library of game types, mostly generatable from glossary + 4-level engine. → detail in *Academy → "Duolingo for sports" — game catalog* (Feature Concepts & Gamification).
+6. **Recap polish (sparse "Key Performance")** — finished games; costs tokens. → detail in *Recap enhancements* (Active Build Detail).
 
 ### 🥉 TIER 3 — QUEUED
-1. **Feedback button** — pairs with the cache (validates which reads land). → detail in *FEATURE — Feedback button + …CACHE* (Active Build Detail).
-2. **Per-sport live indicators in the picker** — surfacing job; the cross-sport machinery already exists. → detail in *Per-sport live indicators in the sport picker* (Active Build Detail).
-3. **First-launch onboarding** — activation + set difficulty up front. → detail in *Feature concepts → First-launch onboarding flow* (Feature Concepts).
-4. **Individual-sport Coach's Corner fork (tennis/golf)** — a DIFFERENT archetype (situational-decision, not team-state). → detail in *Coach's Corner — team sports vs. individual sports* (Active Build Detail).
+- **Feedback button** (pairs w/ cache) → *FEATURE — Feedback button + …CACHE* (Active Build Detail).
+- **Per-sport live indicators in picker** → *Per-sport live indicators in the sport picker* (Active Build Detail).
+- **First-launch onboarding** → *Feature concepts → First-launch onboarding flow*.
+- **FAQ / common questions** (low lift) → *Feature concepts → FAQ / common questions*.
+- **Animated X's-and-O's Coach's Corner** (Lottie/Rive whiteboard — the big content-heavy differentiator, distinct from the pulse-text CC) → *Feature concepts → 🏟️ Coach's Corner*.
+- **Individual-sport Coach's Corner fork** (tennis/golf archetype) → *Coach's Corner — team sports vs. individual sports* (Active Build Detail).
+- **Daily challenge / Badges** → *Gamification → Priority 4 / Priority 5*.
+- **Progression rank system** — **DEPENDENCY: after more Academy games exist** (it's a progression layer OVER the game catalog) → *Gamification → 🏆 Progression rank system*.
+- **Post-game recap enhancements** → *Feature concepts → 🏁 Post-game summary / recap*.
+- **No-games / off-season screen redesign** → *Feature concepts → 🗞️ Rethink the no-games / off-season screen*.
+- **Vision clarifying follow-up** → *Vision enhancements*.
+- **Image / video upload** (v2) → *Feature concepts → 📸 Image / video upload*.
 
 ### 🏛️ TIER 4 — STRATEGY / REFERENCE *(know this, not "to build")*
 - **Visuals + "don't become a scoreboard" guardrail** → *STRATEGY — visuals, data, and the "don't become a scoreboard" line*.
-- **LLM provider strategy (consolidated + decided)** → *🔌 LLM PROVIDER (decided)*.
-- **Platform / [Topic]Wise vision** → *Platform vision — the "[Topic]Wise" family*.
-- **TV app vision** → *TV app vision*.
-- **Gamification / progression** → *Gamification / Learning progression*.
-- **Per-sport data-upgrade roadmap** → *Per-sport data upgrade roadmap*.
-- **Authoritative plans & status** → *The live explanation — full learning design*, *Live Now / Step D backlog*.
+- **LLM provider (decided)** → *🔌 LLM PROVIDER (decided)*.
+- **Per-sport data-upgrade roadmap (the framework)** → *Per-sport data upgrade roadmap*.
+- **Platform / [Topic]Wise vision + governing design principle** → *Platform vision — the "[Topic]Wise" family*.
+- **TV app** → *TV app vision*.
+- **Yahoo-steal** → *Yahoo Sports features to steal*.
+- **Gamification philosophy** → *Gamification / Learning progression*.
+- **Mascot / character** (big later swing) → *Academy → "Duolingo for sports" — game catalog* (Characters note).
 
 ---
 
@@ -619,15 +631,13 @@ drama without teaching. App-wide split: **Academy = Duolingo** (the practice loo
 Corner = Khan Academy** (the live explanation that makes the hard thing click) — **practice +
 comprehension**. This split generalizes to every `[Topic]Wise` vertical.
 
-**Soccer Coach's Corner *(banked — needs a timeline/momentum model)*:** the Highlightly soccer
-enricher adds an `events` TIMELINE (goals/cards/subs by minute), not the current-state `situation`
-(count/down) that `hasSufficientState` reads — so soccer correctly stays "coming soon" (it does
-NOT auto-light, by design). Lighting soccer coaching up *well* needs a soccer-specific notion:
-**man-down after a red card · chasing a goal late · momentum swings** — distinct from the
-count/down situation model. Design it when soccer events are flowing and banking is unblocked
-(the premium card can't be sold during banking processing anyway, so a weak version costs nothing
-to defer). The visible in-season win is the **better soccer explanations** (event context), which
-the enricher already delivers on the free path.
+**Soccer Coach's Corner *(✅ BUILT — pulse-text CC; this section is the SEPARATE whiteboard concept)*:**
+the soccer pulse-text Coach's Corner is **built** — Gates A–D1: a deterministic SoccerMatchPulse
+engine (man-down after a red · chasing late · score/time/manpower state) + the LLM strategic read,
+with possession/shots enrichment (Gate D-1) **pending live test + commit**. So the old "banked —
+needs a timeline/momentum model" framing is **resolved**. ⚠️ NOTE: THIS section (🏟️ Coach's Corner)
+is about the SEPARATE **animated X's-and-O's whiteboard** concept (Lottie/Rive), NOT the live
+pulse-text read — they're two different features that share the "Coach's Corner" name.
 
 ### 🖼️ Images / illustrations in quizzes *(post-launch)*
 
