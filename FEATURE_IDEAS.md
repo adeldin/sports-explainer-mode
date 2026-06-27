@@ -1113,3 +1113,54 @@ applied prospectively.)
 - Extension (float live sports to front of picker): flag a tension — it conflicts with the user's deliberate My Sports order set in Settings. Dots/badges are less disorienting than reordering tabs under them. Prefer dots over reordering for v1; if reordering, make it opt-in.
 
 **RELATED BUG to fix as part of this work:** The global "LIVE" header pill (LiveScreen.tsx ~612) currently renders on `games.length > 0` — i.e. it shows "LIVE" whenever the selected sport has ANY games including scheduled/final, NOT only live ones. So it's inaccurate today (over-shows "LIVE"). The correct check is `games.some(g => g.state === 'in')` (already computed elsewhere as hasLiveInSport, ~527). When building the per-tab dots, either RETIRE the global pill (the dots are the better map) or FIX it to the accurate check so it stops lying.
+
+---
+
+## 💡 FEATURE — Tappable Stat Glossary (stats as teaching, not a scoreboard)
+
+The mission-aligned way to use the rich stat data (boxscore possession/shots, baseball RISP, etc.): present the stat AND teach what it means, at the user's difficulty level. ESPN shows "RISP 2-for-7" and assumes you know it; we make RISP tappable → a definition that teaches. Same data, but where ESPN assumes knowledge, we build it. This is the wedge ("watch and ask why") applied to statistics.
+
+### The mechanic
+- A curated list of meaningful stats per sport (in-game + end-of-game). CURATED, not a firehose — pick stats that TEACH (RISP, OPS, possession%, shots on target, pace, etc.), skip noise (total clearances, longball%). The selectivity IS the editorial product — it's what keeps us a learning app, not a stats dump.
+- Each stat term is tappable → reveals a definition at the user's CURRENT difficulty level (Rookie/Beginner/Intermediate/Expert), reusing the existing level system. Example RISP:
+  - Rookie: "how well they hit when a hit would score a run"
+  - Expert: "situational hitting with runners on 2nd/3rd; ~.250 league avg, noisy in-game sample"
+- Definitions can be CONTEXTUAL where useful ("2-for-7 is middling — good teams convert more of these").
+
+### Why it's architecturally great
+- CHEAP: stat definitions are STATIC (RISP means the same every game) → build a GLOSSARY (data file: term × 4 levels), authored ONCE, looked up on tap. ZERO per-game AI cost. Could have Claude Code draft the whole glossary.
+- Reuses the existing difficulty-level system end-to-end.
+- Turns the "unused ESPN boxscore data" + "GUMBO stats" into teaching surface area instead of a scoreboard.
+- Selectivity solves "don't become ESPN" — a hand-picked list of stats-worth-understanding is editorial judgment, not a data firehose.
+
+### Build sketch (future)
+- A glossary module: { sport: { statKey: { rookie, beginner, intermediate, expert, contextualHint? } } }.
+- Stats rendered anywhere (recap, Coach's Corner, a future stats strip) link into the glossary.
+- Start with one sport's curated list (baseball RISP/OPS/ERA or soccer possession/xG-concepts/shots) as the pattern, then extend.
+- Pairs naturally with the visuals (tap a strike-zone pitch → what's a "paint the corner"; tap possession% → what possession really tells you).
+
+---
+
+## 🧭 STRATEGY — visuals, data, and the "don't become a scoreboard" line
+
+### The identity guardrail (decided)
+SportsWise's wedge is EXPLANATION ("watch and ask why"), not scores/stats as a destination. ESPN/Yahoo/TheScore own "check scores + stats" — we can't out-ESPN them and shouldn't try. 
+- ✅ Use stats/data IN SERVICE OF teaching (possession data → smarter Coach's Corner).
+- ❌ Do NOT reposition as a scores-and-stats destination (blurs the wedge, competes where we have no edge).
+- The filter for every data/feature question: "does this make our EXPLANATION better?" Yes → on-mission. "Is this just a thing to check?" → off-mission, leave it to ESPN.
+
+### Visuals — the app is too text-heavy, and that's a LEARNING weakness
+Much of sports understanding is SPATIAL (zone location, positioning, shot origin) — text teaches it poorly. Visuals are pedagogically core, not just polish.
+Key insight: the teaching-valuable visuals are DATA-DRIVEN DIAGRAMS (geometry + coordinates), NOT artwork — so they can be built in code (SVG) with NO designer. The blocker is whether free data provides the COORDINATES, not whether we have an artist.
+- Strike zone (MLB): box + pitch dots at (x,z) coords. GUMBO is Statcast-grade → almost certainly has pitch coordinates. STRONG candidate once GUMBO lands. Pitch comes in → plotted in the zone → one-line explanation of why that location matters.
+- Soccer formation diagram: 11 numbered circles at formation positions. ESPN summary already returns rosters + formation strings (4-3-3, 4-2-3-1). Feasible NOW. Pair with Coach's Corner EXPLAINING the formation = perfect mission fit (visual + teaching together).
+- NBA shot chart: half-court + shot dots. Needs shot x/y coords — curl ESPN play-by-play to confirm availability before committing.
+- Principle: render visuals deterministically (SVG, code-drawn), spend the AI call ONLY on the teaching sentence. Visuals REDUCE reliance on generated text → cheaper AND better.
+
+### AI-call cost discipline (ties it together)
+Deterministic engine does max work (free); LLM only for genuine language. Visuals = free (pure SVG). Stats = free (already fetched). Pulse = free (deterministic). Only the explanation sentence costs a call. This architecture is cheaper than a text-heavy app AND teaches better.
+
+### Open questions to resolve before building visuals
+- Confirm GUMBO pitch coordinates (when integrating GUMBO).
+- Curl ESPN NBA play-by-play for shot x/y.
+- Decide visual priority: soccer formation (feasible now, World Cup timing) vs. strike zone (waits for GUMBO).
