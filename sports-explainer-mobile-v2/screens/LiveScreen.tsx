@@ -784,7 +784,14 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               {/* Soccer Match Timeline (Highlightly events from the explain response). Soccer-only;
                   renders the no-events state intentionally when the match is early/goalless. Free. */}
               {['soccer', 'worldcup', 'epl', 'laliga'].includes(sport) && (
-                <MatchTimeline events={result.events || []} language={language} />
+                <MatchTimeline
+                  events={result.events || []}
+                  language={language}
+                  teams={selectedGame ? {
+                    home: { name: selectedGame.homeTeamFull ?? selectedGame.homeTeam, logo: selectedGame.homeLogo },
+                    away: { name: selectedGame.awayTeamFull ?? selectedGame.awayTeam, logo: selectedGame.awayLogo },
+                  } : undefined}
+                />
               )}
 
               <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>

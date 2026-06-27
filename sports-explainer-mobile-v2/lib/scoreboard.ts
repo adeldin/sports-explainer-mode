@@ -12,6 +12,11 @@ export interface Game {
   id: string;
   homeTeam: string;
   awayTeam: string;
+  // Full ESPN display names (e.g. "Spain") — ADDITIVE, alongside the abbreviation-preferred
+  // homeTeam/awayTeam (e.g. "ESP") which the score cards use. Needed to match Highlightly event
+  // team names for the Match Timeline crest. Optional: absent for feeds without a displayName.
+  homeTeamFull?: string;
+  awayTeamFull?: string;
   homeScore: string;
   awayScore: string;
   homeLogo?: string;
@@ -81,6 +86,8 @@ export async function fetchScoreboard(
       id: String(e.id),
       homeTeam: teamName(home),
       awayTeam: teamName(away),
+      homeTeamFull: home?.team?.displayName || home?.team?.shortDisplayName || teamName(home),
+      awayTeamFull: away?.team?.displayName || away?.team?.shortDisplayName || teamName(away),
       homeScore: scoreOf(home),
       awayScore: scoreOf(away),
       homeLogo: logoOf(home),

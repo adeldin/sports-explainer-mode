@@ -69,6 +69,11 @@ export default function RecapCard({ recap, isPro, sport, language, onUnlock }: P
         </View>
       ))}
 
+      {/* Honest-availability caption — free users only. The three locked rows market the sections
+          by name, but each appears only when the game's data supports it (never fabricated), so this
+          quiet line keeps the teaser from reading as a hard guarantee of all three. */}
+      {!isPro && <Text style={styles.lockedNote}>{S.recapAvailabilityNote}</Text>}
+
       {/* Unlock CTA — free users only. */}
       {!isPro && (
         <TouchableOpacity style={styles.unlockBtn} activeOpacity={0.85}
@@ -105,6 +110,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // Locked teaser bars (suggest hidden prose).
   lockedBars: { gap: 8, marginTop: 2 },
   lockedBar: { height: 12, borderRadius: 6, backgroundColor: t.border, opacity: 0.6 },
+  // Quiet honest-availability caption under the locked rows (not a section — a muted aside).
+  lockedNote: { color: t.textMuted, fontSize: 12, fontStyle: 'italic', lineHeight: 17, marginTop: 14, marginBottom: 2 },
   unlockBtn: { marginTop: 18, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   unlockBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   // Glossary (mirrors PlayCard).
