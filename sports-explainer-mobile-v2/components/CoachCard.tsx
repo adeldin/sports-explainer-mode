@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
@@ -48,10 +48,15 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
     return () => { cancelled = true; };
   }, [sport, gameId]);
 
-  const expand = async () => {
+  // Tap is a TOGGLE: collapse if open, otherwise expand + fire the Groq read on first open only.
+  // We KEEP cached `full` on collapse so re-expanding the SAME play is instant (no new Groq call);
+  // a genuinely new play remounts this card (LiveScreen keys it on the play), resetting full→null so
+  // the next expand fetches fresh — that remount is what bounds Groq cost to one call per play.
+  const toggleExpand = async () => {
     Haptics.selectionAsync();
+    if (expanded) { setExpanded(false); return; }   // collapse — keep cached `full`
     setExpanded(true);
-    if (full || fullLoading) return;
+    if (full || fullLoading) return;                 // already read this play → no refetch
     setFullLoading(true);
     try {
       setFull(await fetchCoachFull(sport, gameId, level, language));
@@ -61,6 +66,58 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
       setFullLoading(false);
     }
   };
+
+  // The Groq read body (strategicRead + 👀 NEXT + glossary def box) — shared verbatim by the
+  // soccer (Gate C) and 4-sports expanded paths so the two stay in lockstep.
+  const renderFullRead = () => (
+    <View>
+      {!!full?.strategicRead && (
+        <GlossaryText text={full.strategicRead} sport={sport} baseStyle={styles.readText}
+          language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
+      )}
+      {!!full?.whatItSetsUp && (
+        <View style={styles.nextRow}>
+          <Text style={styles.nextLabel}>👀 NEXT</Text>
+          <GlossaryText text={full.whatItSetsUp} sport={sport} baseStyle={styles.nextText}
+            language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
+        </View>
+      )}
+      {openTerm && (
+        <View style={styles.glossaryDefBox}>
+          <View style={styles.glossaryDefHeader}>
+            <Text style={styles.glossaryDefTerm}>{openTerm.term}</Text>
+            <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setOpenTerm(null); }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.glossaryDefClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.glossaryDefText}>{openTerm.def}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  // The EXPANDED Pro content: a collapse control (▾, taps to minimize — fixes the one-way expand)
+  // followed by spinner / read / fallback. `fallback` shows when the read is empty/failed (soccer →
+  // the deterministic line; 4 sports → coming-soon).
+  const renderExpanded = (fallback: ReactNode) => (
+    <>
+      <TouchableOpacity style={styles.collapseRow} activeOpacity={0.7} onPress={toggleExpand}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={styles.chevron}>▾</Text>
+      </TouchableOpacity>
+      {fullLoading ? (
+        <View style={styles.thinkingRow}>
+          <ActivityIndicator color={theme.accentCool} />
+          <Text style={styles.thinkingText}>{S.coachThinking}</Text>
+        </View>
+      ) : full && hasCoachContent(full) ? (
+        renderFullRead()
+      ) : (
+        fallback
+      )}
+    </>
+  );
 
   // While the cheap state call is in flight, render a slim placeholder (keeps the card
   // discoverable without flicker).
@@ -85,10 +142,11 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
 
   const tag = deriveSituationTag(sport, situation);
 
-  // Soccer (Gate B): render the DETERMINISTIC pulse summary — no LLM, no unlock gating yet. This
-  // proves the gate is open + the pulse state flows end-to-end; the Groq coaching read lands in
-  // Gate C. If there's no pulse, hasSufficientState above already routed to coming-soon.
+  // Soccer (Gate C): the deterministic pulse line is the FREE + fallback read; Pro users expand to
+  // the Groq pulse-derived coaching read (same {strategicRead, whatItSetsUp} shape as the 4 sports).
+  // On any empty/failed read we fall back to the honest deterministic line — never break.
   if (situation?.pulse) {
+    const detLine = summarizeSoccerPulse(situation.pulse);
     return (
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -102,7 +160,23 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
           </View>
           {!!tag && <Text style={styles.tag}>{tag}</Text>}
         </View>
-        <Text style={styles.readText}>{summarizeSoccerPulse(situation.pulse)}</Text>
+
+        {!isPro ? (
+          // FREE — the honest deterministic state line (no Groq call).
+          <Text style={styles.readText}>{detLine}</Text>
+        ) : !expanded ? (
+          // PRO collapsed — show the state line + an expand affordance; the Groq read fires on tap.
+          <>
+            <Text style={styles.readText}>{detLine}</Text>
+            <TouchableOpacity style={styles.expandRow} activeOpacity={0.7} onPress={toggleExpand}>
+              <Text style={styles.expandText}>{S.coachExpand}</Text>
+              <Text style={styles.chevron}>▸</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          // PRO expanded — collapse control + the Groq read; empty/failed → deterministic fallback.
+          renderExpanded(<Text style={styles.readText}>{detLine}</Text>)
+        )}
       </View>
     );
   }
@@ -132,44 +206,13 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
         </>
       ) : !expanded ? (
         // PRO collapsed — the Groq read fires only on this tap.
-        <TouchableOpacity style={styles.expandRow} activeOpacity={0.7} onPress={expand}>
+        <TouchableOpacity style={styles.expandRow} activeOpacity={0.7} onPress={toggleExpand}>
           <Text style={styles.expandText}>{S.coachExpand}</Text>
           <Text style={styles.chevron}>▸</Text>
         </TouchableOpacity>
-      ) : fullLoading ? (
-        <View style={styles.thinkingRow}>
-          <ActivityIndicator color={theme.accentCool} />
-          <Text style={styles.thinkingText}>{S.coachThinking}</Text>
-        </View>
-      ) : full && hasCoachContent(full) ? (
-        <View>
-          {!!full.strategicRead && (
-            <GlossaryText text={full.strategicRead} sport={sport} baseStyle={styles.readText}
-              language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
-          )}
-          {!!full.whatItSetsUp && (
-            <View style={styles.nextRow}>
-              <Text style={styles.nextLabel}>👀 NEXT</Text>
-              <GlossaryText text={full.whatItSetsUp} sport={sport} baseStyle={styles.nextText}
-                language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
-            </View>
-          )}
-          {openTerm && (
-            <View style={styles.glossaryDefBox}>
-              <View style={styles.glossaryDefHeader}>
-                <Text style={styles.glossaryDefTerm}>{openTerm.term}</Text>
-                <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setOpenTerm(null); }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Text style={styles.glossaryDefClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.glossaryDefText}>{openTerm.def}</Text>
-            </View>
-          )}
-        </View>
       ) : (
-        // Pro, expanded, but the data didn't support a real read → honest short line, no platitude.
-        <Text style={styles.comingSoon}>{S.coachComingSoon}</Text>
+        // PRO expanded — collapse control + the Groq read; empty/failed → honest coming-soon line.
+        renderExpanded(<Text style={styles.comingSoon}>{S.coachComingSoon}</Text>)
       )}
     </View>
   );
@@ -199,6 +242,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   expandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
   expandText: { color: t.accentCoolLight, fontSize: 14, fontWeight: '700' },
   chevron: { color: t.accentCoolLight, fontSize: 14, fontWeight: '800' },
+  // Collapse control on an EXPANDED read — a right-aligned ▾ that taps to minimize.
+  collapseRow: { alignSelf: 'flex-end', marginBottom: 4, paddingVertical: 2, paddingHorizontal: 6 },
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
   thinkingText: { color: t.textMuted, fontSize: 14, fontStyle: 'italic' },
   readText: { color: t.textPrimary, fontSize: 16, fontWeight: '500', lineHeight: 24, marginTop: 12 },

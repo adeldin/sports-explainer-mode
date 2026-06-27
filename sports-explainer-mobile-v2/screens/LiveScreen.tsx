@@ -760,7 +760,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   daily-explanation cap pill now lives in this card's header (top-right). */}
               {selectedGameId && (
                 <CoachCard
-                  key={`coach|${sport}|${selectedGameId}|${level}|${language}`}
+                  // Key on the PLAY (lastPlayKeyRef), not just the game: a genuinely new play remounts
+                  // the card → resets expanded/full → refetches the FREE state line and returns to
+                  // collapsed (the paid Groq read fires only on the user's next expand — bounds cost).
+                  // Same-play 60s refreshes keep the same key (lastPlayKeyRef only changes on a new
+                  // play, set before setResult), so the card doesn't churn on routine polls.
+                  key={`coach|${sport}|${selectedGameId}|${lastPlayKeyRef.current}|${level}|${language}`}
                   sport={sport}
                   gameId={selectedGameId}
                   level={level}

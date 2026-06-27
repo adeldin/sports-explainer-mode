@@ -102,8 +102,57 @@ const levelGuide: Record<string, string> = {
   expert: 'deep tactical reasoning; assume the basics are known',
 };
 
+const langNamesMap: Record<string, string> = { es: 'Spanish', fr: 'French', pt: 'Portuguese', de: 'German', it: 'Italian', ja: 'Japanese', zh: 'Chinese', ko: 'Korean', ar: 'Arabic' };
+
+// Soccer (Gate C) — the Pro 'full' coaching read, built from the SoccerMatchPulse ONLY (score, time,
+// phase, leverage, manpower/reds, cards, subs, derived tags, trigger, recent events). Same
+// {strategicRead, whatItSetsUp} JSON shape the app renders. HONESTY GUARDRAIL: no possession,
+// formation, pressing, momentum-as-dominance, xG, shots, or "who's better" — none of that is in the
+// feed. Reason ONLY from what the scoreline + clock + man advantage + cards + subs FORCE.
+export function buildSoccerCoachPrompt(s: CoachSituation, level: string, language: string) {
+  const langLine = language && language !== 'en' ? ` Respond entirely in ${langNamesMap[language] || language}.` : '';
+  const p = s.pulse!;
+  const h = p.score.home, a = p.score.away;
+  const facts: string[] = [];
+  facts.push(`Score: ${h.team} ${h.goals} – ${a.team} ${a.goals}, ${p.minute}' (${p.gamePhase} phase)`);
+  facts.push(`Score state: ${p.scoreState.replace(/_/g, ' ')}; leverage (how much the next goal swings it): ${p.leverage}`);
+  if (p.manpower.state !== 'even') {
+    const up = p.manpower.state === 'home_advantage' ? h.team : a.team;
+    const down = p.manpower.state === 'home_advantage' ? a.team : h.team;
+    facts.push(`Manpower: ${up} have an extra man — ${down} down to 10${p.manpower.redCardMinute ? ` after a red card at ${p.manpower.redCardMinute}'` : ''}.`);
+  }
+  if (p.discipline.reds.length) facts.push(`Red cards: ${p.discipline.reds.map(r => `${r.team} ${r.minute}'`).join(', ')}.`);
+  if (p.discipline.homeYellows || p.discipline.awayYellows) facts.push(`Bookings: ${h.team} ${p.discipline.homeYellows} yellow(s), ${a.team} ${p.discipline.awayYellows} yellow(s).`);
+  if (p.substitutionPosture) facts.push(`Substitution posture (inferred from timing + score, NOT positions): ${p.substitutionPosture}.`);
+  if (p.derivedTags.length) facts.push(`Strategic state tags: ${p.derivedTags.join(', ')}.`);
+  if (p.triggerReason) facts.push(`What just happened: ${p.triggerReason}.`);
+  if (p.recentEvents.length) facts.push(`Recent events: ${p.recentEvents.map(e => `${e.minute ?? '?'}' ${e.type}${e.team ? ` (${e.team}${e.player ? ` — ${e.player}` : ''})` : ''}`).join('; ')}.`);
+
+  const system = `You are a knowledgeable soccer coach sitting beside a ${level}-level fan, teaching like Khan Academy — NOT a hype broadcaster.${langLine}
+Your job: the STRATEGIC WHY of the match RIGHT NOW — what the SCORE + TIME + MANPOWER force each team to do — then what to watch next. Walk the reasoning out loud so the viewer could read the next moment themselves. Meet them at their level: ${levelGuide[level] || levelGuide.beginner}.
+CARDINAL RULES — NEVER FABRICATE (honesty guardrail — do not weaken):
+- Use ONLY the state facts below. You have NO possession data, NO formation or lineup, NO pressing/territory, NO xG, NO shot counts, and NO read on which side is "playing better."
+- NEVER claim or imply any of those. Do NOT say a team is "dominating," "controlling possession," "on top," "pressing," "in form," or "the better side" — the data cannot support it. Reason ONLY from the scoreline, the clock, the man advantage, cards, and substitutions.
+- NEVER invent a player, a tactic, a pass, a chance, or a stat that is not in the facts.
+- Explain any jargon in plain terms.
+HOW TO WRITE THE READ (craft — this is what separates a real read from filler):
+- LEAD WITH THE INSIGHT, not the setup. Open with the strategic point itself and weave the state in. Do NOT open with a "Given the early phase…", "Since [team] is leading…", or "With the score level…" preamble. Vary the opening — never reuse the same scaffolding.
+- ANCHOR ON CONCRETE EVENTS. When the facts name a specific event — a missed penalty, a just-scored goal, a red card, a booking — TEACH from it concretely (e.g. a missed penalty → "the miss is a let-off for the side that gave away the spot-kick and a momentum check for the team that won it"), instead of vaguely noting that "the game has seen some big moments."
+- LOW-ANGLE STATES → BE BRIEF, NOT PADDED. When nothing has forced a hand yet (level score, early, low leverage), the CORRECT read is ONE crisp sentence stating that plainly — never three sentences of hedging. Honest brevity is the GOAL for a flat state, not a fallback or a failure.
+- BANNED FILLER — never write these or anything close to them: "feeling okay about their chances", "won't change their approach too much", "crucial to watch", "the next segment will be important", "introduce an element of unpredictability", "both teams will be looking to", "anything can happen", "it's all to play for", "big moments".`;
+  const user = `Match state (the ONLY facts you may use):
+${facts.map(f => `- ${f}`).join('\n')}
+
+Respond as JSON with EXACTLY these fields: { "strategicRead", "whatItSetsUp" }.
+- "strategicRead": the strategic why of the CURRENT state — what the scoreline + time + manpower force each side to do now. LEAD with the point (no "given the situation" preamble). If there's a real angle (a lead to protect, a man up or down, a chase, a recent goal or miss): 1-2 sentences at a ${level} level, reasoning walked out and anchored on the concrete event. If the state is flat (level + early, low leverage, nothing forced): ONE crisp sentence stating that plainly — no padding, no filler. Empty string only if there is truly nothing to say.
+- "whatItSetsUp": what to watch for NEXT and why — 1 concrete sentence tied to a real next beat (the next goal's effect on the scoreline, a substitution window, the man advantage starting to tell). No filler.
+No possession/formation/pressing/xG/"who's better" claims. Substance or honest brevity; never platitudes, never invented detail.`;
+  return { system, user };
+}
+
 // Khan-voiced, never-platitude, never-fabricate coaching prompt. Pure.
 export function buildCoachPrompt(s: CoachSituation, sport: string, level: string, language: string) {
+  if (SOCCER.has(sport) && s.pulse) return buildSoccerCoachPrompt(s, level, language);   // Gate C: pulse-derived read
   const langNames: Record<string, string> = { es: 'Spanish', fr: 'French', pt: 'Portuguese', de: 'German', it: 'Italian', ja: 'Japanese', zh: 'Chinese', ko: 'Korean', ar: 'Arabic' };
   const langLine = language && language !== 'en' ? ` Respond entirely in ${langNames[language] || language}.` : '';
   const facts: string[] = [`${s.awayTeam} ${s.awayScore} – ${s.homeTeam} ${s.homeScore}`];
