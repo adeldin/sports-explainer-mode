@@ -239,6 +239,72 @@ type RecapData = {
   homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
   winner: string; statusDetail: string; summaryFacts: string[];
 };
+
+const SOCCER_RECAP_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
+
+// Soccer-only: pull the EXACT goal tally (from keyEvents) + real boxscore team stats out of the SAME
+// summary response fetchRecapData already fetches. Never fabricates: a goal tally is only shown when
+// the parsed per-scorer goals SUM to the authoritative final score (else just the team total); a stat
+// line is only added when BOTH teams expose that stat. xG is not in the feed and never appears.
+function buildSoccerRecapExtras(
+  sum: any, homeTeam: string, awayTeam: string, homeScore: string, awayScore: string,
+): { goalFacts: string[]; statFacts: string[] } {
+  const goalFacts: string[] = [];
+  const statFacts: string[] = [];
+
+  // --- Goal tally from keyEvents (scoringPlay === true = it changed the score; sums to the score) ---
+  // Per team → per scorer surname → count, so a hat-trick is captured (Dembélé 3).
+  const byTeam = new Map<string, Map<string, number>>();
+  for (const e of (sum?.keyEvents || [])) {
+    if (e?.scoringPlay !== true) continue;
+    const team = e?.team?.displayName;
+    if (!team) continue;
+    const ownGoal = /own goal/i.test(String(e?.type?.text || '')) || String(e?.type?.type || '') === 'own-goal';
+    const full = String(e?.participants?.[0]?.athlete?.displayName || '').trim();
+    const label = ownGoal ? '(own goal)' : (full.split(/\s+/).pop() || '');
+    if (!byTeam.has(team)) byTeam.set(team, new Map());
+    if (label) { const m = byTeam.get(team)!; m.set(label, (m.get(label) || 0) + 1); }
+  }
+  const hs = parseInt(homeScore, 10), as = parseInt(awayScore, 10);
+  if ((Number.isFinite(hs) && hs > 0) || (Number.isFinite(as) && as > 0)) {
+    // Team total is the SCORE (ground truth); show the scorer breakdown only when it reconciles.
+    const teamStr = (name: string, score: number): string => {
+      const m = byTeam.get(name);
+      if (!m || !Number.isFinite(score)) return `${name} ${score}`;
+      const sum2 = [...m.values()].reduce((a, b) => a + b, 0);
+      if (sum2 !== score) return `${name} ${score}`;   // parse incomplete → total only (honest)
+      const brk = [...m.entries()].map(([n, c]) => `${n} ${c}`).join(', ');
+      return brk ? `${name} ${score} (${brk})` : `${name} ${score}`;
+    };
+    goalFacts.push(`Goals — ${teamStr(awayTeam, as)}, ${teamStr(homeTeam, hs)}`);
+  }
+
+  // --- Boxscore team stats (real, from the same summary). Away–home order matches the Final line. ---
+  const teams: any[] = sum?.boxscore?.teams || [];
+  const statMap = (side: string): Record<string, string> => {
+    const t = teams.find(x => x?.homeAway === side);
+    const out: Record<string, string> = {};
+    for (const s of (t?.statistics || [])) if (s?.name != null && s?.displayValue != null) out[s.name] = String(s.displayValue);
+    return out;
+  };
+  const H = statMap('home'), A = statMap('away');
+  const has = (k: string) => H[k] != null && A[k] != null;
+  const p0 = (v: string) => `${Math.round(parseFloat(v))}%`;        // possessionPct is already 0–100
+  const pf = (v: string) => `${Math.round(parseFloat(v) * 100)}%`;  // passPct is a 0–1 fraction
+  if (has('possessionPct')) statFacts.push(`Possession: ${awayTeam} ${p0(A.possessionPct)} – ${homeTeam} ${p0(H.possessionPct)}`);
+  if (has('totalShots') && has('shotsOnTarget')) statFacts.push(`Shots (on target): ${awayTeam} ${A.totalShots} (${A.shotsOnTarget}) – ${homeTeam} ${H.totalShots} (${H.shotsOnTarget})`);
+  if (has('wonCorners')) statFacts.push(`Corners: ${awayTeam} ${A.wonCorners} – ${homeTeam} ${H.wonCorners}`);
+  if (has('saves')) statFacts.push(`Saves: ${awayTeam} ${A.saves} – ${homeTeam} ${H.saves}`);
+  if (has('accuratePasses') && has('passPct')) statFacts.push(`Passing: ${awayTeam} ${A.accuratePasses} (${pf(A.passPct)}) – ${homeTeam} ${H.accuratePasses} (${pf(H.passPct)})`);
+  if (has('foulsCommitted')) statFacts.push(`Fouls: ${awayTeam} ${A.foulsCommitted} – ${homeTeam} ${H.foulsCommitted}`);
+  const cardStr = (m: Record<string, string>) => `${parseInt(m.yellowCards) || 0}Y${(parseInt(m.redCards) || 0) > 0 ? ` ${parseInt(m.redCards)}R` : ''}`;
+  if (has('yellowCards') && ((parseInt(H.yellowCards) || 0) + (parseInt(A.yellowCards) || 0) + (parseInt(H.redCards) || 0) + (parseInt(A.redCards) || 0) > 0)) {
+    statFacts.push(`Cards: ${awayTeam} ${cardStr(A)} – ${homeTeam} ${cardStr(H)}`);
+  }
+
+  return { goalFacts, statFacts };
+}
+
 async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData> {
   const out: RecapData = { homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', winner: '', statusDetail: '', summaryFacts: [] };
   const cfg = espnConfig[sport];
@@ -292,7 +358,17 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
             if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
               for (const e of (sum?.keyEvents || [])) { if (e?.text) scoringFacts.push(String(e.text)); }
             }
-            out.summaryFacts.push(...leaderFacts, ...scoringFacts);
+            if (SOCCER_RECAP_KEYS.includes(sport)) {
+              // Goals (exact tally) + real stats LEAD and always survive; raw keyEvents text + leaders
+              // fill the rest under a higher cap. Fixes the goal under-count + surfaces possession/shots.
+              const { goalFacts, statFacts } = buildSoccerRecapExtras(sum, out.homeTeam, out.awayTeam, out.homeScore, out.awayScore);
+              const dedup = (arr: string[]) => [...new Set(arr.filter(Boolean))];
+              const priority = dedup([...goalFacts, ...statFacts]);
+              const rest = dedup([...leaderFacts, ...scoringFacts]).filter(f => !priority.includes(f));
+              out.summaryFacts = [...priority, ...rest].slice(0, 16);
+            } else {
+              out.summaryFacts.push(...leaderFacts, ...scoringFacts);
+            }
           } catch { /* no summary → thin (honest) recap */ }
         }
       }
@@ -300,7 +376,11 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
   } catch (e) {
     console.error('Recap data fetch error:', e);
   }
-  out.summaryFacts = [...new Set(out.summaryFacts.filter(Boolean))].slice(0, 10);
+  // Soccer already assembled + capped above (priority-preserving). All OTHER sports: byte-identical
+  // dedup + cap-10 as before.
+  if (!SOCCER_RECAP_KEYS.includes(sport)) {
+    out.summaryFacts = [...new Set(out.summaryFacts.filter(Boolean))].slice(0, 10);
+  }
   return out;
 }
 
@@ -321,8 +401,13 @@ function buildRecapPrompt(data: RecapData, sport: string, level: string, languag
 - "keyPerformance": the standout player or unit — ONLY if the data names one, else "".
 - "whyItMattered": the significance/stakes in plain language — ONLY if supported, else "".`
     : storyLine;
+  // Soccer-only: when a structured "Goals —" tally is present, force the model to honor it EXACTLY
+  // (fixes the "said two, was three" under-count). Empty for every other sport → prompt unchanged.
+  const goalRule = (SOCCER_RECAP_KEYS.includes(sport) && data.summaryFacts.some(f => f.startsWith('Goals —')))
+    ? ' If a "Goals —" line is given, it is the AUTHORITATIVE tally: your recap MUST reflect those EXACT goal counts per team and per scorer — never state more or fewer goals than the tally shows (if it says a player scored 3, never write "two").'
+    : '';
   const system = `You are a sports broadcaster writing a post-game recap for a ${level}-level viewer (someone newer to ${sport}).${langLine}
-CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.`;
+CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.${goalRule}`;
   const facts = data.summaryFacts.length ? data.summaryFacts.map(f => `- ${f}`).join('\n') : '(no detailed play/stat data available for this game)';
   const winnerName = data.winner === 'home' ? data.homeTeam : data.winner === 'away' ? data.awayTeam : '';
   const user = `DATA (the ONLY facts you may use):
