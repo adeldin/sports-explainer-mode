@@ -60,6 +60,8 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>{`🏆 ${board.name || 'Leaderboard'}`}</Text>
         {!!roundLine && <Text style={styles.subtitle}>{roundLine}</Text>}
+        {/* Quiet cue that the columns teach — recessive, always shown, no dismiss. */}
+        <Text style={styles.hint}>Tap a column to learn what it means</Text>
       </View>
 
       {/* Tapped-concept reveal — reuses the app's inline glossaryDefBox pattern (PlayCard/RecapCard). */}
@@ -75,13 +77,14 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
         </View>
       )}
 
-      {/* Column labels — POS/TOTAL/TODAY/THRU tappable → teach the concept (PLAYER is not). */}
+      {/* Column labels — POS/TOTAL/TODAY/THRU read like links (amber + underline) → teach the concept;
+          PLAYER stays plain/non-tappable. The amber headers + the hint line are the whole signal. */}
       <View style={[styles.row, styles.colHeaderRow]}>
-        <Text style={[styles.colHeader, styles.posCol, styles.tappable]} onPress={() => openField('position')} suppressHighlighting accessibilityRole="button">POS</Text>
+        <Text style={[styles.colHeader, styles.posCol, styles.tappableHeader]} onPress={() => openField('position')} suppressHighlighting accessibilityRole="button">POS</Text>
         <Text style={[styles.colHeader, styles.nameCol]}>PLAYER</Text>
-        <Text style={[styles.colHeader, styles.numCol, styles.tappable]} onPress={() => openField('total')} suppressHighlighting accessibilityRole="button">TOTAL</Text>
-        <Text style={[styles.colHeader, styles.numCol, styles.tappable]} onPress={() => openField('today')} suppressHighlighting accessibilityRole="button">TODAY</Text>
-        <Text style={[styles.colHeader, styles.thruCol, styles.tappable]} onPress={() => openField('thru')} suppressHighlighting accessibilityRole="button">THRU</Text>
+        <Text style={[styles.colHeader, styles.numCol, styles.tappableHeader]} onPress={() => openField('total')} suppressHighlighting accessibilityRole="button">TOTAL</Text>
+        <Text style={[styles.colHeader, styles.numCol, styles.tappableHeader]} onPress={() => openField('today')} suppressHighlighting accessibilityRole="button">TODAY</Text>
+        <Text style={[styles.colHeader, styles.thruCol, styles.tappableHeader]} onPress={() => openField('thru')} suppressHighlighting accessibilityRole="button">THRU</Text>
       </View>
 
       {/* Rows — pre-sorted leader-first by the provider; render with .map() (parent ScrollView).
@@ -131,6 +134,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
   title: { color: t.textPrimary, fontSize: 16, fontWeight: '800' },
   subtitle: { color: t.textSecondary, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  hint: { color: t.textMuted, fontSize: 12, fontWeight: '400', marginTop: 6 },
 
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border },
@@ -152,7 +156,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   under: { color: t.accentCool },                            // restrained teal for under-par
 
   // Tappable teaching affordance — a subtle underline (restrained; reads as "tap to learn", on-brand).
+  // Used on the leader-row cells (the quieter secondary discovery path).
   tappable: { textDecorationLine: 'underline' },
+  // Tappable COLUMN HEADERS read like links — amber + underline so they're clearly interactive
+  // against the navy (the primary discovery path, paired with the hint line).
+  tappableHeader: { color: t.accentText, textDecorationLine: 'underline' },
 
   // Concept reveal box — mirrors PlayCard's glossaryDefBox (surface bg + t.accent left stripe). The
   // card has no padding, so marginHorizontal: 16 aligns the box with the header/row content gutter.
