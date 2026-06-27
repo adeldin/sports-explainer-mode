@@ -1399,3 +1399,59 @@ SCOPE NOTE: this touches the SHARED CoachCard (all 5 sports) — test across bas
   App.tsx). Trivial, low priority.
 - **Spanish native review** — es is a real translation already; a native proofread (founder has
   a fluent contact) is polish, folds into a later build. Non-blocking.
+
+---
+
+## 🧭 ARCHITECTURE — "Strategy" tab + Coach's Corner bridge (proactive vs reactive split)
+
+REVISITING the earlier "no dedicated Coach's Corner tab" decision — the facts changed. Enough proactive strategy content is now accumulating that a destination tab earns its place. The clean resolution is a REACTIVE/PROACTIVE SPLIT across two surfaces with a bridge between them:
+
+### Live screen — Coach's Corner (REACTIVE, in-context)
+Explains THIS moment, next to the live game (where it belongs — divorcing it into a tab would separate it from the thing it explains):
+- The live pulse-text strategic read (BUILT, Gates A–D1).
+- NEW: a "Learn more in Strategy →" LINK that bridges from the live moment into the relevant Strategy lesson (formation, concept, etc.).
+
+### Strategy tab (PROACTIVE destination — you go TO it to learn)
+The on-demand strategy teacher. A real "room with furniture + a front door" now because it has multiple destination pieces AND a traffic source (the Learn-more link):
+- Formation diagrams (BUILDING NOW — the first concrete inhabitant of this tab; browse/learn what shapes mean).
+- Animated X's-and-O's plays (banked Lottie/Rive concept).
+- NEW: "You're the assistant coach" judgment quizzes (see below).
+
+### NEW FEATURE — "Assistant Coach" judgment quiz
+Active-recall applied to STRATEGY (the deepest learning — judgment, not definition). The coach poses a situation; the user (assistant coach) picks the best call:
+- e.g. Expert: "The defense is playing Cover 2 — which of these four plays is best?" Rookie: simpler binary ("lots of defenders back → pass short or go long?").
+- Difficulty-scaled (4 tiers). Reveals the answer + WHY (teaching, not just right/wrong) — fits the Khan-Academy pedagogy pillar.
+- This is the banked "you make the call" Academy concept (situation → reveal what pros do + why), sharpened into a coach-voiced multiple-choice strategy quiz.
+- SCOPING (honest): the MECHANIC is cheap (reuse the Academy quiz framework — show scenario → 4 options → reveal + why). The CONTENT is the real work (authoring good scenarios + right answers + teaching explanations, per sport, per difficulty — candidate for the crowd-source-3-models-and-curate workflow, or LLM-pregenerate + curate). BIGGER future version: scenario pulled from LIVE game state ("3rd and long right now — what do you call?") — ties to live data, larger lift.
+
+### The learning loop (three pillars connect)
+- Live (reactive) surfaces a concept in the wild → "Learn more in Strategy" →
+- Strategy (proactive) teaches it deep (diagram / animated play / judgment quiz) →
+- Academy (practice) drills it (Duolingo loop).
+This mirrors the already-banked "Coach's Corner ↔ Academy bridge" pattern, now generalized: Live finds the teachable moment, Strategy/Academy hold the structured lesson.
+
+### Tab decision — UPDATED
+Was "no tab (deferred)." Now: YES, a Strategy tab makes sense — it has 3 destination pieces (formations, animated plays, assistant-coach quiz) + a bridge driving traffic. The formation diagram is piece one. Build the tab when 2–3 of its pieces exist (formations being the first); don't force an empty room early, but the door is no longer closed. Trigger: when the formation diagram ships + one more Strategy piece is ready, stand up the tab.
+**UPDATE (this session): trigger now SATISFIED** — formation diagram ✅ BUILT + read-the-play quiz = the second piece. The tab is GO once read-the-play is built (see LOCKED LAUNCH PLAN below).
+
+### Strategy tab — LOCKED LAUNCH PLAN (decided this session)
+Build order to avoid a one-item room (honors the banked "formation + one more piece" trigger):
+- **Launch content (build before standing up the tab):**
+  1. Formation diagrams — ✅ BUILT (browse the shapes + the coach's read explanation). The react-native-svg FormationDiagram component + layout engine + explanation lookup are done.
+  2. Read-the-play quiz — BUILD NEXT. The cheapest, highest-synergy second piece: REUSES the formation diagram renderer + the 4-level system + awardPoints(). Show a formation → "name this shape" / "what's this formation's weakness?" Browse (diagram) + test (quiz) on the SAME content = a legitimate two-piece tab for minimal new code.
+- **Sequence:** build read-the-play FIRST, THEN stand up the Strategy tab with BOTH pieces (so it debuts feeling full, not blank). The formation diagram work is safely parked/committable in the meantime.
+- **Fast-follow (next expansion, not a launch gate):**
+  3. "Assistant Coach" judgment quiz ("defense is in Cover 2 — which play?"). Mechanic cheap (Academy quiz framework); CONTENT is the lift → use the crowd-source-3-models / LLM-pregenerate-and-curate workflow (same as the formation explanations). More differentiating but content-heavy, so it follows launch.
+- **Grow into:**
+  4. Animated X's-and-O's whiteboard plays (Lottie/Rive) — heaviest/most screenshot-worthy; the marquee piece to grow toward, NOT a launch requirement.
+  5. Per-sport formations: rugby/cricket reuse the team-state engine; tennis/golf need the separate "situational-decision" archetype (which is itself Strategy content).
+- **Game source (decided):** Strategy v1 uses INDEPENDENT game selection (its own game strip via fetchScoreboard + own rosters fetch) — NOT shared with Live, because the selected game is currently LOCAL to LiveScreen (state-lift deferred to avoid touching the live path / caps metering). Bank "lift sport+selectedGameId into useAppState so Live & Strategy share the selected game" as a later upgrade (B→A).
+- **Shared util to extract:** fetchSummaryRosters(sport, gameId) — Strategy (and the read-the-play quiz) need ESPN summary.rosters; no shared fetcher exists today (only inline in the temp test).
+
+### Naming — RESOLVED (this session)
+Resolves the two-things-one-name tension (the proactive tab vs the reactive live card both wanting "Coach's Corner"):
+- **The TAB is named "Coach's Corner"** (not "Strategy") — it was originally going to be called this at project start, and a chalkboard "COACHES CORNER" header asset was made for it. The tab is the proactive destination (formations, read-the-play, → assistant-coach quiz, → animated plays).
+- **The live in-context card is RENAMED "Coach's Read"** (was "Coach's Corner" on the Live screen) — the reactive, in-the-moment pulse-text strategic read (Gates A–D1). 
+- This creates a tidy family: **Coach's Corner (the place) contains Coach's Reads (the insights)**. Consistent with the formation diagram's existing "COACH'S READ ·" explanation-slot label — the whole app now coheres on this vocabulary.
+- ⚠️ The card rename is DISPLAY-ONLY (per the "Kid"→"Rookie" pattern): change only the user-facing display string; leave internal component names, storage keys, analytics events, and identifiers UNTOUCHED to avoid touching the caps/CoachCard/storage wiring. 
+- ASSET: a chalkboard "COACHES CORNER" image (warm wood-framed blackboard w/ X's-and-O's) made for the tab HEADER. Use it as a banner at the top of the Coach's Corner tab, cropped/faded into the navy (the cream frame-surround needs handling so it doesn't clash with the navy app). Apply when building the tab UI (after read-the-play). [Asset file is on Anthony's machine.]
