@@ -50,6 +50,11 @@ export interface SoccerMatchPulse {
   substitutionPosture: string | null;
   derivedTags: string[];
   triggerReason: string | null;   // populated by the CALLER via detectTrigger(); null from compute
+  // Gate D-1: REAL boxscore stats, CALLER-SET post-compute (like triggerReason) — NOT computed by the
+  // pure engine, which never sees the boxscore. Absent on thin-data games. Self-contained type (no
+  // import) to keep this engine a standalone copy. xG is not in the feed and never appears.
+  teamStats?: { home: { possessionPct?: number; totalShots?: number; shotsOnTarget?: number };
+                away: { possessionPct?: number; totalShots?: number; shotsOnTarget?: number } };
   confidence: Confidence;
   knownLimitations: string[];
 }

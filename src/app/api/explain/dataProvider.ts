@@ -23,6 +23,11 @@ export interface PitchEvent {
 export interface MatchEvent {
   minute?: number; type?: string; team?: string; player?: string; detail?: string;
 }
+// Soccer boxscore team stats (Gate D-1) — possession % (0–100) + shot counts. All optional: only the
+// stats both teams actually expose are filled; the rest stay undefined so the read degrades gracefully.
+export interface SoccerTeamStats {
+  possessionPct?: number; totalShots?: number; shotsOnTarget?: number;
+}
 
 // The normalized shape — the contract. ESPN base fields everyone uses + OPTIONAL enrichment
 // fields (absent on ESPN-only). Consumers unaware of enrichment fields are unaffected.
@@ -42,6 +47,9 @@ export interface NormalizedGameData {
   pitchSequence?: PitchEvent[];                 // GUMBO (MLB)
   events?: MatchEvent[];                         // soccer (goals/cards/subs w/ minute)
   lineups?: { home: string[]; away: string[] }; // soccer
+  // soccer — REAL boxscore team stats from the ESPN summary (Gate D-1). Present only when both teams
+  // expose them; absent on thin-data games / non-soccer. xG is NOT in the feed and never appears here.
+  teamStats?: { home: SoccerTeamStats; away: SoccerTeamStats };
   enrichedBy?: string;                          // which enricher ran (telemetry)
 }
 
@@ -154,7 +162,25 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
         const ke: any[] = sum?.keyEvents || [];
         const comm: any[] = sum?.commentary || [];
         out.lastPlay = ke[ke.length - 1]?.text || comm[comm.length - 1]?.text || out.lastPlay;
-      } catch { /* keep the scoreboard lastPlay */ }
+        // Gate D-1: pull REAL team stats from the SAME summary (no extra fetch). Mirrors the recap's
+        // parsing (route.ts buildSoccerRecapExtras): key by homeAway, possessionPct is already 0–100.
+        // Only attach teamStats when BOTH sides expose a given stat (else leave it undefined → honest).
+        const teams: any[] = sum?.boxscore?.teams || [];
+        const statMap = (side: string): Record<string, string> => {
+          const t = teams.find((x: any) => x?.homeAway === side);
+          const o: Record<string, string> = {};
+          for (const st of (t?.statistics || [])) if (st?.name != null && st?.displayValue != null) o[st.name] = String(st.displayValue);
+          return o;
+        };
+        const H = statMap('home'), A = statMap('away');
+        const both = (k: string) => H[k] != null && A[k] != null;
+        const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : undefined; };
+        const home: SoccerTeamStats = {}, away: SoccerTeamStats = {};
+        if (both('possessionPct')) { home.possessionPct = Math.round(parseFloat(H.possessionPct)); away.possessionPct = Math.round(parseFloat(A.possessionPct)); }
+        if (both('totalShots')) { home.totalShots = num(H.totalShots); away.totalShots = num(A.totalShots); }
+        if (both('shotsOnTarget')) { home.shotsOnTarget = num(H.shotsOnTarget); away.shotsOnTarget = num(A.shotsOnTarget); }
+        if (Object.keys(home).length) out.teamStats = { home, away };
+      } catch { /* keep the scoreboard lastPlay; teamStats stays undefined on any failure */ }
     }
 
     // Situation — extracted identically to the original coach normalizer (byte-identical output).

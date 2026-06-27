@@ -68,6 +68,7 @@ async function normalizeSoccerCoachState(sport: string, gameId?: string): Promis
     const events = Array.isArray(d.events) ? d.events : [];
     const pulse = computeSoccerPulse(events, { home, away }, minute, d.homeTeam, d.awayTeam);
     pulse.triggerReason = detectTrigger(events, minute, pulse).reason;
+    if (d.teamStats) pulse.teamStats = d.teamStats;   // Gate D-1: real boxscore stats, post-compute (engine untouched)
     return {
       sport,
       homeTeam: d.homeTeam, awayTeam: d.awayTeam, homeScore: d.homeScore, awayScore: d.awayScore,
@@ -128,11 +129,37 @@ export function buildSoccerCoachPrompt(s: CoachSituation, level: string, languag
   if (p.triggerReason) facts.push(`What just happened: ${p.triggerReason}.`);
   if (p.recentEvents.length) facts.push(`Recent events: ${p.recentEvents.map(e => `${e.minute ?? '?'}' ${e.type}${e.team ? ` (${e.team}${e.player ? ` — ${e.player}` : ''})` : ''}`).join('; ')}.`);
 
+  // Gate D-1: REAL run-of-play stats (possession % + shots), home-first to match the Score line above.
+  // Built only from stats BOTH teams expose; drives the conditional guardrail relax below. Home-first.
+  const ts = p.teamStats;
+  const statParts: string[] = [];
+  if (ts) {
+    if (ts.home.possessionPct != null && ts.away.possessionPct != null)
+      statParts.push(`possession ${h.team} ${ts.home.possessionPct}% – ${a.team} ${ts.away.possessionPct}%`);
+    if (ts.home.totalShots != null && ts.away.totalShots != null) {
+      const sot = (shots?: number, on?: number) => (on != null ? `${shots} (${on} on target)` : `${shots}`);
+      statParts.push(`shots ${h.team} ${sot(ts.home.totalShots, ts.home.shotsOnTarget)} – ${a.team} ${sot(ts.away.totalShots, ts.away.shotsOnTarget)}`);
+    }
+  }
+  const hasStats = statParts.length > 0;
+  if (hasStats) facts.push(`Run of play — REAL stats (possession & shots ONLY; no xG, no positions): ${statParts.join('; ')}.`);
+
+  // The data-honesty block RELAXES when real possession/shot stats are present (cite them, tie "on top"
+  // to the number) and stays VERBATIM Gate C when absent (no possession claims at all — thin-data honest).
+  const cardinalDataLines = hasStats
+    ? `- Use ONLY the state facts below. You DO have real possession % and shot counts — cite them as given. You still have NO formation or lineup, NO pressing/territory, NO xG, and NO "who's playing better" signal beyond what possession and shots actually show.
+- You MAY say a side is on top of the run of play ONLY when the possession or shot numbers support it, and you MUST tie the claim to the specific number ("outshooting them 8–2", "with 64% of the ball"). NEVER use "dominating," "controlling," "on top," or "the better side" without that number behind it. NEVER claim pressing, formation, territory, xG, or momentum-as-dominance — none of that is in the feed. Possession alone is NOT winning: a side can control the ball and lose, so weigh the stats AGAINST the scoreline, never above it.
+- HIGH-VALUE ANGLE: possession and shots matter MOST when they COMPLICATE the scoreline — a leader being outshot or outpossessed, or a level game one side has created everything in. Use the stats to reveal when the score isn't telling the whole story. They are SECONDARY context that colors the read; the PRIMARY driver stays the scoreline, the clock, and the man advantage.`
+    : `- Use ONLY the state facts below. You have NO possession data, NO formation or lineup, NO pressing/territory, NO xG, NO shot counts, and NO read on which side is "playing better."
+- NEVER claim or imply any of those. Do NOT say a team is "dominating," "controlling possession," "on top," "pressing," "in form," or "the better side" — the data cannot support it. Reason ONLY from the scoreline, the clock, the man advantage, cards, and substitutions.`;
+  const userGuardLine = hasStats
+    ? `You MAY cite the real possession % and shot counts and flag where the scoreline and the run of play diverge — but tie any "on top" claim to the specific number, and never rate possession above the scoreline. No formation/pressing/territory/xG claims.`
+    : `No possession/formation/pressing/xG/"who's better" claims.`;
+
   const system = `You are a knowledgeable soccer coach sitting beside a ${level}-level fan, teaching like Khan Academy — NOT a hype broadcaster.${langLine}
 Your job: the STRATEGIC WHY of the match RIGHT NOW — what the SCORE + TIME + MANPOWER force each team to do — then what to watch next. Walk the reasoning out loud so the viewer could read the next moment themselves. Meet them at their level: ${levelGuide[level] || levelGuide.beginner}.
 CARDINAL RULES — NEVER FABRICATE (honesty guardrail — do not weaken):
-- Use ONLY the state facts below. You have NO possession data, NO formation or lineup, NO pressing/territory, NO xG, NO shot counts, and NO read on which side is "playing better."
-- NEVER claim or imply any of those. Do NOT say a team is "dominating," "controlling possession," "on top," "pressing," "in form," or "the better side" — the data cannot support it. Reason ONLY from the scoreline, the clock, the man advantage, cards, and substitutions.
+${cardinalDataLines}
 - NEVER invent a player, a tactic, a pass, a chance, or a stat that is not in the facts.
 - Explain any jargon in plain terms.
 HOW TO WRITE THE READ (craft — this is what separates a real read from filler):
@@ -146,7 +173,7 @@ ${facts.map(f => `- ${f}`).join('\n')}
 Respond as JSON with EXACTLY these fields: { "strategicRead", "whatItSetsUp" }.
 - "strategicRead": the strategic why of the CURRENT state — what the scoreline + time + manpower force each side to do now. LEAD with the point (no "given the situation" preamble). If there's a real angle (a lead to protect, a man up or down, a chase, a recent goal or miss): 1-2 sentences at a ${level} level, reasoning walked out and anchored on the concrete event. If the state is flat (level + early, low leverage, nothing forced): ONE crisp sentence stating that plainly — no padding, no filler. Empty string only if there is truly nothing to say.
 - "whatItSetsUp": what to watch for NEXT and why — 1 concrete sentence tied to a real next beat (the next goal's effect on the scoreline, a substitution window, the man advantage starting to tell). No filler.
-No possession/formation/pressing/xG/"who's better" claims. Substance or honest brevity; never platitudes, never invented detail.`;
+${userGuardLine} Substance or honest brevity; never platitudes, never invented detail.`;
   return { system, user };
 }
 
