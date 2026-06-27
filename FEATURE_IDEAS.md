@@ -465,8 +465,6 @@ demand"). One LLM outage = the core feature breaks. Resilience plan:
 
 ## 🛰️ Per-sport data upgrade roadmap *(researched 2026-06-24)*
 
-> ⚠️ SUPERSEDED (2026-06-25) by evidence-based recon → see DATA_SOURCES.md. That doc reorders priority: MLB GUMBO (upgrades already-shipped baseball) outranks adding tennis/golf; full build sequence + endpoint shapes there.
-
 **Core architecture move — a `sportDataProvider` abstraction** (the SAME swappable-adapter pattern
 as `visionProvider.ts`: env-driven, one file, each adapter normalizes its source's JSON into our
 internal shape). **ESPN stays the DEFAULT for all sports**; specific sports override with a richer
@@ -1096,3 +1094,22 @@ applied prospectively.)
   App.tsx). Trivial, low priority.
 - **Spanish native review** — es is a real translation already; a native proofread (founder has
   a fluent contact) is polish, folds into a later build. Non-blocking.
+
+---
+
+## 🔴 Per-sport live indicators in the sport picker (1.3/1.4)
+
+**Problem:** With ~14 sports in the picker, users must tap through every sport tab to discover which have live games — lots of dead taps, makes the app feel emptier than it is, and scales WORSE as more sports are added. The single global "LIVE" pill in the header tells you something is live but not WHAT.
+
+**Fix:** Show a live indicator (dot, or live-count badge) on each individual sport tab that currently has a live event — turns the picker into a map of where the action is.
+
+**Buildability (recon-confirmed, FAVORABLE):** The cross-sport machinery already exists. `gatherWatchCandidates()` (lib/watchNext.ts) already fetches ALL non-learn-mode sports' live status in parallel (Promise.allSettled over fetchScoreboard) and returns WatchCandidate[] each carrying sport + status ('live'/'upcoming'). It's what powers Watch Next / Live Now. So this is mostly a SURFACING job, not new fetching architecture. Effort: MEDIUM-small for the dot v1.
+
+**v1 approach:** Add a top-level effect that calls gatherWatchCandidates() eagerly on mount; derive a Set<parentSport> (via the already-exported parentSport(), so a "Soccer" tab lights when EPL/LaLiga/WorldCup is live, "Rugby" covers rugby/mlr) from candidates where status==='live'; render a dot (reuse existing liveDot style) on each visibleSports tab in that set.
+
+**Scoping notes:**
+- Learn-mode sports (tennis/golf/cricket) correctly never light up — no live ESPN scoreboard source. Accurate, not a bug.
+- Polling cost: eager cross-sport = ~10-11 parallel ESPN calls/cycle. Live status changes slowly — use a GENTLER cadence (every 2-3 min, or only while Live tab focused), NOT the verbatim 60s play-refresh interval.
+- Extension (float live sports to front of picker): flag a tension — it conflicts with the user's deliberate My Sports order set in Settings. Dots/badges are less disorienting than reordering tabs under them. Prefer dots over reordering for v1; if reordering, make it opt-in.
+
+**RELATED BUG to fix as part of this work:** The global "LIVE" header pill (LiveScreen.tsx ~612) currently renders on `games.length > 0` — i.e. it shows "LIVE" whenever the selected sport has ANY games including scheduled/final, NOT only live ones. So it's inaccurate today (over-shows "LIVE"). The correct check is `games.some(g => g.state === 'in')` (already computed elsewhere as hasLiveInSport, ~527). When building the per-tab dots, either RETIRE the global pill (the dots are the better map) or FIX it to the accurate check so it stops lying.
