@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, Theme } from '../lib/theme';
 import { Leaderboard } from '../lib/api';
 
@@ -20,9 +20,17 @@ const isUnderPar = (s: string): boolean => typeof s === 'string' && s.trim().sta
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmtFinalDate = (ms: number): string => { const d = new Date(ms); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
 
+const COLLAPSED_COUNT = 15;
+
 export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  // Weather-app north star: glanceable by default (top 15), deep on demand. Still .map() — no nested
+  // scroll (this lives inside LiveScreen's parent ScrollView).
+  const [expanded, setExpanded] = useState(false);
+  const canToggle = board.rows.length > COLLAPSED_COUNT;
+  const visibleRows = expanded ? board.rows : board.rows.slice(0, COLLAPSED_COUNT);
 
   // Live → today's "Round N · {status}". Final (most-recent-ended fallback) → an honest "Final · {Mon D}"
   // from the schedule endDate, so a finished board reads as intentional, not stale.
@@ -47,11 +55,12 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
         <Text style={[styles.colHeader, styles.thruCol]}>THRU</Text>
       </View>
 
-      {/* Rows — pre-sorted leader-first by the provider; render with .map() (parent ScrollView) */}
-      {board.rows.map((r, i) => (
+      {/* Rows — pre-sorted leader-first by the provider; render with .map() (parent ScrollView).
+          Truncated to the top COLLAPSED_COUNT unless expanded (Weather-app glanceable default). */}
+      {visibleRows.map((r, i) => (
         <View
           key={`${r.playerId || r.name}-${i}`}
-          style={[styles.row, i < board.rows.length - 1 && styles.rowDivider]}>
+          style={[styles.row, i < visibleRows.length - 1 && styles.rowDivider]}>
           <Text style={[styles.cell, styles.posCol, styles.posText]} numberOfLines={1}>{r.position}</Text>
           <Text style={[styles.cell, styles.nameCol, styles.nameText]} numberOfLines={1}>
             {r.name}{r.isAmateur ? ' (a)' : ''}
@@ -65,6 +74,20 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
           <Text style={[styles.cell, styles.thruCol, styles.thruText]} numberOfLines={1}>{r.thru}</Text>
         </View>
       ))}
+
+      {/* Footer toggle — only when there are more rows than the collapsed count. Glanceable→deep. */}
+      {canToggle && (
+        <Pressable
+          onPress={() => setExpanded(e => !e)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={expanded ? 'Show less' : `Show full leaderboard, ${board.rows.length} players`}
+          style={({ pressed }) => [styles.toggle, pressed && styles.togglePressed]}>
+          <Text style={styles.toggleText}>
+            {expanded ? 'Show less ↑' : `Show full leaderboard (${board.rows.length}) ↓`}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -95,4 +118,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   todayText: { color: t.textMuted, fontWeight: '600' },
   thruText: { color: t.textMuted, fontWeight: '600' },
   under: { color: t.accentCool },                            // restrained teal for under-par
+
+  // Footer expand/collapse toggle — centered full-width, hairline top border, ~44px tap target.
+  toggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border },
+  togglePressed: { backgroundColor: t.surfaceAlt },          // visible press state (reuses a token)
+  toggleText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
 });
