@@ -1164,3 +1164,139 @@ Deterministic engine does max work (free); LLM only for genuine language. Visual
 - Confirm GUMBO pitch coordinates (when integrating GUMBO).
 - Curl ESPN NBA play-by-play for shot x/y.
 - Decide visual priority: soccer formation (feasible now, World Cup timing) vs. strike zone (waits for GUMBO).
+
+---
+
+## 🧭 Coach's Corner — team sports vs. individual sports (architectural fork)
+
+Insight: the SoccerMatchPulse model works because TEAM-sport strategy = "the game state (score + time + manpower) FORCES both teams into collective postures" (protect lead / chase / drop a defender after a red). The coaching read = reading that forced posture.
+
+### Fits the pulse model (team-state read) — same engine, sport-specific pulse:
+- Soccer (built), Rugby, Cricket. All have: a score, a clock/innings structure, and TWO teams making strategic choices in response to shared state. Cricket especially (run rate vs required rate, wickets in hand, overs left, attack vs consolidate). Rugby (territory, phases, bonus-point math, kick vs go).
+
+### Breaks the pulse model (individual sports) — needs a DIFFERENT archetype:
+- Tennis, Golf. No "two teams forced into collective postures." 
+  - Tennis: strategy is within the point / serve-return patterns / matchups / momentum — about ONE player's shot selection, not a forced collective posture.
+  - Golf: players don't even directly interact; it's player vs course vs field over hours. Strategy = club selection, risk/reward per hole, course management.
+- Tell: tennis/golf are ALREADY learn-mode sports (no live play-by-play) — the app already treats them differently.
+
+### Proposed fork — TWO Coach's Corner archetypes:
+1. **Team-state read** (soccer/rugby/cricket): forced collective posture from game state. The pulse engine.
+2. **Situational-decision read** (tennis/golf): the tactical tension / risk-reward of a key INDIVIDUAL moment.
+   - Tennis: "what's the play at break point / second serve at 30-40 / tiebreak" — the tactical tension in THIS point situation.
+   - Golf: "risk/reward on this shot/hole given position vs the field" — individual decision under tournament pressure.
+   - Different engine, different triggers (key moments, not game-state changes).
+
+Decision: build the team-state version fully first (soccer Gates C/D → rugby → cricket). The individual-sport "situational-decision" archetype is a SEPARATE future design, not a forced fit onto the pulse engine. Don't try to make tennis/golf use the team model.
+
+---
+
+## 🐛 BUG — stale "THE PLAY" card on soccer (sits frozen for long stretches)
+Observed live: Belgium-NZL at 47', but THE PLAY card still showed Trossard's goal from the 28th minute — 19 minutes of a live game with no new play explanation. The user sees/learns nothing new for that whole stretch. Coach's Corner updated correctly (showed 45'+3'); it's THE PLAY card specifically that's stale.
+
+Hypothesis (NOT yet confirmed — needs recon): soccer's "current play" pulls the last ESPN keyEvent/commentary entry, and likely only refreshes on a SIGNIFICANT event (goal/card/sub). Between sparse soccer events, the play card sits frozen — fine for baseball/football (every play is an event) but bad for soccer (notable events are minutes apart). 
+
+Possible fixes to investigate:
+- Pull from the full commentary[] feed (minute-by-minute), not just keyEvents, so the play updates on more frequent beats (shots, fouls, chances) — gives the explainer fresh material between goals.
+- Or: when no new keyEvent, fall back to the latest commentary[] entry for "the play."
+- Tradeoff: more frequent updates = more Groq calls (each new play explanation is an AI call). Balance freshness vs cost — maybe update the play on meaningful commentary beats only (shots/big chances), not every routine pass.
+Separate from the Coach's Corner gates. Worth a dedicated recon of how soccer's "last play" is selected + how often it should refresh.
+
+---
+
+## 🐛 BUG (pre-existing, all sports) — Coach's Corner frozen to the game, not the play
+Confirmed via recon: NOT caused by Gate C. The expand/full-read machinery is from the original Coach's Corner commit d378a20; reproduces in baseball (untouched sport). Live since launch.
+
+ROOT CAUSE (one issue, three symptoms): CoachCard's lifecycle is keyed to the GAME, not the PLAY.
+- Parent key is coach|sport|gameId|level|language — no play key. New play = same gameId = same key = no remount → the read freezes from the first play until game/level/language changes.
+- expand() only ever does setExpanded(true) — no collapse, one-way.
+- pull-to-refresh re-runs the play fetch only; never refetches/remounts the coach card.
+Symptoms: (1) read stuck on old play (saw it on baseball: strikeout→hit, read didn't change), (2) can't minimize the expanded read, (3) no way to get a read on the new play.
+
+THE LEVER: derivePlayKey(rawPlay, playType) is ALREADY computed in LiveScreen (lastPlayKeyRef). Thread it into CoachCard.
+
+FIX PLAN (Option A + collapse, cost-aware):
+1. Add play key to the CoachCard key: coach|sport|gameId|PLAYKEY|level|language → new play remounts → resets stale read + refetches the FREE state/tag. Fixes stale + makes pull-to-refresh work.
+2. Make expand a toggle (setExpanded(e=>!e)) + a hide/▾ chevron. Fixes can't-collapse.
+3. KEEP the Groq full read MANUAL (tap-to-expand per play) — on a new play the card returns to the collapsed deterministic/free line with a "read this play" affordance; Pro taps for a fresh read. CRITICAL for cost: do NOT auto-fire a paid Groq call on every play. Soccer ticks every minute → auto-refetch would multiply Groq calls badly.
+SCOPE NOTE: this touches the SHARED CoachCard (all 5 sports) — test across baseball AND soccer, not just soccer. Separate commit from Gate C.
+
+---
+
+## 🔌 LLM provider strategy — Groq Dev (when available) + KEEP Gemini fallback
+Verified live: Gemini fallback works end-to-end (caught a real maxed-Groq 429, kept the app working) — but it's noticeably SLOWER than Groq.
+
+DECISION (reasoning): when Groq Dev/paid tier becomes purchasable (currently NOT available), upgrade Groq to paid as PRIMARY — but DO NOT drop Gemini. Keep it as the fallback.
+- Paid Groq raises the LIMIT; it does NOT provide a fallback. Any single provider is a single point of failure (rate limits even on paid, outages, key/API issues, regional problems).
+- Tonight proved the value: Groq went unavailable, Gemini kept the app alive. Removing the only safety net = total outage the next time Groq has a bad hour, paid tier or not.
+- Cost of keeping Gemini fallback ≈ zero when rarely hit (only pay for the rare fallback calls). Cheap insurance.
+- Architecture already supports this: llmProvider.ts provider switch + LLM_FALLBACK_PROVIDER=gemini stays set; just upgrade the Groq key. Nothing structural changes.
+
+ALSO:
+- Track Groq Dev tier availability/pricing (currently can't purchase). Upgrade = swap key, keep everything else.
+- The llmProvider abstraction means NOT locked to Groq/Gemini — can swap primary to any OpenAI-compatible provider if a better/cheaper/faster one emerges. Don't trade away that flexibility by hard-committing to one vendor.
+- Operational: Groq free = 100k tokens/DAY (burned it in one heavy test day). Plan for paid tier before user growth; monitor token usage.
+
+NOTE: the 3 Gemini-fallback vars in Vercel (LLM_FALLBACK_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL) are Production-ONLY scope, not "Production and Preview" — fallback wouldn't arm on Preview deployments. Minor; extend to Preview if you ever test against Preview builds.
+
+---
+
+## 🔬 OBSERVATION — Gemini reads may be BETTER than Groq (worth a head-to-head)
+While running on the Gemini fallback (Groq maxed), the reads looked noticeably strong — e.g. a baseball 0-2/9th Coach's Corner: "expand the strike zone or throw a waste pitch... batter in pure survival mode... next pitch a put-away pitch... induce a chase." Genuinely good, specific, correct baseball vocabulary.
+
+CAVEATS before concluding "Gemini is better":
+- Confounded: the strong Gemini read was BASEBALL on a HIGH-ANGLE state (0-2, 9th); the "just OK" Groq reads were mostly SOCCER on LOW-ANGLE states (level-early). Quality diff may be situation, not model.
+- One sample ≠ a pattern.
+- Gemini is noticeably SLOWER than Groq (confirmed). Better-but-slower is a real tradeoff, not an obvious win.
+
+TO TEST PROPERLY (future): head-to-head on IDENTICAL inputs — force the same play/situation through Groq vs Gemini via the llmProvider abstraction, compare reads side by side. Removes the situation confound. Do it across a few sports + difficulty levels.
+
+STRATEGIC IMPLICATION if Gemini really is better: flips the provider question. Instead of "Groq primary, Gemini fallback," might be "Gemini primary for quality, Groq for speed/fallback" — or rethink which is primary. Worth resolving before committing to Groq Dev tier. The llmProvider switch makes either config trivial.
+
+ALSO NOTED: the Coach's Corner refresh/collapse bug fix is now VERIFIED working — baseball Coach's Corner header showed live "0-2 · 1 out" (tracking the play, not frozen) + the ▾ collapse chevron present. Both halves of the fix confirmed.
+
+---
+
+## 💡 FEATURE — Feedback button + situation-keyed explanation CACHE ("the app learns, not the model")
+
+IMPORTANT FRAMING: the LLM (Groq/Gemini/Llama) is STATIC — it does NOT learn from user feedback. Feedback cannot flow back into the model. So "the AI learns over time" must be built as CACHING + feedback, not model-learning. (Fine-tuning is a heavy, expensive, separate undertaking — not what a feedback button enables.)
+
+### Part 1 — Feedback button (build-worthy on its own)
+A lightweight "was this helpful / I learned something" tap on each read — e.g. a greyed-out lightbulb that lights up when tapped. Fits the learning/Academy identity, low-friction. Gives us data we have ZERO of today: which explanations actually land. Thumbs/heart/lightbulb — pick the on-brand one.
+
+### Part 2 — Situation-keyed explanation cache (the REAL "learning" mechanism)
+Recurring situations (e.g. "3-2 full count, 2 outs, bottom 9th, game on the line") have essentially the SAME strategic explanation every time (players change; the situational teaching is constant). So:
+- Compute a SITUATION KEY (we already do this — derivePlayKey + count/outs/inning state = a situation fingerprint).
+- First time a situation appears → generate (Groq) + STORE the read keyed by situation.
+- Next time a similar situation appears → SERVE THE CACHED read instantly (DB lookup, no AI call), optionally light-template the current player names in.
+Benefits = exactly the intuition: FASTER (no AI call), CHEAPER (no tokens on repeats — directly eases the 100k/day Groq limit), and BETTER over time as the cache of validated reads grows.
+
+### Part 3 — Feedback feeds the cache (how the SYSTEM gets smarter)
+- Thumbs-up / lightbulb on a read → promote it as "good enough to reuse" in the cache.
+- Thumbs-down → don't cache; regenerate next time.
+- The system improves not because the model learns, but because the cache of human-validated explanations grows.
+
+### Part 4 — Caching removes speed pressure → enables a slower/better model for novel situations
+If cached reads serve instantly, the speed problem disappears for repeat situations. That frees us to use a slower-but-maybe-better model (e.g. Gemini) for the RARE first-generation of a novel situation (happens once, then cached forever). Connects to the "Gemini may write better but is too slow for live" finding — caching is what could make Gemini's quality affordable on the latency budget.
+
+### Open design questions
+- Situation-key granularity: too coarse = generic reads; too fine = never cache-hits. Tune (e.g. count+outs+inning+score-state, NOT exact players).
+- Per-difficulty-level caching (4 levels × situations).
+- Staleness/variety: serving the identical read every time may feel repetitive — maybe cache 2-3 variants per situation, or light-template.
+- Storage: where the cache lives (backend DB). 
+- This is a bigger architectural feature — significant, but high-value (cost + speed + the feedback loop). Future, well after the current Coach's Corner gates.
+
+---
+
+## ✅ DECISION — Groq primary (speed), Gemini fallback only. Speed wins for live.
+Tested Gemini live (Groq maxed): its reads MAY be slightly better in quality, but it's SO slow in comparison it almost feels unusable for a LIVE app. 
+
+Decision: SPEED WINS for live reads. For "watch and ask why" in the moment, a fast good-enough read beats a slow great read — a read that arrives after the play has moved on defeats the purpose. Groq's low latency is a real product feature for a live app, not just a benchmark.
+
+- Groq = PRIMARY (speed). 
+- Gemini = FALLBACK only (slow, but a slow working app beats a broken one when Groq maxes — verified it does this job).
+- The "Gemini writes better" signal stays banked but SECONDARY — quality delta doesn't beat the latency cost for live use.
+
+REFRAME for the future: it's not "pick one provider" — it's "the right provider depends on whether the call is latency-sensitive." Live play reads → Groq (speed). Any FUTURE non-live / pre-generated feature (post-game deep-dive, Academy content generated ahead of time, a recap that can take its time) → Gemini's quality-over-speed tradeoff might win there. The llmProvider switch makes this a per-use-case choice. But everything live today = Groq primary.
+
+Supersedes the open question in the earlier provider note: for live, speed is decided.
