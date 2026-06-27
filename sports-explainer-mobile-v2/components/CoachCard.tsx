@@ -5,6 +5,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { Sport, Level, Language, CoachSituation, CoachFull, fetchCoachState, fetchCoachFull } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import { hasSufficientState, deriveSituationTag, hasCoachContent } from '../lib/coach';
+import { summarizeSoccerPulse } from '../lib/soccerPulse';
 import GlossaryText from './GlossaryText';
 
 // Coach's Corner (premium #3) — the live strategic-insight layer BELOW the PlayCard. Collapsible,
@@ -83,6 +84,28 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
   }
 
   const tag = deriveSituationTag(sport, situation);
+
+  // Soccer (Gate B): render the DETERMINISTIC pulse summary — no LLM, no unlock gating yet. This
+  // proves the gate is open + the pulse state flows end-to-end; the Groq coaching read lands in
+  // Gate C. If there's no pulse, hasSufficientState above already routed to coming-soon.
+  if (situation?.pulse) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+            {capLeft != null && (
+              <View style={styles.capPill}>
+                <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(capLeft))}</Text>
+              </View>
+            )}
+          </View>
+          {!!tag && <Text style={styles.tag}>{tag}</Text>}
+        </View>
+        <Text style={styles.readText}>{summarizeSoccerPulse(situation.pulse)}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.card}>

@@ -1,18 +1,30 @@
-// SoccerMatchPulse — PURE, deterministic "match state" engine for soccer (no React, no network,
-// no LLM). Mirrors lib/coach.ts / lib/matchTimeline.ts in style + testability. It consumes the
-// Highlightly event timeline (MatchEvent[]) + score + minute and computes a normalized strategic
-// state object: phase, score state, leverage, manpower, discipline, substitution posture, and
-// strategic tags — plus a SEPARATE trigger detector for "should this surface now?".
+// SoccerMatchPulse — BACKEND COPY of the app's lib/soccerPulse.ts (Gate A engine), ported VERBATIM.
+// ⚠️ KEEP IN SYNC with sports-explainer-mobile-v2/lib/soccerPulse.ts (same rules/tags/calibration,
+// already unit-tested there). Copied rather than shared because the backend (src/) and the Expo app
+// are separate packages with no shared module path — same pattern as the teamKey copy.
 //
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// HONESTY GUARDRAIL (load-bearing): this is PURE STATE only. The engine must NEVER infer or output
-// possession, formation, pressing, "momentum as dominance", or field position — Highlightly's feed
-// carries none of it, and inventing it is the cardinal sin. The ONLY pressure signal allowed is
-// event CLUSTERING ("multiple events in a short window"), and it is labelled as such — never as
-// "team X is dominating". Every field below is derivable from event TYPES + minute + score alone.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
+// PURE, deterministic "match state" engine for soccer (no LLM). Consumes the Highlightly event
+// timeline (MatchEvent[]) + score + minute → a normalized strategic state object.
+//
+// HONESTY GUARDRAIL: PURE STATE only. NEVER infer possession, formation, pressing, momentum-as-
+// dominance, or field position — the feed carries none of it. The only pressure signal allowed is
+// event CLUSTERING, labelled as such. Every field is derivable from event TYPES + minute + score.
 
-import { MatchEvent, sortEvents } from './matchTimeline';
+// --- Self-contained MatchEvent + sortEvents (mirror of the app's lib/matchTimeline.ts) ---
+export interface MatchEvent {
+  minute?: number;
+  type?: string;
+  team?: string;
+  player?: string;
+  detail?: string;
+}
+function sortEvents(events: MatchEvent[]): MatchEvent[] {
+  return [...(events || [])].sort((a, b) => {
+    const am = typeof a.minute === 'number' ? a.minute : Infinity;
+    const bm = typeof b.minute === 'number' ? b.minute : Infinity;
+    return am - bm;
+  });
+}
 
 export type GamePhase = 'opening' | 'early' | 'adjusting' | 'crunch' | 'closing';
 export type ScoreState =
@@ -42,7 +54,6 @@ export interface SoccerMatchPulse {
   knownLimitations: string[];
 }
 
-// Canonical event types are matched case-insensitively (the feed emits Title Case verbatim).
 const T = {
   goal: 'goal', yellow: 'yellow card', red: 'red card',
   sub: 'substitution', missedPen: 'missed penalty',
@@ -52,7 +63,6 @@ const RELEVANT = new Set<string>([T.goal, T.yellow, T.red, T.sub, T.missedPen]);
 const norm = (s?: string): string => (s || '').trim().toLowerCase();
 const isType = (e: MatchEvent, t: string): boolean => norm(e.type) === t;
 
-// The fixed honesty disclaimer — what this engine can NEVER know from the feed.
 const KNOWN_LIMITATIONS: string[] = [
   'No possession or pass data',
   'No shots or xG',
@@ -69,7 +79,6 @@ export function computePhase(minute: number): GamePhase {
   return 'closing';
 }
 
-// margin (home - away) → score state.
 export function computeScoreState(homeGoals: number, awayGoals: number): ScoreState {
   const m = homeGoals - awayGoals;
   if (m === 0) return 'level';
@@ -79,20 +88,10 @@ export function computeScoreState(homeGoals: number, awayGoals: number): ScoreSt
   return 'away_leading_by_two_plus';
 }
 
-// Leverage = score margin × phase, with a manpower bump in tight games. Documented table:
-//   margin ≥3 (decided)        → low  at every phase.
-//   margin 2                   → low early; medium in crunch/closing.
-//   margin 1 (one-goal game)   → low / medium / medium / high / extreme   (by phase index 0-4).
-//   margin 0 (level)           → low / medium / medium / high / high.
-// Then: if manpower is uneven AND the game is within one goal, bump leverage one level (a red card
-// raises the stakes of a tight game). Clamped low..extreme.
-//
-// A level game in the crunch phase (61-80') is HIGH — a late level World Cup game is genuinely
-// high-stakes (the design-note reading, adopted over the earlier offhand "medium" test guess).
 const ORDER: Leverage[] = ['low', 'medium', 'high', 'extreme'];
 const PHASE_IDX: Record<GamePhase, number> = { opening: 0, early: 1, adjusting: 2, crunch: 3, closing: 4 };
-const ONE_GOAL_LEVERAGE = [0, 1, 1, 2, 3];   // by phase index
-const LEVEL_LEVERAGE = [0, 1, 1, 2, 2];      // by phase index (crunch=2 → level/crunch = HIGH)
+const ONE_GOAL_LEVERAGE = [0, 1, 1, 2, 3];
+const LEVEL_LEVERAGE = [0, 1, 1, 2, 2];
 
 export function computeLeverage(homeGoals: number, awayGoals: number, phase: GamePhase, manpowerEven: boolean): Leverage {
   const margin = Math.abs(homeGoals - awayGoals);
@@ -102,11 +101,10 @@ export function computeLeverage(homeGoals: number, awayGoals: number, phase: Gam
   else if (margin === 2) idx = p >= 3 ? 1 : 0;
   else if (margin === 1) idx = ONE_GOAL_LEVERAGE[p];
   else idx = LEVEL_LEVERAGE[p];
-  if (!manpowerEven && margin <= 1) idx += 1;     // a red card in a tight game raises the stakes
+  if (!manpowerEven && margin <= 1) idx += 1;
   return ORDER[Math.max(0, Math.min(3, idx))];
 }
 
-// The main engine. Deterministic — same inputs always yield the same pulse.
 export function computeSoccerPulse(
   events: MatchEvent[],
   score: { home: number; away: number },
@@ -124,14 +122,13 @@ export function computeSoccerPulse(
   };
   const teamName = (s: Side): string => (s === 'home' ? homeTeam : awayTeam);
 
-  const margin = score.home - score.away;            // + = home leads
+  const margin = score.home - score.away;
   const absMargin = Math.abs(margin);
   const leadingSide: Side | null = margin > 0 ? 'home' : margin < 0 ? 'away' : null;
   const trailingSide: Side | null = margin > 0 ? 'away' : margin < 0 ? 'home' : null;
   const gamePhase = computePhase(minute);
   const scoreState = computeScoreState(score.home, score.away);
 
-  // --- Manpower from red cards (the only structural certainty the feed gives us) ---
   const reds = evs
     .filter(e => isType(e, T.red) && typeof e.minute === 'number')
     .map(e => ({ team: e.team || '', minute: e.minute as number }))
@@ -144,22 +141,18 @@ export function computeSoccerPulse(
   const manpowerEven = mpState === 'even';
   const manUpSide: Side | null = mpState === 'home_advantage' ? 'home' : mpState === 'away_advantage' ? 'away' : null;
   const manDownSide: Side | null = manUpSide ? (manUpSide === 'home' ? 'away' : 'home') : null;
-  const redCardMinute = reds.length ? reds[reds.length - 1].minute : undefined;   // most recent red
+  const redCardMinute = reds.length ? reds[reds.length - 1].minute : undefined;
 
-  // --- Discipline ---
   const yellows = evs.filter(e => isType(e, T.yellow));
   const homeYellows = yellows.filter(e => sideOf(e.team) === 'home').length;
   const awayYellows = yellows.filter(e => sideOf(e.team) === 'away').length;
 
-  // --- Recent relevant events (last ~6, filtered to meaningful types) ---
   const recentEvents = evs.filter(e => RELEVANT.has(norm(e.type))).slice(-6);
 
-  // --- Substitution posture (NO positions — inferred from timing + score only) ---
   const subs = evs.filter(e => isType(e, T.sub));
   const subsAfter = (side: Side, m: number) => subs.filter(e => sideOf(e.team) === side && (e.minute ?? 0) >= m);
   let substitutionPosture: string | null = null;
   if (reds.length) {
-    // Structural repair: the red-card side reshaping within ~12 min of going down a man.
     const lastRed = reds[reds.length - 1];
     const redSide = sideOf(lastRed.team);
     if (redSide && subs.some(e => sideOf(e.team) === redSide && (e.minute ?? -1) >= lastRed.minute && (e.minute ?? -1) <= lastRed.minute + 12)) {
@@ -176,7 +169,6 @@ export function computeSoccerPulse(
     substitutionPosture = 'tactical chess — both reshaping while level';
   }
 
-  // --- Derived strategic tags (emit ONLY when the condition genuinely holds) ---
   const tags: string[] = [];
   const goals = evs.filter(e => isType(e, T.goal));
   const lastGoalMinute = goals.length ? Math.max(...goals.map(g => g.minute ?? -Infinity)) : -Infinity;
@@ -201,20 +193,16 @@ export function computeSoccerPulse(
   if (lastGoalMinute >= minute - 5 && lastGoalMinute > -Infinity) tags.push('post-goal response');
   if (evs.some(e => isType(e, T.missedPen) && (e.minute ?? -1) >= minute - 5)) tags.push('missed-penalty swing');
 
-  // Never leave derivedTags empty — give the downstream LLM a light, honest anchor when no specific
-  // strategic tag fired (e.g. a level, even-strength game before 75'). Generic, no fabricated drama.
   if (tags.length === 0) {
     tags.push(scoreState === 'level' ? 'level game' : absMargin === 1 ? 'one-goal game' : 'two-goal-plus cushion');
   }
 
-  // --- Confidence: high when a red / clear score+late time imply strategy; medium for score OR
-  // late time alone; low when the read would rest mainly on substitution inference (level + early). ---
   let confidence: Confidence;
   if (!manpowerEven) confidence = 'high';
   else if (absMargin >= 1 && minute >= 60) confidence = 'high';
   else if (absMargin >= 1) confidence = 'medium';
-  else if (minute >= 75) confidence = 'medium';     // level but late = real, time-based stakes
-  else confidence = 'low';                          // level + not late → rests on subs → low
+  else if (minute >= 75) confidence = 'medium';
+  else confidence = 'low';
 
   const leverage = computeLeverage(score.home, score.away, gamePhase, manpowerEven);
 
@@ -229,16 +217,12 @@ export function computeSoccerPulse(
     recentEvents,
     substitutionPosture,
     derivedTags: tags,
-    triggerReason: null,    // computeSoccerPulse is the STATE engine; trigger is separate (below)
+    triggerReason: null,
     confidence,
     knownLimitations: KNOWN_LIMITATIONS,
   };
 }
 
-// Trigger detector — "should Coach's Corner surface NOW?" — kept separate so it's testable alone.
-// Examines events that JUST happened (within ~2 min of `minute`) in priority order, plus time
-// milestones as a fallback. `prevState` (optional) supplies score context for the conditional
-// sub/yellow triggers (tied or one-goal only) — without it, those conditions are treated as met.
 export function detectTrigger(
   events: MatchEvent[],
   minute: number,
@@ -247,47 +231,15 @@ export function detectTrigger(
   const recent = (events || []).filter(e => typeof e.minute === 'number' && (e.minute as number) >= minute - 2 && (e.minute as number) <= minute);
   const has = (t: string) => recent.some(e => norm(e.type) === t);
 
-  // Always-trigger major events.
   if (has(T.goal)) return { triggered: true, reason: 'Goal just scored' };
   if (has(T.red)) return { triggered: true, reason: 'Red card shown' };
   if (has(T.missedPen)) return { triggered: true, reason: 'Penalty missed' };
 
-  // Tight game = level or one-goal (the only states where a sub/booking shifts strategy enough).
   const tight = !prevState || prevState.scoreState === 'level' || /leading_by_one$/.test(prevState.scoreState);
   if (minute >= 55 && has(T.sub) && tight) return { triggered: true, reason: 'Substitution in a tight game' };
   if (minute >= 60 && has(T.yellow) && tight) return { triggered: true, reason: 'Booking late in a tight game' };
 
-  // Time milestones — only as a fallback when no major event fired (the checks above already returned).
   if ([45, 60, 75, 85, 90].includes(minute)) return { triggered: true, reason: `Match milestone (${minute}')` };
 
   return { triggered: false, reason: null };
-}
-
-// Gate B placeholder — a deterministic, HONEST plain-language summary of the live match state,
-// built PURELY from the pulse (no LLM, no fabrication). It states only real facts (score, the phase
-// framing, manpower) — never an invented tactic. The actual coaching read lands in Gate C.
-export function summarizeSoccerPulse(p: SoccerMatchPulse): string {
-  const h = p.score.home, a = p.score.away;
-  const margin = h.goals - a.goals;
-  const leader = margin > 0 ? h : margin < 0 ? a : null;
-  const trailer = margin > 0 ? a : margin < 0 ? h : null;
-  const score = `${h.team} ${h.goals}–${a.goals} ${a.team}`;
-  const min = p.minute ? `${p.minute}'` : '';
-  const late = p.gamePhase === 'closing' || p.gamePhase === 'crunch';
-
-  const parts: string[] = [];
-  if (margin === 0) {
-    parts.push(`Level at ${score}${min ? ` (${min})` : ''}${late ? ' — both sides chasing the winner' : ''}.`);
-  } else if (leader && trailer) {
-    const am = Math.abs(margin);
-    const lead = am === 1 ? 'a one-goal lead' : `a ${am}-goal lead`;
-    const verb = am === 1 && late ? 'protecting' : 'holding';
-    parts.push(`${leader.team} ${verb} ${lead} over ${trailer.team}${min ? ` at ${min}` : ''}.`);
-  }
-  if (p.manpower.state !== 'even') {
-    const up = p.manpower.state === 'home_advantage' ? h.team : a.team;
-    const down = p.manpower.state === 'home_advantage' ? a.team : h.team;
-    parts.push(`${up} have the extra man after ${down}'s red card.`);
-  }
-  return parts.join(' ').trim();
 }

@@ -2,13 +2,20 @@
 // (mirrors lib/caps, lib/recap, lib/vision). Operates on the normalized situation the backend's
 // 'state' mode returns; the model/provider/data-source swap never changes this.
 
+import { SoccerMatchPulse } from './soccerPulse';
+
 export interface CoachSituation {
   sport: string;
   homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
   statusDetail: string; period?: number; clock?: string; lastPlay?: string;
   down?: number; distance?: number; downDistanceText?: string; possession?: string; isRedZone?: boolean;
   balls?: number; strikes?: number; outs?: number; onBase?: string;
+  // soccer (Gate B) — the deterministic SoccerMatchPulse; present only on the soccer path.
+  pulse?: SoccerMatchPulse;
 }
+
+// Soccer league keys whose coach state carries a pulse (not the football/baseball situation fields).
+const SOCCER_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
 
 export interface CoachFull { strategicRead: string; whatItSetsUp: string }
 
@@ -16,6 +23,7 @@ export interface CoachFull { strategicRead: string; whatItSetsUp: string }
 // per-sport fields needed to coach, NOT a hardcoded sport allowlist. Insufficient → coming-soon.
 export function hasSufficientState(sport: string, s: CoachSituation | null): boolean {
   if (!s) return false;
+  if (SOCCER_KEYS.includes(sport)) return !!s.pulse;   // soccer (Gate B): a computed pulse is enough
   if (sport === 'nfl') return typeof s.down === 'number' && s.down > 0;
   if (sport === 'mlb') return typeof s.balls === 'number' && typeof s.outs === 'number';
   if (sport === 'nba' || sport === 'wnba') return typeof s.period === 'number' && !!s.clock;

@@ -7,7 +7,8 @@
 // Coach's Corner gets richer for those sports with no change here. The v1 rich set is the sports
 // whose ESPN feed exposes real per-play situation: NFL / NBA / WNBA / MLB. Everything else →
 // normalizeCoachState returns null → the client renders "coming soon".
-import { getGameData } from './dataProvider';
+import { getGameData, NormalizedGameData } from './dataProvider';
+import { computeSoccerPulse, detectTrigger, SoccerMatchPulse } from './soccerPulse';
 
 // v1 rich sports only (all site-API). Absence here → null → client coming-soon. NOT a buried
 // allowlist in the gating logic — it's the input to "which fields to read"; sufficiency itself
@@ -27,6 +28,9 @@ export interface CoachSituation {
   down?: number; distance?: number; downDistanceText?: string; possession?: string; isRedZone?: boolean;
   // baseball
   balls?: number; strikes?: number; outs?: number; onBase?: string;
+  // soccer — the deterministic SoccerMatchPulse (Gate B). Present only on the soccer path; the 4
+  // rich sports never set it, so their CoachSituation is byte-identical to before.
+  pulse?: SoccerMatchPulse;
 }
 
 // Read the normalized game-state through dataProvider (ESPN base + any registered enrichment) and
@@ -34,7 +38,50 @@ export interface CoachSituation {
 // Coach's Corner supports today). Output is byte-identical to the prior direct-fetch version — the
 // ESPN extraction moved verbatim into dataProvider's fetchEspnBase. Returns null for non-rich
 // sports / no live game → the client shows coming-soon (never a fabricated insight).
+// Soccer family — uses the SoccerMatchPulse path (Gate B) instead of the football/baseball
+// CoachSituation fields. The Highlightly enricher supplies the event timeline via getGameData.
+const SOCCER = new Set(['soccer', 'worldcup', 'epl', 'laliga']);
+
+// Parse the current match minute from ESPN's displayClock ("63'") → statusDetail → max event minute.
+// Returns null when none is derivable (→ caller falls back to coming-soon, never a wrong pulse).
+function parseSoccerMinute(d: NormalizedGameData): number | null {
+  const fromClock = String(d.clock || '').match(/\d+/);
+  if (fromClock) return parseInt(fromClock[0], 10);
+  const fromStatus = String(d.statusDetail || '').match(/\d+/);
+  if (fromStatus) return parseInt(fromStatus[0], 10);
+  const evMins = (d.events || []).map(e => e.minute).filter((m): m is number => typeof m === 'number');
+  return evMins.length ? Math.max(...evMins) : null;
+}
+
+// SAFE-BY-DEFAULT: any missing/invalid piece (not live, no minute, unparseable score, enricher
+// failure) → null → the client renders the existing "coming soon". Never throws, never fabricates.
+async function normalizeSoccerCoachState(sport: string, gameId?: string): Promise<CoachSituation | null> {
+  try {
+    const d = await getGameData(sport, gameId);
+    if (!d || d.state !== 'in') return null;                       // live games only
+    if (!d.homeTeam || !d.awayTeam) return null;
+    const minute = parseSoccerMinute(d);
+    if (minute == null || minute <= 0) return null;                // no reliable minute → coming-soon
+    const home = parseInt(d.homeScore, 10);
+    const away = parseInt(d.awayScore, 10);
+    if (!Number.isFinite(home) || !Number.isFinite(away)) return null;
+    const events = Array.isArray(d.events) ? d.events : [];
+    const pulse = computeSoccerPulse(events, { home, away }, minute, d.homeTeam, d.awayTeam);
+    pulse.triggerReason = detectTrigger(events, minute, pulse).reason;
+    return {
+      sport,
+      homeTeam: d.homeTeam, awayTeam: d.awayTeam, homeScore: d.homeScore, awayScore: d.awayScore,
+      statusDetail: d.statusDetail,
+      pulse,
+    };
+  } catch (e) {
+    console.error(`normalizeSoccerCoachState(${sport}) failed — coming soon:`, e);
+    return null;
+  }
+}
+
 export async function normalizeCoachState(sport: string, gameId?: string): Promise<CoachSituation | null> {
+  if (SOCCER.has(sport)) return normalizeSoccerCoachState(sport, gameId);
   if (!RICH[sport]) return null;
   const d = await getGameData(sport, gameId);
   if (!d || (!d.homeTeam && !d.awayTeam)) return null;
