@@ -21,6 +21,7 @@ import RecapCard from '../components/RecapCard';
 import MatchTimeline from '../components/MatchTimeline';
 import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
+import SportStrip from '../components/SportStrip';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
@@ -620,21 +621,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         </View>
 
         {/* Sport Tabs — visible sports in saved order (customize in Settings › My Sports). */}
-        <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
-            {visibleSports.map(s => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.sportTab, sport === s.key && styles.sportTabActive]}
-                onPress={() => handleSportChange(s.key)}>
-                <Text style={styles.sportEmoji}>{s.emoji}</Text>
-                <Text style={[styles.sportLabel, sport === s.key && styles.sportLabelActive]}>
-                  {SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        <SportStrip
+          items={visibleSports.map(s => ({ key: s.key, emoji: s.emoji, label: SPORT_NAME_KEY[s.key] ? S[SPORT_NAME_KEY[s.key]!] : s.label }))}
+          selectedKey={sport}
+          onSelect={(key) => handleSportChange(key as Sport)}
+          marginBottom={10}
+        />
 
         <ScrollView
           style={styles.scroll}

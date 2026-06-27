@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   TextInput, KeyboardAvoidingView, Keyboard, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, Easing, FadeIn, SlideInRight,
+  FadeIn, SlideInRight,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { askQuestion, Sport } from '../lib/api';
-import { useAppState, RANK_EMOJI } from '../lib/appState';
+import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORT_FAQS } from '../lib/faqs';
@@ -19,7 +21,10 @@ import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
 import { AcademyGameId, getAcademyGame, gamesForSportKeys } from '../lib/academyGames';
 
 import DidYouKnow from '../components/DidYouKnow';
+import RankCard from '../components/RankCard';
 import GameHost from '../components/academy/GameHost';
+import SportStrip from '../components/SportStrip';
+
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
 // the first category (MLB) when there's no sport or no match.
@@ -38,7 +43,7 @@ type AcademyScreenProps = { route?: { params?: { sport?: Sport } } };
 // route.params.sport keeps working untouched). Did You Know + FAQ + Ask live on the
 // home below the grid.
 export default function AcademyScreen({ route }: AcademyScreenProps) {
-  const { language, level, dailyStreak, points, rank } = useAppState();
+  const { language, level, dailyStreak } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -52,6 +57,19 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   // Which game is open full-screen (null = the home). Local state, no nav stack.
   const [activeGameId, setActiveGameId] = useState<AcademyGameId | null>(null);
+  const navigation = useNavigation<BottomTabNavigationProp<any>>();
+
+  // Tap the active Academy tab while inside a game → pop back to the Academy landing (standard
+  // "tap active tab = go to root"). No-op when already on the landing; switching tabs is untouched.
+  useEffect(() => {
+    const unsub = navigation.addListener('tabPress', (e) => {
+      if (activeGameId !== null) {
+        e.preventDefault();
+        setActiveGameId(null);
+      }
+    });
+    return unsub;
+  }, [navigation, activeGameId]);
 
   // When the Live CTA navigates here with a (possibly new) sport, open its matching
   // category. De-duped: only updates when the resolved category actually changes, so
@@ -134,17 +152,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     }
   };
 
-  // --- Home rank card: ease the bar fill to its current width on mount / point change
-  // (the user returns from a game with more points → the bar fills in on the home). ---
-  const barWidth = useSharedValue(0);
-  const rankPct = rank.next
-    ? Math.min(100, Math.max(0, ((points - rank.min) / (rank.next.min - rank.min)) * 100))
-    : 100;
-  useEffect(() => {
-    barWidth.value = withTiming(rankPct, { duration: 600, easing: Easing.out(Easing.quad) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rankPct]);
-  const rankBarFillStyle = useAnimatedStyle(() => ({ width: `${barWidth.value}%` }));
+  // (Rank-card bar animation now lives in the shared <RankCard /> component — Gate 5A extraction.)
 
   const faqs = SPORT_FAQS[primarySport];
 
@@ -160,6 +168,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
       </Animated.View>
     );
   }
+
 
   return (
     <Animated.View style={styles.root} entering={FadeIn.duration(200)}>
@@ -182,53 +191,20 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
           </View>
 
           {/* Category selector — Academy-only categories, independent of My Sports. */}
-          <View style={styles.tabsContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
-              {ACADEMY_CATEGORIES.map(c => (
-                <TouchableOpacity
-                  key={c.key}
-                  style={[styles.sportTab, category.key === c.key && styles.sportTabActive]}
-                  onPress={() => handleCategoryChange(c)}>
-                  <Text style={styles.sportEmoji}>{c.emoji}</Text>
-                  <Text style={[styles.sportLabel, category.key === c.key && styles.sportLabelActive]}>
-                    {c.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          <SportStrip
+            items={ACADEMY_CATEGORIES.map(c => ({ key: c.key, emoji: c.emoji, label: c.label }))}
+            selectedKey={category.key}
+            onSelect={(key) => { const c = ACADEMY_CATEGORIES.find(x => x.key === key); if (c) handleCategoryChange(c); }}
+          />
 
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled">
 
-            {/* ── Identity: the full rank card (overall journey across the Academy) ── */}
+            {/* ── Identity: the full rank card (overall journey across the Academy) — shared component ── */}
             <View style={styles.section}>
-              <View style={styles.rankCard}>
-                <View style={styles.rankTopRow}>
-                  <Text style={styles.rankEmoji}>{RANK_EMOJI[rank.name] ?? '🔰'}</Text>
-                  <View style={styles.rankNameCol}>
-                    <Text style={styles.rankKicker}>YOUR ACADEMY RANK</Text>
-                    <Text style={styles.rankName}>{rank.name}</Text>
-                  </View>
-                  <Text style={styles.rankPts}>{points} pts</Text>
-                </View>
-
-                {rank.next ? (
-                  <>
-                    <View style={styles.rankBarTrack}>
-                      <Animated.View style={[styles.rankBarFill, rankBarFillStyle]} />
-                    </View>
-                    {/* Absolute totals so the numbers match the big "{points} pts" above. */}
-                    <Text style={styles.rankProgressText}>
-                      {points} / {rank.next.min} → {rank.next.name} {RANK_EMOJI[rank.next.name] ?? ''}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.rankMaxed}>👑 Legend — maxed</Text>
-                )}
-              </View>
+              <RankCard kicker="YOUR ACADEMY RANK" />
             </View>
 
             {/* ── Hero: the featured game (registry-driven; a Daily Challenge can replace

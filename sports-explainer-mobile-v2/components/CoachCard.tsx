@@ -124,7 +124,7 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
   if (!stateLoaded) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+        <Text style={styles.eyebrow}>🧠 COACH'S READ</Text>
         <ActivityIndicator color={theme.accentCool} style={{ marginTop: 8 }} />
       </View>
     );
@@ -134,7 +134,7 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
   if (!hasSufficientState(sport, situation)) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+        <Text style={styles.eyebrow}>🧠 COACH'S READ</Text>
         <Text style={styles.comingSoon}>{S.coachComingSoon}</Text>
       </View>
     );
@@ -151,7 +151,7 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
       <View style={styles.card}>
         <View style={styles.headerRow}>
           <View style={styles.headerTopRow}>
-            <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+            <Text style={styles.eyebrow}>🧠 COACH'S READ</Text>
             {capLeft != null && (
               <View style={styles.capPill}>
                 <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(capLeft))}</Text>
@@ -185,7 +185,7 @@ export default function CoachCard({ sport, gameId, level, language, isPro, onUnl
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerTopRow}>
-          <Text style={styles.eyebrow}>🧠 COACH'S CORNER</Text>
+          <Text style={styles.eyebrow}>🧠 COACH'S READ</Text>
           {capLeft != null && (
             <View style={styles.capPill}>
               <Text style={styles.capPillText}>{S.capLeftToday.replace('{n}', String(capLeft))}</Text>

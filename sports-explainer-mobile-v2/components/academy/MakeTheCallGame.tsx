@@ -1,8 +1,9 @@
-// FormationQuizGame — the scoring wrapper for the read-the-play quiz. Mirrors the live QuizGame
-// pattern (combo, "+N" float, milestone + rank-up beats, daily-streak/reminder) and reuses awardPoints
-// + the SAME scoring constants. Renders FormationQuizCard (not the live QuizCard). The live QuizGame is
-// left untouched; the scoring constants are copied (values identical) so nothing in the shipped quiz
-// changes. Self-contained (the read-the-play quiz generates its own questions — no sportKeys needed).
+// MakeTheCallGame — the scoring wrapper for the universal "Make the Call" judgment quiz. Copies the
+// FormationQuizGame body (combo, "+N" float, milestone + rank-up beats, daily-streak/reminder) and
+// reuses awardPoints + the SAME scoring constants. The live QuizGame is left untouched; the constants
+// are copied (values identical). Deltas vs FormationQuizGame (per BUILD_MAKE_THE_CALL.md Gate 2):
+//   (1) takes AcademyGameProps so GameHost can mount it; (2) header uses categoryEmoji like the live
+//   QuizGame; (3) renders MakeTheCallCard, passing sportKeys + streak (the card pools BY SPORT).
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
@@ -15,16 +16,13 @@ import { useAppState, getRank, RANK_EMOJI } from '../../lib/appState';
 import { useTheme, Theme } from '../../lib/theme';
 import { scheduleQuizReminder } from '../../lib/notifications';
 import type { AcademyGameProps } from '../../lib/academyGames';
-import FormationQuizCard from './FormationQuizCard';
+import MakeTheCallCard from './MakeTheCallCard';
 
 // COPIED from QuizGame (values identical — reuse without touching the shipped file).
 const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
 const COMBO_BONUS_CAP = 10;
 
-// AcademyGameProps signature (Gate 4 / doc 5.2) so GameHost mounts it uniformly with the other pieces.
-// Formations are soccer-only and this self-generates its pool, so `sportKeys` is accepted-but-ignored;
-// `categoryEmoji` feeds the header like the live QuizGame / MakeTheCallGame.
-export default function FormationQuizGame({ sportKeys, categoryEmoji }: AcademyGameProps) {
+export default function MakeTheCallGame({ sportKeys, categoryEmoji }: AcademyGameProps) {
   const { level, notificationsEnabled, dailyStreak, recordQuizActivity, points, rank, awardPoints } = useAppState();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -146,7 +144,9 @@ export default function FormationQuizGame({ sportKeys, categoryEmoji }: AcademyG
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <FormationQuizCard
+        <MakeTheCallCard
+          sportKeys={sportKeys}
+          streak={combo}
           onCorrect={() => {
             const comboBonus = Math.min(combo, COMBO_BONUS_CAP);
             const gained = QUIZ_POINTS[level] + comboBonus;

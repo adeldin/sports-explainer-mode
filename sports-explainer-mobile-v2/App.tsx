@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import Constants from 'expo-constants';
@@ -22,6 +23,7 @@ import ScrumIntro from './components/ScrumIntro';
 import MorphCinematic from './components/MorphCinematic';
 import LiveScreen from './screens/LiveScreen';
 import AcademyScreen from './screens/AcademyScreen';
+import CoachesCornerScreen from './screens/CoachesCornerScreen';
 import SettingsTab from './screens/SettingsTab';
 
 // Prevent the native splash from hiding automatically
@@ -35,6 +37,7 @@ const Tab = createBottomTabNavigator();
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Live: 'radio',
   Academy: 'school',
+  "Coach's Corner": 'clipboard',
   Settings: 'settings',
 };
 
@@ -183,6 +186,20 @@ export default function App() {
             <LiveScreen initialSport={initialSport} navigation={navigation} />
           )}
         </Tab.Screen>
+        <Tab.Screen
+          name="Coach's Corner"
+          component={CoachesCornerScreen}
+          options={{
+            // Two-line stacked label so "Coach's Corner" fits the tab bar. Render-function form
+            // (bottom-tabs supports it); sized to sit intentionally next to the single-line labels.
+            tabBarLabel: ({ color }) => (
+              <View style={{ alignItems: 'center', marginTop: -2 }}>
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Coach's</Text>
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Corner</Text>
+              </View>
+            ),
+          }}
+        />
         <Tab.Screen name="Academy" component={AcademyScreen} options={{ tabBarLabel: 'Academy' }} />
         <Tab.Screen name="Settings" component={SettingsTab} options={{ tabBarLabel: 'Settings' }} />
       </Tab.Navigator>

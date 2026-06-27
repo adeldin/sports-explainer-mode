@@ -70,7 +70,7 @@ export default function FormationDiagram({ team, level, hideFormationLabel = fal
         ) : (
           <>
             <SvgText x={pitchLeft} y={TOP + 30} fontFamily={F_BOLD} fontSize={26} fill={ORANGE}>{formation || '—'}</SvgText>
-            <SvgText x={pitchLeft} y={TOP + 50} fontFamily={F_MED} fontSize={13} fill={MUTED}>{`${teamName} · starting XI`}</SvgText>
+            <SvgText x={pitchLeft} y={TOP + 50} fontFamily={F_MED} fontSize={13} fill={MUTED}>{teamName ? `${teamName} · starting XI` : 'Starting XI'}</SvgText>
           </>
         )}
 
