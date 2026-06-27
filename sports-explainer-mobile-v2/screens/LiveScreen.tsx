@@ -22,12 +22,13 @@ import MatchTimeline from '../components/MatchTimeline';
 import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import SportStrip from '../components/SportStrip';
+import GolfLeaderboard from '../components/GolfLeaderboard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
-import { fetchExplanation, askQuestion, fetchRecap, Sport, Level, Language, ExplanationResponse } from '../lib/api';
+import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, Sport, Level, Language, ExplanationResponse, Leaderboard } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
@@ -66,6 +67,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // --- State (Live-local) ---
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
+  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
@@ -177,6 +179,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setSelectedGameId(null);
       setResult(null);
       setLearnContext(null);
+      setLeaderboard(null);
       if (cfg.learnMode && cfg.espnSport && cfg.league) {
         try {
           const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`);
@@ -195,6 +198,14 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           }
         } catch { /* leave null → EmptyState shows "no tournaments this week" */ }
       }
+      // liveFormat sports (golf): fetch the live leaderboard alongside the thin ESPN context. Best-
+      // effort — fetchLeaderboard returns null on any failure / no live tournament, so the render
+      // falls through to the existing ESPN tournament line (additive upgrade, never a regression).
+      if (cfg.liveFormat === 'leaderboard') {
+        const board = await fetchLeaderboard();
+        if (isCancelled()) return;
+        setLeaderboard(board);
+      }
       // A real fetch completed (even if there are no head-to-head games): mark fetched so
       // the Live Now trigger's `noLiveContent` (gamesFetched && games.length === 0) can fire
       // on offseason AND learn-mode sports. Set after the cancellation-guarded learn fetch.
@@ -202,6 +213,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       return;
     }
     setLearnContext(null);
+    setLeaderboard(null);
     try {
       const parsed = await fetchScoreboard(sport, isCancelled);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
@@ -681,6 +693,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 )}
               />
             </View>
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
+            <GolfLeaderboard board={leaderboard} />
           ) : learnMode && learnContext ? (
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>

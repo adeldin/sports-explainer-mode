@@ -34,6 +34,53 @@ export interface Play {
 
 const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 
+// Live golf leaderboard lives at a SIBLING endpoint (/api/leaderboard) on the same host. API_URL
+// hardcodes the full /api/explain path, so derive the sibling rather than reusing it verbatim.
+const LEADERBOARD_URL = API_URL.replace('/api/explain', '/api/leaderboard');
+
+// Client-side mirror of the provider's exported shape (server types can't be imported across the
+// app/backend boundary). Keep in sync with golfLeaderboardProvider.ts's Leaderboard/LeaderboardRow.
+export interface LeaderboardRound {
+  roundId: number;
+  scoreToPar: string;   // "-6" (display string)
+  strokes: number;
+  courseName: string;
+}
+export interface LeaderboardRow {
+  playerId: string;
+  name: string;         // firstName + lastName joined
+  position: string;     // "1" / "T3" — display string (keeps the tie "T" prefix)
+  total: string;        // "-20" — to-par
+  today: string;        // currentRoundScore "-4"
+  thru: string;         // "17" while playing, "F" when the round's done
+  roundComplete: boolean;
+  isAmateur: boolean;
+  status: string;       // "active" / "complete"
+  teeTime?: string;
+  rounds: LeaderboardRound[];
+}
+export interface Leaderboard {
+  tournId: string;
+  name?: string;
+  status: string;
+  currentRound?: number;
+  roundStatus?: string;
+  rows: LeaderboardRow[];
+}
+
+// GET the live golf leaderboard. Best-effort: on ANY failure (no live tournament, network, non-200,
+// bad JSON) return null so the caller falls back to today's ESPN thin tournament line — never throws.
+export async function fetchLeaderboard(): Promise<Leaderboard | null> {
+  try {
+    const response = await fetch(LEADERBOARD_URL, { method: 'GET' });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.leaderboard ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Sports whose ESPN summary endpoint exposes a play-by-play `plays[]` array.
 const SUMMARY_PATHS: Partial<Record<Sport, string>> = {
   mlb: 'baseball/mlb',
