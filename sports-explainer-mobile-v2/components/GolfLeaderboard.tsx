@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTheme, Theme } from '../lib/theme';
+import { useAppState } from '../lib/appState';
 import { Leaderboard } from '../lib/api';
+import { GolfConcept, conceptForField, levelText } from '../lib/golfTeaching';
 
 // Golf live leaderboard — the app's first vertical-list archetype. CLEAN board only (Build 2):
 // position / name / total / today / thru, with a tournament header. Tappable teaching concepts are
@@ -32,6 +34,20 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
   const canToggle = board.rows.length > COLLAPSED_COUNT;
   const visibleRows = expanded ? board.rows : board.rows.slice(0, COLLAPSED_COUNT);
 
+  // Teaching layer (Build 3): tap a column header or the leader's cell → reveal that concept at the
+  // user's difficulty level, reusing the app's inline glossaryDefBox pattern (no modal). A missed
+  // lookup is a safe no-op. Tapping the same concept toggles it closed; another swaps it (PlayCard UX).
+  const { level } = useAppState();
+  const [openConcept, setOpenConcept] = useState<GolfConcept | null>(null);
+  const openField = (field: string) => {
+    const c = conceptForField(field);
+    if (!c) return;
+    setOpenConcept(prev => (prev && prev.id === c.id ? null : c));
+  };
+  // Spread onto a leader-row <Text> only when tappable, so non-leader cells stay plain text.
+  const tapProps = (field: string, enabled: boolean) =>
+    enabled ? { onPress: () => openField(field), suppressHighlighting: true, accessibilityRole: 'button' as const } : {};
+
   // Live → today's "Round N · {status}". Final (most-recent-ended fallback) → an honest "Final · {Mon D}"
   // from the schedule endDate, so a finished board reads as intentional, not stale.
   const roundLine = board.isLive
@@ -46,34 +62,50 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
         {!!roundLine && <Text style={styles.subtitle}>{roundLine}</Text>}
       </View>
 
-      {/* Column labels */}
+      {/* Tapped-concept reveal — reuses the app's inline glossaryDefBox pattern (PlayCard/RecapCard). */}
+      {openConcept && (
+        <View style={styles.defBox}>
+          <View style={styles.defHeader}>
+            <Text style={styles.defTerm}>{openConcept.term}</Text>
+            <Pressable onPress={() => setOpenConcept(null)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+              <Text style={styles.defClose}>✕</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.defText}>{levelText(openConcept, level)}</Text>
+        </View>
+      )}
+
+      {/* Column labels — POS/TOTAL/TODAY/THRU tappable → teach the concept (PLAYER is not). */}
       <View style={[styles.row, styles.colHeaderRow]}>
-        <Text style={[styles.colHeader, styles.posCol]}>POS</Text>
+        <Text style={[styles.colHeader, styles.posCol, styles.tappable]} onPress={() => openField('position')} suppressHighlighting accessibilityRole="button">POS</Text>
         <Text style={[styles.colHeader, styles.nameCol]}>PLAYER</Text>
-        <Text style={[styles.colHeader, styles.numCol]}>TOTAL</Text>
-        <Text style={[styles.colHeader, styles.numCol]}>TODAY</Text>
-        <Text style={[styles.colHeader, styles.thruCol]}>THRU</Text>
+        <Text style={[styles.colHeader, styles.numCol, styles.tappable]} onPress={() => openField('total')} suppressHighlighting accessibilityRole="button">TOTAL</Text>
+        <Text style={[styles.colHeader, styles.numCol, styles.tappable]} onPress={() => openField('today')} suppressHighlighting accessibilityRole="button">TODAY</Text>
+        <Text style={[styles.colHeader, styles.thruCol, styles.tappable]} onPress={() => openField('thru')} suppressHighlighting accessibilityRole="button">THRU</Text>
       </View>
 
       {/* Rows — pre-sorted leader-first by the provider; render with .map() (parent ScrollView).
           Truncated to the top COLLAPSED_COUNT unless expanded (Weather-app glanceable default). */}
-      {visibleRows.map((r, i) => (
-        <View
-          key={`${r.playerId || r.name}-${i}`}
-          style={[styles.row, i < visibleRows.length - 1 && styles.rowDivider]}>
-          <Text style={[styles.cell, styles.posCol, styles.posText]} numberOfLines={1}>{r.position}</Text>
-          <Text style={[styles.cell, styles.nameCol, styles.nameText]} numberOfLines={1}>
-            {r.name}{r.isAmateur ? ' (a)' : ''}
-          </Text>
-          <Text style={[styles.cell, styles.numCol, styles.totalText, isUnderPar(r.total) && styles.under]} numberOfLines={1}>
-            {r.total}
-          </Text>
-          <Text style={[styles.cell, styles.numCol, styles.todayText, isUnderPar(r.today) && styles.under]} numberOfLines={1}>
-            {r.today}
-          </Text>
-          <Text style={[styles.cell, styles.thruCol, styles.thruText]} numberOfLines={1}>{r.thru}</Text>
-        </View>
-      ))}
+      {visibleRows.map((r, i) => {
+        const isLeader = i === 0; // leader-first (provider pre-sorted): only the leader row teaches in v1
+        return (
+          <View
+            key={`${r.playerId || r.name}-${i}`}
+            style={[styles.row, i < visibleRows.length - 1 && styles.rowDivider]}>
+            <Text style={[styles.cell, styles.posCol, styles.posText, isLeader && styles.tappable]} numberOfLines={1} {...tapProps('position', isLeader)}>{r.position}</Text>
+            <Text style={[styles.cell, styles.nameCol, styles.nameText]} numberOfLines={1}>
+              {r.name}{r.isAmateur ? ' (a)' : ''}
+            </Text>
+            <Text style={[styles.cell, styles.numCol, styles.totalText, isUnderPar(r.total) && styles.under, isLeader && styles.tappable]} numberOfLines={1} {...tapProps('total', isLeader)}>
+              {r.total}
+            </Text>
+            <Text style={[styles.cell, styles.numCol, styles.todayText, isUnderPar(r.today) && styles.under, isLeader && styles.tappable]} numberOfLines={1} {...tapProps('today', isLeader)}>
+              {r.today}
+            </Text>
+            <Text style={[styles.cell, styles.thruCol, styles.thruText, isLeader && styles.tappable]} numberOfLines={1} {...tapProps('thru', isLeader)}>{r.thru}</Text>
+          </View>
+        );
+      })}
 
       {/* Footer toggle — only when there are more rows than the collapsed count. Glanceable→deep. */}
       {canToggle && (
@@ -118,6 +150,17 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   todayText: { color: t.textMuted, fontWeight: '600' },
   thruText: { color: t.textMuted, fontWeight: '600' },
   under: { color: t.accentCool },                            // restrained teal for under-par
+
+  // Tappable teaching affordance — a subtle underline (restrained; reads as "tap to learn", on-brand).
+  tappable: { textDecorationLine: 'underline' },
+
+  // Concept reveal box — mirrors PlayCard's glossaryDefBox (surface bg + t.accent left stripe). The
+  // card has no padding, so marginHorizontal: 16 aligns the box with the header/row content gutter.
+  defBox: { marginHorizontal: 16, marginTop: 4, marginBottom: 12, padding: 14, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent },
+  defHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  defTerm: { color: t.accentText, fontSize: 15, fontWeight: '800', flex: 1 },
+  defClose: { color: t.textMuted, fontSize: 16, fontWeight: '700', paddingHorizontal: 4 },
+  defText: { color: t.textPrimary, fontSize: 14, lineHeight: 21 },
 
   // Footer expand/collapse toggle — centered full-width, hairline top border, ~44px tap target.
   toggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border },
