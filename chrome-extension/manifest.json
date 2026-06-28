@@ -1,13 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Sports Explainer 2026",
-  "version": "1.0",
+  "version": "1.0.1",
   "description": "Real-time AI sports play explanations overlaid on any stream",
   "permissions": [
     "activeTab",
-    "storage",
-    "scripting",
-    "tabs"
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
