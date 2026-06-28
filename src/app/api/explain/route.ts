@@ -3,6 +3,7 @@ import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData } from './dataProvider';
 import { createChatCompletion } from './llmProvider';
+import { cacheGet, cacheSet, normalizeQuestion, askKey } from './explanationCache';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
@@ -612,6 +613,27 @@ export async function POST(req: NextRequest) {
     if (action === 'ask' && question) {
       const langName = languageNames[language] || 'English';
       const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
+
+      // Situation-keyed cache (sport-agnostic): a normalized-question HIT replays the exact success
+      // shape; a miss/empty/failure falls through to the existing path UNCHANGED. Empty nq → no cache.
+      const nq = normalizeQuestion(question);
+      const aKey = nq ? askKey({ sport, level, lang: language, normQuestion: nq }) : '';
+      if (nq) {
+        const cached = await cacheGet(aKey);
+        if (cached) {
+          try {
+            const stored = JSON.parse(cached);
+            if (stored && typeof stored.answer === 'string') {
+              console.log('[cache] ask HIT', aKey);
+              return NextResponse.json({ answer: stored.answer }, { headers: corsHeaders });
+            }
+          } catch {
+            // corrupted cache value → fall through to a normal live call (treat as miss)
+          }
+        }
+        console.log('[cache] ask MISS', aKey);
+      }
+
       const completion = await createChatCompletion({
         model: GROQ_MODEL,
         messages: [
@@ -620,7 +642,12 @@ export async function POST(req: NextRequest) {
         ],
         temperature: 0.7,
       });
-      return NextResponse.json({ answer: completion.choices[0]?.message?.content?.trim() }, { headers: corsHeaders });
+      const answer = completion.choices[0]?.message?.content?.trim();
+      // Cache only a successful, non-empty answer (never errors/empties). 24h TTL per §2e.
+      if (nq && answer) {
+        await cacheSet(aKey, JSON.stringify({ answer }), 86400);
+      }
+      return NextResponse.json({ answer }, { headers: corsHeaders });
     }
 
     // Post-Game Recap (premium #1). `score` is built server-side from the real data (never
