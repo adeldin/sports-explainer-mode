@@ -154,8 +154,5 @@ export async function gumboEnricher(base: NormalizedGameData, gameId: string): P
   feedCache.set(gamePk, { t: Date.now(), pitches });
   if (!pitches.length) return {};                          // no pitches yet (game just started, etc.)
 
-  // TEMP (Gate 2 live-test proof — remove before commit): prove the data flows for one live game.
-  console.log(`[gumbo] gamePk=${gamePk} pitchSequence=${JSON.stringify(pitches)}`);
-
   return { pitchSequence: pitches };
 }
