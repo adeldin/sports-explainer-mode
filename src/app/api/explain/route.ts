@@ -3,7 +3,7 @@ import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData } from './dataProvider';
 import { createChatCompletion } from './llmProvider';
-import { cacheGet, cacheSet, normalizeQuestion, askKey } from './explanationCache';
+import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey } from './explanationCache';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
@@ -778,6 +778,7 @@ export async function POST(req: NextRequest) {
     const SOCCER = ['soccer', 'worldcup', 'epl', 'laliga'];
     const enriched = (SOCCER.includes(sport) && !playText) ? await getGameData(sport, gameId) : null;
     let play: string, gameContext: string, homeTeam: string, awayTeam: string;
+    let eKey: string | null = null;   // situation-cache key — set ONLY for cacheable English soccer requests
     if (enriched) {
       homeTeam = enriched.homeTeam;
       awayTeam = enriched.awayTeam;
@@ -789,10 +790,45 @@ export async function POST(req: NextRequest) {
           .join('; ');
         gameContext += ` Recent events: ${recent}`;
       }
+      // Situation cache (English soccer only for v1): key off the BUCKETED situation. soccerSig → null
+      // when there's no usable last event → skip caching. Non-English skips entirely (its playType is a
+      // translation we don't store yet — documented v2). eKey stays null for every non-cacheable case.
+      const sig = (language === 'en') ? soccerSig(enriched) : null;
+      eKey = sig ? explainKey({ sport, level, lang: language, sig }) : null;
     } else {
       const fetched = await fetchGameData(sport, gameId, !!playText);
       play = playText || fetched.play;
       ({ gameContext, homeTeam, awayTeam } = fetched);
+    }
+
+    // Situation-cache HIT: replay the cached TEACHING CORE merged with LIVE values (playType/teams/
+    // gameContext/events from THIS request — never the cached moment's). Returns BEFORE the Promise.all,
+    // skipping BOTH Groq calls. Miss / corrupt / non-English / null-sig → fall through to the live path.
+    if (eKey) {
+      const cached = await cacheGet(eKey);
+      if (cached) {
+        try {
+          const t = JSON.parse(cached);
+          if (t && typeof t.simple === 'string') {
+            console.log('[cache] explain HIT', eKey);
+            return NextResponse.json({
+              simple: t.simple,
+              whyItMatters: t.whyItMatters ?? '',
+              ruleDetail: t.ruleDetail ?? '',
+              showRule: t.showRule ?? (level !== 'expert'),
+              complexity: t.complexity ?? 'low',
+              playType: play,            // live, English passthrough
+              homeTeam,                  // live
+              awayTeam,                  // live
+              gameContext,               // live
+              events: enriched?.events,  // live
+            }, { headers: corsHeaders });
+          }
+        } catch {
+          // corrupted value → fall through to a normal live call (treat as miss)
+        }
+      }
+      console.log('[cache] explain MISS', eKey);
     }
 
     // Run the explanation and the play-text translation concurrently (the
@@ -803,6 +839,18 @@ export async function POST(req: NextRequest) {
       explainPlay(play, gameContext, sport, level, language),
       translatePlayText(play, language),
     ]);
+
+    // Cache ONLY the teaching core (the situation-dependent fields) under the sig key — never the
+    // moment-specific playType/gameContext/events. 6h TTL per §2e. Best-effort (cacheSet swallows errors).
+    if (eKey && typeof parsed.simple === 'string' && parsed.simple) {
+      await cacheSet(eKey, JSON.stringify({
+        simple: parsed.simple,
+        whyItMatters: parsed.whyItMatters || '',
+        ruleDetail: parsed.ruleDetail || '',
+        showRule: parsed.showRule ?? (level !== 'expert'),
+        complexity: parsed.complexity || 'low',
+      }), 21600);
+    }
 
     return NextResponse.json({
       simple: parsed.simple || play,
