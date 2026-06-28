@@ -14,6 +14,7 @@
 // existing fetchers (the live 1.0 path) until migrated later behind byte-identical tests.
 
 import { highlightlyEnricher } from './highlightlyEnricher';
+import { gumboEnricher } from './gumboEnricher';
 
 // --- Optional enrichment placeholders (PitchEvent for the GUMBO follow-on; MatchEvent populated
 //     by the soccer enricher below) ---
@@ -63,6 +64,7 @@ const enrichers: Partial<Record<string, Enricher>> = {
   soccer: highlightlyEnricher,
   epl: highlightlyEnricher,
   laliga: highlightlyEnricher,
+  mlb: gumboEnricher,
 };
 
 type EspnCfg = { sport: string; league: string; core?: boolean; learnMode?: boolean };
