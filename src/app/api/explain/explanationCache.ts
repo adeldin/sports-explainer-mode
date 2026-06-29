@@ -1,7 +1,7 @@
-// Situation-keyed explanation cache (Gate 1 — module only, NOTHING imports this yet → zero behavior
-// change, safe first deploy). Two paths will use it later: live-explain (keyed by a soccer/MLB
-// situation signature) and Q&A (keyed by a normalized question). Best-effort throughout: any cache
-// failure or missing config degrades to a normal cache MISS — the live read path is never blocked.
+// Situation-keyed explanation cache. Imported by route.ts on two paths: live-explain (keyed by a
+// soccer/MLB situation signature) and Q&A (keyed by a normalized question). Gated by the CACHE_ENABLED
+// master kill-switch (default OFF → fully inert). Best-effort throughout: any cache failure, missing
+// config, or the switch being off degrades to a normal cache MISS — the live read path is never blocked.
 //
 // Backing store: Upstash Redis via its REST API over `fetch` (NOT the @upstash/redis SDK — that
 // package isn't in package.json and importing it would break `next build`; the REST API needs no
