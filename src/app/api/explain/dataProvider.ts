@@ -185,6 +185,22 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
       } catch { /* keep the scoreboard lastPlay; teamStats stays undefined on any failure */ }
     }
 
+    // MLB — the play-by-play text lives in the summary plays[] (NOT the scoreboard situation), exactly
+    // as the explain path's fetchGameData pulls it (route.ts:198-211). Replicated here so routing live
+    // MLB-explain through getGameData yields a BYTE-IDENTICAL play text (the Gate-3 contract). Mirrors
+    // the soccer deep-dive above; live-only gating is at the caller (route.ts calls getGameData only for
+    // !playText), so MLB past-plays are unaffected.
+    if (sport === 'mlb') {
+      // Match fetchGameData's scoreboard fallback chain (situation.lastPlay → comp.lastPlay) first…
+      out.lastPlay = sit?.lastPlay?.text || comp?.lastPlay?.text || out.lastPlay;
+      try {
+        const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
+        // …then the EXACT deep-dive: reverse, skip 'inning' entries, take the first match (route.ts:208-211).
+        const lastReal = sum?.plays?.reverse().find((p: any) => p.text && !p.text.toLowerCase().includes('inning'));
+        if (lastReal) out.lastPlay = lastReal.text;
+      } catch { /* keep the scoreboard lastPlay on any summary failure (mirrors soccer) */ }
+    }
+
     // Situation — extracted identically to the original coach normalizer (byte-identical output).
     const situation: NonNullable<NormalizedGameData['situation']> = {};
     if (sport === 'nfl') {

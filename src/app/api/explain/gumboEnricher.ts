@@ -29,8 +29,15 @@ const FEED_TTL = 60_000;
 const MAX_PITCHES = 3;
 const MAX_LOOKBACK_PLAYS = 4;
 
+// Bound the statsapi cost on the live-explain critical path (Gate 3 puts gumbo inline before the Groq
+// call): a SLOW statsapi can't drag the MLB read. On timeout the fetch aborts → for the schedule call,
+// resolveGamePk's catch returns null ({} = no enrichment); for the feed call, it throws → dataProvider's
+// catch degrades to the ESPN base. Either way the explanation still returns on the ESPN base.
+const FETCH_TIMEOUT = 2500; // ms
 function mlb(path: string): Promise<Response> {
-  return fetch(`${BASE}${path}`, { cache: 'no-store' });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+  return fetch(`${BASE}${path}`, { cache: 'no-store', signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
 // Team-name matching is ORDER-INDEPENDENT (token-sort), same approach as the soccer enricher. MLB's

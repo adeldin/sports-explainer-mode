@@ -783,7 +783,14 @@ export async function POST(req: NextRequest) {
     // no-game edge fall to the EXISTING fetchGameData path, byte-identical. With no Highlightly
     // events the soccer branch is also identical to today (gameContext gets no events suffix).
     const SOCCER = ['soccer', 'worldcup', 'epl', 'laliga'];
-    const enriched = (SOCCER.includes(sport) && !playText) ? await getGameData(sport, gameId) : null;
+    // Live MLB now ALSO routes through getGameData (enricher-aware → GUMBO pitch data on pitchSequence,
+    // which nothing reads until Gate 4). Gated to live (!playText) so MLB past-plays stay on
+    // fetchGameData. For MLB: enriched.events is undefined → no 'Recent events' suffix → gameContext
+    // byte-identical; and the MLB summary deep-dive in fetchEspnBase makes enriched.lastPlay
+    // byte-identical to fetchGameData's play. soccerSig(enriched) returns null for MLB (no events) →
+    // eKey null → MLB is never cached and forCache stays false (vivid + named), so this is output-neutral.
+    const ENRICHED = [...SOCCER, 'mlb'];
+    const enriched = (ENRICHED.includes(sport) && !playText) ? await getGameData(sport, gameId) : null;
     let play: string, gameContext: string, homeTeam: string, awayTeam: string;
     let eKey: string | null = null;   // situation-cache key — set ONLY for cacheable English soccer requests
     if (enriched) {
