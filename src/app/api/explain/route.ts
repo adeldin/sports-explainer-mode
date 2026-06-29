@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
-import { getGameData } from './dataProvider';
+import { getGameData, type PitchEvent } from './dataProvider';
 import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 
@@ -451,7 +451,36 @@ const lessonTargets: Record<string, string> = {
   expert: 'the strategic layer — the WHY BEHIND THE WHY (intent, sequencing, matchup), outcome assumed',
 };
 
-export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false): string {
+// MLB Statcast zone → a HANDEDNESS-NEUTRAL human label. Vertical (up/middle/down) is always correct;
+// horizontal in/away is NOT (PitchEvent carries no batter side), so we never say in/away — corners stay
+// "[height] corner", the middle column is the height alone, edges are "[height] edge", out-of-zone is
+// "high/low, off the plate". buildPitchLine always appends "(zone N)" so the raw zone stays verifiable.
+function mlbZoneLabel(zone: string): string {
+  switch (parseInt(zone, 10)) {
+    case 1: case 3: return 'up corner';
+    case 2: return 'up in the zone';
+    case 4: case 6: return 'middle edge';
+    case 5: return 'middle';
+    case 7: case 9: return 'down corner';
+    case 8: return 'down in the zone';
+    case 11: case 12: return 'high, off the plate';
+    case 13: case 14: return 'low, off the plate';
+    default: return 'off the plate';
+  }
+}
+
+// Format the LAST pitch of the sequence into one prompt line. Missing fields are omitted (never
+// "undefinedmph"); empty sequence / all-missing → '' (→ output-neutral, no line injected).
+function buildPitchLine(seq: PitchEvent[]): string {
+  const p = seq.length ? seq[seq.length - 1] : undefined;
+  if (!p) return '';
+  const lead = [typeof p.velocity === 'number' ? `${p.velocity}mph` : '', p.pitchType].filter(Boolean).join(' ');
+  const loc = p.location ? `${mlbZoneLabel(p.location)} (zone ${p.location})` : '';
+  const parts = [lead, p.result, loc].filter(Boolean);
+  return parts.length ? `Last pitch: ${parts.join(', ')}` : '';
+}
+
+export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false, pitchLine = ''): string {
   const target = lessonTargets[level] || lessonTargets['beginner'];
 
   // Generic-teaching addendum — appended ONLY for the cacheable path (forCache). A cached situation
@@ -461,9 +490,20 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
     ? `\n\nGENERIC TEACHING (this explanation may be reused across different matches): In simple, whyItMatters, and ruleDetail, do NOT name specific teams, players, clubs, or cities. Refer to roles instead — "the attacking side", "the leading team", "the home side", "the defender". Teach the TYPE of situation, not this match's participants. The live play headline and scoreboard supply the actual identities separately.`
     : '';
 
+  // Pitch-data conditional (MLB enriched): with a real "Last pitch:" line present, drop the pitch
+  // specifics from the forbidden list and add an explicit permission clause. With pitchLine === '',
+  // both reconstruct the grounding rule BYTE-IDENTICAL to today (forbiddenList = the original text,
+  // pitchPermission = '').
+  const forbiddenList = pitchLine
+    ? 'a route type, coverage scheme, or baserunner'
+    : 'a route type, coverage scheme, pitch count, pitch sequence, or baserunner';
+  const pitchPermission = pitchLine
+    ? ` The 'Last pitch' line is real data you may reference (the pitch type, velocity, and location shown). Do NOT invent any pitch detail beyond what that line states — no counts, no prior pitches in the sequence, no spin or movement not given.`
+    : '';
+
   return `Sport: ${sport.toUpperCase()}
 Game situation: ${gameContext}
-Play data: "${play}"
+Play data: "${play}"${pitchLine ? `\n${pitchLine}` : ''}
 
 STEP 1 — Choose the lesson (reason silently; do NOT put this reasoning in the output):
 From this play, consider the concepts someone could learn — the rule, the outcome, the technique/craft, the strategy, and the situational stakes. Pick the SINGLE best PRIMARY LESSON to teach a ${level}-level viewer. Choose the one that best balances:
@@ -489,7 +529,7 @@ Rules for JSON flags:
 - "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
 - If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
 
-CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name a route type, coverage scheme, pitch count, pitch sequence, or baserunner that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${genericRule}`;
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${genericRule}`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
@@ -559,13 +599,13 @@ export function applyExpertNuclearOption(parsed: any, level: string): any {
 // apply the expert guard. Shared by POST and the local lesson-test harness so the
 // harness exercises the EXACT prompts/flow (not a copy).
 export async function explainPlay(
-  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false,
+  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false, pitchLine = '',
 ): Promise<any> {
   const completion = await createChatCompletion({
     model: GROQ_MODEL,
     messages: [
       { role: 'system', content: buildSystemPrompt(sport, level, language) },
-      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache) },
+      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache, pitchLine) },
     ],
     temperature: level === 'expert' ? 0.2 : 0.6,
     response_format: { type: 'json_object' },
@@ -793,11 +833,17 @@ export async function POST(req: NextRequest) {
     const enriched = (ENRICHED.includes(sport) && !playText) ? await getGameData(sport, gameId) : null;
     let play: string, gameContext: string, homeTeam: string, awayTeam: string;
     let eKey: string | null = null;   // situation-cache key — set ONLY for cacheable English soccer requests
+    let pitchLine = '';               // one "Last pitch:" line — set ONLY for enriched MLB (real pitchSequence)
     if (enriched) {
       homeTeam = enriched.homeTeam;
       awayTeam = enriched.awayTeam;
       play = enriched.lastPlay || 'A key play just happened';
       gameContext = `${awayTeam} vs ${homeTeam} — ${enriched.statusDetail || ''}`;
+      // MLB only: real GUMBO pitch data → one pitch-context line. Absent / empty (no live pitch,
+      // cross-walk miss, statsapi down) → '' → prompt byte-identical to today (output-neutral).
+      if (sport === 'mlb' && enriched.pitchSequence?.length) {
+        pitchLine = buildPitchLine(enriched.pitchSequence);
+      }
       if (enriched.events?.length) {
         const recent = enriched.events.slice(-6)
           .map(e => `${e.minute ?? '?'}' ${e.type}${e.player ? ` ${e.player}` : ''}${e.detail ? ` (${e.detail})` : ''}`)
@@ -850,7 +896,7 @@ export async function POST(req: NextRequest) {
     // explainPlay builds the leveled prompts, calls the model, and applies the
     // expert guard (shared with the lesson-test harness).
     const [parsed, translatedPlay] = await Promise.all([
-      explainPlay(play, gameContext, sport, level, language, !!eKey),
+      explainPlay(play, gameContext, sport, level, language, !!eKey, pitchLine),
       translatePlayText(play, language),
     ]);
 
