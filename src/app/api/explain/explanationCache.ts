@@ -12,13 +12,34 @@
 // there's no runtime coupling to dataProvider.
 import type { NormalizedGameData, MatchEvent } from './dataProvider';
 
-// Bump this when a key format / bucketing scheme changes — old keys are abandoned, not migrated.
-export const CACHE_NS = 'v1';
+// Path-specific key namespaces. Bump a namespace whenever THAT path's cached prompt / key scheme
+// changes — old keys are then abandoned (never read again) and TTL out, no manual migration.
+//   ASK_NS     — bump when the Q&A ('ask') prompt changes.
+//   EXPLAIN_NS — bump when the cached live-explain teaching prompt changes.
+export const ASK_NS = 'v1';        // unchanged — preserves the proven v1:ask:* keys
+export const EXPLAIN_NS = 'v2';    // bumped from v1 — abandons the team-named v1:explain:* entries
 
 // --- Config (read once; the REST client is just these two strings + fetch) ---
 const REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const isEnabled = (): boolean => !!(REST_URL && REST_TOKEN);
+
+// MASTER KILL-SWITCH (default OFF). One env var gates the ENTIRE cache system: reads, writes, AND —
+// via cacheIsEnabled() at the call site — the generic-teaching prompt flag. Unset / not '1' → every
+// cacheGet is a miss and every cacheSet a no-op BEFORE any Upstash call (zero reads/writes/latency/
+// cost), and forCache stays false → every explanation is vivid + named + live (today's behavior).
+// Set CACHE_ENABLED=1 in Vercel prod to activate caching + situation reuse + generic teaching together.
+const CACHE_ENABLED = process.env.CACHE_ENABLED === '1';
+export function cacheIsEnabled(): boolean { return CACHE_ENABLED; }
+
+// Debug logging — silent unless CACHE_DEBUG=1. Replaces the temporary inline [cache] console.logs.
+const CACHE_DEBUG = process.env.CACHE_DEBUG === '1';
+export function cacheLog(...args: unknown[]): void { if (CACHE_DEBUG) console.log(...args); }
+
+// In-memory hit/miss counters (per warm instance), for a future admin read — no endpoint yet.
+let cacheHits = 0;
+let cacheMisses = 0;
+export function getCacheStats(): { hits: number; misses: number } { return { hits: cacheHits, misses: cacheMisses }; }
 
 // Log each class of problem at most once per cold start (module-level flags).
 let warnedDisabled = false;
@@ -50,21 +71,38 @@ async function redisCmd(cmd: (string | number)[]): Promise<unknown> {
 
 // --- I/O ops: best-effort, never throw (get → null on any failure; set → no-op on any failure) ---
 export async function cacheGet(key: string): Promise<string | null> {
-  if (!isEnabled()) { warnDisabledOnce(); return null; }
+  if (!CACHE_ENABLED) return null;                         // master kill-switch: miss before any Upstash call
+  if (!isEnabled()) { warnDisabledOnce(); return null; }   // 2nd safety net: env-absent disabled mode
   try {
     const r = await redisCmd(['GET', key]);
-    return r == null ? null : String(r);
+    if (r == null) { cacheMisses++; return null; }
+    cacheHits++;
+    return String(r);
   } catch (e) {
     warnFailureOnce(e);
+    cacheMisses++;                                          // a failed lookup is a miss to the caller
     return null;
   }
 }
 
 export async function cacheSet(key: string, value: string, ttlSeconds: number): Promise<void> {
-  if (!isEnabled()) { warnDisabledOnce(); return; }
+  if (!CACHE_ENABLED) return;                              // master kill-switch: no-op before any Upstash call
+  if (!isEnabled()) { warnDisabledOnce(); return; }        // 2nd safety net: env-absent disabled mode
   try {
     const ttl = Math.max(1, Math.floor(ttlSeconds));
     await redisCmd(['SET', key, value, 'EX', ttl]);
+  } catch (e) {
+    warnFailureOnce(e);
+  }
+}
+
+// Best-effort DELETE — the seam the future feedback button uses to blacklist a bad cached entry.
+// Unused today. Mirrors cacheSet: kill-switch + disabled-mode guards, swallows all errors.
+export async function cacheDelete(key: string): Promise<void> {
+  if (!CACHE_ENABLED) return;
+  if (!isEnabled()) { warnDisabledOnce(); return; }
+  try {
+    await redisCmd(['DEL', key]);
   } catch (e) {
     warnFailureOnce(e);
   }
@@ -123,10 +161,10 @@ export function soccerSig(enriched: NormalizedGameData): string | null {
   return `${score}|${phase}|${type}|${side}`;
 }
 
-// Live-explain cache key. `sig` comes from soccerSig (or the future MLB sig). CACHE_NS-prefixed so a
-// scheme change abandons old keys cleanly.
+// Live-explain cache key. `sig` comes from soccerSig (or the future MLB sig). EXPLAIN_NS-prefixed so a
+// teaching-prompt / scheme change abandons old keys cleanly (v2 abandons the team-named v1 entries).
 export function explainKey(p: { sport: string; level: string; lang: string; sig: string }): string {
-  return `${CACHE_NS}:explain:${p.sport}:${p.level}:${p.lang}:${p.sig}`;
+  return `${EXPLAIN_NS}:explain:${p.sport}:${p.level}:${p.lang}:${p.sig}`;
 }
 
 // Normalize a user-typed Q&A question so trivially-different phrasings collide: lowercase, strip
@@ -143,5 +181,5 @@ export function normalizeQuestion(q: string): string {
 
 // Q&A cache key from the normalized question.
 export function askKey(p: { sport: string; level: string; lang: string; normQuestion: string }): string {
-  return `${CACHE_NS}:ask:${p.sport}:${p.level}:${p.lang}:${p.normQuestion.replace(/ /g, '_')}`;
+  return `${ASK_NS}:ask:${p.sport}:${p.level}:${p.lang}:${p.normQuestion.replace(/ /g, '_')}`;
 }
