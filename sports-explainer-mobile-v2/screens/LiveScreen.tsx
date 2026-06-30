@@ -23,12 +23,13 @@ import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import SportStrip from '../components/SportStrip';
 import GolfLeaderboard from '../components/GolfLeaderboard';
+import TennisLiveCard from '../components/TennisLiveCard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
 import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
-import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, Sport, Level, Language, ExplanationResponse, Leaderboard } from '../lib/api';
+import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, fetchTennisLive, Sport, Level, Language, ExplanationResponse, Leaderboard, TennisLiveMatch, TennisTimelineEntry } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
@@ -68,6 +69,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
+  const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // tennis live matches (liveFormat:'tennis')
+  const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match rawId (null → first live)
+  const [tennisTimeline, setTennisTimeline] = useState<TennisTimelineEntry[] | null>(null);
+  const [tennisRead, setTennisRead] = useState<ExplanationResponse | null>(null); // Gate-3 situational explanation
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
@@ -135,6 +140,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // game is in `games`.
   const selectedGame = games.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
+  // Live-tennis selection (orthogonal to game selection): explicit pick by rawId, else the first live
+  // match. Drives TennisLiveCard + the timeline/explanation fetch. Null when no live tennis match.
+  const selectedTennisMatch = tennisMatches.find(m => m.rawId === tennisSel) || tennisMatches[0] || null;
   // A LIVE game gets the play explanation (PlayCard); a FINAL game gets the Post-Game Recap
   // (RecapCard) instead — "what happened in this play" no longer fits a finished game.
   const isLive = selectedGameState === 'in';
@@ -184,6 +192,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setResult(null);
       setLearnContext(null);
       setLeaderboard(null);
+      setTennisMatches([]);
       if (cfg.learnMode && cfg.espnSport && cfg.league) {
         try {
           const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`);
@@ -210,6 +219,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         if (isCancelled()) return;
         setLeaderboard(board);
       }
+      // liveFormat:'tennis' — fetch live matches from /api/tennis-live. Best-effort: fetchTennisLive
+      // returns { matches: [] } on any failure OR when the backend TENNIS_LIVE flag is off, so the
+      // render falls through to today's exact learn-mode tennis view (additive upgrade, never a
+      // regression). Poll cadence is the shared 60s auto-refresh (fetchGames) — no tighter poll.
+      if (cfg.liveFormat === 'tennis') {
+        const { matches } = await fetchTennisLive();
+        if (isCancelled()) return;
+        setTennisMatches(matches.filter(m => m.isLive));
+      }
       // A real fetch completed (even if there are no head-to-head games): mark fetched so
       // the Live Now trigger's `noLiveContent` (gamesFetched && games.length === 0) can fire
       // on offseason AND learn-mode sports. Set after the cancellation-guarded learn fetch.
@@ -218,6 +236,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     }
     setLearnContext(null);
     setLeaderboard(null);
+    setTennisMatches([]);
     try {
       const parsed = await fetchScoreboard(sport, isCancelled);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
@@ -500,6 +519,28 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     handleFetch(() => cancelled);
     return () => { cancelled = true; };
   }, [selectedGameId, level, language, isLive]);
+  // Live-tennis situational read (Gate-3) + timeline. Self-contained / ADDITIVE: independent of the
+  // PlayCard/handleFetch path (tennis stays learnMode → no caps, no PlayCard). When a live match is
+  // selected, lazy-load its timeline (saves the per-second BASIC budget) and fetch the situational
+  // explanation — the backend treats tennis as learn mode and reads the rawId, so Gate-3's branch
+  // returns the real situation. Best-effort: any failure leaves the card's deterministic situation
+  // intact (the read just stays null). Re-runs only on match/level/language change (no extra poll).
+  useEffect(() => {
+    const rawId = selectedTennisMatch?.rawId;
+    if (!rawId) { setTennisTimeline(null); setTennisRead(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { timeline } = await fetchTennisLive(rawId);
+        if (!cancelled) setTennisTimeline(timeline ?? null);
+      } catch { if (!cancelled) setTennisTimeline(null); }
+      try {
+        const data = await fetchExplanation(sport, level, rawId, language);
+        if (!cancelled) setTennisRead(data);
+      } catch { if (!cancelled) setTennisRead(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedTennisMatch?.rawId, sport, level, language]);
   // Post-Game Recap (premium #1) — fetch for FINAL games (replaces the explanation). Mirrors
   // the explanation effect's cancellation + fresh-context reset; refetches on sport/game/level/
   // language AND on isPro (so buying Pro mid-view upgrades the teaser → full recap). Recap does
@@ -707,6 +748,44 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 )}
               />
             </View>
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0 ? (
+            // Live tennis: optional multi-match selector + the selected match's TennisLiveCard. When
+            // tennisMatches is empty (flag off / nothing live) this branch is skipped and tennis falls
+            // through to today's exact learn view below — no regression.
+            <>
+              {tennisMatches.length > 1 && (
+                <View style={styles.tennisSelector}>
+                  <FlatList
+                    data={tennisMatches}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={m => m.rawId}
+                    contentContainerStyle={styles.tennisSelectorContent}
+                    renderItem={({ item }) => {
+                      const sel = selectedTennisMatch?.rawId === item.rawId;
+                      return (
+                        <TouchableOpacity
+                          onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.rawId); }}
+                          style={[styles.tennisChip, sel && styles.tennisChipSel]}
+                          activeOpacity={0.8}>
+                          <Text style={[styles.tennisChipText, sel && styles.tennisChipTextSel]} numberOfLines={1}>
+                            {item.home} / {item.away}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    }}
+                  />
+                </View>
+              )}
+              {selectedTennisMatch && (
+                <TennisLiveCard
+                  match={selectedTennisMatch}
+                  timeline={tennisTimeline}
+                  read={tennisRead ? { simple: tennisRead.simple, whyItMatters: tennisRead.whyItMatters } : null}
+                  labels={{ serving: S.tennisServing, breakPoint: S.tennisBreakPoint, gamePoint: S.tennisGamePoint }}
+                />
+              )}
+            </>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
             <GolfLeaderboard board={leaderboard} />
           ) : learnMode && learnContext ? (
@@ -1078,6 +1157,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
+
+  // Live-tennis match selector — compact horizontal chips (only shown when >1 live match).
+  tennisSelector: { marginBottom: 8 },
+  tennisSelectorContent: { paddingHorizontal: 16, gap: 8 },
+  tennisChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, maxWidth: 200 },
+  tennisChipSel: { borderColor: t.accent, borderWidth: 2 },
+  tennisChipText: { color: t.textSecondary, fontSize: 12, fontWeight: '700' },
+  tennisChipTextSel: { color: t.textPrimary },
   // Scheduled-game "hasn't started yet" card (Bug 1) — neutral navy surface; the future
   // Live Now card can sit alongside this in the same slot.
   upcomingCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },

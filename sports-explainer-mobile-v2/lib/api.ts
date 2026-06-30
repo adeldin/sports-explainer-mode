@@ -38,6 +38,7 @@ const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 // hardcodes the full /api/explain path, so derive the sibling rather than reusing it verbatim.
 const LEADERBOARD_URL = API_URL.replace('/api/explain', '/api/leaderboard');
 const FEEDBACK_URL = API_URL.replace('/api/explain', '/api/feedback');
+const TENNIS_LIVE_URL = API_URL.replace('/api/explain', '/api/tennis-live');
 
 // Client-side mirror of the provider's exported shape (server types can't be imported across the
 // app/backend boundary). Keep in sync with golfLeaderboardProvider.ts's Leaderboard/LeaderboardRow.
@@ -81,6 +82,49 @@ export async function fetchLeaderboard(): Promise<Leaderboard | null> {
     return data?.leaderboard ?? null;
   } catch {
     return null;
+  }
+}
+
+// Client-side mirror of the backend tennisProvider.ts shapes (server types can't cross the app/backend
+// boundary). Keep in sync with TennisGame / TennisTimelineEntry. The endpoint envelope is
+// { matches: TennisLiveMatch[]; timeline?: TennisTimelineEntry[] | null }.
+export interface TennisLiveMatch {
+  home: string;
+  away: string;
+  server: 'home' | 'away' | null;        // current server (from the live indicator)
+  sets: { home: number; away: number }[]; // last entry = in-progress set
+  currentGame: { home: string; away: string } | null; // tennis points ('0'/'15'/'30'/'40'/'AD')
+  status: string;
+  isLive: boolean;                        // status === 'InPlay'
+  league: string;
+  rawId: string;                          // keys the timeline + the explain rawId
+}
+export interface TennisTimelineEntry {
+  game: number;
+  player: string;                         // the player who WON that game (result-owner)
+  result: 'hold' | 'break';
+  closeAt: string;
+}
+export interface TennisLiveResponse {
+  matches: TennisLiveMatch[];
+  timeline?: TennisTimelineEntry[] | null;
+}
+
+// GET live tennis matches (+ optionally one match's timeline via ?timeline=<rawId>). Best-effort: on
+// ANY failure (flag off returns {matches:[]} naturally, network, non-200, bad JSON) returns
+// { matches: [] } so the caller falls through to today's learn-mode tennis view — never throws.
+export async function fetchTennisLive(rawId?: string): Promise<TennisLiveResponse> {
+  try {
+    const url = rawId ? `${TENNIS_LIVE_URL}?timeline=${encodeURIComponent(rawId)}` : TENNIS_LIVE_URL;
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) return { matches: [] };
+    const data = await response.json();
+    return {
+      matches: Array.isArray(data?.matches) ? data.matches : [],
+      timeline: Array.isArray(data?.timeline) ? data.timeline : null,
+    };
+  } catch {
+    return { matches: [] };
   }
 }
 

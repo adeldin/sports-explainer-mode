@@ -35,8 +35,10 @@ export interface Game {
 // we send is found server-side. (Moved from LiveScreen; imported back there.)
 // `liveFormat` is an ORTHOGONAL live-surface hint (independent of learnMode): 'leaderboard' marks a
 // sport that, when a live event exists, renders a leaderboard instead of head-to-head game cards.
-// Golf keeps learnMode:true (its Q&A/FAQ/Academy stay) AND gains liveFormat:'leaderboard'.
-export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' };
+// Golf keeps learnMode:true (its Q&A/FAQ/Academy stay) AND gains liveFormat:'leaderboard'. Tennis
+// likewise keeps learnMode:true AND gains liveFormat:'tennis' (its live matches come from the
+// /api/tennis-live endpoint, not ESPN — fetchScoreboard still returns [] for it).
+export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' | 'tennis' };
 export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   mlb: { espnSport: 'baseball', league: 'mlb' },
   nhl: { espnSport: 'hockey', league: 'nhl' },
@@ -50,7 +52,7 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   laliga: { espnSport: 'soccer', league: 'esp.1' },
   mlr: { espnSport: 'rugby', league: '289262', core: true },
   // Learn Mode sports — tennis/golf fetch tournament context; cricket has no data source.
-  tennis: { espnSport: 'tennis', league: 'atp', learnMode: true },
+  tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
   golf: { espnSport: 'golf', league: 'pga', learnMode: true, liveFormat: 'leaderboard' },
   cricket: { learnMode: true },
 };
