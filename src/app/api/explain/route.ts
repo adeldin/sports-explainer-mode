@@ -647,6 +647,39 @@ function buildTennisSituation(match: TennisGame, timeline: TennisTimelineEntry[]
   return parts.join(' ');
 }
 
+// Situation string from ESPN SET SCORES only (case (b): names present, no RapidAPI live-point data).
+// Set scores are always available + free from ESPN, so the read reflects the real match state even
+// without server/current-game/timeline. NO server/points/break content here — we don't have it.
+function buildTennisSituationFromSets(
+  home: string, away: string,
+  sets: Array<{ home: number; away: number }>, statusDetail: string,
+): string {
+  const valid = (Array.isArray(sets) ? sets : []).filter(
+    s => s && Number.isFinite(Number(s.home)) && Number.isFinite(Number(s.away)),
+  ).map(s => ({ home: Number(s.home), away: Number(s.away) }));
+  const anyGames = valid.some(s => s.home > 0 || s.away > 0);
+  // No real games anywhere → genuine fresh start.
+  if (!valid.length || !anyGames) {
+    return `${home} is playing ${away}. The match has just begun; no games have been played yet.`;
+  }
+  const parts: string[] = [`${home} is playing ${away}.`];
+  const last = valid[valid.length - 1];
+  // Completed sets = all but the last (ESPN's last entry is the in-progress set); winner = more games.
+  valid.slice(0, -1).forEach((s, i) => {
+    const winner = s.home > s.away ? home : away;
+    parts.push(`${winner} won the ${tennisOrdinal(i + 1)} set ${Math.max(s.home, s.away)}-${Math.min(s.home, s.away)}.`);
+  });
+  const ord = tennisOrdinal(valid.length);
+  if (last.home === last.away) {
+    parts.push(`The ${ord} set is level at ${last.home}-${last.away}.`);
+  } else {
+    const leader = last.home > last.away ? home : away;
+    parts.push(`${leader} leads ${Math.max(last.home, last.away)}-${Math.min(last.home, last.away)} in the ${ord} set.`);
+  }
+  if (statusDetail) parts.push(`The match is currently in the ${statusDetail}.`);
+  return parts.join(' ');
+}
+
 // Tennis-live SYSTEM prompt. The data limitation is framed as EPISTEMIC FACT (not a polite request) so
 // the model can't rationalize inventing shot/stroke/surface detail — buried "do not" lines in the user
 // prompt were being ignored. Gender is anchored here too (authoritative). Level tunes term-defining.
@@ -1044,12 +1077,16 @@ export async function POST(req: NextRequest) {
           // buildSystemPrompt path below, which solicits "the tactic on display" (the shot-detail source).
           if (match || hasNames) {
             const timeline = match ? await getTennisTimeline(match.rawId) : null; // null on failure/empty
+            // Case (b) (no RapidAPI match): ground the situation in ESPN's SET SCORES (always present),
+            // so the read reflects the real match state instead of "serving to open the match".
+            const espnSets = Array.isArray(body.tennisSets) ? body.tennisSets : [];
+            const espnSetsHaveGames = espnSets.some((s: any) => s && (Number(s.home) > 0 || Number(s.away) > 0));
             const situation = match
               ? buildTennisSituation(match, timeline)
-              : `${tHome} is playing ${tAway}. Live point-by-point data is not available for this match right now.`;
+              : buildTennisSituationFromSets(tHome, tAway, espnSets, typeof body.tennisStatusDetail === 'string' ? body.tennisStatusDetail : '');
             const pronounGuidance = tennisPronounGuidance(body.tennisCategory);
-            // Minimal (no live data) → treat like a fresh start: brief, no fabrication.
-            const justStarted = match ? tennisJustStarted(match, timeline) : true;
+            // Case (a): from the real match. Case (b): NOT a fresh start when ESPN set scores show games.
+            const justStarted = match ? tennisJustStarted(match, timeline) : !espnSetsHaveGames;
             const langLine = language && language !== 'en'
               ? ` Respond entirely in ${languageNames[language] || language}.`
               : '';
