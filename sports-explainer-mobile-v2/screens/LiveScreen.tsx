@@ -714,101 +714,6 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           marginBottom={10}
         />
 
-        {/* Live tennis OWNS the area under SportStrip as a fixed two-zone layout (opts OUT of the big
-            ScrollView): a category filter + an independently-scrolling match list (Zone A) over a pinned
-            detail card (Zone B). The two zones are separate scroll containers so they never collide at
-            scroll-bottom. When tennis is NOT live (flag off / nothing live) we fall through to the
-            existing ScrollView body below — byte-identical to today, for tennis-learn AND every sport. */}
-        {SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0 ? (
-          <View style={styles.tennisZones}>
-            {/* Filter row — All / Men's / Women's (mirrors SportStrip chip aesthetic) */}
-            <View style={styles.tFilterRow}>
-              {(['all', 'mens', 'womens'] as const).map(f => (
-                <TouchableOpacity
-                  key={f}
-                  onPress={async () => { await Haptics.selectionAsync(); setTennisFilter(f); }}
-                  style={[styles.tFilterChip, tennisFilter === f && styles.tFilterChipActive]}
-                  activeOpacity={0.8}>
-                  <Text style={[styles.tFilterChipText, tennisFilter === f && styles.tFilterChipTextActive]}>
-                    {f === 'all' ? S.tennisFilterAll : f === 'mens' ? S.tennisFilterMens : S.tennisFilterWomens}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* ZONE A — bounded, independently-scrolling match list (~3 cards, rest scroll) */}
-            <View style={styles.tZoneA}>
-              <ScrollView showsVerticalScrollIndicator nestedScrollEnabled contentContainerStyle={{ paddingBottom: 12 }}>
-                {filteredMatches.map((item) => {
-                  const sel = selectedTennisMatch?.espnId === item.espnId;
-                  const lastIdx = item.sets.length - 1;
-                  const caption = [item.round, item.court].filter(Boolean).join(' · ');
-                  // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
-                  const server = sel ? tennisDetail?.live?.server : undefined;
-                  const renderSide = (side: 'home' | 'away') => (
-                    <View style={styles.tTeamRow}>
-                      <View style={styles.tTeamLeft}>
-                        {server === side ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
-                        {(side === 'home' ? item.homeFlag : item.awayFlag)
-                          ? <Image source={{ uri: side === 'home' ? item.homeFlag : item.awayFlag }} style={styles.tFlag} resizeMode="contain" />
-                          : <View style={styles.tFlagSpacer} />}
-                        {(side === 'home' ? item.homeSeed : item.awaySeed) != null &&
-                          <Text style={styles.tSeed}>({side === 'home' ? item.homeSeed : item.awaySeed})</Text>}
-                        <Text style={styles.tTeamName} numberOfLines={1}>{side === 'home' ? item.home : item.away}</Text>
-                      </View>
-                      <View style={styles.tSetScores}>
-                        {item.sets.map((s, i) => (
-                          <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>
-                            {side === 'home' ? s.home : s.away}
-                          </Text>
-                        ))}
-                      </View>
-                    </View>
-                  );
-                  return (
-                    <TouchableOpacity
-                      key={item.espnId}
-                      onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.espnId); }}
-                      style={[styles.tMatchCard, sel && styles.tMatchCardSel]}
-                      activeOpacity={0.85}>
-                      <View style={styles.tTopRow}>
-                        <View style={styles.tLiveBadge}>
-                          <View style={styles.tLiveDot} />
-                          <Text style={styles.tLiveText}>LIVE</Text>
-                          {!!item.statusDetail && <Text style={styles.tStatusDetail}>· {item.statusDetail}</Text>}
-                        </View>
-                        {!!item.category && <Text style={styles.tLeague} numberOfLines={1}>{item.category}</Text>}
-                      </View>
-                      {!!caption && <Text style={styles.tCaption} numberOfLines={1}>{caption}</Text>}
-                      <View style={styles.tMatchup}>
-                        {renderSide('home')}
-                        {renderSide('away')}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-
-            {/* Clear section break so Zone B never reads as a continuation of the list (the "sliced
-                screen" bug) — a hairline divider; tZoneB's own surface + top border reinforce it. */}
-            <View style={styles.tZoneDivider} />
-
-            {/* ZONE B — pinned detail; its own scroll lets a long read scroll without moving Zone A */}
-            <View style={styles.tZoneB}>
-              <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}>
-                {selectedTennisMatch && (
-                  <TennisLiveCard
-                    match={selectedTennisMatch}
-                    live={tennisDetail?.live ?? null}
-                    read={tennisRead ? { simple: tennisRead.simple, whyItMatters: tennisRead.whyItMatters } : null}
-                    labels={{ serving: S.tennisServing, breakPoint: S.tennisBreakPoint, gamePoint: S.tennisGamePoint }}
-                  />
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        ) : (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
@@ -862,6 +767,92 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 )}
               />
             </View>
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0 ? (
+            // Live tennis — an arm of the in-ScrollView score slot (page scrolls as ONE, so the
+            // Ask/FAQ blocks below are reachable). Order: (1) inline filter, (2) bounded scrollable
+            // match-list card, (3) the selected match's TennisLiveCard in NORMAL flow (page scroll
+            // handles it — NOT independently scrollable).
+            <>
+              {/* Filter row — All / Men's / Women's (inline; scrolls with the page) */}
+              <View style={styles.tFilterRow}>
+                {(['all', 'mens', 'womens'] as const).map(f => (
+                  <TouchableOpacity
+                    key={f}
+                    onPress={async () => { await Haptics.selectionAsync(); setTennisFilter(f); }}
+                    style={[styles.tFilterChip, tennisFilter === f && styles.tFilterChipActive]}
+                    activeOpacity={0.8}>
+                    <Text style={[styles.tFilterChipText, tennisFilter === f && styles.tFilterChipTextActive]}>
+                      {f === 'all' ? S.tennisFilterAll : f === 'mens' ? S.tennisFilterMens : S.tennisFilterWomens}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Match list — a BOUNDED card that scrolls INTERNALLY (nestedScrollEnabled) so the list
+                  stays compact while the page scrolls around it. tMatchCard JSX unchanged. */}
+              <View style={styles.tListCard}>
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={{ paddingVertical: 8 }}>
+                  {filteredMatches.map((item) => {
+                    const sel = selectedTennisMatch?.espnId === item.espnId;
+                    const lastIdx = item.sets.length - 1;
+                    const caption = [item.round, item.court].filter(Boolean).join(' · ');
+                    // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
+                    const server = sel ? tennisDetail?.live?.server : undefined;
+                    const renderSide = (side: 'home' | 'away') => (
+                      <View style={styles.tTeamRow}>
+                        <View style={styles.tTeamLeft}>
+                          {server === side ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
+                          {(side === 'home' ? item.homeFlag : item.awayFlag)
+                            ? <Image source={{ uri: side === 'home' ? item.homeFlag : item.awayFlag }} style={styles.tFlag} resizeMode="contain" />
+                            : <View style={styles.tFlagSpacer} />}
+                          {(side === 'home' ? item.homeSeed : item.awaySeed) != null &&
+                            <Text style={styles.tSeed}>({side === 'home' ? item.homeSeed : item.awaySeed})</Text>}
+                          <Text style={styles.tTeamName} numberOfLines={1}>{side === 'home' ? item.home : item.away}</Text>
+                        </View>
+                        <View style={styles.tSetScores}>
+                          {item.sets.map((s, i) => (
+                            <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>
+                              {side === 'home' ? s.home : s.away}
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={item.espnId}
+                        onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.espnId); }}
+                        style={[styles.tMatchCard, sel && styles.tMatchCardSel]}
+                        activeOpacity={0.85}>
+                        <View style={styles.tTopRow}>
+                          <View style={styles.tLiveBadge}>
+                            <View style={styles.tLiveDot} />
+                            <Text style={styles.tLiveText}>LIVE</Text>
+                            {!!item.statusDetail && <Text style={styles.tStatusDetail}>· {item.statusDetail}</Text>}
+                          </View>
+                          {!!item.category && <Text style={styles.tLeague} numberOfLines={1}>{item.category}</Text>}
+                        </View>
+                        {!!caption && <Text style={styles.tCaption} numberOfLines={1}>{caption}</Text>}
+                        <View style={styles.tMatchup}>
+                          {renderSide('home')}
+                          {renderSide('away')}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Selected-match detail — NORMAL flow (the page scroll handles it; not independently scrollable) */}
+              {selectedTennisMatch && (
+                <TennisLiveCard
+                  match={selectedTennisMatch}
+                  live={tennisDetail?.live ?? null}
+                  read={tennisRead ? { simple: tennisRead.simple, whyItMatters: tennisRead.whyItMatters } : null}
+                  labels={{ serving: S.tennisServing, breakPoint: S.tennisBreakPoint, gamePoint: S.tennisGamePoint }}
+                />
+              )}
+            </>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
             <GolfLeaderboard board={leaderboard} />
           ) : learnMode && learnContext ? (
@@ -1124,7 +1115,6 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             )}
           </View>
         </ScrollView>
-        )}
 
         {/* Analyze-the-screen (premium #2). gameContext enriches the analysis when a game is
             selected; the modal renders a locked preview (no vision call) for free users. */}
@@ -1235,18 +1225,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
 
-  // Live-tennis two-zone layout (Option A): filter + scrolling list (Zone A) over pinned detail (Zone B).
-  tennisZones: { flex: 1 },                                            // fills the area under SportStrip
+  // Live-tennis (single-scroll page): inline filter row + a bounded internally-scrolling match-list card.
   tFilterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
   tFilterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tFilterChipActive: { backgroundColor: t.accent, borderColor: t.accent },
   tFilterChipText: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
   tFilterChipTextActive: { color: '#ffffff' },
-  tZoneA: { flexShrink: 0, maxHeight: '42%' },                         // ~3 cards visible, rest scroll
-  // Short centered "handle" divider — an obvious section break between the list and the detail panel.
-  tZoneDivider: { height: 4, width: 40, borderRadius: 2, backgroundColor: t.border, alignSelf: 'center', marginTop: 4, marginBottom: 8 },
-  // Zone B is its OWN panel: distinct top edge + clip so scrolled content can't bleed under Zone A.
-  tZoneB: { flex: 1, backgroundColor: t.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border, overflow: 'hidden' }, // pinned detail — the visual focus
+  // Bounded "match list" well — subtle surfaceAlt band + hairline edges, clips its inner scroll so it
+  // reads as a distinct compact list region within the page (inner tMatchCards keep their own chrome).
+  tListCard: { maxHeight: 340, marginBottom: 10, backgroundColor: t.surfaceAlt, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: t.border, overflow: 'hidden' },
 
   // Live-tennis match selector — VERTICAL stacked cards mirroring GameCard (topRow/matchup tokens).
   tMatchCard: { marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
