@@ -135,6 +135,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Distinguish "season just ended" (in-window Live sport, fetched empty) from
   // off-season / explicit Learn sports — drives the EmptyState message.
   const seasonEnded = gamesFetched && games.length === 0 && !offSeason && SPORT_CONFIG[sport]?.learnMode !== true;
+  // Live content in a non-game-based format (tennis matches / a live golf board). Used to suppress the
+  // cross-sport WatchNext recommendation: those sports have empty `games`, so the games-only emptiness
+  // check would wrongly flag them as "nothing live" and recommend another sport.
+  const hasAltLiveContent =
+    (SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0) ||
+    (SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && !!leaderboard?.isLive);
   // The selected game + its ESPN state. We only explain LIVE ('in') or FINAL ('post')
   // games — a scheduled ('pre') game has no play yet, so no explanation fetch and no
   // PlayCard (just the "hasn't started" state below). `state` is undefined until the
@@ -618,7 +624,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const selGame = games.find(g => g.id === selectedGameId);
     const state = selGame?.state;
     const hasLiveInSport = games.some(g => g.state === 'in');
-    const noLiveContent = gamesFetched && games.length === 0;
+    // Tennis/golf have empty `games` but their OWN live content — don't treat them as "nothing live".
+    const noLiveContent = gamesFetched && games.length === 0 && !hasAltLiveContent;
 
     let key: string | null = null;
     let excludeCurrentSport = false;
@@ -649,7 +656,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       if (cancelled()) return;
       setWatchNext(pick); // pick may be null → no card (correct empty state)
     })();
-  }, [games, selectedGameId, sport, gamesFetched]);
+  }, [games, selectedGameId, sport, gamesFetched, hasAltLiveContent]);
 
   useEffect(() => {
     if (autoRefresh) {
@@ -843,6 +850,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 </ScrollView>
               </View>
 
+              {/* Light-blue handle divider — section break between the list and the detail card */}
+              <View style={styles.tListDivider} />
+
               {/* Selected-match detail — NORMAL flow (the page scroll handles it; not independently scrollable) */}
               {selectedTennisMatch && (
                 <TennisLiveCard
@@ -866,7 +876,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               the scheduled-game case renders its own card beneath the "hasn't started"
               card below (so it sits under that content). Glanceable; primary tap opens
               the game (cross-sport reuses handleSportChange's reset path). */}
-          {watchNext && selectedGameState !== 'pre' && (
+          {watchNext && selectedGameState !== 'pre' && !hasAltLiveContent && (
             <WatchNextCard
               rec={watchNext}
               isDiscovery={parentSport(watchNext.sport) !== parentSport(sport)}
@@ -1046,7 +1056,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 <Text style={styles.upcomingMatchup}>{selectedGame.awayTeam} vs {selectedGame.homeTeam}</Text>
                 {!!selectedGame.status && <Text style={styles.upcomingTime}>{selectedGame.status}</Text>}
               </View>
-              {watchNext && (
+              {watchNext && !hasAltLiveContent && (
                 <WatchNextCard
                   rec={watchNext}
                   isDiscovery={parentSport(watchNext.sport) !== parentSport(sport)}
@@ -1233,10 +1243,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tFilterChipTextActive: { color: '#ffffff' },
   // Bounded "match list" well — subtle surfaceAlt band + hairline edges, clips its inner scroll so it
   // reads as a distinct compact list region within the page (inner tMatchCards keep their own chrome).
-  tListCard: { maxHeight: 340, marginBottom: 10, backgroundColor: t.surfaceAlt, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: t.border, overflow: 'hidden' },
+  // Transparent bounded list — the dark-blue tMatchCards show directly on the page bg (distinct cards,
+  // not a flat band); keeps the internal scroll so the list stays compact.
+  tListCard: { maxHeight: 340, overflow: 'hidden' },
+  // Light-blue handle divider — section break between the match list and the detail card below.
+  tListDivider: { height: 4, width: 40, borderRadius: 2, backgroundColor: t.accentCoolLight, alignSelf: 'center', marginTop: 4, marginBottom: 12 },
 
   // Live-tennis match selector — VERTICAL stacked cards mirroring GameCard (topRow/matchup tokens).
-  tMatchCard: { marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  tMatchCard: { marginHorizontal: 16, marginBottom: 12, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tMatchCardSel: { borderColor: t.accent, borderWidth: 2 },           // selected → accent border (GameCard pattern)
   tTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   tLiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },

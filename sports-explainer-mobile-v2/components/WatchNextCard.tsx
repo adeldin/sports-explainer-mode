@@ -27,9 +27,11 @@ export default function WatchNextCard({ rec, isDiscovery, variant, language, onO
   const S = UI_STRINGS[language];
   const [expanded, setExpanded] = useState(false);
 
-  const isLiveNow = variant === 'live-now';
-  const eyebrowIcon = isLiveNow ? '🔴' : '👀';
-  const eyebrowLabel = (isLiveNow ? S.liveNowLabel : S.watchNextLabel).toUpperCase();
+  // Badge reflects the RECOMMENDED game's real status (not the variant): live → 🔴 LIVE NOW (live token),
+  // scheduled → ⏳ STARTING SOON (teal). The honest body matchup line below already mirrors this.
+  const isLive = rec.status === 'live';
+  const eyebrowIcon = isLive ? '🔴' : '⏳';
+  const eyebrowLabel = (isLive ? S.liveNowLabel : S.watchNextStartingSoon).toUpperCase();
 
   const meta = SPORTS.find(s => s.key === rec.sport);
   const sportLabel = meta?.label ?? rec.sport;
@@ -51,7 +53,7 @@ export default function WatchNextCard({ rec, isDiscovery, variant, language, onO
   return (
     <View style={styles.card}>
       <View style={styles.eyebrowRow}>
-        <Text style={styles.eyebrow}>{eyebrowIcon} {eyebrowLabel}</Text>
+        <Text style={[styles.eyebrow, isLive && { color: theme.live }]}>{eyebrowIcon} {eyebrowLabel}</Text>
         <Text style={styles.sportChip}>{sportEmoji} {sportLabel}</Text>
       </View>
 
