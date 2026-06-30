@@ -643,12 +643,6 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               accessibilityLabel={S.visionTitle}>
               <Text style={styles.visionBtnIcon}>📸</Text>
             </TouchableOpacity>
-            {games.length > 0 ? (
-              <View style={styles.livePill}>
-                <View style={styles.liveDot} />
-                <Text style={styles.livePillText}>LIVE</Text>
-              </View>
-            ) : null}
           </View>
         </View>
 
@@ -1015,9 +1009,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   visionBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.surface, borderWidth: 1, borderColor: t.borderStrong, alignItems: 'center', justifyContent: 'center' },
   visionBtnIcon: { fontSize: 18 },
-  livePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.liveSoftBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: t.live + '33' },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
-  livePillText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   tabsContainer: { height: 70, marginBottom: 10 },
   sportTabsContent: { paddingHorizontal: 16, gap: 8 },
   sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
