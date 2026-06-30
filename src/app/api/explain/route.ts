@@ -4,6 +4,7 @@ import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
 import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
+import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
@@ -544,6 +545,99 @@ Respond with this exact JSON structure:
 }`;
 }
 
+// --- Live tennis (Learn Mode pre-check helpers) ---------------------------------------------------
+// The situation string is built DETERMINISTICALLY from parsed provider data — the LLM never invents
+// score/serve/momentum facts. Semantics are LOCKED by reconciliation (timeline rows credit the player
+// who WON the game; 'break' = broke opponent's serve). No invented shot detail (no aces/winners/UE).
+const TENNIS_SET_ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth'];
+const tennisOrdinal = (n: number): string => TENNIS_SET_ORDINALS[n - 1] || `${n}th`;
+// Rank tennis points so we can compare them ('40' beats '30'); 'AD' is highest, unknown → -1.
+const tennisPointRank = (p: string): number =>
+  ({ '0': 0, '15': 1, '30': 2, '40': 3, AD: 4 } as Record<string, number>)[p] ?? -1;
+
+// Conservative break/game-point label from the CURRENT game, point scores in SERVER-first order.
+// Only labels when unambiguous (deuce / 40-40 / odd values → no label).
+function tennisPointLabel(sPts: string, rPts: string): 'break' | 'game' | null {
+  if (rPts === 'AD') return 'break';                              // returner has advantage → can break
+  if (rPts === '40' && tennisPointRank(sPts) < 3) return 'break'; // returner one point from the game
+  if (sPts === 'AD') return 'game';                               // server has advantage → can hold
+  if (sPts === '40' && tennisPointRank(rPts) < 3) return 'game';  // server one point from the game
+  return null;
+}
+
+// Factual English situation string from the live match + game-by-game timeline.
+function buildTennisSituation(match: TennisGame, timeline: TennisTimelineEntry[] | null): string {
+  const { home, away, sets, currentGame, server } = match;
+  const serverName = server === 'home' ? home : server === 'away' ? away : null;
+  const returnerName = server === 'home' ? away : server === 'away' ? home : null;
+  const parts: string[] = [`${home} is playing ${away}.`];
+
+  // Sets: all but the last are completed; the last entry is the in-progress set.
+  if (sets.length) {
+    const current = sets[sets.length - 1];
+    sets.slice(0, -1).forEach((s, i) => {
+      const winner = s.home > s.away ? home : away;
+      parts.push(`${winner} won set ${i + 1} ${Math.max(s.home, s.away)}-${Math.min(s.home, s.away)}.`);
+    });
+    const ord = tennisOrdinal(sets.length);
+    if (current.home === current.away) {
+      parts.push(`The ${ord} set is level at ${current.home}-${current.away}.`);
+    } else {
+      const leader = current.home > current.away ? home : away;
+      parts.push(`${leader} leads ${Math.max(current.home, current.away)}-${Math.min(current.home, current.away)} in the ${ord} set.`);
+    }
+  }
+
+  // Current game + serve. Points rendered server-first; conservative break/game-point label.
+  if (serverName && currentGame) {
+    const sPts = server === 'home' ? currentGame.home : currentGame.away;
+    const rPts = server === 'home' ? currentGame.away : currentGame.home;
+    parts.push(`${serverName} is serving at ${sPts}-${rPts} (server's points first).`);
+    const label = tennisPointLabel(sPts, rPts);
+    if (label === 'break') parts.push(`It is break point — ${returnerName} can win ${serverName}'s service game.`);
+    else if (label === 'game') parts.push(`It is game point for ${serverName}.`);
+  } else if (serverName) {
+    parts.push(`${serverName} is serving.`);
+  }
+
+  // Momentum from the timeline. Rows credit the WINNER of the game; foreground BREAKS. Do NOT assert
+  // score==timeline equality (the timeline can lead by one game).
+  if (timeline && timeline.length) {
+    const breaks = (name: string) => timeline.filter(t => t.player === name && t.result === 'break').length;
+    const bHome = breaks(home), bAway = breaks(away);
+    if (bHome) parts.push(`${home} has broken serve ${bHome} time${bHome > 1 ? 's' : ''}.`);
+    if (bAway) parts.push(`${away} has broken serve ${bAway} time${bAway > 1 ? 's' : ''}.`);
+    // Current run: consecutive trailing rows won by the same player.
+    const last = timeline[timeline.length - 1].player;
+    let run = 0;
+    for (let i = timeline.length - 1; i >= 0 && timeline[i].player === last; i--) run++;
+    if (run >= 2 && (last === home || last === away)) {
+      parts.push(`${last} has won the last ${run} games in a row.`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+// Level-aware user prompt. Same situation string; the INSTRUCTION varies by difficulty (kid/beginner
+// teach what the situation MEANS; intermediate/expert assume the terms and focus on momentum/stakes).
+function buildTennisLearnUserPrompt(situation: string, level: string): string {
+  const isBasic = level === 'kid' || level === 'beginner';
+  const focus = isBasic
+    ? `Explain in plain terms what this situation MEANS. If there is a break point, explain that the returner has a chance to win the server's game — a big deal because the server normally has the advantage. Define the key term simply.`
+    : `Assume the viewer knows the terms. Focus on the momentum and the stakes — what the breaks and any current run say about who is in control and what is at risk on this point.`;
+  return `The user is watching a live tennis match. Current situation: ${situation}
+
+${focus}
+
+Respond with this exact JSON structure:
+{
+  "simple": "What is happening and what to watch for",
+  "whyItMatters": "Why it matters / the momentum and stakes",
+  "complexity": "low" | "medium" | "high"
+}`;
+}
+
 // playType is raw ESPN text, so it never passes through the explanation prompt.
 // Translate it directly (deterministic) rather than relying on the model to echo
 // a translated copy inside its JSON — which it drops unreliably. Returns null for
@@ -790,6 +884,51 @@ export async function POST(req: NextRequest) {
     // explain the sport + current tournament context. No playType/rawPlay.
     const learn = (espnConfig[sport]?.learnMode || body.learnMode) === true;
     if (learn) {
+      // Live-tennis pre-check (ADDITIVE, gated on sport==='tennis' AND TENNIS_LIVE==='1' AND a live
+      // match existing). When the flag is unset, the sport isn't tennis, or nothing is live, this is
+      // skipped ENTIRELY and the request falls through to the exact generic learn completion below —
+      // byte-identical to today. Best-effort: any provider null/failure → fall through, never 500.
+      if (sport === 'tennis' && process.env.TENNIS_LIVE === '1') {
+        try {
+          const wanted = (typeof body.rawId === 'string' && body.rawId)
+            || (typeof gameId === 'string' && gameId) || '';
+          const matches = await getLiveTennisMatches();
+          const live = (matches || []).filter(m => m.isLive);
+          // Prefer the requested match by rawId; else the first live one.
+          const match = (wanted && live.find(m => m.rawId === wanted)) || live[0] || null;
+          if (match) {
+            const timeline = await getTennisTimeline(match.rawId); // null on failure/empty — fine
+            const situation = buildTennisSituation(match, timeline);
+            const langLine = language && language !== 'en'
+              ? ` Respond entirely in ${languageNames[language] || language}.`
+              : '';
+            const completion = await createChatCompletion({
+              model: GROQ_MODEL,
+              messages: [
+                { role: 'system', content: buildSystemPrompt(sport, level, language) },
+                { role: 'user', content: buildTennisLearnUserPrompt(situation, level) + langLine },
+              ],
+              temperature: 0.6,
+              response_format: { type: 'json_object' },
+            });
+            const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+            return NextResponse.json({
+              simple: parsed.simple || '',
+              whyItMatters: parsed.whyItMatters || '',
+              ruleDetail: '',
+              showRule: false,
+              complexity: parsed.complexity || 'low',
+              gameContext: situation,
+              learnMode: true,
+            }, { headers: corsHeaders });
+          }
+          // No live match → fall through to the generic learn completion (output-neutral).
+        } catch (e) {
+          console.error('Tennis live learn error (degrading to generic):', e);
+          // fall through to the generic learn completion below
+        }
+      }
+
       const fetched = await fetchGameData(sport, gameId);
       const gameContext = fetched.gameContext;
       const langLine = language && language !== 'en'
