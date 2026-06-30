@@ -82,7 +82,10 @@ function golfFetch(path: string): Promise<Response> {
 let tournCache: { t: number; id: string | null; name?: string; isLive: boolean; endDate?: number } | null = null;
 const TOURN_TTL = 5 * 60_000;
 const lbCache = new Map<string, { t: number; data: Leaderboard }>();
-const LB_TTL = 45_000;
+// 80s — must EXCEED the mobile 60s autoRefresh poll so the cache absorbs the timer (a leaderboard ~80s
+// stale is imperceptible; this cuts steady-state RapidAPI calls from ~1/min to ~1 per TTL window per
+// instance — the 45s prior value was shorter than the poll, so every tick re-fetched).
+const LB_TTL = 80_000;
 
 // Resolve the tournament to show from the schedule: LIVE first (window spans now, padded +1 day to
 // cover the final round), else fall back to the MOST-RECENTLY-ENDED (latest date.end <= now) so golf
