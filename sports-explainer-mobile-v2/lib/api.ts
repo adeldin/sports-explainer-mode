@@ -37,6 +37,7 @@ const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 // Live golf leaderboard lives at a SIBLING endpoint (/api/leaderboard) on the same host. API_URL
 // hardcodes the full /api/explain path, so derive the sibling rather than reusing it verbatim.
 const LEADERBOARD_URL = API_URL.replace('/api/explain', '/api/leaderboard');
+const FEEDBACK_URL = API_URL.replace('/api/explain', '/api/feedback');
 
 // Client-side mirror of the provider's exported shape (server types can't be imported across the
 // app/backend boundary). Keep in sync with golfLeaderboardProvider.ts's Leaderboard/LeaderboardRow.
@@ -80,6 +81,30 @@ export async function fetchLeaderboard(): Promise<Leaderboard | null> {
     return data?.leaderboard ?? null;
   } catch {
     return null;
+  }
+}
+
+// One-tap "I learned something" feedback ping. FIRE-AND-FORGET + best-effort: swallows ALL errors and
+// returns void — a failed feedback write is invisible to the user (never throws, never surfaces).
+export interface FeedbackPayload {
+  sport: Sport;
+  level: Level;
+  language: Language;
+  gameId?: string | null;
+  playKey: string;
+  playType: string;
+  gameContext: string;
+  helpful: boolean;
+}
+export async function fetchFeedback(payload: FeedbackPayload): Promise<void> {
+  try {
+    await fetch(FEEDBACK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // swallow — feedback is best-effort and never user-visible
   }
 }
 

@@ -28,7 +28,7 @@ import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
-import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, Sport, Level, Language, ExplanationResponse, Leaderboard } from '../lib/api';
+import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, Sport, Level, Language, ExplanationResponse, Leaderboard } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
@@ -71,6 +71,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
+  // One-tap feedback flag — PLAY-KEYED here (NOT a useState inside PlayCard, whose remount key is
+  // game-level and would keep the lightbulb lit on the next play). Reset alongside setAnswers([]) when
+  // a genuinely new play arrives, so the lightbulb re-arms per play.
+  const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
@@ -266,6 +270,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setExplainBlocked(false);
       if (playKey !== lastPlayKeyRef.current) {
         setAnswers([]);
+        setFeedbackGiven(false);   // re-arm the "I learned something" lightbulb for the new play
         lastPlayKeyRef.current = playKey;
       }
       setResult(data);
@@ -369,6 +374,21 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Step 1 of the share flow: snapshot the CURRENT result into shareData, which
   // mounts the off-screen ShareCard (populated with real content, not placeholders).
   // The actual capture is deferred to onShareCardLayout, once the card has laid out.
+  // One-tap "I learned something" — fire once per play (feedbackGiven gates re-taps; it resets per
+  // playKey in handleFetch). Fire-and-forget: fetchFeedback never throws / never blocks the UI.
+  const handleFeedback = () => {
+    if (feedbackGiven) return;
+    setFeedbackGiven(true);
+    fetchFeedback({
+      sport, level, language,
+      gameId: selectedGameId,
+      playKey: lastPlayKeyRef.current,
+      playType: result?.playType ?? result?.rawPlay ?? '',
+      gameContext: result?.gameContext ?? '',
+      helpful: true,
+    });
+  };
+
   const handleShare = async () => {
     if (!result || shareData) return; // ignore taps while a capture is already in flight
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -758,6 +778,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 language={language}
                 lastUpdated={lastUpdated}
                 answers={answers.filter(a => a.source === 'chip')}
+                feedbackGiven={feedbackGiven}
+                onFeedback={handleFeedback}
               />
 
               {/* Coach's Corner (premium #3) — the live strategic layer, below THE PLAY. Keyed on

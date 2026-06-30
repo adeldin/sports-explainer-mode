@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
 import { Sport, Language, ExplanationResponse } from '../lib/api';
@@ -28,13 +29,15 @@ interface Props {
   language: Language;
   lastUpdated: string | null;
   answers: QAItem[];        // live Q&A — each renders as an appended, collapsible layer
+  feedbackGiven?: boolean;  // "I learned something" lit state — PLAY-KEYED in LiveScreen (not local state)
+  onFeedback?: () => void;  // one-tap positive feedback (fire-and-forget); absent → no lightbulb
 }
 
 // Layer keys + their partial default (simple + why open; rule collapsed). Modeled as a
 // Set so Phase 2's chips-as-layers slot in uniformly.
 const DEFAULT_OPEN = ['simple', 'whyItMatters'];
 
-export default function PlayCard({ result, sport, language, lastUpdated, answers }: Props) {
+export default function PlayCard({ result, sport, language, lastUpdated, answers, feedbackGiven, onFeedback }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
@@ -160,6 +163,24 @@ export default function PlayCard({ result, sport, language, lastUpdated, answers
           <Text style={styles.glossaryDefText}>{openTerm.def}</Text>
         </View>
       )}
+
+      {/* One-tap "I learned something" — quiet/glanceable; outline bulb → lit amber once tapped, then
+          disabled. Only shown on a real explanation (result.simple) and when the parent wires it. */}
+      {!!result.simple && onFeedback && (
+        <TouchableOpacity
+          style={styles.feedbackRow}
+          onPress={() => { if (feedbackGiven) return; Haptics.selectionAsync(); onFeedback(); }}
+          disabled={!!feedbackGiven}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !!feedbackGiven }}
+          accessibilityLabel={feedbackGiven ? S.feedbackThanks : S.feedbackPrompt}>
+          <Ionicons name={feedbackGiven ? 'bulb' : 'bulb-outline'} size={16} color={feedbackGiven ? theme.accentText : theme.textMuted} />
+          <Text style={[styles.feedbackText, feedbackGiven && styles.feedbackTextOn]}>
+            {feedbackGiven ? S.feedbackThanks : S.feedbackPrompt}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -177,6 +198,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   layer: { marginTop: 14, borderTopWidth: 1, borderTopColor: t.border, paddingTop: 12 },
   layerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   layerLabel: { color: t.accentText, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  // One-tap feedback row — understated, separated by a hairline top border like the layers.
+  feedbackRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: t.border },
+  feedbackText: { color: t.textMuted, fontSize: 13, fontWeight: '600' },
+  feedbackTextOn: { color: t.accentText },   // amber confirmation once tapped
   layerChevron: { color: t.accentText, fontSize: 14, fontWeight: '800' },
   insightText: { color: t.textPrimary, fontSize: 16, fontWeight: '500', lineHeight: 24, marginTop: 8 },
   ruleText: { color: t.ruleText, fontSize: 15, lineHeight: 22, marginTop: 8 },
