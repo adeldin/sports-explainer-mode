@@ -30,7 +30,7 @@ export interface TennisGame {
 
 export interface TennisTimelineEntry {
   game: number;        // "Game 7 ..." → 7
-  player: string;      // the player who served that game
+  player: string;      // the player who WON that game (result-owner): 'hold'=held own serve, 'break'=broke opponent. NOT the server.
   result: 'hold' | 'break';
   closeAt: string;     // "to 40" / "to love" → "40" / "love"
 }
