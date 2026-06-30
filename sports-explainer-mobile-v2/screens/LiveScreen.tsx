@@ -852,8 +852,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 </ScrollView>
               </View>
 
-              {/* Light-blue handle divider — section break between the list and the detail card */}
+              {/* Full-width hairline — a section break between the list and the detail card */}
               <View style={styles.tListDivider} />
+
+              {/* Eyebrow label — shows only when a match is selected (so it never sits above an empty read) */}
+              {selectedTennisMatch && (
+                <Text style={styles.tCurrentSelLabel}>{S.currentSelection.toUpperCase()}</Text>
+              )}
 
               {/* Selected-match detail — NORMAL flow (the page scroll handles it; not independently scrollable) */}
               {selectedTennisMatch && (
@@ -1249,7 +1254,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // not a flat band); keeps the internal scroll so the list stays compact.
   tListCard: { maxHeight: 340, overflow: 'hidden' },
   // Light-blue handle divider — section break between the match list and the detail card below.
-  tListDivider: { height: 4, width: 40, borderRadius: 2, backgroundColor: t.accentCoolLight, alignSelf: 'center', marginTop: 4, marginBottom: 12 },
+  tListDivider: { height: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: t.border, marginTop: 8, marginBottom: 10 },
+  tCurrentSelLabel: { color: t.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8, marginHorizontal: 16 },
 
   // Live-tennis match selector — VERTICAL stacked cards mirroring GameCard (topRow/matchup tokens).
   tMatchCard: { marginHorizontal: 16, marginBottom: 12, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
