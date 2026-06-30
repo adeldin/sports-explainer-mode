@@ -647,22 +647,42 @@ function buildTennisSituation(match: TennisGame, timeline: TennisTimelineEntry[]
   return parts.join(' ');
 }
 
-// Level-aware user prompt. Same situation string; the INSTRUCTION varies by difficulty (kid/beginner
-// teach what the situation MEANS; intermediate/expert assume the terms and focus on momentum/stakes).
-// `pronounGuidance` fixes gendered language on women's matches; `justStarted` blocks fabricated tactics
-// when no games have been played. A hard no-shot-data rule applies in ALL cases.
-function buildTennisLearnUserPrompt(situation: string, level: string, pronounGuidance: string, justStarted: boolean): string {
+// Tennis-live SYSTEM prompt. The data limitation is framed as EPISTEMIC FACT (not a polite request) so
+// the model can't rationalize inventing shot/stroke/surface detail — buried "do not" lines in the user
+// prompt were being ignored. Gender is anchored here too (authoritative). Level tunes term-defining.
+function buildTennisSystemPrompt(level: string, language: string, pronounGuidance: string): string {
+  const isBasic = level === 'kid' || level === 'beginner';
+  const levelLine = isBasic
+    ? `Explain at a ${level} level: define tennis terms simply (break point, hold, serve) the first time they matter.`
+    : `Explain at a ${level} level: assume the viewer knows tennis terms; focus on momentum and stakes.`;
+  let prompt = `You explain live tennis to someone watching, at a ${level} level.
+
+CRITICAL — what you can and cannot see:
+You are working from a LIMITED live-scoring feed. The ONLY information you have is the set scores, the current game's point score, who is serving, and how many times each player has broken serve. You have NOT watched any points. You do NOT know what shots were played, what strokes were used, spin, court surface, rally length, tactics, or playing style. This information does not exist in your data.
+
+Therefore: NEVER mention specific shots, strokes (forehand, backhand, slice, volley, serve type), spin, court surface, rally patterns, or tactical sequences. You have no basis for any of it and stating it would be fabrication. If you find yourself describing HOW a player is hitting the ball, stop — you cannot know that.
+
+What you CAN discuss: the score situation, who is serving and what's at stake (hold, break, break point, game point), the set and match score, momentum from break counts, and what a given outcome would mean for the match. ${levelLine} ${pronounGuidance}
+
+Respond ONLY about the scoreboard situation and its stakes.`;
+  if (language && language !== 'en') {
+    const langName = languageNames[language] || language;
+    prompt += `\n\nIMPORTANT: Write every value in the JSON response entirely in ${langName}. Translate tennis terms naturally; do not output English.`;
+  }
+  return prompt;
+}
+
+// Tennis-live USER prompt — now LEAN: it just carries the situation + the level/just-started ask. The
+// heavy data-limitation and pronoun constraints are authoritative in the SYSTEM prompt above (burying
+// them here diluted them and the model ignored them).
+function buildTennisLearnUserPrompt(situation: string, level: string, justStarted: boolean): string {
   const isBasic = level === 'kid' || level === 'beginner';
   const focus = justStarted
-    ? `The match has just started, so there is no texture yet. Briefly note who is serving to open the match and what is generally at stake. Do NOT invent shot-by-shot tactics, specific strokes, or rally patterns — you do not have that data. Keep it to one or two short sentences.`
+    ? `The match has just started, so there is no texture yet. Briefly note who is serving to open the match and what is generally at stake. Keep it to one or two short sentences.`
     : isBasic
       ? `Explain in plain terms what this situation MEANS. If there is a break point, explain that the returner has a chance to win the server's game — a big deal because the server normally has the advantage. Define the key term simply.`
       : `Assume the viewer knows the terms. Focus on the momentum and the stakes — what the breaks and any current run say about who is in control and what is at risk on this point.`;
   return `The user is watching a live tennis match. Current situation: ${situation}
-
-${pronounGuidance}
-
-You have NO shot-level data (no strokes, no shot types, no rally detail). Never describe specific shots, strokes, or rally patterns. Only discuss score, serve, games, sets, breaks, and momentum.
 
 ${focus}
 
@@ -945,10 +965,10 @@ export async function POST(req: NextRequest) {
             const completion = await createChatCompletion({
               model: GROQ_MODEL,
               messages: [
-                { role: 'system', content: buildSystemPrompt(sport, level, language) },
-                { role: 'user', content: buildTennisLearnUserPrompt(situation, level, pronounGuidance, justStarted) + langLine },
+                { role: 'system', content: buildTennisSystemPrompt(level, language, pronounGuidance) },
+                { role: 'user', content: buildTennisLearnUserPrompt(situation, level, justStarted) + langLine },
               ],
-              temperature: 0.6,
+              temperature: 0.3, // tighter than the generic 0.6 — less likely to embellish with invented detail
               response_format: { type: 'json_object' },
             });
             const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
