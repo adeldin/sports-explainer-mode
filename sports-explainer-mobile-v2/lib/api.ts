@@ -187,9 +187,13 @@ export async function fetchExplanation(
   gameId?: string,
   language: Language = 'en',
   playText?: string, // explain THIS specific play instead of the latest
-  // Tennis-only hints so the Gate-3 situational read can avoid gendered pronouns on women's matches
-  // and key the right match by name (names set up future work). All optional; omitted when absent.
-  opts?: { tennisHome?: string; tennisAway?: string; tennisCategory?: string },
+  // Tennis-only hints so the Gate-3 situational read can avoid gendered pronouns on women's matches,
+  // key the right match by name, AND ground the read in ESPN's set scores when RapidAPI has no live
+  // point data. All optional; omitted when absent.
+  opts?: {
+    tennisHome?: string; tennisAway?: string; tennisCategory?: string;
+    tennisSets?: { home: number; away: number }[]; tennisStatusDetail?: string;
+  },
 ): Promise<ExplanationResponse> {
   const response = await fetch(API_URL, {
     method: 'POST',
@@ -203,6 +207,8 @@ export async function fetchExplanation(
       tennisHome: opts?.tennisHome,         // omitted by JSON.stringify when undefined
       tennisAway: opts?.tennisAway,
       tennisCategory: opts?.tennisCategory, // "Men's Singles" | "Women's Singles" → pronoun guidance
+      tennisSets: opts?.tennisSets,         // ESPN set scores → grounds the read when no RapidAPI data
+      tennisStatusDetail: opts?.tennisStatusDetail, // e.g. "2nd Set"
     }),
   });
 

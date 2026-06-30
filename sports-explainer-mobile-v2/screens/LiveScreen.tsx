@@ -560,6 +560,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           tennisHome: selectedTennisMatch?.home,
           tennisAway: selectedTennisMatch?.away,
           tennisCategory: selectedTennisMatch?.category,
+          tennisSets: selectedTennisMatch?.sets,            // ESPN set scores ground the read w/o RapidAPI
+          tennisStatusDetail: selectedTennisMatch?.statusDetail,
         });
         if (!cancelled) setTennisRead(data);
       } catch { if (!cancelled) setTennisRead(null); }
