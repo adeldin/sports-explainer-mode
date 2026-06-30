@@ -565,11 +565,39 @@ function tennisPointLabel(sPts: string, rPts: string): 'break' | 'game' | null {
   return null;
 }
 
+// Pronoun guidance for the LLM free-text (the deterministic situation string is pronoun-free — it
+// uses names + role nouns). Women's/Men's Singles → she/he; unknown → strictly gender-neutral.
+function tennisPronounGuidance(category: any): string {
+  const c = String(category || '');
+  if (c === "Women's Singles") return 'Both players are women — use she/her pronouns.';
+  if (c === "Men's Singles") return 'Both players are men — use he/his pronouns.';
+  return 'Use gender-neutral phrasing (the server, the returner, the player, they) — do NOT assume gender.';
+}
+
+// "Nothing has happened yet" detector — first set 0-0 (or no sets), current game 0-0 (or none), and an
+// empty/absent timeline. When true the read must NOT fabricate shot/tactic detail it cannot know.
+function tennisJustStarted(match: TennisGame, timeline: TennisTimelineEntry[] | null): boolean {
+  const { sets, currentGame } = match;
+  const noSets = sets.length === 0 || (sets.length === 1 && sets[0].home === 0 && sets[0].away === 0);
+  const noGame = !currentGame || (currentGame.home === '0' && currentGame.away === '0');
+  const noTimeline = !timeline || timeline.length === 0;
+  return noSets && noGame && noTimeline;
+}
+
 // Factual English situation string from the live match + game-by-game timeline.
 function buildTennisSituation(match: TennisGame, timeline: TennisTimelineEntry[] | null): string {
   const { home, away, sets, currentGame, server } = match;
   const serverName = server === 'home' ? home : server === 'away' ? away : null;
   const returnerName = server === 'home' ? away : server === 'away' ? home : null;
+
+  // Fresh start: no games played yet → say so plainly, name the opening server, and stop (no invented
+  // texture). The prompt also forbids fabricating tactics in this case.
+  if (tennisJustStarted(match, timeline)) {
+    const intro = [`The match between ${home} and ${away} has just begun; no games have been played yet.`];
+    if (serverName) intro.push(`${serverName} serves to open the match.`);
+    return intro.join(' ');
+  }
+
   const parts: string[] = [`${home} is playing ${away}.`];
 
   // Sets: all but the last are completed; the last entry is the in-progress set.
@@ -621,12 +649,20 @@ function buildTennisSituation(match: TennisGame, timeline: TennisTimelineEntry[]
 
 // Level-aware user prompt. Same situation string; the INSTRUCTION varies by difficulty (kid/beginner
 // teach what the situation MEANS; intermediate/expert assume the terms and focus on momentum/stakes).
-function buildTennisLearnUserPrompt(situation: string, level: string): string {
+// `pronounGuidance` fixes gendered language on women's matches; `justStarted` blocks fabricated tactics
+// when no games have been played. A hard no-shot-data rule applies in ALL cases.
+function buildTennisLearnUserPrompt(situation: string, level: string, pronounGuidance: string, justStarted: boolean): string {
   const isBasic = level === 'kid' || level === 'beginner';
-  const focus = isBasic
-    ? `Explain in plain terms what this situation MEANS. If there is a break point, explain that the returner has a chance to win the server's game — a big deal because the server normally has the advantage. Define the key term simply.`
-    : `Assume the viewer knows the terms. Focus on the momentum and the stakes — what the breaks and any current run say about who is in control and what is at risk on this point.`;
+  const focus = justStarted
+    ? `The match has just started, so there is no texture yet. Briefly note who is serving to open the match and what is generally at stake. Do NOT invent shot-by-shot tactics, specific strokes, or rally patterns — you do not have that data. Keep it to one or two short sentences.`
+    : isBasic
+      ? `Explain in plain terms what this situation MEANS. If there is a break point, explain that the returner has a chance to win the server's game — a big deal because the server normally has the advantage. Define the key term simply.`
+      : `Assume the viewer knows the terms. Focus on the momentum and the stakes — what the breaks and any current run say about who is in control and what is at risk on this point.`;
   return `The user is watching a live tennis match. Current situation: ${situation}
+
+${pronounGuidance}
+
+You have NO shot-level data (no strokes, no shot types, no rally detail). Never describe specific shots, strokes, or rally patterns. Only discuss score, serve, games, sets, breaks, and momentum.
 
 ${focus}
 
@@ -899,6 +935,10 @@ export async function POST(req: NextRequest) {
           if (match) {
             const timeline = await getTennisTimeline(match.rawId); // null on failure/empty — fine
             const situation = buildTennisSituation(match, timeline);
+            // Gender guidance from the ESPN category (mobile passes tennisCategory); fresh-start guard
+            // so the read doesn't fabricate tactics at 0-0.
+            const pronounGuidance = tennisPronounGuidance(body.tennisCategory);
+            const justStarted = tennisJustStarted(match, timeline);
             const langLine = language && language !== 'en'
               ? ` Respond entirely in ${languageNames[language] || language}.`
               : '';
@@ -906,7 +946,7 @@ export async function POST(req: NextRequest) {
               model: GROQ_MODEL,
               messages: [
                 { role: 'system', content: buildSystemPrompt(sport, level, language) },
-                { role: 'user', content: buildTennisLearnUserPrompt(situation, level) + langLine },
+                { role: 'user', content: buildTennisLearnUserPrompt(situation, level, pronounGuidance, justStarted) + langLine },
               ],
               temperature: 0.6,
               response_format: { type: 'json_object' },
