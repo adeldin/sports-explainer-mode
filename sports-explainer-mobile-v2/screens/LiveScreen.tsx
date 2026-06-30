@@ -757,13 +757,28 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 12 }]} />
             </View>
           ) : explainBlocked ? (
-            // Daily free-explanation cap hit — a graceful "keep going" moment (leads with what
-            // they got, frames Pro as continuation, notes the free refresh — NOT an error wall).
+            // Daily free-explanation cap hit. PRO is the primary ask (filled brand button, first);
+            // the still-free teaching surfaces (Academy + Coach's Corner — NOT cap-gated) sit below as
+            // orange text-links. nbsp before each "→" keeps the arrow from orphaning on a wrap.
             <View style={styles.capCard}>
               <Text style={styles.capTitle}>{S.capExplainTitle.replace('{n}', String(caps.DAILY_FREE))}</Text>
               <Text style={styles.capBody}>{S.capExplainBody}</Text>
+              {/* PRIMARY — Pro (the conversion ask). */}
               <TouchableOpacity style={styles.capBtn} onPress={presentPaywall} activeOpacity={0.85}>
-                <Text style={styles.capBtnText}>{S.capCta}</Text>
+                <Text style={styles.capBtnText}>{S.capCta.replace(' →', ' →')}</Text>
+              </TouchableOpacity>
+              {/* SECONDARY — still-free teaching surfaces, as text-links. */}
+              <TouchableOpacity
+                style={styles.capBtnSecondary}
+                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigation.navigate('Academy', { sport }); }}
+                activeOpacity={0.7}>
+                <Text style={styles.capBtnSecondaryText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.9}>{S.capAcademyCta.replace(' →', ' →')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.capBtnSecondary}
+                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigation.navigate("Coach's Corner"); }}
+                activeOpacity={0.7}>
+                <Text style={styles.capBtnSecondaryText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.9}>{S.capCoachCta.replace(' →', ' →')}</Text>
               </TouchableOpacity>
             </View>
           ) : result ? (
@@ -910,7 +925,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   navigation.navigate('Academy', { sport });
                 }}
                 activeOpacity={0.7}>
-                <Text style={styles.learnCtaPillText}>Test your knowledge in the Academy →</Text>
+                <Text style={styles.learnCtaPillText}>{S.capAcademyCta}</Text>
               </TouchableOpacity>
               <Text style={styles.learnExplainer}>{learnContext ? S.learnModeFollowAlong : S.learnModeExplainer}</Text>
               <View style={styles.learnAskCard}>
@@ -1103,6 +1118,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   capInlineBody: { color: t.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 14 },
   capBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, alignSelf: 'stretch', alignItems: 'center' },
   capBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  // Secondary text-links (Academy / Coach's Corner) — no fill, full-width centered so long labels wrap
+  // cleanly under the filled Pro button; orange, visually subordinate to the primary Pro button.
+  capBtnSecondary: { alignSelf: 'stretch', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, marginTop: 10 },
+  capBtnSecondaryText: { color: t.accentText, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   askInput: { flex: 1, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: t.textPrimary, fontSize: 14 },
   askSend: { width: 44, height: 44, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' },
