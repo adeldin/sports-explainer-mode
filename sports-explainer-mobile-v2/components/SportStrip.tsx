@@ -9,6 +9,7 @@ export interface SportStripItem {
   key: string;        // the selection key (sport key, category key — caller's choice)
   emoji: string;
   label: string;
+  disabled?: boolean; // optional: render dimmed + untappable (Coach's Corner level-gating). Default false.
 }
 
 export default function SportStrip({
@@ -27,11 +28,14 @@ export default function SportStrip({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sportTabsContent}>
         {items.map(it => {
           const active = selectedKey === it.key;
+          const isDisabled = !!it.disabled;
           return (
             <TouchableOpacity
               key={it.key}
-              style={[styles.sportTab, active && styles.sportTabActive]}
-              onPress={() => onSelect(it.key)}>
+              style={[styles.sportTab, active && styles.sportTabActive, isDisabled && styles.sportTabDisabled]}
+              onPress={() => { if (!isDisabled) onSelect(it.key); }}
+              activeOpacity={isDisabled ? 1 : 0.2}
+              accessibilityState={{ disabled: isDisabled }}>
               <Text style={styles.sportEmoji}>{it.emoji}</Text>
               <Text style={[styles.sportLabel, active && styles.sportLabelActive]} numberOfLines={1}>{it.label}</Text>
             </TouchableOpacity>
@@ -49,6 +53,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sportTabsContent: { paddingHorizontal: 16, gap: 8 },
   sportTab: { alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, minWidth: 64 },
   sportTabActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
+  sportTabDisabled: { opacity: 0.4 },
   sportEmoji: { fontSize: 20 },
   sportLabel: { color: t.textSecondary, fontSize: 11, fontWeight: '700', marginTop: 2 },
   sportLabelActive: { color: t.accentText },

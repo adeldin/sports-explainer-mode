@@ -37,7 +37,10 @@ const CC_CANDIDATES: CCSport[] = [
   { key: "nfl", emoji: "🏈", label: "NFL" },
 ];
 
-// The sports that actually have content right now (at the given level), in display order.
-export function coachesCornerSports(level: Level): CCSport[] {
-  return CC_CANDIDATES.filter(c => piecesForSport(c.key, level).length > 0);
+// A candidate + whether it has any piece at this level. We now return ALL candidates (not just the
+// ones with content) so MLB/NFL render DIMMED + untappable at levels with no scenarios, instead of
+// disappearing. Soccer is always enabled (level-independent formations/read-the-play).
+export type CCSportEntry = CCSport & { enabled: boolean };
+export function coachesCornerSports(level: Level): CCSportEntry[] {
+  return CC_CANDIDATES.map(c => ({ ...c, enabled: piecesForSport(c.key, level).length > 0 }));
 }

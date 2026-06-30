@@ -7,6 +7,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 import { Sport } from '../lib/api';
 import { useAppState } from '../lib/appState';
+import { UI_STRINGS } from '../lib/strings';
 import { useTheme, Theme } from '../lib/theme';
 import SportStrip from '../components/SportStrip';
 import GameHost from '../components/academy/GameHost';
@@ -34,12 +35,13 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
 };
 
 export default function CoachesCornerScreen() {
-  const { level } = useAppState();
+  const { level, language } = useAppState();
+  const S = UI_STRINGS[language];
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const ccSports = coachesCornerSports(level);          // data-driven sport list (≥ soccer always)
-  const [selectedSport, setSelectedSport] = useState<Sport>(ccSports[0]?.key ?? 'soccer');
+  const ccSports = coachesCornerSports(level);          // ALL candidates, each tagged enabled (≥ soccer always enabled)
+  const [selectedSport, setSelectedSport] = useState<Sport>(ccSports.find(s => s.enabled)?.key ?? 'soccer');
   const [activePiece, setActivePiece] = useState<CCPieceId | null>(null);
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
 
@@ -58,7 +60,11 @@ export default function CoachesCornerScreen() {
 
   // Guard: if a level change (made inside a piece) dropped the selected sport from the content list,
   // fall back to the first available — keeps the strip highlight + pieces consistent without an effect.
-  const activeSport: Sport = ccSports.some(s => s.key === selectedSport) ? selectedSport : (ccSports[0]?.key ?? 'soccer');
+  // Only treat selectedSport as active if it's present AND enabled; otherwise fall back to the first
+  // enabled sport — so a DISABLED (greyed) sport can never become active and open an empty pieces area.
+  const activeSport: Sport = ccSports.some(s => s.key === selectedSport && s.enabled)
+    ? selectedSport
+    : (ccSports.find(s => s.enabled)?.key ?? 'soccer');
   const activeEntry = ccSports.find(s => s.key === activeSport);
   const pieces = piecesForSport(activeSport, level);
 
@@ -103,10 +109,16 @@ export default function CoachesCornerScreen() {
         <StatusBar barStyle={theme.statusBar} />
         <CoachesCornerHeader />
         <SportStrip
-          items={ccSports.map(s => ({ key: s.key, emoji: s.emoji, label: s.label }))}
+          items={ccSports.map(s => ({ key: s.key, emoji: s.emoji, label: s.label, disabled: !s.enabled }))}
           selectedKey={activeSport}
           onSelect={(key) => setSelectedSport(key as Sport)}
         />
+        {/* Hint: when a sport is greyed out (no scenarios at this level), name it + point to where it's available. */}
+        {ccSports.some(s => !s.enabled) && (
+          <Text style={styles.ccLevelHint}>
+            {ccSports.filter(s => !s.enabled).map(s => s.label).join(' & ')}{' '}{S.ccMoreAtLevels}
+          </Text>
+        )}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
           {/* Identity/progress — the shared rank card (global points total). */}
           <View style={styles.section}>
@@ -170,6 +182,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48 },
   section: { marginBottom: 20 },
   sectionLabel: { color: t.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.2, marginBottom: 10 },
+  ccLevelHint: { color: t.textMuted, fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 8, marginHorizontal: 16 },
   // Tile grid — copied from AcademyScreen gameGrid/gameTile so pieces match the Academy games visually.
   pieceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   pieceTile: { width: '47%', flexGrow: 1, minHeight: 92, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
