@@ -691,13 +691,22 @@ function buildTennisSystemPrompt(level: string, language: string, pronounGuidanc
   let prompt = `You explain live tennis to someone watching, at a ${level} level.
 
 CRITICAL — what you can and cannot see:
-You are working from a LIMITED live-scoring feed. The ONLY information you have is the set scores, the current game's point score, who is serving, and how many times each player has broken serve. You have NOT watched any points. You do NOT know what shots were played, what strokes were used, spin, court surface, rally length, tactics, or playing style. This information does not exist in your data.
+You are working from a LIMITED live-scoring feed. The ONLY facts you have are the set scores, the current game's point score, who is serving, and how many breaks each player has. You have NOT watched a single point. You cannot see the court.
 
-Therefore: NEVER mention specific shots, strokes (forehand, backhand, slice, volley, serve type), spin, court surface, rally patterns, or tactical sequences. You have no basis for any of it and stating it would be fabrication. If you find yourself describing HOW a player is hitting the ball, stop — you cannot know that.
+The one rule that matters: You may explain the SITUATION and the SPORT in general terms. You may NEVER state, imply, or guess what THIS player is doing right now.
 
-What you CAN discuss: the score situation, who is serving and what's at stake (hold, break, break point, game point), the set and match score, momentum from break counts, and what a given outcome would mean for the match. ${levelLine} ${pronounGuidance}
+ALLOWED — the situation and general knowledge:
+- The score and what it means.
+- What is at stake (break point, game point, holding serve).
+- General truths about tennis (e.g. grass keeps the ball low and fast, which rewards aggressive serving).
+- What a shot or tactic generally does (e.g. a slice stays low and can be hard to attack).
 
-Respond ONLY about the scoreboard situation and its stakes.`;
+FORBIDDEN — any claim about THIS player's live actions, because you cannot see them:
+- "She's hitting slices." / "He just ripped a backhand winner." / "Her forehand is controlling the point."
+- Anything describing HOW a player is hitting, what they just did, or their tactics in THIS match.
+- This holds even if phrased as "if" or "appears to" — you still cannot see the court, so do not make the determination.
+
+Speak about the situation and the sport. Never narrate the player. ${levelLine} ${pronounGuidance}`;
   if (language && language !== 'en') {
     const langName = languageNames[language] || language;
     prompt += `\n\nIMPORTANT: Write every value in the JSON response entirely in ${langName}. Translate tennis terms naturally; do not output English.`;
@@ -721,8 +730,9 @@ ${focus}
 
 Respond with this exact JSON structure:
 {
-  "simple": "What is happening and what to watch for",
-  "whyItMatters": "Why it matters / the momentum and stakes",
+  "simple": "What the score situation is and what to watch for — the scoreboard reality only",
+  "whyItMatters": "Why this situation matters — momentum and stakes",
+  "worthNoting": "OPTIONAL. A genuine piece of general tennis insight a knowledgeable fan would add — about the surface, conditions, what a situation typically rewards, or what a tactic generally does. General knowledge ONLY, never a claim about what this player is doing. Leave as an empty string if there is nothing genuinely worth adding — most routine moments need nothing here.",
   "complexity": "low" | "medium" | "high"
 }`;
 }
@@ -732,10 +742,24 @@ Respond with this exact JSON structure:
 const normTennisName = (s: any): string =>
   String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
 
-// Banned shot/stroke/surface vocabulary — we have NONE of this in the live-scoring feed, so any of it
-// in the output is fabrication. 'serve' itself is allowed (we discuss serving); only shot TYPES are banned.
-const TENNIS_BANNED_SHOT = /\b(forehand|backhand|slice|volley|topspin|underspin|spin|groundstroke|stroke|rally|rallies|grass|clay|hardcourt|dropshot|lob|ace|aces)\b/i;
-const hasBannedShotWords = (s: any): boolean => TENNIS_BANNED_SHOT.test(String(s || '')) || /\bdrop shot\b/i.test(String(s || ''));
+// LIVE-ACTION CLAIM detector — NARROW + high-precision. The new rule ALLOWS general tennis knowledge
+// ("a slice stays low on grass") but FORBIDS claims about what THIS player is doing ("she's hitting
+// slices") since we cannot see the court. So this no longer bans knowledge words; it catches only an
+// unambiguous player+live-action+shot claim, in two shapes:
+//   (1) a possessive pronoun owning a shot noun — "her forehand", "his backhand";
+//   (2) a player subject + a live-action verb + a shot noun in proximity — "she is hitting slices".
+// The SYSTEM PROMPT is the primary control; this is a backstop that triggers ONE regen. Test-verified
+// to catch the FORBIDDEN examples and allow general/conditional usage (incl. player + knowledge in the
+// same sentence, and a pronoun near a shot noun with no action verb).
+const TENNIS_SHOT_NOUN = 'forehand|backhand|slice|volley|dropshot|drop\\s?shot|lob|groundstroke';
+const TENNIS_ACTION_VERB = 'hit|hits|hitting|ripped|rips|ripping|sliced|slices|slicing|volleyed|volleys|volleying|smashed|smashes|smashing|played|plays|playing|used|uses|using|struck|strikes';
+const TENNIS_LIVE_CLAIM = new RegExp(
+  `\\b(her|his)\\s+(?:\\w+\\s+){0,2}(${TENNIS_SHOT_NOUN})s?\\b` +
+  '|' +
+  `\\b(she|he|they|the player)\\b[^.]{0,25}\\b(${TENNIS_ACTION_VERB})\\b[^.]{0,25}\\b(${TENNIS_SHOT_NOUN})s?\\b`,
+  'i',
+);
+const hasLivePlayerClaim = (s: any): boolean => TENNIS_LIVE_CLAIM.test(String(s || ''));
 
 // Deterministic, guaranteed-clean "why it matters" — used as the last-resort fallback if the model
 // keeps fabricating. Role nouns + names only, never shot detail.
@@ -760,7 +784,7 @@ function tennisDeterministicWhy(match: TennisGame | null): string {
 async function runTennisRead(
   situation: string, level: string, language: string, pronounGuidance: string,
   justStarted: boolean, langLine: string, fallbackMatch: TennisGame | null,
-): Promise<{ simple: string; whyItMatters: string; complexity: string }> {
+): Promise<{ simple: string; whyItMatters: string; worthNoting: string; complexity: string }> {
   const system = buildTennisSystemPrompt(level, language, pronounGuidance);
   const baseUser = buildTennisLearnUserPrompt(situation, level, justStarted) + langLine;
   const call = async (extra: string) => {
@@ -779,21 +803,25 @@ async function runTennisRead(
   let parsed = await call('');
   let simple = String(parsed.simple || '');
   let why = String(parsed.whyItMatters || '');
+  let worthNoting = String(parsed.worthNoting || '');   // general-knowledge field — NOT filtered
   let complexity = parsed.complexity || 'low';
 
-  if (hasBannedShotWords(simple) || hasBannedShotWords(why)) {
-    console.warn('[tennis read] banned shot vocabulary in first response — regenerating');
-    parsed = await call('\n\nYour previous response invented shot detail. Do NOT mention any stroke, shot, spin, or surface. Describe ONLY the score, serve, and breaks.');
+  // The filter applies to simple + whyItMatters ONLY (the situation read). worthNoting carries vetted
+  // general knowledge (surface/conditions/what a tactic does) and is intentionally NOT filtered.
+  if (hasLivePlayerClaim(simple) || hasLivePlayerClaim(why)) {
+    console.warn('[tennis read] live-player claim in first response — regenerating');
+    parsed = await call('\n\nDo NOT describe what either player is doing — no shots, strokes, or tactics in THIS match. Describe ONLY the score, serve, breaks, and general context.');
     simple = String(parsed.simple || '');
     why = String(parsed.whyItMatters || '');
+    worthNoting = String(parsed.worthNoting || '');
     complexity = parsed.complexity || complexity;
-    if (hasBannedShotWords(simple) || hasBannedShotWords(why)) {
-      console.warn('[tennis read] regen STILL contained banned vocabulary — using deterministic fallback');
+    if (hasLivePlayerClaim(simple) || hasLivePlayerClaim(why)) {
+      console.warn('[tennis read] regen STILL contained a live-player claim — using deterministic fallback');
       simple = situation;
       why = tennisDeterministicWhy(fallbackMatch);
     }
   }
-  return { simple, whyItMatters: why, complexity };
+  return { simple, whyItMatters: why, worthNoting, complexity };
 }
 
 // playType is raw ESPN text, so it never passes through the explanation prompt.
@@ -1096,6 +1124,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({
               simple: read.simple,
               whyItMatters: read.whyItMatters,
+              worthNoting: read.worthNoting,
               ruleDetail: '',
               showRule: false,
               complexity: read.complexity,

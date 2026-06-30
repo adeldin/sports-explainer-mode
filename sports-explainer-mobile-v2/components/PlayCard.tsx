@@ -131,6 +131,11 @@ export default function PlayCard({ result, sport, language, lastUpdated, answers
         <Layer id="rule" label={`📜 ${S.theRule}`} text={result.ruleDetail} baseStyle={styles.ruleText} />
       )}
 
+      {/* WORTH NOTING — optional general-knowledge callout (tennis now). Only shows when non-empty. */}
+      {!!result.worthNoting && (
+        <Layer id="worthNoting" label={`💭 ${S.worthNoting}`} text={result.worthNoting} baseStyle={styles.insightText} />
+      )}
+
       {/* Live Q&A (Phase 2) — chip taps + free-text asks append here as layers. Each is a
           collapsible layer: the question is the header, the answer the body (glossary works
           inside it); a per-item spinner shows while in flight. Cleared on a genuine new play
