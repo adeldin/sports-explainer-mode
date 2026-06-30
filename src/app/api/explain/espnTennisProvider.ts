@@ -64,7 +64,7 @@ function competitorBySide(competitors: any[], side: 'home' | 'away'): any | null
 
 // Parse one competition (already known live + singles) into a match, tagged with its board. Returns
 // null when the essential players can't be resolved (best-effort: skip, don't crash).
-function parseCompetition(comp: any, tour: 'atp' | 'wta'): EspnTennisMatch | null {
+function parseCompetition(comp: any): EspnTennisMatch | null {
   const competitors: any[] = Array.isArray(comp?.competitors) ? comp.competitors : [];
   const homeC = competitorBySide(competitors, 'home');
   const awayC = competitorBySide(competitors, 'away');
@@ -74,10 +74,15 @@ function parseCompetition(comp: any, tour: 'atp' | 'wta'): EspnTennisMatch | nul
   const away = asStr(awayC.athlete?.displayName);
   if (!home || !away) return null;
 
+  // Tour is derived from the match CATEGORY, not the board it came from — ESPN's /atp/ board returns
+  // BOTH men's and women's singles, so the board is NOT a reliable tour signal. Category is canonical.
+  const category = asStr(comp.type?.text);
+  const tour: 'atp' | 'wta' = category === "Women's Singles" ? 'wta' : 'atp';
+
   const match: EspnTennisMatch = {
     espnId: asStr(comp.id),
     tour,
-    category: asStr(comp.type?.text),
+    category,
     home,
     away,
     sets: [],
@@ -122,7 +127,7 @@ function parseCompetition(comp: any, tour: 'atp' | 'wta'): EspnTennisMatch | nul
 }
 
 // Walk one board's JSON → its live-singles matches, in feed order. Best-effort: bad shape → [].
-function parseBoard(json: any, tour: 'atp' | 'wta'): EspnTennisMatch[] {
+function parseBoard(json: any): EspnTennisMatch[] {
   const out: EspnTennisMatch[] = [];
   const events: any[] = Array.isArray(json?.events) ? json.events : [];
   for (const ev of events) {
@@ -132,7 +137,7 @@ function parseBoard(json: any, tour: 'atp' | 'wta'): EspnTennisMatch[] {
       for (const comp of comps) {
         if (comp?.status?.type?.state !== 'in') continue;
         if (!isSinglesCategory(asStr(comp?.type?.text))) continue;
-        const m = parseCompetition(comp, tour);
+        const m = parseCompetition(comp);
         if (m) out.push(m);
       }
     }
@@ -149,13 +154,22 @@ export async function getEspnSinglesLive(): Promise<EspnTennisMatch[]> {
   // Fetch both boards in parallel; one board failing must not sink the other.
   const [atpJson, wtaJson] = await Promise.all([boardFetch(ATP), boardFetch(WTA)]);
   const merged = [
-    ...(atpJson ? parseBoard(atpJson, 'atp') : []),
-    ...(wtaJson ? parseBoard(wtaJson, 'wta') : []),
+    ...(atpJson ? parseBoard(atpJson) : []),
+    ...(wtaJson ? parseBoard(wtaJson) : []),
   ];
 
+  // Both boards can return BOTH categories, so the same match (espnId) may appear twice — dedupe,
+  // keeping the first occurrence, BEFORE the sort.
+  const seen = new Set<string>();
+  const deduped = merged.filter(m => {
+    if (seen.has(m.espnId)) return false;
+    seen.add(m.espnId);
+    return true;
+  });
+
   // Stable sort: seeded matches (have sortRank) ascending first, then unseeded in original feed order.
-  const seeded = merged.filter(m => typeof m.sortRank === 'number');
-  const unseeded = merged.filter(m => typeof m.sortRank !== 'number');
+  const seeded = deduped.filter(m => typeof m.sortRank === 'number');
+  const unseeded = deduped.filter(m => typeof m.sortRank !== 'number');
   seeded.sort((a, b) => (a.sortRank as number) - (b.sortRank as number));
   const data = [...seeded, ...unseeded];
 
