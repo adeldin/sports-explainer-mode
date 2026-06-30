@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, SafeAreaView, StatusBar, FlatList,
-  RefreshControl, Animated, Alert,
+  RefreshControl, Animated, Alert, Image,
   TextInput, KeyboardAvoidingView, Keyboard, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -29,7 +29,7 @@ import { derivePlayKey } from '../lib/playKey';
 import { useCaps, presentPaywall } from '../lib/entitlement';
 
 // Libs
-import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, fetchTennisLive, Sport, Level, Language, ExplanationResponse, Leaderboard, TennisLiveMatch, TennisTimelineEntry } from '../lib/api';
+import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, fetchTennisLive, fetchTennisMatch, Sport, Level, Language, ExplanationResponse, Leaderboard, TennisLiveMatch } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
@@ -69,9 +69,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
-  const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // tennis live matches (liveFormat:'tennis')
-  const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match rawId (null → first live)
-  const [tennisTimeline, setTennisTimeline] = useState<TennisTimelineEntry[] | null>(null);
+  const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // ESPN live singles list (liveFormat:'tennis')
+  const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match espnId (null → first live)
+  const [tennisDetail, setTennisDetail] = useState<TennisLiveMatch | null>(null); // selected match enriched w/ RapidAPI live overlay
   const [tennisRead, setTennisRead] = useState<ExplanationResponse | null>(null); // Gate-3 situational explanation
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
@@ -140,9 +140,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // game is in `games`.
   const selectedGame = games.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
-  // Live-tennis selection (orthogonal to game selection): explicit pick by rawId, else the first live
-  // match. Drives TennisLiveCard + the timeline/explanation fetch. Null when no live tennis match.
-  const selectedTennisMatch = tennisMatches.find(m => m.rawId === tennisSel) || tennisMatches[0] || null;
+  // Live-tennis selection (orthogonal to game selection): explicit pick by espnId, else the first live
+  // match. Drives TennisLiveCard + the detail/explanation fetch. Null when no live tennis match.
+  const selectedTennisMatch = tennisMatches.find(m => m.espnId === tennisSel) || tennisMatches[0] || null;
   // A LIVE game gets the play explanation (PlayCard); a FINAL game gets the Post-Game Recap
   // (RecapCard) instead — "what happened in this play" no longer fits a finished game.
   const isLive = selectedGameState === 'in';
@@ -519,28 +519,33 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     handleFetch(() => cancelled);
     return () => { cancelled = true; };
   }, [selectedGameId, level, language, isLive]);
-  // Live-tennis situational read (Gate-3) + timeline. Self-contained / ADDITIVE: independent of the
-  // PlayCard/handleFetch path (tennis stays learnMode → no caps, no PlayCard). When a live match is
-  // selected, lazy-load its timeline (saves the per-second BASIC budget) and fetch the situational
-  // explanation — the backend treats tennis as learn mode and reads the rawId, so Gate-3's branch
-  // returns the real situation. Best-effort: any failure leaves the card's deterministic situation
-  // intact (the read just stays null). Re-runs only on match/level/language change (no extra poll).
+  // Live-tennis detail (RapidAPI live overlay) + situational read (Gate-3). Self-contained / ADDITIVE:
+  // independent of the PlayCard/handleFetch path (tennis stays learnMode → no caps, no PlayCard). When
+  // a match is selected, lazy-fetch THAT match enriched (server/currentGame/timeline in ESPN
+  // orientation) and the situational explanation. Best-effort: any failure leaves the plain ESPN card
+  // intact (overlay/read stay null). Re-runs only on match/level/language change (no extra poll).
+  //
+  // KNOWN GAP (G3): the explain call still keys off rawId/first-live RapidAPI match (Gate-3 backend),
+  // NOT the selected espnId — so with multiple concurrent live matches the situational read MAY
+  // describe a different match than the one selected. Acceptable for G3 (cards/flags focus); revisit
+  // by passing the ESPN player names to the explain branch if the read shows the wrong match.
   useEffect(() => {
-    const rawId = selectedTennisMatch?.rawId;
-    if (!rawId) { setTennisTimeline(null); setTennisRead(null); return; }
+    const espnId = selectedTennisMatch?.espnId;
+    if (!espnId) { setTennisDetail(null); setTennisRead(null); return; }
     let cancelled = false;
+    setTennisDetail(null); // clear the previous match's overlay so it can't linger under the new card
     (async () => {
       try {
-        const { timeline } = await fetchTennisLive(rawId);
-        if (!cancelled) setTennisTimeline(timeline ?? null);
-      } catch { if (!cancelled) setTennisTimeline(null); }
+        const detail = await fetchTennisMatch(espnId);
+        if (!cancelled) setTennisDetail(detail);
+      } catch { if (!cancelled) setTennisDetail(null); }
       try {
-        const data = await fetchExplanation(sport, level, rawId, language);
+        const data = await fetchExplanation(sport, level, espnId, language);
         if (!cancelled) setTennisRead(data);
       } catch { if (!cancelled) setTennisRead(null); }
     })();
     return () => { cancelled = true; };
-  }, [selectedTennisMatch?.rawId, sport, level, language]);
+  }, [selectedTennisMatch?.espnId, sport, level, language]);
   // Post-Game Recap (premium #1) — fetch for FINAL games (replaces the explanation). Mirrors
   // the explanation effect's cancellation + fresh-context reset; refetches on sport/game/level/
   // language AND on isPro (so buying Pro mid-view upgrades the teaser → full recap). Recap does
@@ -753,51 +758,55 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             // tennisMatches is empty (flag off / nothing live) this branch is skipped and tennis falls
             // through to today's exact learn view below — no regression.
             <>
-              {/* Vertical stacked list of live matches (mirrors GameCard). Renders for >=1 match — a
-                  single match is one card, no horizontal scroll. .map (not FlatList) because the outer
-                  ScrollView already scrolls. Tapping a card selects it (rawId is the selection key). */}
+              {/* Vertical stacked list of live ESPN singles (mirrors GameCard) — flag + seed + name per
+                  player, set grid, round·court caption. .map (not FlatList) because the outer ScrollView
+                  already scrolls. Tapping a card selects it (espnId is the selection key). Serve dots
+                  only light up once a match is selected and its RapidAPI live overlay loads. */}
               <View style={styles.tennisList}>
                 {tennisMatches.map((item) => {
-                  const sel = selectedTennisMatch?.rawId === item.rawId;
+                  const sel = selectedTennisMatch?.espnId === item.espnId;
                   const lastIdx = item.sets.length - 1;
+                  const caption = [item.round, item.court].filter(Boolean).join(' · ');
+                  // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
+                  const server = sel ? tennisDetail?.live?.server : undefined;
+                  const renderSide = (side: 'home' | 'away') => (
+                    <View style={styles.tTeamRow}>
+                      <View style={styles.tTeamLeft}>
+                        {server === side ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
+                        {(side === 'home' ? item.homeFlag : item.awayFlag)
+                          ? <Image source={{ uri: side === 'home' ? item.homeFlag : item.awayFlag }} style={styles.tFlag} resizeMode="contain" />
+                          : <View style={styles.tFlagSpacer} />}
+                        {(side === 'home' ? item.homeSeed : item.awaySeed) != null &&
+                          <Text style={styles.tSeed}>({side === 'home' ? item.homeSeed : item.awaySeed})</Text>}
+                        <Text style={styles.tTeamName} numberOfLines={1}>{side === 'home' ? item.home : item.away}</Text>
+                      </View>
+                      <View style={styles.tSetScores}>
+                        {item.sets.map((s, i) => (
+                          <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>
+                            {side === 'home' ? s.home : s.away}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                  );
                   return (
                     <TouchableOpacity
-                      key={item.rawId}
-                      onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.rawId); }}
+                      key={item.espnId}
+                      onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.espnId); }}
                       style={[styles.tMatchCard, sel && styles.tMatchCardSel]}
                       activeOpacity={0.85}>
                       <View style={styles.tTopRow}>
-                        {item.isLive ? (
-                          <View style={styles.tLiveBadge}>
-                            <View style={styles.tLiveDot} />
-                            <Text style={styles.tLiveText}>LIVE</Text>
-                          </View>
-                        ) : <View />}
-                        {!!item.league && <Text style={styles.tLeague} numberOfLines={1}>{item.league}</Text>}
+                        <View style={styles.tLiveBadge}>
+                          <View style={styles.tLiveDot} />
+                          <Text style={styles.tLiveText}>LIVE</Text>
+                          {!!item.statusDetail && <Text style={styles.tStatusDetail}>· {item.statusDetail}</Text>}
+                        </View>
+                        {!!item.category && <Text style={styles.tLeague} numberOfLines={1}>{item.category}</Text>}
                       </View>
+                      {!!caption && <Text style={styles.tCaption} numberOfLines={1}>{caption}</Text>}
                       <View style={styles.tMatchup}>
-                        <View style={styles.tTeamRow}>
-                          <View style={styles.tTeamLeft}>
-                            {item.server === 'home' ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
-                            <Text style={styles.tTeamName} numberOfLines={1}>{item.home}</Text>
-                          </View>
-                          <View style={styles.tSetScores}>
-                            {item.sets.map((s, i) => (
-                              <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>{s.home}</Text>
-                            ))}
-                          </View>
-                        </View>
-                        <View style={styles.tTeamRow}>
-                          <View style={styles.tTeamLeft}>
-                            {item.server === 'away' ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
-                            <Text style={styles.tTeamName} numberOfLines={1}>{item.away}</Text>
-                          </View>
-                          <View style={styles.tSetScores}>
-                            {item.sets.map((s, i) => (
-                              <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>{s.away}</Text>
-                            ))}
-                          </View>
-                        </View>
+                        {renderSide('home')}
+                        {renderSide('away')}
                       </View>
                     </TouchableOpacity>
                   );
@@ -806,7 +815,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               {selectedTennisMatch && (
                 <TennisLiveCard
                   match={selectedTennisMatch}
-                  timeline={tennisTimeline}
+                  live={tennisDetail?.live ?? null}
                   read={tennisRead ? { simple: tennisRead.simple, whyItMatters: tennisRead.whyItMatters } : null}
                   labels={{ serving: S.tennisServing, breakPoint: S.tennisBreakPoint, gamePoint: S.tennisGamePoint }}
                 />
@@ -1188,17 +1197,22 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tennisList: { marginBottom: 8 },
   tMatchCard: { marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tMatchCardSel: { borderColor: t.accent, borderWidth: 2 },           // selected → accent border (GameCard pattern)
-  tTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  tTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   tLiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   tLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
   tLiveText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  tStatusDetail: { color: t.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginLeft: 2 },
   tLeague: { color: t.textMuted, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 8 },
+  tCaption: { color: t.textMuted, fontSize: 11, fontWeight: '600', marginTop: -2, marginBottom: 8 }, // round · court
   tMatchup: { gap: 6 },                                                // two teamRows, 6px gap (GameCard.matchup)
   tTeamRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tTeamLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 8 },
+  tTeamLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 7, marginRight: 8 },
   tServeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent },   // serve cue (same as TennisLiveCard)
   tServeDotSpacer: { width: 7, height: 7 },                            // keep names aligned when not serving
-  tTeamName: { color: t.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 },    // GameCard teamName bumped 13→15
+  tFlag: { width: 22, height: 16, borderRadius: 2 },                   // mirrors GameCard logo treatment (contain)
+  tFlagSpacer: { width: 22, height: 16 },                              // reserve space when a flag is absent
+  tSeed: { color: t.textMuted, fontSize: 13, fontWeight: '700' },      // ESPN-style "(4)" before the name
+  tTeamName: { color: t.textPrimary, fontSize: 15, fontWeight: '700', flexShrink: 1 }, // GameCard teamName bumped 13→15
   tSetScores: { flexDirection: 'row', gap: 6 },
   tSetCell: { width: 18, textAlign: 'center', fontSize: 16, fontVariant: ['tabular-nums'] },
   tSetCellDone: { color: t.textSecondary, fontWeight: '700' },

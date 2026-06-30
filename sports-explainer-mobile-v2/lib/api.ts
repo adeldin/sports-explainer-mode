@@ -85,46 +85,67 @@ export async function fetchLeaderboard(): Promise<Leaderboard | null> {
   }
 }
 
-// Client-side mirror of the backend tennisProvider.ts shapes (server types can't cross the app/backend
-// boundary). Keep in sync with TennisGame / TennisTimelineEntry. The endpoint envelope is
-// { matches: TennisLiveMatch[]; timeline?: TennisTimelineEntry[] | null }.
-export interface TennisLiveMatch {
-  home: string;
-  away: string;
-  server: 'home' | 'away' | null;        // current server (from the live indicator)
-  sets: { home: number; away: number }[]; // last entry = in-progress set
-  currentGame: { home: string; away: string } | null; // tennis points ('0'/'15'/'30'/'40'/'AD')
-  status: string;
-  isLive: boolean;                        // status === 'InPlay'
-  league: string;
-  rawId: string;                          // keys the timeline + the explain rawId
-}
+// Client-side mirror of the backend espnTennisProvider.ts EspnTennisMatch shape (server types can't
+// cross the app/backend boundary). The LIST (/api/tennis-live) is ESPN-rich (names/flags/round/court/
+// seed/sets); a single match (/api/tennis-live?match=<espnId>) additionally carries a `live` overlay
+// (server/currentGame/timeline) enriched from RapidAPI in ESPN's home/away orientation.
 export interface TennisTimelineEntry {
   game: number;
   player: string;                         // the player who WON that game (result-owner)
   result: 'hold' | 'break';
   closeAt: string;
 }
+export interface TennisLiveOverlay {
+  server: 'home' | 'away' | null;                       // in ESPN orientation
+  currentGame: { home: string; away: string } | null;  // tennis points ('0'/'15'/'30'/'40'/'AD'), ESPN orientation
+  timeline: TennisTimelineEntry[] | null;               // name-keyed (no orientation flip)
+}
+export interface TennisLiveMatch {
+  espnId: string;
+  tour: 'atp' | 'wta';
+  category: string;                       // "Men's Singles" | "Women's Singles"
+  home: string;
+  away: string;
+  homeFlag?: string; awayFlag?: string;   // full https PNG url (omitted if absent)
+  homeFlagAlt?: string; awayFlagAlt?: string; // country name, e.g. "USA"
+  homeSeed?: number; awaySeed?: number;   // present only for seeded players
+  sets: { home: number; away: number }[]; // games per set, zipped home vs away (last = in-progress)
+  round?: string;                         // "Round 1"
+  court?: string;                         // "No. 2 Court"
+  statusDetail?: string;                  // "3rd Set"
+  isLive: boolean;
+  sortRank?: number;                      // min seed of whichever exist (seeded-first sort)
+  live?: TennisLiveOverlay | null;        // only on the ?match= response
+}
 export interface TennisLiveResponse {
   matches: TennisLiveMatch[];
-  timeline?: TennisTimelineEntry[] | null;
 }
 
-// GET live tennis matches (+ optionally one match's timeline via ?timeline=<rawId>). Best-effort: on
-// ANY failure (flag off returns {matches:[]} naturally, network, non-200, bad JSON) returns
-// { matches: [] } so the caller falls through to today's learn-mode tennis view — never throws.
-export async function fetchTennisLive(rawId?: string): Promise<TennisLiveResponse> {
+// GET the live tennis SINGLES list (ESPN). Best-effort: on ANY failure (flag off returns {matches:[]}
+// naturally, network, non-200, bad JSON) returns { matches: [] } so the caller falls through to
+// today's learn-mode tennis view — never throws.
+export async function fetchTennisLive(): Promise<TennisLiveResponse> {
   try {
-    const url = rawId ? `${TENNIS_LIVE_URL}?timeline=${encodeURIComponent(rawId)}` : TENNIS_LIVE_URL;
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetch(TENNIS_LIVE_URL, { method: 'GET' });
     if (!response.ok) return { matches: [] };
     const data = await response.json();
-    return {
-      matches: Array.isArray(data?.matches) ? data.matches : [],
-      timeline: Array.isArray(data?.timeline) ? data.timeline : null,
-    };
+    return { matches: Array.isArray(data?.matches) ? data.matches : [] };
   } catch {
     return { matches: [] };
+  }
+}
+
+// GET one match enriched with the RapidAPI live overlay (server/currentGame/timeline). Best-effort:
+// null on any failure OR when the backend couldn't resolve the id (it returns { matches } instead of
+// { match }), so the caller keeps the plain ESPN card.
+export async function fetchTennisMatch(espnId: string): Promise<TennisLiveMatch | null> {
+  try {
+    const response = await fetch(`${TENNIS_LIVE_URL}?match=${encodeURIComponent(espnId)}`, { method: 'GET' });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data && data.match ? (data.match as TennisLiveMatch) : null;
+  } catch {
+    return null;
   }
 }
 
