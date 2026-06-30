@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
-import { getLiveTennisMatches, getTennisTimeline } from '../explain/tennisProvider';
+import { getEspnSinglesLive } from '../explain/espnTennisProvider';
 
 // Standalone live-tennis endpoint — parallel to /api/leaderboard, deliberately OFF the explain path.
-// It calls the parallel tennis provider directly (no getGameData, no explain handler, no enricher).
+//
+// The LIST path is ESPN-only (keyless, free, no rate limit): the merged live SINGLES list across both
+// tours, with names/flags/round/court/seed/set-scores. RapidAPI is NOT on the list path — it stays the
+// live-point ENRICHER for a single selected match (server / current-game points / timeline), wired in
+// G2 behind the ?match=<espnId> param below.
 //
 // KILL-SWITCH: TENNIS_LIVE (default OFF — mirrors the cache's CACHE_ENABLED posture exactly). When OFF
-// the handler returns { matches: [] } IMMEDIATELY and NEVER touches RapidAPI, so prod stays empty and
-// burns zero rate-limit budget until Anthony flips TENNIS_LIVE=1 in Vercel. When ON it returns the live
-// matches (isLive only), and — if ?timeline=<rawId> is present — that match's game-by-game timeline too,
-// so mobile lazy-loads the timeline only for the viewed match (saves the per-second BASIC budget).
+// the handler returns { matches: [] } IMMEDIATELY and NEVER touches any upstream, so prod stays empty
+// until Anthony flips TENNIS_LIVE=1 in Vercel.
 //
-// Best-effort throughout: the provider already swallows its own failures (null/empty on any error), and
-// the handler guards again — every path returns { matches: [] }, NEVER a 500.
+// Best-effort throughout: the provider swallows its own failures (returns [] on any error), and the
+// handler guards again — every path returns { matches: [] }, NEVER a 500.
 
 const TENNIS_LIVE = process.env.TENNIS_LIVE === '1'; // default OFF
 
@@ -37,15 +39,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const all = await getLiveTennisMatches();
-    // Provider null → total failure; degrade to empty (client keeps its learn-mode tennis view).
-    const matches = (all ?? []).filter((m) => m.isLive === true);
+    // ESPN-only list: merged live singles across both tours (best-effort → [] on failure).
+    const matches = await getEspnSinglesLive();
 
-    // Optional lazy timeline: only when the flag is on AND a specific match id was requested.
-    const rawId = new URL(request.url).searchParams.get('timeline');
-    if (rawId) {
-      const timeline = await getTennisTimeline(rawId); // null on failure/empty — fine to pass through
-      return NextResponse.json({ matches, timeline }, { headers: corsHeaders });
+    // G2 TODO: ?match=<espnId> → enrich THAT match with RapidAPI live points (server / current-game
+    // points / timeline), joined by player name. For now the param is accepted but ignored — the list
+    // is returned unchanged so the client can already render flags/round/court/seed/sets.
+    const matchId = new URL(request.url).searchParams.get('match');
+    if (matchId) {
+      // (G2 enrichment goes here.)
+      return NextResponse.json({ matches }, { headers: corsHeaders });
     }
 
     return NextResponse.json({ matches }, { headers: corsHeaders });
