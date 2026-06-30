@@ -753,30 +753,56 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             // tennisMatches is empty (flag off / nothing live) this branch is skipped and tennis falls
             // through to today's exact learn view below — no regression.
             <>
-              {tennisMatches.length > 1 && (
-                <View style={styles.tennisSelector}>
-                  <FlatList
-                    data={tennisMatches}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={m => m.rawId}
-                    contentContainerStyle={styles.tennisSelectorContent}
-                    renderItem={({ item }) => {
-                      const sel = selectedTennisMatch?.rawId === item.rawId;
-                      return (
-                        <TouchableOpacity
-                          onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.rawId); }}
-                          style={[styles.tennisChip, sel && styles.tennisChipSel]}
-                          activeOpacity={0.8}>
-                          <Text style={[styles.tennisChipText, sel && styles.tennisChipTextSel]} numberOfLines={1}>
-                            {item.home} / {item.away}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }}
-                  />
-                </View>
-              )}
+              {/* Vertical stacked list of live matches (mirrors GameCard). Renders for >=1 match — a
+                  single match is one card, no horizontal scroll. .map (not FlatList) because the outer
+                  ScrollView already scrolls. Tapping a card selects it (rawId is the selection key). */}
+              <View style={styles.tennisList}>
+                {tennisMatches.map((item) => {
+                  const sel = selectedTennisMatch?.rawId === item.rawId;
+                  const lastIdx = item.sets.length - 1;
+                  return (
+                    <TouchableOpacity
+                      key={item.rawId}
+                      onPress={async () => { await Haptics.selectionAsync(); setTennisSel(item.rawId); }}
+                      style={[styles.tMatchCard, sel && styles.tMatchCardSel]}
+                      activeOpacity={0.85}>
+                      <View style={styles.tTopRow}>
+                        {item.isLive ? (
+                          <View style={styles.tLiveBadge}>
+                            <View style={styles.tLiveDot} />
+                            <Text style={styles.tLiveText}>LIVE</Text>
+                          </View>
+                        ) : <View />}
+                        {!!item.league && <Text style={styles.tLeague} numberOfLines={1}>{item.league}</Text>}
+                      </View>
+                      <View style={styles.tMatchup}>
+                        <View style={styles.tTeamRow}>
+                          <View style={styles.tTeamLeft}>
+                            {item.server === 'home' ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
+                            <Text style={styles.tTeamName} numberOfLines={1}>{item.home}</Text>
+                          </View>
+                          <View style={styles.tSetScores}>
+                            {item.sets.map((s, i) => (
+                              <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>{s.home}</Text>
+                            ))}
+                          </View>
+                        </View>
+                        <View style={styles.tTeamRow}>
+                          <View style={styles.tTeamLeft}>
+                            {item.server === 'away' ? <View style={styles.tServeDot} /> : <View style={styles.tServeDotSpacer} />}
+                            <Text style={styles.tTeamName} numberOfLines={1}>{item.away}</Text>
+                          </View>
+                          <View style={styles.tSetScores}>
+                            {item.sets.map((s, i) => (
+                              <Text key={i} style={[styles.tSetCell, i === lastIdx ? styles.tSetCellCurrent : styles.tSetCellDone]}>{s.away}</Text>
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
               {selectedTennisMatch && (
                 <TennisLiveCard
                   match={selectedTennisMatch}
@@ -1158,13 +1184,25 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
 
-  // Live-tennis match selector — compact horizontal chips (only shown when >1 live match).
-  tennisSelector: { marginBottom: 8 },
-  tennisSelectorContent: { paddingHorizontal: 16, gap: 8 },
-  tennisChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, maxWidth: 200 },
-  tennisChipSel: { borderColor: t.accent, borderWidth: 2 },
-  tennisChipText: { color: t.textSecondary, fontSize: 12, fontWeight: '700' },
-  tennisChipTextSel: { color: t.textPrimary },
+  // Live-tennis match selector — VERTICAL stacked cards mirroring GameCard (topRow/matchup tokens).
+  tennisList: { marginBottom: 8 },
+  tMatchCard: { marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  tMatchCardSel: { borderColor: t.accent, borderWidth: 2 },           // selected → accent border (GameCard pattern)
+  tTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  tLiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: t.live },
+  tLiveText: { color: t.live, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  tLeague: { color: t.textMuted, fontSize: 11, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 8 },
+  tMatchup: { gap: 6 },                                                // two teamRows, 6px gap (GameCard.matchup)
+  tTeamRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  tTeamLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 8 },
+  tServeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent },   // serve cue (same as TennisLiveCard)
+  tServeDotSpacer: { width: 7, height: 7 },                            // keep names aligned when not serving
+  tTeamName: { color: t.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 },    // GameCard teamName bumped 13→15
+  tSetScores: { flexDirection: 'row', gap: 6 },
+  tSetCell: { width: 18, textAlign: 'center', fontSize: 16, fontVariant: ['tabular-nums'] },
+  tSetCellDone: { color: t.textSecondary, fontWeight: '700' },
+  tSetCellCurrent: { color: t.textPrimary, fontWeight: '900' },        // in-progress set stands out
   // Scheduled-game "hasn't started yet" card (Bug 1) — neutral navy surface; the future
   // Live Now card can sit alongside this in the same slot.
   upcomingCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },

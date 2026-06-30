@@ -146,7 +146,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   nameCell: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 8 },
   serveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: t.accent },         // orange serve cue
   serveDotSpacer: { width: 7, height: 7 },                                                // keep names aligned
-  playerName: { color: t.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 },
+  playerName: { color: t.textPrimary, fontSize: 17, fontWeight: '700', flex: 1 },
 
   // Set columns — fixed-width, right-aligned numbers (scoreboard feel).
   setCell: { width: 26, textAlign: 'center', fontSize: 16, fontVariant: ['tabular-nums'] },
@@ -156,14 +156,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   gameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border, backgroundColor: t.surfaceAlt },
   servingLabel: { color: t.textSecondary, fontSize: 12, fontWeight: '600', flex: 1, marginRight: 8 },
   gameRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  points: { color: t.textPrimary, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  points: { color: t.textPrimary, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
   tag: { backgroundColor: t.accent, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { color: '#ffffff', fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  tagText: { color: '#ffffff', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
 
   momentum: { color: t.accentCool, fontSize: 12, fontWeight: '700', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
 
   // Situational read — mirrors PlayCard/GolfLeaderboard's accent-stripe def box.
   readBox: { marginHorizontal: 16, marginTop: 10, marginBottom: 14, padding: 14, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.border, borderLeftWidth: 4, borderLeftColor: t.accent },
-  readSimple: { color: t.textPrimary, fontSize: 14, lineHeight: 21, fontWeight: '600' },
-  readWhy: { color: t.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  readSimple: { color: t.textPrimary, fontSize: 18, lineHeight: 26, fontWeight: '600' },
+  readWhy: { color: t.textSecondary, fontSize: 16, lineHeight: 24, marginTop: 8 },
 });
