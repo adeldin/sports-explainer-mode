@@ -738,7 +738,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
 
             {/* ZONE A — bounded, independently-scrolling match list (~3 cards, rest scroll) */}
             <View style={styles.tZoneA}>
-              <ScrollView showsVerticalScrollIndicator nestedScrollEnabled contentContainerStyle={{ paddingBottom: 8 }}>
+              <ScrollView showsVerticalScrollIndicator nestedScrollEnabled contentContainerStyle={{ paddingBottom: 12 }}>
                 {filteredMatches.map((item) => {
                   const sel = selectedTennisMatch?.espnId === item.espnId;
                   const lastIdx = item.sets.length - 1;
@@ -790,9 +790,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               </ScrollView>
             </View>
 
+            {/* Clear section break so Zone B never reads as a continuation of the list (the "sliced
+                screen" bug) — a hairline divider; tZoneB's own surface + top border reinforce it. */}
+            <View style={styles.tZoneDivider} />
+
             {/* ZONE B — pinned detail; its own scroll lets a long read scroll without moving Zone A */}
             <View style={styles.tZoneB}>
-              <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 24 }}>
+              <ScrollView showsVerticalScrollIndicator contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}>
                 {selectedTennisMatch && (
                   <TennisLiveCard
                     match={selectedTennisMatch}
@@ -1239,7 +1243,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tFilterChipText: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
   tFilterChipTextActive: { color: '#ffffff' },
   tZoneA: { flexShrink: 0, maxHeight: '42%' },                         // ~3 cards visible, rest scroll
-  tZoneB: { flex: 1 },                                                 // pinned detail — the visual focus
+  // Short centered "handle" divider — an obvious section break between the list and the detail panel.
+  tZoneDivider: { height: 4, width: 40, borderRadius: 2, backgroundColor: t.border, alignSelf: 'center', marginTop: 4, marginBottom: 8 },
+  // Zone B is its OWN panel: distinct top edge + clip so scrolled content can't bleed under Zone A.
+  tZoneB: { flex: 1, backgroundColor: t.background, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border, overflow: 'hidden' }, // pinned detail — the visual focus
 
   // Live-tennis match selector — VERTICAL stacked cards mirroring GameCard (topRow/matchup tokens).
   tMatchCard: { marginHorizontal: 16, marginBottom: 8, padding: 14, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
