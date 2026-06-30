@@ -694,6 +694,75 @@ Respond with this exact JSON structure:
 }`;
 }
 
+// Name normalization for the ESPN↔RapidAPI join (mirrors tennis-live route): NFD, strip diacritics,
+// lowercase, trim, collapse whitespace — so "Cerúndolo" set-equals "cerundolo".
+const normTennisName = (s: any): string =>
+  String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+// Banned shot/stroke/surface vocabulary — we have NONE of this in the live-scoring feed, so any of it
+// in the output is fabrication. 'serve' itself is allowed (we discuss serving); only shot TYPES are banned.
+const TENNIS_BANNED_SHOT = /\b(forehand|backhand|slice|volley|topspin|underspin|spin|groundstroke|stroke|rally|rallies|grass|clay|hardcourt|dropshot|lob|ace|aces)\b/i;
+const hasBannedShotWords = (s: any): boolean => TENNIS_BANNED_SHOT.test(String(s || '')) || /\bdrop shot\b/i.test(String(s || ''));
+
+// Deterministic, guaranteed-clean "why it matters" — used as the last-resort fallback if the model
+// keeps fabricating. Role nouns + names only, never shot detail.
+function tennisDeterministicWhy(match: TennisGame | null): string {
+  if (!match) return 'Live point-by-point updates are not available for this match right now; the score above reflects the latest data.';
+  const { home, away, currentGame, server } = match;
+  const serverName = server === 'home' ? home : server === 'away' ? away : null;
+  if (serverName && currentGame) {
+    const sPts = server === 'home' ? currentGame.home : currentGame.away;
+    const rPts = server === 'home' ? currentGame.away : currentGame.home;
+    const label = tennisPointLabel(sPts, rPts);
+    if (label === 'break') return `It is break point — winning this point would let the returner take ${serverName}'s service game, a major momentum swing.`;
+    if (label === 'game') return `It is game point — ${serverName} is one point from holding serve.`;
+  }
+  return 'Holding serve and converting break chances will decide which way this set turns.';
+}
+
+// Run the guarded tennis completion with a post-process safety net: if the output contains banned shot
+// vocabulary, regenerate ONCE with an explicit correction; if it STILL does, fall back to a
+// deterministic read (the situation string + a templated stakes line). Guarantees no fabricated shot
+// detail ever ships, regardless of model behavior.
+async function runTennisRead(
+  situation: string, level: string, language: string, pronounGuidance: string,
+  justStarted: boolean, langLine: string, fallbackMatch: TennisGame | null,
+): Promise<{ simple: string; whyItMatters: string; complexity: string }> {
+  const system = buildTennisSystemPrompt(level, language, pronounGuidance);
+  const baseUser = buildTennisLearnUserPrompt(situation, level, justStarted) + langLine;
+  const call = async (extra: string) => {
+    const completion = await createChatCompletion({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: baseUser + extra },
+      ],
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
+    });
+    return JSON.parse(completion.choices[0]?.message?.content || '{}');
+  };
+
+  let parsed = await call('');
+  let simple = String(parsed.simple || '');
+  let why = String(parsed.whyItMatters || '');
+  let complexity = parsed.complexity || 'low';
+
+  if (hasBannedShotWords(simple) || hasBannedShotWords(why)) {
+    console.warn('[tennis read] banned shot vocabulary in first response — regenerating');
+    parsed = await call('\n\nYour previous response invented shot detail. Do NOT mention any stroke, shot, spin, or surface. Describe ONLY the score, serve, and breaks.');
+    simple = String(parsed.simple || '');
+    why = String(parsed.whyItMatters || '');
+    complexity = parsed.complexity || complexity;
+    if (hasBannedShotWords(simple) || hasBannedShotWords(why)) {
+      console.warn('[tennis read] regen STILL contained banned vocabulary — using deterministic fallback');
+      simple = situation;
+      why = tennisDeterministicWhy(fallbackMatch);
+    }
+  }
+  return { simple, whyItMatters: why, complexity };
+}
+
 // playType is raw ESPN text, so it never passes through the explanation prompt.
 // Translate it directly (deterministic) rather than relying on the model to echo
 // a translated copy inside its JSON — which it drops unreliably. Returns null for
@@ -946,43 +1015,58 @@ export async function POST(req: NextRequest) {
       // byte-identical to today. Best-effort: any provider null/failure → fall through, never 500.
       if (sport === 'tennis' && process.env.TENNIS_LIVE === '1') {
         try {
+          const tHome = typeof body.tennisHome === 'string' ? body.tennisHome : '';
+          const tAway = typeof body.tennisAway === 'string' ? body.tennisAway : '';
+          const hasNames = !!(tHome && tAway);
           const wanted = (typeof body.rawId === 'string' && body.rawId)
             || (typeof gameId === 'string' && gameId) || '';
+
           const matches = await getLiveTennisMatches();
           const live = (matches || []).filter(m => m.isLive);
-          // Prefer the requested match by rawId; else the first live one.
-          const match = (wanted && live.find(m => m.rawId === wanted)) || live[0] || null;
-          if (match) {
-            const timeline = await getTennisTimeline(match.rawId); // null on failure/empty — fine
-            const situation = buildTennisSituation(match, timeline);
-            // Gender guidance from the ESPN category (mobile passes tennisCategory); fresh-start guard
-            // so the read doesn't fabricate tactics at 0-0.
+
+          // NAME-FIRST match (lands the explain on the SELECTED match — mobile sends the ESPN names).
+          // Set-equality, order-independent (same logic as tennis-live G2). Fall back to rawId/gameId.
+          // Deliberately NO live[0] fallback — an arbitrary match = a read about the WRONG players.
+          let match: TennisGame | null = null;
+          if (hasNames) {
+            const want = new Set([normTennisName(tHome), normTennisName(tAway)]);
+            match = live.find(m => {
+              const h = normTennisName(m.home), a = normTennisName(m.away);
+              return h !== a && want.has(h) && want.has(a);
+            }) || null;
+          }
+          if (!match && wanted) match = live.find(m => m.rawId === wanted) || null;
+
+          // Fire the GUARDED tennis read whenever this is a real live-tennis request: a matched RapidAPI
+          // match (full situation + timeline) OR a known selected match by name (minimal situation, no
+          // live-point data — e.g. RapidAPI quota-blocked / match absent from its feed). In BOTH cases
+          // we use buildTennisSystemPrompt with its no-fabrication guardrails — NEVER the generic
+          // buildSystemPrompt path below, which solicits "the tactic on display" (the shot-detail source).
+          if (match || hasNames) {
+            const timeline = match ? await getTennisTimeline(match.rawId) : null; // null on failure/empty
+            const situation = match
+              ? buildTennisSituation(match, timeline)
+              : `${tHome} is playing ${tAway}. Live point-by-point data is not available for this match right now.`;
             const pronounGuidance = tennisPronounGuidance(body.tennisCategory);
-            const justStarted = tennisJustStarted(match, timeline);
+            // Minimal (no live data) → treat like a fresh start: brief, no fabrication.
+            const justStarted = match ? tennisJustStarted(match, timeline) : true;
             const langLine = language && language !== 'en'
               ? ` Respond entirely in ${languageNames[language] || language}.`
               : '';
-            const completion = await createChatCompletion({
-              model: GROQ_MODEL,
-              messages: [
-                { role: 'system', content: buildTennisSystemPrompt(level, language, pronounGuidance) },
-                { role: 'user', content: buildTennisLearnUserPrompt(situation, level, justStarted) + langLine },
-              ],
-              temperature: 0.3, // tighter than the generic 0.6 — less likely to embellish with invented detail
-              response_format: { type: 'json_object' },
-            });
-            const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+
+            // Guarded completion + banned-shot-vocabulary safety net (regen → deterministic fallback).
+            const read = await runTennisRead(situation, level, language, pronounGuidance, justStarted, langLine, match);
             return NextResponse.json({
-              simple: parsed.simple || '',
-              whyItMatters: parsed.whyItMatters || '',
+              simple: read.simple,
+              whyItMatters: read.whyItMatters,
               ruleDetail: '',
               showRule: false,
-              complexity: parsed.complexity || 'low',
+              complexity: read.complexity,
               gameContext: situation,
               learnMode: true,
             }, { headers: corsHeaders });
           }
-          // No live match → fall through to the generic learn completion (output-neutral).
+          // Not a groundable live-tennis request (no match AND no names) → fall through to generic.
         } catch (e) {
           console.error('Tennis live learn error (degrading to generic):', e);
           // fall through to the generic learn completion below
