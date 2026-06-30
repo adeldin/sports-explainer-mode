@@ -540,7 +540,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         if (!cancelled) setTennisDetail(detail);
       } catch { if (!cancelled) setTennisDetail(null); }
       try {
-        const data = await fetchExplanation(sport, level, espnId, language);
+        // Pass category (+ names) so the Gate-3 read uses correct pronouns on women's matches and
+        // can avoid fabricating shot detail at a fresh 0-0 start.
+        const data = await fetchExplanation(sport, level, espnId, language, undefined, {
+          tennisHome: selectedTennisMatch?.home,
+          tennisAway: selectedTennisMatch?.away,
+          tennisCategory: selectedTennisMatch?.category,
+        });
         if (!cancelled) setTennisRead(data);
       } catch { if (!cancelled) setTennisRead(null); }
     })();

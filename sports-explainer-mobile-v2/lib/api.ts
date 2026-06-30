@@ -187,6 +187,9 @@ export async function fetchExplanation(
   gameId?: string,
   language: Language = 'en',
   playText?: string, // explain THIS specific play instead of the latest
+  // Tennis-only hints so the Gate-3 situational read can avoid gendered pronouns on women's matches
+  // and key the right match by name (names set up future work). All optional; omitted when absent.
+  opts?: { tennisHome?: string; tennisAway?: string; tennisCategory?: string },
 ): Promise<ExplanationResponse> {
   const response = await fetch(API_URL, {
     method: 'POST',
@@ -197,6 +200,9 @@ export async function fetchExplanation(
       gameId, // Pass the ID to the backend
       language,
       playText, // omitted by JSON.stringify when undefined
+      tennisHome: opts?.tennisHome,         // omitted by JSON.stringify when undefined
+      tennisAway: opts?.tennisAway,
+      tennisCategory: opts?.tennisCategory, // "Men's Singles" | "Women's Singles" → pronoun guidance
     }),
   });
 
