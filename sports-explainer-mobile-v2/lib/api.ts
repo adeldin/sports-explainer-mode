@@ -14,7 +14,6 @@ export type Language = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja' | 'zh' | 'ko' | '
 export interface ExplanationResponse {
    simple: string;
   whyItMatters: string;
-  worthNoting?: string;   // optional general-knowledge callout (tennis now; other sports later)
   ruleDetail: string;
   showRule: boolean;        // Added
   complexity: 'low' | 'medium' | 'high'; // Added

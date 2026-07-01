@@ -488,7 +488,7 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
   // entry may be replayed under a DIFFERENT match, so the teaching text must not bake in this match's
   // team/player/city names. Empty string when forCache is false → prompt byte-identical to today.
   const genericRule = forCache
-    ? `\n\nGENERIC TEACHING (this explanation may be reused across different matches): In simple, whyItMatters, ruleDetail, and worthNoting, do NOT name specific teams, players, clubs, or cities. Refer to roles instead — "the attacking side", "the leading team", "the home side", "the defender". Teach the TYPE of situation, not this match's participants. The live play headline and scoreboard supply the actual identities separately.`
+    ? `\n\nGENERIC TEACHING (this explanation may be reused across different matches): In simple, whyItMatters, and ruleDetail, do NOT name specific teams, players, clubs, or cities. Refer to roles instead — "the attacking side", "the leading team", "the home side", "the defender". Teach the TYPE of situation, not this match's participants. The live play headline and scoreboard supply the actual identities separately.`
     : '';
 
   // Pitch-data conditional (MLB enriched): with a real "Last pitch:" line present, drop the pitch
@@ -522,8 +522,7 @@ STEP 3 — Respond with this EXACT JSON structure (content varies by level, stru
   "whyItMatters": "Why that lesson / this play matters in the game situation",
   "ruleDetail": "Explanation of the specific rule involved (or empty string if none)",
   "showRule": true/false,
-  "complexity": "low" | "medium" | "high",
-  "worthNoting": "OPTIONAL. A genuine piece of general context a knowledgeable fan would add about this sport or situation — what this kind of situation typically means, a relevant general principle, or useful background. General knowledge grounded in the situation, NEVER invented specifics beyond the play data. Leave as an empty string when there is nothing genuinely worth adding — most plays need nothing here."
+  "complexity": "low" | "medium" | "high"
 }
 
 Rules for JSON flags:
@@ -542,8 +541,7 @@ Respond with this exact JSON structure:
 {
   "simple": "What is happening and what to watch for",
   "whyItMatters": "Why it's interesting / extra context",
-  "complexity": "low" | "medium" | "high",
-  "worthNoting": "OPTIONAL. A genuine piece of general context a knowledgeable fan would add about this sport or situation — what this kind of situation typically means, a relevant general principle, or useful background. General knowledge grounded in the situation, NEVER invented specifics beyond the play data. Leave as an empty string when there is nothing genuinely worth adding — most plays need nothing here."
+  "complexity": "low" | "medium" | "high"
 }`;
 }
 
@@ -734,7 +732,6 @@ Respond with this exact JSON structure:
 {
   "simple": "What the score situation is and what to watch for — the scoreboard reality only",
   "whyItMatters": "Why this situation matters — momentum and stakes",
-  "worthNoting": "OPTIONAL. A genuine piece of general tennis insight a knowledgeable fan would add — about the surface, conditions, what a situation typically rewards, or what a tactic generally does. General knowledge ONLY, never a claim about what this player is doing. Leave as an empty string if there is nothing genuinely worth adding — most routine moments need nothing here.",
   "complexity": "low" | "medium" | "high"
 }`;
 }
@@ -786,7 +783,7 @@ function tennisDeterministicWhy(match: TennisGame | null): string {
 async function runTennisRead(
   situation: string, level: string, language: string, pronounGuidance: string,
   justStarted: boolean, langLine: string, fallbackMatch: TennisGame | null,
-): Promise<{ simple: string; whyItMatters: string; worthNoting: string; complexity: string }> {
+): Promise<{ simple: string; whyItMatters: string; complexity: string }> {
   const system = buildTennisSystemPrompt(level, language, pronounGuidance);
   const baseUser = buildTennisLearnUserPrompt(situation, level, justStarted) + langLine;
   const call = async (extra: string) => {
@@ -805,17 +802,14 @@ async function runTennisRead(
   let parsed = await call('');
   let simple = String(parsed.simple || '');
   let why = String(parsed.whyItMatters || '');
-  let worthNoting = String(parsed.worthNoting || '');   // general-knowledge field — NOT filtered
   let complexity = parsed.complexity || 'low';
 
-  // The filter applies to simple + whyItMatters ONLY (the situation read). worthNoting carries vetted
-  // general knowledge (surface/conditions/what a tactic does) and is intentionally NOT filtered.
+  // The filter applies to simple + whyItMatters (the situation read).
   if (hasLivePlayerClaim(simple) || hasLivePlayerClaim(why)) {
     console.warn('[tennis read] live-player claim in first response — regenerating');
     parsed = await call('\n\nDo NOT describe what either player is doing — no shots, strokes, or tactics in THIS match. Describe ONLY the score, serve, breaks, and general context.');
     simple = String(parsed.simple || '');
     why = String(parsed.whyItMatters || '');
-    worthNoting = String(parsed.worthNoting || '');
     complexity = parsed.complexity || complexity;
     if (hasLivePlayerClaim(simple) || hasLivePlayerClaim(why)) {
       console.warn('[tennis read] regen STILL contained a live-player claim — using deterministic fallback');
@@ -823,7 +817,7 @@ async function runTennisRead(
       why = tennisDeterministicWhy(fallbackMatch);
     }
   }
-  return { simple, whyItMatters: why, worthNoting, complexity };
+  return { simple, whyItMatters: why, complexity };
 }
 
 // playType is raw ESPN text, so it never passes through the explanation prompt.
@@ -1126,7 +1120,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({
               simple: read.simple,
               whyItMatters: read.whyItMatters,
-              worthNoting: read.worthNoting,
               ruleDetail: '',
               showRule: false,
               complexity: read.complexity,
@@ -1159,7 +1152,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         simple: parsed.simple || '',
         whyItMatters: parsed.whyItMatters || '',
-        worthNoting: parsed.worthNoting || '',
         ruleDetail: '',
         showRule: false,
         complexity: parsed.complexity || 'low',
@@ -1226,7 +1218,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({
               simple: t.simple,
               whyItMatters: t.whyItMatters ?? '',
-              worthNoting: t.worthNoting ?? '',
               ruleDetail: t.ruleDetail ?? '',
               showRule: t.showRule ?? (level !== 'expert'),
               complexity: t.complexity ?? 'low',
@@ -1259,7 +1250,6 @@ export async function POST(req: NextRequest) {
       await cacheSet(eKey, JSON.stringify({
         simple: parsed.simple,
         whyItMatters: parsed.whyItMatters || '',
-        worthNoting: parsed.worthNoting || '',
         ruleDetail: parsed.ruleDetail || '',
         showRule: parsed.showRule ?? (level !== 'expert'),
         complexity: parsed.complexity || 'low',
@@ -1269,7 +1259,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       simple: parsed.simple || play,
       whyItMatters: parsed.whyItMatters || '',
-      worthNoting: parsed.worthNoting || '',
       ruleDetail: parsed.ruleDetail || '',
       showRule: parsed.showRule ?? (level !== 'expert'),
       complexity: parsed.complexity || 'low',
