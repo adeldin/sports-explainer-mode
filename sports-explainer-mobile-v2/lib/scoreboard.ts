@@ -8,6 +8,14 @@
 import { Sport } from './api';
 import { isOffSeason } from './sports';
 
+// A probable starter (MLB probable pitcher today; other sports have no analog). `record` is ESPN's
+// pre-formatted "(W-L, ERA)" string, ready to display verbatim.
+export interface GameProbable {
+  name: string;
+  record?: string;
+  headshot?: string;
+}
+
 export interface Game {
   id: string;
   homeTeam: string;
@@ -27,6 +35,17 @@ export interface Game {
   // LiveScreen consumers ignore these, so game-loading behavior is unchanged. ---
   state?: string;       // raw ESPN state: 'pre' | 'in' | 'post'
   startTime?: number;   // epoch ms from the event date (window filter + tiebreak)
+  // --- ADDITIVE (Build 2): optional pre-game "tune-in" fields, retained WHEN PRESENT. All degrade
+  // gracefully — MLB carries the full set; a bare World Cup fixture has only matchup/time/venue/TV.
+  // Existing consumers (GameCard / live / recap / Watch Next) ignore these entirely. ---
+  venue?: string;        // venue.fullName, e.g. "Truist Park"
+  venueCity?: string;    // "City, ST" from venue.address (city + state when present)
+  broadcasts?: string[]; // deduped network/streaming names from BOTH broadcasts + geoBroadcasts
+  homeRecord?: string;   // overall W-L summary, e.g. "50-34" (MLB rich; empty for knockout soccer)
+  awayRecord?: string;
+  homeProbable?: GameProbable; // MLB probable starter (name + "(W-L, ERA)" + headshot)
+  awayProbable?: GameProbable;
+  weather?: { displayValue?: string; temperature?: number }; // outdoor-MLB color; absent elsewhere
   sport: string;
 }
 
@@ -85,6 +104,27 @@ export async function fetchScoreboard(
   // Site API gives team.logo (a URL); Core API (rugby) gives team.logos[].href.
   const logoOf = (c: any): string | undefined =>
     c?.team?.logo || c?.team?.logos?.[0]?.href || undefined;
+  // --- Build 2 pre-game extractors (all defensive: return undefined when the field is absent) ---
+  // Overall W-L only (records[] is [overall, home, road]); prefer the total/overall entry.
+  const recordOf = (c: any): string | undefined => {
+    const recs: any[] = c?.records || [];
+    const overall = recs.find((r: any) => r?.type === 'total' || r?.name === 'overall') || recs[0];
+    return overall?.summary || undefined;
+  };
+  const probableOf = (c: any): GameProbable | undefined => {
+    const p = (c?.probables || [])[0];
+    const name = p?.athlete?.fullName || p?.athlete?.displayName;
+    if (!name) return undefined;
+    return { name: String(name), record: p?.record ? String(p.record) : undefined, headshot: p?.athlete?.headshot || undefined };
+  };
+  // TV/streaming — merge BOTH broadcasts (names[]) and geoBroadcasts (media.shortName), deduped.
+  const broadcastsOf = (comp: any): string[] | undefined => {
+    const names: string[] = [];
+    for (const b of (comp?.broadcasts || [])) for (const n of (b?.names || [])) if (n) names.push(String(n));
+    for (const g of (comp?.geoBroadcasts || [])) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
+    const uniq = Array.from(new Set(names));
+    return uniq.length ? uniq : undefined;
+  };
   const toGame = (e: any): Game => {
     const comp = e.competitions?.[0];
     const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
@@ -106,6 +146,20 @@ export async function fetchScoreboard(
       isLive: st?.type?.state === 'in',
       state: st?.type?.state,                          // ADDITIVE
       startTime: e.date ? Date.parse(e.date) : undefined, // ADDITIVE
+      // ADDITIVE (Build 2) — optional tune-in fields; undefined when the feed doesn't carry them.
+      venue: comp?.venue?.fullName || undefined,
+      venueCity: comp?.venue?.address?.city
+        ? `${comp.venue.address.city}${comp.venue.address.state ? `, ${comp.venue.address.state}` : ''}`
+        : undefined,
+      broadcasts: broadcastsOf(comp),
+      homeRecord: recordOf(home),
+      awayRecord: recordOf(away),
+      homeProbable: probableOf(home),
+      awayProbable: probableOf(away),
+      weather: e?.weather
+        ? { displayValue: e.weather.displayValue ? String(e.weather.displayValue) : undefined,
+            temperature: typeof e.weather.temperature === 'number' ? e.weather.temperature : undefined }
+        : undefined,
       sport,
     };
   };
