@@ -240,6 +240,10 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
 type RecapData = {
   homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
   winner: string; statusDetail: string; summaryFacts: string[];
+  // ESPN's own AP recap, pulled from the SAME summary response as summaryFacts (sum.article).
+  // Captured but not yet wired into the prompt (Gate 1: output-neutral). Empty for thin sports
+  // (golf/rugby) and on any error → graceful, matches the existing "thin → honest recap" path.
+  articleHeadline: string; articleLede: string; articleLink: string;
 };
 
 const SOCCER_RECAP_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
@@ -308,7 +312,7 @@ function buildSoccerRecapExtras(
 }
 
 async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData> {
-  const out: RecapData = { homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', winner: '', statusDetail: '', summaryFacts: [] };
+  const out: RecapData = { homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', winner: '', statusDetail: '', summaryFacts: [], articleHeadline: '', articleLede: '', articleLink: '' };
   const cfg = espnConfig[sport];
   if (!cfg || cfg.learnMode) return out;
   const teamName = (comp: any, side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
@@ -344,6 +348,14 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
         if (game.id) {
           try {
             const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
+            // ESPN's own AP game recap lives in sum.article (same response). Headline + description
+            // (clean plain text) are captured here for grounding; wired into the prompt in a later
+            // gate. Lede: strip the leading "— " AP-dateline artifact (no-op when absent). Link:
+            // taken VERBATIM — the web href shape is sport-specific (/{sport}/recap?gameId= vs
+            // /soccer/report/_/gameId/), so never reconstruct it.
+            out.articleHeadline = String(sum?.article?.headline || '');
+            out.articleLede = String(sum?.article?.description || '').replace(/^—\s*/, '');
+            out.articleLink = String(sum?.article?.links?.web?.href || '');
             // Order facts by SIGNIFICANCE, not recency, so the model leads with what mattered:
             // leaders (the "who dominated" signal) first, then scoring events earliest-first
             // (an opening burst precedes late/garbage-time scores, which fall last and get
