@@ -22,6 +22,7 @@ import MatchTimeline from '../components/MatchTimeline';
 import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import SportStrip from '../components/SportStrip';
+import DateStrip from '../components/DateStrip';
 import GolfLeaderboard from '../components/GolfLeaderboard';
 import TennisLiveCard from '../components/TennisLiveCard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
@@ -33,7 +34,7 @@ import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedb
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { Game, SPORT_CONFIG, fetchScoreboard } from '../lib/scoreboard';
+import { Game, SPORT_CONFIG, fetchScoreboard, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
@@ -85,6 +86,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [refreshing, setRefreshing] = useState(false);
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  // Date strip: the day whose games are shown. null = today (default / live). The strip sets it;
+  // threaded into fetchGames → fetchScoreboard so a chosen day refetches that day's slate.
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // The current sport's event-model game-days (dashed YYYY-MM-DD) for the strip. Recomputed per
+  // sport (MLB's game-days ≠ World Cup's). Empty for learn-mode/core sports → the strip hides.
+  const [gameDays, setGameDays] = useState<string[]>([]);
   // Live Q&A (Phase 2): an ordered list, not a single slot — chip taps + free-text asks
   // each append an item that renders as a layer in the PlayCard (live/final), or inline
   // under the ask box (learn-mode, where there's no card). Per-item loading/error status.
@@ -147,6 +154,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // game is in `games`.
   const selectedGame = games.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
+  // Date strip anchors: today (labeled "TODAY" + centered) and the active day (selectedDate, or
+  // today when null). Kept as local day-strings so they match the strip cells + the fetch filter.
+  const todayDay = toLocalDayString(new Date());
+  const selectedDay = selectedDate ? toLocalDayString(selectedDate) : todayDay;
   // Category filter (All / Men's / Women's). filteredMatches preserves the rank-sort order.
   const filteredMatches = useMemo(() => tennisMatches.filter(m =>
     tennisFilter === 'all' ? true
@@ -252,7 +263,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setLeaderboard(null);
     setTennisMatches([]);
     try {
-      const parsed = await fetchScoreboard(sport, isCancelled);
+      const parsed = await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
       const sorted = [...parsed].sort((a, b) => {
@@ -276,7 +287,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     } catch (e) {
       console.error('Games fetch error:', e);
     }
-  }, [sport, selectedGameId, favorites]);
+  }, [sport, selectedGameId, favorites, selectedDate]);
 
   // `isCancelled` (first arg) lets the calling effect discard a superseded response.
   // Defaults to never-cancelled so the refresh callers below behave as before.
@@ -328,6 +339,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
+    setSelectedDate(null); // reset the date strip to today — a chosen day is per-sport, never carried across
     setResult(null);
     setGames([]);
     setLoading(false); // start the switch from a clean loading state (no stranded skeleton)
@@ -515,7 +527,34 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     let cancelled = false;
     fetchGames(() => cancelled);
     return () => { cancelled = true; };
-  }, [sport, favorites]);
+  }, [sport, favorites, selectedDate]);
+
+  // Date strip: compute the current sport's event-model game-days (prev/today/next, gap-skipping).
+  // Per-sport (recomputed on switch); head-to-head site sports only. Today is always injected as
+  // the home anchor so there's a "TODAY" cell to return to even on an off/rest day.
+  useEffect(() => {
+    let cancelled = false;
+    const cfg = SPORT_CONFIG[sport];
+    if (!cfg || cfg.learnMode || cfg.core) { setGameDays([]); return; }
+    (async () => {
+      const disc = await discoverGameDays(sport);
+      if (cancelled) return;
+      const set = new Set(disc.gameDays);
+      set.add(toLocalDayString(new Date()));
+      setGameDays(Array.from(set).sort());
+    })();
+    return () => { cancelled = true; };
+  }, [sport]);
+
+  // Tap a strip day → show that day's games. Reset the selected game so the new day auto-selects
+  // its first/live game (→ recap for a past final, countdown for a future 'pre', PlayCard for live).
+  // Today is canonicalized to null so it uses the live "bare today" fetch path.
+  const handleDaySelect = async (day: string) => {
+    if (day === selectedDay) return;
+    await Haptics.selectionAsync();
+    setSelectedGameId(null);
+    setSelectedDate(day === todayDay ? null : fromLocalDayString(day));
+  };
   useEffect(() => {
     // Only LIVE games have a play to explain (PlayCard). FINAL games take the recap path
     // below; pre/no-selection → no fetch, and clear any prior result so a stale PlayCard
@@ -661,11 +700,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   }, [games, selectedGameId, sport, gamesFetched, hasAltLiveContent]);
 
   useEffect(() => {
-    if (autoRefresh) {
+    // Only poll the live "today" view — a past/future day (selectedDate set) is static, so polling
+    // it is pointless and would also re-run fetchGames against a non-today slate.
+    if (autoRefresh && !selectedDate) {
       autoRefreshRef.current = setInterval(() => { fetchGames(); handleFetch(() => false, true); }, 60000);
     }
     return () => { if (autoRefreshRef.current) clearInterval(autoRefreshRef.current); };
-  }, [autoRefresh, sport, level, selectedGameId, language]);
+  }, [autoRefresh, sport, level, selectedGameId, language, selectedDate]);
 
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -722,6 +763,19 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           onSelect={(key) => handleSportChange(key as Sport)}
           marginBottom={10}
         />
+
+        {/* Event-model date strip — the current sport's game-days (prev/today/next, gap-skipping).
+            Hidden for learn-mode/core sports (empty gameDays) and when today is the ONLY cell
+            (length 1 = nothing to navigate to → a lone "TODAY" chip adds no value). */}
+        {gameDays.length > 1 && (
+          <DateStrip
+            days={gameDays}
+            selectedDay={selectedDay}
+            todayDay={todayDay}
+            onSelect={handleDaySelect}
+            marginBottom={10}
+          />
+        )}
 
         <ScrollView
           style={styles.scroll}

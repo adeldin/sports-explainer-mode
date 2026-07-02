@@ -65,9 +65,14 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
 export async function fetchScoreboard(
   sport: Sport,
   isCancelled: () => boolean = () => false,
+  date?: Date,   // when set, fetch THAT local day's games (date strip). Default: today's bare scoreboard.
 ): Promise<Game[]> {
   const cfg = SPORT_CONFIG[sport];
-  if (!cfg || cfg.learnMode || isOffSeason(sport)) return [];
+  if (!cfg || cfg.learnMode) return [];
+  // Off-season → [] for the DEFAULT (today) fetch; an explicit date bypasses this, since the date
+  // strip only asks for days discoverGameDays already found to have games (incl. across an
+  // offseason gap — e.g. tapping a preseason day for a currently-out-of-season league).
+  if (!date && isOffSeason(sport)) return [];
 
   // Team labels: prefer abbreviation, fall back for sports that lack it (rugby/soccer).
   const teamName = (c: any) =>
@@ -209,33 +214,46 @@ export async function fetchScoreboard(
     }
     parsed = deduped.map(toGame);
   } else {
+    // Date strip: fetch a specific day via ?dates=YYYYMMDD; default (no date) = bare "today".
+    const q = date ? `?dates=${compactLocal(date)}` : '';
     const res = await fetch(
-      `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard`,
+      `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard${q}`,
     );
     const data = await res.json();
-    // Belt-and-suspenders: drop completed games older than 24h so a stale scoreboard
-    // can't surface last season's results even if isOffSeason misses.
-    const now = Date.now();
-    parsed = (data?.events || [])
-      .filter((e: any) => {
-        const isFinal = e.status?.type?.state === 'post';
-        const ageMs = e.date ? now - new Date(e.date).getTime() : 0;
-        return !(isFinal && ageMs > 24 * 60 * 60 * 1000);
-      })
-      .map(toGame);
+    if (date) {
+      // Explicit day: return exactly that LOCAL day's games. ESPN's dates=YYYYMMDD bleeds ±1 day
+      // at the UTC boundary, so filter to the requested local day. The two today-only guards in
+      // the else-branch are DELIBERATELY skipped here — the 24h-stale drop and end-of-season
+      // clear would delete the very past finals we're navigating to.
+      const wantDay = dashedLocal(date);
+      parsed = (data?.events || [])
+        .filter((e: any) => e?.date && localDayOf(e.date) === wantDay)
+        .map(toGame);
+    } else {
+      // Belt-and-suspenders: drop completed games older than 24h so a stale scoreboard
+      // can't surface last season's results even if isOffSeason misses.
+      const now = Date.now();
+      parsed = (data?.events || [])
+        .filter((e: any) => {
+          const isFinal = e.status?.type?.state === 'post';
+          const ageMs = e.date ? now - new Date(e.date).getTime() : 0;
+          return !(isFinal && ageMs > 24 * 60 * 60 * 1000);
+        })
+        .map(toGame);
 
-    // End-of-season guard (date-aware): clear the list only when ESPN returns nothing
-    // live/upcoming AND no game dated today-or-later — i.e. genuinely past completed
-    // games. Daily sports (MLB) briefly show today's slate as `post`; those are dated
-    // today/future, so we keep them.
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const hasCurrent = (data?.events || []).some((e: any) => {
-      const st = e.status?.type?.state;
-      if (st === 'in' || st === 'pre') return true;
-      return (e.date || '').slice(0, 10) >= todayStr;
-    });
-    if (!hasCurrent && parsed.length > 0) {
-      parsed = [];
+      // End-of-season guard (date-aware): clear the list only when ESPN returns nothing
+      // live/upcoming AND no game dated today-or-later — i.e. genuinely past completed
+      // games. Daily sports (MLB) briefly show today's slate as `post`; those are dated
+      // today/future, so we keep them.
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const hasCurrent = (data?.events || []).some((e: any) => {
+        const st = e.status?.type?.state;
+        if (st === 'in' || st === 'pre') return true;
+        return (e.date || '').slice(0, 10) >= todayStr;
+      });
+      if (!hasCurrent && parsed.length > 0) {
+        parsed = [];
+      }
     }
   }
 
@@ -279,6 +297,16 @@ const compactLocal = (d: Date) =>
 const dashedLocal = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const localDayOf = (iso: string) => dashedLocal(new Date(iso));
+
+// Public local-day helpers for the date strip — keep the strip's Date <-> day-string math
+// identical to the fetch filter above (never UTC).
+export const toLocalDayString = (d: Date): string => dashedLocal(d);
+// Parse a dashed YYYY-MM-DD as a LOCAL calendar day at NOON (noon dodges DST/tz edges that could
+// shift the day). Feeding this back to fetchScoreboard(date) yields the same day it came from.
+export function fromLocalDayString(day: string): Date {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
 
 const latestBefore = (days: string[], day: string): string | null => {
   const before = days.filter(d => d < day).sort();
