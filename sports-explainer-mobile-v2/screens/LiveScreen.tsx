@@ -23,6 +23,7 @@ import CoachCard from '../components/CoachCard';
 import VisionModal from '../components/VisionModal';
 import SportStrip from '../components/SportStrip';
 import DateStrip from '../components/DateStrip';
+import TuneInCard from '../components/TuneInCard';
 import GolfLeaderboard from '../components/GolfLeaderboard';
 import TennisLiveCard from '../components/TennisLiveCard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
@@ -1107,16 +1108,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               </View>
             </Animated.View>
           ) : selectedGame && selectedGameState === 'pre' ? (
-            // Scheduled game — no play yet. Matchup + start time; the always-on FAQ
-            // stays below so the user can still explore. The Watch Next / Live Now card
-            // sits BENEATH this card: "Watch Next" 👀 when the sport has a live game to
-            // point at, else "Live Now" 🔴 (cross-sport discovery).
+            // Scheduled game — no play yet. The TuneInCard is the pre-game DETAIL card for THIS
+            // selected game (matchup/time/venue/records/probables/weather + first-class Watch-on-TV),
+            // degrading gracefully per sport. The always-on FAQ stays below so the user can explore.
+            // The Watch Next / Live Now card still sits BENEATH: "Watch Next" 👀 when the sport has a
+            // live game to point at, else "Live Now" 🔴 (cross-sport discovery of live alternatives).
             <>
-              <View style={styles.upcomingCard}>
-                <Text style={styles.upcomingLabel}>⏳ {S.gameNotStarted}</Text>
-                <Text style={styles.upcomingMatchup}>{selectedGame.awayTeam} vs {selectedGame.homeTeam}</Text>
-                {!!selectedGame.status && <Text style={styles.upcomingTime}>{selectedGame.status}</Text>}
-              </View>
+              <TuneInCard game={selectedGame} language={language} />
               {watchNext && !hasAltLiveContent && (
                 <WatchNextCard
                   rec={watchNext}
@@ -1336,10 +1334,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tSetCellCurrent: { color: t.textPrimary, fontWeight: '900' },        // in-progress set stands out
   // Scheduled-game "hasn't started yet" card (Bug 1) — neutral navy surface; the future
   // Live Now card can sit alongside this in the same slot.
-  upcomingCard: { marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
-  upcomingLabel: { color: t.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
-  upcomingMatchup: { color: t.textPrimary, fontSize: 18, fontWeight: '800' },
-  upcomingTime: { color: t.textSecondary, fontSize: 13, fontWeight: '600', marginTop: 4 },
   chipsWrap: { gap: 8 },                          // column of rows; 8px gap between the two rows
   chipRow: { flexDirection: 'row', gap: 8 },      // two chips per row, 8px gap between them
   chip: { flex: 1, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, alignItems: 'center' },
