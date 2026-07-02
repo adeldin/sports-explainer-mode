@@ -24,6 +24,7 @@ import VisionModal from '../components/VisionModal';
 import SportStrip from '../components/SportStrip';
 import DateStrip from '../components/DateStrip';
 import TuneInCard from '../components/TuneInCard';
+import WatchOn from '../components/WatchOn';
 import GolfLeaderboard from '../components/GolfLeaderboard';
 import TennisLiveCard from '../components/TennisLiveCard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
@@ -946,6 +947,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               language={language}
               onOpen={() => openWatchNext(watchNext)}
             />
+          )}
+
+          {/* Where-to-watch — QUIET variant, high on the LIVE card: a recessive TV reference label
+              near the score, glanceable without scrolling past the play. The PlayCard stays the
+              star (see WatchOn's quiet styling). Live-only + guarded on broadcast data. */}
+          {isLive && !!selectedGame?.broadcasts?.length && (
+            <WatchOn broadcasts={selectedGame.broadcasts} language={language} variant="quiet" />
           )}
 
           {isFinal ? (

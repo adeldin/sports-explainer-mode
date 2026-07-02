@@ -4,6 +4,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { Game, GameProbable } from '../lib/scoreboard';
 import { Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
+import WatchOn from './WatchOn';
 
 // Pre-game "tune-in" card — the scheduled-game analog of PlayCard (live) / RecapCard (final).
 // Shows matchup + LOCAL start time + venue, a first-class "Watch on {networks}" affordance (the
@@ -71,12 +72,10 @@ export default function TuneInCard({ game, language }: Props) {
       {!!timeLine && <Text style={styles.time}>{timeLine}</Text>}
       {!!venueLine && <Text style={styles.venue}>📍 {venueLine}</Text>}
 
-      {/* Watch on — FIRST-CLASS. The companion-app hook. Omitted only when no broadcast data. */}
-      {!!game.broadcasts?.length && (
-        <View style={styles.watchRow}>
-          <Text style={styles.watchText}>📺 {S.tuneInWatchOn} {game.broadcasts.join(', ')}</Text>
-        </View>
-      )}
+      {/* Watch on — FIRST-CLASS (prominent variant). Shared with the live card (quiet variant).
+          Omitted internally when no broadcast data. */}
+      <WatchOn broadcasts={game.broadcasts} language={language} variant="prominent" />
+
 
       {/* Probable starters — MLB (pitchers). Absent elsewhere → whole block hidden. */}
       {(game.awayProbable || game.homeProbable) && (
@@ -103,9 +102,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   teamRecord: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
   time: { color: t.textSecondary, fontSize: 14, fontWeight: '600', marginTop: 12 },
   venue: { color: t.textSecondary, fontSize: 13, fontWeight: '500', marginTop: 4 },
-  // Watch-on — the hero affordance: accent-bordered tinted row.
-  watchRow: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.accent },
-  watchText: { color: t.accentText, fontSize: 15, fontWeight: '800' },
   section: { marginTop: 16, borderTopWidth: 1, borderTopColor: t.border, paddingTop: 12 },
   sectionTitle: { color: t.accentText, fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 10 },
   probLine: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
