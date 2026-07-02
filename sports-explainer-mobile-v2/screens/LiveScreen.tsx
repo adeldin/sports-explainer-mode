@@ -1191,6 +1191,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               </>
             )}
           </View>
+
+          {/* Game Information — STATIC reference furniture, DEAD LAST on the page (below the play
+              stack AND Common Questions). Any selected LIVE game; independent of explanation state /
+              free cap; never gated on isPro/caps. The quiet TV row lives up high. */}
+          {isLive && selectedGame && (
+            <TuneInCard game={selectedGame} language={language} variant="context" />
+          )}
         </ScrollView>
 
         {/* Analyze-the-screen (premium #2). gameContext enriches the analysis when a game is

@@ -6,14 +6,19 @@ import { Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import WatchOn from './WatchOn';
 
-// Pre-game "tune-in" card — the scheduled-game analog of PlayCard (live) / RecapCard (final).
-// Shows matchup + LOCAL start time + venue, a first-class "Watch on {networks}" affordance (the
-// TV-companion hook), and — WHEN PRESENT — team records, probable starters, and weather. Every
-// enrich-field is conditional: a rich MLB game shows everything; a bare World Cup fixture shows
-// matchup + time + venue + TV, with no broken/empty rows. No odds, no tickets (locked mission call).
+// ONE reusable game-context card, TWO placements (variant):
+//   • 'tunein'  — pre-game (scheduled): the analog of PlayCard (live) / RecapCard (final). Eyebrow
+//     "UP NEXT" + a FIRST-CLASS prominent "Watch on {networks}" row (the TV hook).
+//   • 'context' — appended at the BOTTOM of the LIVE card stack (the "Game Information" reference
+//     block ESPN/Yahoo put there). Eyebrow "GAME INFO", NO TV row here (the live card shows a quiet
+//     TV row UP HIGH via <WatchOn variant="quiet">, so the star PlayCard isn't crowded).
+// Shows matchup + stage/round + LOCAL time + venue, and — WHEN PRESENT — records, starting pitchers,
+// weather. Every field conditional: rich MLB game shows everything; a bare World Cup fixture shows
+// matchup + stage + time + venue. No odds/tickets/officials/box-score (locked mission calls).
 interface Props {
   game: Game;
   language: Language;
+  variant?: 'tunein' | 'context';
 }
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -29,10 +34,11 @@ const fmtLocal = (ms?: number): string => {
   return `${WD[d.getDay()]}, ${MO[d.getMonth()]} ${d.getDate()} · ${h}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
-export default function TuneInCard({ game, language }: Props) {
+export default function TuneInCard({ game, language, variant = 'tunein' }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
+  const isContext = variant === 'context';
 
   const timeLine = fmtLocal(game.startTime) || game.status;
   const venueLine = game.venue
@@ -61,7 +67,7 @@ export default function TuneInCard({ game, language }: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>⏳ {S.tuneInEyebrow}</Text>
+      <Text style={styles.eyebrow}>{isContext ? `📋 ${S.gameInfoEyebrow}` : `⏳ ${S.tuneInEyebrow}`}</Text>
 
       {/* Matchup — away over home (the "away at home" reading), logos + records when present. */}
       <View style={styles.matchup}>
@@ -69,12 +75,15 @@ export default function TuneInCard({ game, language }: Props) {
         <TeamRow logo={game.homeLogo} name={game.homeTeamFull || game.homeTeam} record={game.homeRecord} />
       </View>
 
+      {/* Stage/round — newcomer stakes context ("Round of 32"). Suppressed for regular-season. */}
+      {!!game.stage && <Text style={styles.stage}>🏆 {game.stage}</Text>}
+
       {!!timeLine && <Text style={styles.time}>{timeLine}</Text>}
       {!!venueLine && <Text style={styles.venue}>📍 {venueLine}</Text>}
 
-      {/* Watch on — FIRST-CLASS (prominent variant). Shared with the live card (quiet variant).
-          Omitted internally when no broadcast data. */}
-      <WatchOn broadcasts={game.broadcasts} language={language} variant="prominent" />
+      {/* Watch on — FIRST-CLASS (prominent), pre-game ONLY. On the live card the TV row lives up
+          high as the quiet variant, so it's omitted here to avoid a second, competing TV element. */}
+      {!isContext && <WatchOn broadcasts={game.broadcasts} language={language} variant="prominent" />}
 
 
       {/* Probable starters — MLB (pitchers). Absent elsewhere → whole block hidden. */}
@@ -100,6 +109,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   teamLogo: { width: 28, height: 28 },
   teamName: { color: t.textPrimary, fontSize: 18, fontWeight: '800', flex: 1 },
   teamRecord: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
+  stage: { color: t.accentText, fontSize: 13, fontWeight: '800', marginTop: 12 },
   time: { color: t.textSecondary, fontSize: 14, fontWeight: '600', marginTop: 12 },
   venue: { color: t.textSecondary, fontSize: 13, fontWeight: '500', marginTop: 4 },
   section: { marginTop: 16, borderTopWidth: 1, borderTopColor: t.border, paddingTop: 12 },

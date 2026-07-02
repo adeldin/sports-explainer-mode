@@ -46,6 +46,8 @@ export interface Game {
   homeProbable?: GameProbable; // MLB probable starter (name + "(W-L, ERA)" + headshot)
   awayProbable?: GameProbable;
   weather?: { displayValue?: string; temperature?: number }; // outdoor-MLB color; absent elsewhere
+  stage?: string;        // prettified season stage/round, e.g. "Round of 32" — educational stakes
+                         // context for newcomers. From event.season.slug; "regular-season" suppressed.
   sport: string;
 }
 
@@ -117,6 +119,26 @@ export async function fetchScoreboard(
     if (!name) return undefined;
     return { name: String(name), record: p?.record ? String(p.record) : undefined, headshot: p?.athlete?.headshot || undefined };
   };
+  // Season stage/round for newcomer stakes context. Prettify the kebab slug ("round-of-32" →
+  // "Round of 32"); suppress the noise cases (regular/pre season) → undefined so nothing renders.
+  const prettyStage = (slug?: string): string | undefined => {
+    if (!slug || slug === 'regular-season' || slug === 'preseason') return undefined;
+    const small = new Set(['of', 'the', 'and']);
+    return slug.split('-')
+      .map((w, i) => (small.has(w) && i > 0 ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(' ');
+  };
+  // Weather condition TEXT. ESPN INCONSISTENTLY swaps displayValue <-> conditionId: usually the
+  // human label is in displayValue ("Partly sunny", conditionId "3"), but sometimes it's flipped
+  // (displayValue "1", conditionId "Sunny"). Pick whichever field is NON-numeric as the label;
+  // undefined if neither is text (→ card shows temp only, no trailing ", 1").
+  const weatherText = (w: any): string | undefined => {
+    const isNum = (v: any) => typeof v === 'string' && /^\d+$/.test(v.trim());
+    const dv = w?.displayValue, ci = w?.conditionId;
+    if (dv && !isNum(dv)) return String(dv);
+    if (ci && !isNum(ci)) return String(ci);
+    return undefined;
+  };
   // TV/streaming — merge BOTH broadcasts (names[]) and geoBroadcasts (media.shortName), deduped.
   const broadcastsOf = (comp: any): string[] | undefined => {
     const names: string[] = [];
@@ -157,9 +179,10 @@ export async function fetchScoreboard(
       homeProbable: probableOf(home),
       awayProbable: probableOf(away),
       weather: e?.weather
-        ? { displayValue: e.weather.displayValue ? String(e.weather.displayValue) : undefined,
+        ? { displayValue: weatherText(e.weather),
             temperature: typeof e.weather.temperature === 'number' ? e.weather.temperature : undefined }
         : undefined,
+      stage: prettyStage(e?.season?.slug),
       sport,
     };
   };
