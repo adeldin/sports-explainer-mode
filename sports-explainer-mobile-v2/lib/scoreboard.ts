@@ -242,3 +242,116 @@ export async function fetchScoreboard(
   if (isCancelled()) return [];
   return parsed;
 }
+
+// ============================================================================
+// Event-model game-day discovery (for the prev/today/next date strip).
+//
+// Given a sport + anchor day, range-query a bounded window (±PRIMARY_REACH_DAYS)
+// and group events by LOCAL day → the nearest game-day in each direction, widening
+// FORWARD (Option-B) when the primary window is dry. Empty days simply don't
+// appear in the grouping, so gap-skipping (e.g. a World Cup rest day, an MLB
+// All-Star break) is free. Head-to-head SITE sports only: learn-mode
+// (tennis/golf/cricket) and core (rugby/mlr) are excluded — they're not per-day
+// head-to-head strips (golf is tournament-spanning). This is intentionally a
+// LIGHT fetch: it reads only event.date (no team/score/$ref normalization), so
+// it can scan a wide window cheaply, and it does NOT short-circuit on
+// isOffSeason — the forward reach below is exactly how we find the next fixture
+// across an offseason gap.
+// ============================================================================
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Primary window half-width: anchor ±PRIMARY_REACH_DAYS in one range call. Kept SMALL because
+// ESPN's scoreboard caps a response at ~100 events, returned ASCENDING by date (first 100 kept,
+// the rest silently dropped). A dense daily sport (MLB ≈ 15 games/day) blows past 100 in ~7 days,
+// so a wide window (e.g. ±7d) truncates the FAR days and makes `next` skip real game-days. ±3d
+// (≈7 days, ≤~100 even for MLB) captures the immediate prev/next reliably; the forward reach below
+// handles anything sparser. NOTE: the cap is benign for `next`/the widen — ascending order means
+// the nearest-future day always survives truncation.
+const PRIMARY_REACH_DAYS = 3;
+// Forward Option-B reach cap: never scan past +N days. Beyond this → "no upcoming games".
+const FORWARD_REACH_DAYS = 45;
+
+// LOCAL date formatters — mirror fetchScoreboard's timezone-safe `fmt` (NEVER toISOString/UTC,
+// which rolls the day for users behind UTC). Compact YYYYMMDD feeds the ESPN `dates=` param;
+// dashed YYYY-MM-DD is the day-key (lexicographic order == chronological order).
+const compactLocal = (d: Date) =>
+  `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+const dashedLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const localDayOf = (iso: string) => dashedLocal(new Date(iso));
+
+const latestBefore = (days: string[], day: string): string | null => {
+  const before = days.filter(d => d < day).sort();
+  return before.length ? before[before.length - 1] : null;
+};
+const earliestAfter = (days: string[], day: string): string | null => {
+  const after = days.filter(d => d > day).sort();
+  return after.length ? after[0] : null;
+};
+
+// Light range/bare fetch: return the set of LOCAL game-days present for a site scoreboard
+// query. `query` is '?dates=START-END', '?dates=SINGLE', or '' (bare = ESPN's current/next
+// matchday). Network/parse failure → empty set (caller degrades to null prev/next).
+async function fetchGameDays(cfg: SportCfg, query: string): Promise<Set<string>> {
+  const days = new Set<string>();
+  try {
+    const res = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/${cfg.espnSport}/${cfg.league}/scoreboard${query}`,
+    );
+    const data = await res.json();
+    for (const e of (data?.events || [])) {
+      if (e?.date) days.add(localDayOf(e.date));
+    }
+  } catch { /* leave empty */ }
+  return days;
+}
+
+export interface GameDayDiscovery {
+  anchor: string;                 // local YYYY-MM-DD the search pivots on
+  gameDays: string[];             // sorted unique local game-days seen within the scanned reach
+  previousGameDay: string | null; // latest game-day strictly before the anchor (null if none)
+  nextGameDay: string | null;     // earliest game-day strictly after the anchor (null if none within reach)
+}
+
+// Discover the nearest game-days around `anchorDate` for the date strip. prev = latest game-day
+// before the anchor; next = earliest after (gap-skipping). If the primary ±7d window has no
+// next game-day (offseason / intermittent slate), Option-B forward reach: (1) widen the FORWARD
+// query out to the +FORWARD_REACH_DAYS cap, then (2) fall back to the bare scoreboard's
+// "next matchday" (soccer offseason exposes the next real fixture only there) — but still respect
+// the cap, so a fixture beyond the reach reads as "no upcoming games".
+export async function discoverGameDays(
+  sport: Sport,
+  anchorDate: Date = new Date(),
+): Promise<GameDayDiscovery> {
+  const anchor = dashedLocal(anchorDate);
+  const empty: GameDayDiscovery = { anchor, gameDays: [], previousGameDay: null, nextGameDay: null };
+  const cfg = SPORT_CONFIG[sport];
+  if (!cfg || cfg.learnMode || cfg.core || !cfg.espnSport || !cfg.league) return empty;
+
+  // Primary window: anchor −PRIMARY_REACH_DAYS … +PRIMARY_REACH_DAYS in ONE range call.
+  const start = compactLocal(new Date(anchorDate.getTime() - PRIMARY_REACH_DAYS * DAY_MS));
+  const end = compactLocal(new Date(anchorDate.getTime() + PRIMARY_REACH_DAYS * DAY_MS));
+  const all = await fetchGameDays(cfg, `?dates=${start}-${end}`);
+
+  const previousGameDay = latestBefore(Array.from(all), anchor);
+  let nextGameDay = earliestAfter(Array.from(all), anchor);
+
+  // Option-B forward reach — only when the primary window found no upcoming game-day.
+  if (!nextGameDay) {
+    // Contiguous with the primary window's forward edge (+PRIMARY_REACH_DAYS+1 … +cap).
+    const wideStart = compactLocal(new Date(anchorDate.getTime() + (PRIMARY_REACH_DAYS + 1) * DAY_MS));
+    const wideEnd = compactLocal(new Date(anchorDate.getTime() + FORWARD_REACH_DAYS * DAY_MS));
+    const wide = await fetchGameDays(cfg, `?dates=${wideStart}-${wideEnd}`);
+    wide.forEach(d => all.add(d));
+    nextGameDay = earliestAfter(Array.from(all), anchor);
+  }
+  if (!nextGameDay) {
+    const bare = await fetchGameDays(cfg, ''); // ESPN default = current/next matchday
+    bare.forEach(d => all.add(d));
+    const bareNext = earliestAfter(Array.from(all), anchor);
+    const cap = dashedLocal(new Date(anchorDate.getTime() + FORWARD_REACH_DAYS * DAY_MS));
+    if (bareNext && bareNext <= cap) nextGameDay = bareNext;
+  }
+
+  return { anchor, gameDays: Array.from(all).sort(), previousGameDay, nextGameDay };
+}
