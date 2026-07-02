@@ -1033,6 +1033,9 @@ export async function POST(req: NextRequest) {
           turningPoint: isProReq ? String(parsed.turningPoint || '') : '',
           keyPerformance: isProReq ? String(parsed.keyPerformance || '') : '',
           whyItMattered: isProReq ? String(parsed.whyItMattered || '') : '',
+          // Public ESPN recap link — sent to ALL users (not premium content, just a link-out).
+          // Verbatim from the API; the empty/error returns omit it → client normalizes to ''.
+          articleLink: data.articleLink,
         }, { headers: corsHeaders });
       } catch (e) {
         console.error('Recap error:', e);
