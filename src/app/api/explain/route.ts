@@ -190,7 +190,7 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
       );
       const data = await res.json();
       const game = gameId
-        ? data?.events?.find((e: any) => e.id === gameId)
+        ? data?.events?.find((e: any) => String(e.id) === String(gameId))
         : data?.events?.find((e: any) => e.status?.type?.state === 'in') || data?.events?.[0];
       if (game) {
         const comp = game.competitions?.[0];
@@ -332,7 +332,7 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
     } else {
       const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
       const data = await res.json();
-      const game = gameId ? data?.events?.find((e: any) => e.id === gameId) : data?.events?.[0];
+      const game = gameId ? data?.events?.find((e: any) => String(e.id) === String(gameId)) : data?.events?.[0];
       if (game) {
         const comp = game.competitions?.[0];
         out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
