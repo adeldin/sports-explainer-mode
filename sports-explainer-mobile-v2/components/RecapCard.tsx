@@ -6,6 +6,7 @@ import { Sport, Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import { RecapResponse, visibleProSections, RecapSectionKey } from '../lib/recap';
 import GlossaryText from './GlossaryText';
+import LockedSection from './LockedSection';
 
 // Post-Game Recap card (premium #1) — replaces the PlayCard on a FINAL game. Score + story
 // are visible to everyone (the hook); the three narrative sections are full for Pro/trial and
@@ -62,21 +63,14 @@ export default function RecapCard({ recap, isPro, sport, language, onUnlock }: P
         </TouchableOpacity>
       )}
 
-      {/* Pro narrative — full for Pro, locked teaser rows for free. */}
+      {/* Pro narrative — full for Pro, locked teaser rows for free (shared <LockedSection>). */}
       {proSections.map(s => (
-        <View key={s.key} style={styles.section}>
-          <Text style={styles.sectionTitle}>{s.locked ? '🔒 ' : ''}{SECTION_TITLE[s.key]}</Text>
-          {s.locked ? (
-            // Title-only teaser — suggests hidden prose without revealing it.
-            <View style={styles.lockedBars}>
-              <View style={[styles.lockedBar, { width: '92%' }]} />
-              <View style={[styles.lockedBar, { width: '78%' }]} />
-            </View>
-          ) : (
+        <LockedSection key={s.key} label={SECTION_TITLE[s.key]} locked={s.locked}>
+          {!s.locked && (
             <GlossaryText text={s.text} sport={sport} baseStyle={styles.proText}
               language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
           )}
-        </View>
+        </LockedSection>
       ))}
 
       {/* Honest-availability caption — free users only. The three locked rows market the sections
@@ -117,9 +111,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sectionTitle: { color: t.accentText, fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
   storyText: { color: t.textPrimary, fontSize: 16, fontWeight: '500', lineHeight: 24 },
   proText: { color: t.textPrimary, fontSize: 15, lineHeight: 23 },
-  // Locked teaser bars (suggest hidden prose).
-  lockedBars: { gap: 8, marginTop: 2 },
-  lockedBar: { height: 12, borderRadius: 6, backgroundColor: t.border, opacity: 0.6 },
   // Quiet honest-availability caption under the locked rows (not a section — a muted aside).
   lockedNote: { color: t.textMuted, fontSize: 12, fontStyle: 'italic', lineHeight: 17, marginTop: 14, marginBottom: 2 },
   // Subtle "Read on ESPN" link-out (text only — no third-party imagery). Sits under THE STORY.

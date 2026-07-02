@@ -25,6 +25,7 @@ import SportStrip from '../components/SportStrip';
 import DateStrip from '../components/DateStrip';
 import TuneInCard from '../components/TuneInCard';
 import WatchOn from '../components/WatchOn';
+import LockedSection from '../components/LockedSection';
 import GolfLeaderboard from '../components/GolfLeaderboard';
 import TennisLiveCard from '../components/TennisLiveCard';
 import { RecapResponse, hasRecapContent } from '../lib/recap';
@@ -983,8 +984,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             <View style={styles.capCard}>
               <Text style={styles.capTitle}>{S.capExplainTitle.replace('{n}', String(caps.DAILY_FREE))}</Text>
               <Text style={styles.capBody}>{S.capExplainBody}</Text>
-              {/* PRIMARY — Pro (the conversion ask). */}
-              <TouchableOpacity style={styles.capBtn} onPress={presentPaywall} activeOpacity={0.85}>
+              {/* Locked play sections — mirror PlayCard (THE PLAY / WHY IT MATTERS / THE RULE) +
+                  CoachCard's hardcoded "COACH'S READ" eyebrow. Static skeleton bars via the shared
+                  <LockedSection>; NO real content, NO generation (this branch never fetches). */}
+              <LockedSection label={`🎙️ ${S.thePlay}`} />
+              <LockedSection label={`💡 ${S.whyItMatters}`} />
+              <LockedSection label={`📜 ${S.theRule}`} />
+              <LockedSection label="🧠 COACH'S READ" />
+              {/* PRIMARY — Pro (the conversion ask), reusing the existing paywall trigger. */}
+              <TouchableOpacity style={styles.teaseCta} onPress={presentPaywall} activeOpacity={0.85}>
                 <Text style={styles.capBtnText}>{S.capCta.replace(' →', ' →')}</Text>
               </TouchableOpacity>
               {/* SECONDARY — still-free teaching surfaces, as text-links. */}
@@ -1374,6 +1382,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   capInlineBody: { color: t.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 14 },
   capBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, alignSelf: 'stretch', alignItems: 'center' },
   capBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  // Capped-tease Pro CTA — like capBtn but with a top margin (it follows the locked skeleton rows).
+  teaseCta: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 18, alignSelf: 'stretch', alignItems: 'center', marginTop: 18 },
   // Secondary text-links (Academy / Coach's Corner) — no fill, full-width centered so long labels wrap
   // cleanly under the filled Pro button; orange, visually subordinate to the primary Pro button.
   capBtnSecondary: { alignSelf: 'stretch', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, marginTop: 10 },
