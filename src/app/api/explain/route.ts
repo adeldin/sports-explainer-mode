@@ -315,76 +315,62 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
   const out: RecapData = { homeTeam: '', awayTeam: '', homeScore: '', awayScore: '', winner: '', statusDetail: '', summaryFacts: [], articleHeadline: '', articleLede: '', articleLink: '' };
   const cfg = espnConfig[sport];
   if (!cfg || cfg.learnMode) return out;
+  // No gameId → nothing to summarize. Return empty (graceful no-data path) — we do NOT scan a
+  // scoreboard, since that only ever holds today's slate (the very bug this rewrite fixes).
+  if (!gameId) return out;
   const teamName = (comp: any, side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
   const scoreOf = (comp: any, side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.score ?? '');
   try {
-    if (cfg.core) {
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const evRes = await fetch(`https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`, { cache: 'no-store' });
-      const evData = await evRes.json();
-      const items: any[] = (evData.items || []).slice(0, 20);
-      const events = (await Promise.all(items.map(async (it: any) => {
-        try { return await (await fetch(it.$ref, { cache: 'no-store' })).json(); } catch { return null; }
-      }))).filter(Boolean);
-      const game = gameId ? events.find((e: any) => String(e.id) === String(gameId)) : events[0];
-      if (game) {
-        const comp = game.competitions?.[0];
-        out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
-        out.homeScore = scoreOf(comp, 'home'); out.awayScore = scoreOf(comp, 'away');
-        out.statusDetail = game.status?.type?.shortDetail || game.status?.type?.detail || '';
-      }
-    } else {
-      const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
-      const data = await res.json();
-      const game = gameId ? data?.events?.find((e: any) => String(e.id) === String(gameId)) : data?.events?.[0];
-      if (game) {
-        const comp = game.competitions?.[0];
-        out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
-        out.homeScore = scoreOf(comp, 'home'); out.awayScore = scoreOf(comp, 'away');
-        const hc = comp?.competitors?.find((c: any) => c.homeAway === 'home');
-        const ac = comp?.competitors?.find((c: any) => c.homeAway === 'away');
-        out.winner = hc?.winner ? 'home' : ac?.winner ? 'away' : '';
-        out.statusDetail = game.status?.type?.shortDetail || '';
-        if (game.id) {
-          try {
-            const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
-            // ESPN's own AP game recap lives in sum.article (same response). Headline + description
-            // (clean plain text) are captured here for grounding; wired into the prompt in a later
-            // gate. Lede: strip the leading "— " AP-dateline artifact (no-op when absent). Link:
-            // taken VERBATIM — the web href shape is sport-specific (/{sport}/recap?gameId= vs
-            // /soccer/report/_/gameId/), so never reconstruct it.
-            out.articleHeadline = String(sum?.article?.headline || '');
-            out.articleLede = String(sum?.article?.description || '').replace(/^—\s*/, '');
-            out.articleLink = String(sum?.article?.links?.web?.href || '');
-            // Order facts by SIGNIFICANCE, not recency, so the model leads with what mattered:
-            // leaders (the "who dominated" signal) first, then scoring events earliest-first
-            // (an opening burst precedes late/garbage-time scores, which fall last and get
-            // trimmed first by the cap). Behavior-identical when both buckets are empty.
-            const leaderFacts: string[] = [];
-            const scoringFacts: string[] = [];
-            for (const grp of (sum?.leaders || [])) {
-              for (const cat of (grp?.leaders || []).slice(0, 2)) {
-                const l = cat?.leaders?.[0];
-                if (l?.athlete?.displayName && l?.displayValue) leaderFacts.push(`${l.athlete.displayName}: ${l.displayValue}${cat?.displayName ? ` (${cat.displayName})` : ''}`);
-              }
-            }
-            for (const p of (sum?.scoringPlays || [])) { if (p?.text) scoringFacts.push(String(p.text)); }
-            if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
-              for (const e of (sum?.keyEvents || [])) { if (e?.text) scoringFacts.push(String(e.text)); }
-            }
-            if (SOCCER_RECAP_KEYS.includes(sport)) {
-              // Goals (exact tally) + real stats LEAD and always survive; raw keyEvents text + leaders
-              // fill the rest under a higher cap. Fixes the goal under-count + surfaces possession/shots.
-              const { goalFacts, statFacts } = buildSoccerRecapExtras(sum, out.homeTeam, out.awayTeam, out.homeScore, out.awayScore);
-              const dedup = (arr: string[]) => [...new Set(arr.filter(Boolean))];
-              const priority = dedup([...goalFacts, ...statFacts]);
-              const rest = dedup([...leaderFacts, ...scoringFacts]).filter(f => !priority.includes(f));
-              out.summaryFacts = [...priority, ...rest].slice(0, 16);
-            } else {
-              out.summaryFacts.push(...leaderFacts, ...scoringFacts);
-            }
-          } catch { /* no summary → thin (honest) recap */ }
+    // Summary-direct: ONE fetch resolves teams/score/status (header.competitions[0]) AND the AP
+    // article + fact buckets — for ALL sports. The site-API summary serves core sports (rugby)
+    // with inline teams/scores (no $ref), so the old core-vs-scoreboard split is gone. Crucially
+    // this works for PAST games too (a scoreboard only holds today's slate), which is the fix:
+    // the date strip can now reach any final's recap.
+    const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${gameId}`, { cache: 'no-store' })).json();
+    const comp = sum?.header?.competitions?.[0];
+    const st = comp?.status?.type;
+    // Gate on the finished STATE, not the label — shortDetail varies ('Final' / 'FT' / 'Final/OT').
+    if (comp && (st?.state === 'post' || st?.completed === true)) {
+      out.homeTeam = teamName(comp, 'home'); out.awayTeam = teamName(comp, 'away');
+      out.homeScore = scoreOf(comp, 'home'); out.awayScore = scoreOf(comp, 'away');
+      const hc = comp?.competitors?.find((c: any) => c.homeAway === 'home');
+      const ac = comp?.competitors?.find((c: any) => c.homeAway === 'away');
+      out.winner = hc?.winner ? 'home' : ac?.winner ? 'away' : '';
+      out.statusDetail = st?.shortDetail || st?.detail || '';
+      // ESPN's own AP game recap lives in sum.article (same response). Headline + description
+      // (clean plain text) are the grounding. Lede: strip the leading "— " AP-dateline artifact
+      // (no-op when absent). Link: taken VERBATIM — the web href shape is sport-specific
+      // (/{sport}/recap?gameId= vs /soccer/report/_/gameId/), so never reconstruct it. Rugby has
+      // no article → these stay '' → stats-only Branch B (fine, like golf).
+      out.articleHeadline = String(sum?.article?.headline || '');
+      out.articleLede = String(sum?.article?.description || '').replace(/^—\s*/, '');
+      out.articleLink = String(sum?.article?.links?.web?.href || '');
+      // Order facts by SIGNIFICANCE, not recency, so the model leads with what mattered:
+      // leaders (the "who dominated" signal) first, then scoring events earliest-first
+      // (an opening burst precedes late/garbage-time scores, which fall last and get
+      // trimmed first by the cap). Behavior-identical when both buckets are empty.
+      const leaderFacts: string[] = [];
+      const scoringFacts: string[] = [];
+      for (const grp of (sum?.leaders || [])) {
+        for (const cat of (grp?.leaders || []).slice(0, 2)) {
+          const l = cat?.leaders?.[0];
+          if (l?.athlete?.displayName && l?.displayValue) leaderFacts.push(`${l.athlete.displayName}: ${l.displayValue}${cat?.displayName ? ` (${cat.displayName})` : ''}`);
         }
+      }
+      for (const p of (sum?.scoringPlays || [])) { if (p?.text) scoringFacts.push(String(p.text)); }
+      if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
+        for (const e of (sum?.keyEvents || [])) { if (e?.text) scoringFacts.push(String(e.text)); }
+      }
+      if (SOCCER_RECAP_KEYS.includes(sport)) {
+        // Goals (exact tally) + real stats LEAD and always survive; raw keyEvents text + leaders
+        // fill the rest under a higher cap. Fixes the goal under-count + surfaces possession/shots.
+        const { goalFacts, statFacts } = buildSoccerRecapExtras(sum, out.homeTeam, out.awayTeam, out.homeScore, out.awayScore);
+        const dedup = (arr: string[]) => [...new Set(arr.filter(Boolean))];
+        const priority = dedup([...goalFacts, ...statFacts]);
+        const rest = dedup([...leaderFacts, ...scoringFacts]).filter(f => !priority.includes(f));
+        out.summaryFacts = [...priority, ...rest].slice(0, 16);
+      } else {
+        out.summaryFacts.push(...leaderFacts, ...scoringFacts);
       }
     }
   } catch (e) {
