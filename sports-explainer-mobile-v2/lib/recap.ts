@@ -11,6 +11,9 @@ export interface RecapResponse {
   turningPoint: string;
   keyPerformance: string;
   whyItMattered: string;
+  // Public ESPN recap URL (verbatim from the API — sport-specific path shape, never reconstruct).
+  // Empty for golf/thin games and any error path → the "Read on ESPN" link-out simply hides.
+  articleLink: string;
 }
 
 export type RecapSectionKey = 'turningPoint' | 'keyPerformance' | 'whyItMattered';
@@ -26,6 +29,7 @@ export function normalizeRecap(raw: any): RecapResponse {
     turningPoint: str(raw?.turningPoint),
     keyPerformance: str(raw?.keyPerformance),
     whyItMattered: str(raw?.whyItMattered),
+    articleLink: str(raw?.articleLink),
   };
 }
 

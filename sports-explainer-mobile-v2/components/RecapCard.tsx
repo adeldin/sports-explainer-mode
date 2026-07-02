@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
 import { Sport, Language } from '../lib/api';
@@ -50,6 +50,16 @@ export default function RecapCard({ recap, isPro, sport, language, onUnlock }: P
           <GlossaryText text={recap.story} sport={sport} baseStyle={styles.storyText}
             language={language} styles={styles} onToggleTerm={toggleGlossaryTerm} />
         </View>
+      )}
+
+      {/* Read-on-ESPN link-out — text only (no image/logo: ESPN/AP/Getty photos are not licensed).
+          Opens the API's verbatim URL (sport-specific path shape — never reconstruct). Absent for
+          golf/thin games → the row simply doesn't render. */}
+      {!!recap.articleLink && (
+        <TouchableOpacity style={styles.readOnEspn} activeOpacity={0.7}
+          onPress={() => { Haptics.selectionAsync(); Linking.openURL(recap.articleLink); }}>
+          <Text style={styles.readOnEspnText}>{S.recapReadOnEspn}</Text>
+        </TouchableOpacity>
       )}
 
       {/* Pro narrative — full for Pro, locked teaser rows for free. */}
@@ -112,6 +122,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   lockedBar: { height: 12, borderRadius: 6, backgroundColor: t.border, opacity: 0.6 },
   // Quiet honest-availability caption under the locked rows (not a section — a muted aside).
   lockedNote: { color: t.textMuted, fontSize: 12, fontStyle: 'italic', lineHeight: 17, marginTop: 14, marginBottom: 2 },
+  // Subtle "Read on ESPN" link-out (text only — no third-party imagery). Sits under THE STORY.
+  readOnEspn: { marginTop: 12, paddingVertical: 4 },
+  readOnEspnText: { color: t.accent, fontSize: 13, fontWeight: '700' },
   unlockBtn: { marginTop: 18, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   unlockBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   // Glossary (mirrors PlayCard).

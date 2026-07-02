@@ -585,7 +585,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       } catch (e) {
         if (cancelled()) return;
         console.error('Recap fetch error:', e);
-        setRecap({ score: '', story: '', turningPoint: '', keyPerformance: '', whyItMattered: '' });
+        setRecap({ score: '', story: '', turningPoint: '', keyPerformance: '', whyItMattered: '', articleLink: '' });
       } finally {
         if (!cancelled()) setRecapLoading(false);
       }
