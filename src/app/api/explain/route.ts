@@ -420,14 +420,33 @@ function buildRecapPrompt(data: RecapData, sport: string, level: string, languag
   const goalRule = (SOCCER_RECAP_KEYS.includes(sport) && data.summaryFacts.some(f => f.startsWith('Goals —')))
     ? ' If a "Goals —" line is given, it is the AUTHORITATIVE tally: your recap MUST reflect those EXACT goal counts per team and per scorer — never state more or fewer goals than the tally shows (if it says a player scored 3, never write "two").'
     : '';
+  // Branch A vs B pivots on whether ESPN gave us a real AP recap for this game (Gate 2).
+  //   A (article present): the AP recap IS authoritative narrative — the model USES its significance
+  //     and rewrites it at level. The old "never add drama the data doesn't contain" clause would
+  //     FIGHT the source (the drama is now IN the data), so the cardinal rule is transformed to
+  //     "use the story, don't invent past it, don't copy the words."
+  //   B (no article — golf/thin games): the original never-fabricate-from-stats rule, byte-identical
+  //     to before. Sports without an article regress nowhere.
+  const hasArticle = !!data.articleLede;
+  const cardinalRule = hasArticle
+    ? `CARDINAL RULE — GROUND IN THE AP RECAP. The Official AP recap in the DATA below IS authoritative source narrative — use the significance, turning points, and standout performances it describes. Do NOT add anything beyond what the AP recap + stats support, and CRITICALLY do NOT reproduce the AP recap's wording — rewrite it in your own plain, ${level}-appropriate language. Never invent plays, players, scores, or stats the AP recap and data don't contain. If a field isn't supported by the AP recap or the stats, return an EMPTY STRING "". Explain any jargon in plain terms.`
+    : `CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.`;
   const system = `You are a sports broadcaster writing a post-game recap for a ${level}-level viewer (someone newer to ${sport}).${langLine}
-CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.${goalRule}`;
+${cardinalRule}${goalRule}`;
   const facts = data.summaryFacts.length ? data.summaryFacts.map(f => `- ${f}`).join('\n') : '(no detailed play/stat data available for this game)';
   const winnerName = data.winner === 'home' ? data.homeTeam : data.winner === 'away' ? data.awayTeam : '';
+  // AP recap block — injected ONLY when present (Branch A). Empty string when absent → the user
+  // message is byte-identical to before (Branch B). Headline + lede are the grounding; the prompt
+  // above forces a rewrite-at-level, never a copy (copyright discipline).
+  const apRecap = hasArticle
+    ? `Official AP recap (authoritative source narrative — REWRITE in your own ${level}-level words, NEVER copy its sentences):
+${data.articleHeadline ? `Headline: ${data.articleHeadline}\n` : ''}${data.articleLede}
+`
+    : '';
   const user = `DATA (the ONLY facts you may use):
 Final: ${data.awayTeam} ${data.awayScore} — ${data.homeTeam} ${data.homeScore}${data.statusDetail ? ` (${data.statusDetail})` : ''}
 ${winnerName ? `Winner: ${winnerName}` : 'Winner: see score'}
-Key facts:
+${apRecap}Key facts:
 ${facts}
 
 Respond with JSON containing EXACTLY these fields: { ${fields} }.
