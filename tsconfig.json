@@ -25,6 +25,7 @@
   "exclude": [
     "node_modules",
     "sports-explainer-mobile",
-    "sports-explainer-mobile-v2"
+    "sports-explainer-mobile-v2",
+    "coaches-corner-spikes"
   ]
 }

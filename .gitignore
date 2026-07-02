@@ -53,3 +53,9 @@ sports-explainer-v1.zip
 *.mov
 *.mp4
 .rapidapi.env
+
+# design spikes (Coach's Corner visual workbench — lives on desk, not in repo)
+coaches-corner-spikes/
+
+# build artifact zips
+*.zip
