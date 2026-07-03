@@ -97,30 +97,76 @@ function Dot({ p }: { p: FieldPlayer }) {
   );
 }
 
-// The field: turf → stripes → yard lines → [overlay slot, UNDER players] → LOS → players.
-// `fill`: 'width' (default, portrait) sizes by container WIDTH via aspectRatio — a wider column just
-// means bigger dots. 'height' (landscape) sizes by container HEIGHT (width derived from the ratio), so
-// the wide field fills a short viewport without overflowing. Aspect ratio (680/380) is kept either way.
+// Shared sizing wrapper for any field/pitch renderer. `fill='width'` (default) sizes by container
+// WIDTH via aspectRatio — a wider column means bigger art. `fill='height'` (landscape) sizes by
+// container HEIGHT, width derived. The aspect ratio is the renderer's OWN viewBox (viewW/viewH), NOT
+// a hardcoded one — so a gridiron (680×380) and a soccer pitch (680×420) both size correctly.
+function FieldCanvas({ viewW, viewH, fill = 'width', bg, children }: {
+  viewW: number; viewH: number; fill?: 'width' | 'height'; bg: string; children: ReactNode;
+}) {
+  const ratio = viewW / viewH;
+  const byHeight = fill === 'height';
+  return (
+    <View style={[fieldStyles.wrap, byHeight && { height: '100%' as const, aspectRatio: ratio }]}>
+      <Svg
+        viewBox={`0 0 ${viewW} ${viewH}`}
+        style={byHeight
+          ? { width: '100%', height: '100%', backgroundColor: bg }
+          : { width: '100%', aspectRatio: ratio, backgroundColor: bg }}>
+        {children}
+      </Svg>
+    </View>
+  );
+}
+
+// The gridiron: turf → stripes → yard lines → [overlay slot, UNDER players] → LOS → players.
 export function FootballField({ players, overlay, fill = 'width' }: {
   players: FieldPlayer[]; overlay?: ReactNode; fill?: 'width' | 'height';
 }) {
-  const byHeight = fill === 'height';
   return (
-    <View style={[fieldStyles.wrap, byHeight && fieldStyles.wrapH]}>
-      <Svg viewBox={`0 0 ${FIELD.vbW} ${FIELD.vbH}`} style={byHeight ? fieldStyles.svgH : fieldStyles.svg}>
-        <Rect x={0} y={0} width={FIELD.vbW} height={FIELD.vbH} fill={FE.turfD} />
-        {STRIPES.map((s, i) => (
-          <Rect key={`st${i}`} x={s.x} y={FIELD.bandTop} width={FIELD.stripeW} height={FIELD.bandH} fill={s.fill} />
-        ))}
-        {YDLINES.map((x, i) => (
-          <Line key={`yd${i}`} x1={x} y1={FIELD.bandTop} x2={x} y2={FIELD.bandBot} stroke={FE.chalk} strokeWidth={1.2} opacity={0.8} />
-        ))}
-        {overlay}
-        <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
-        <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
-        {players.map(p => <Dot key={p.id} p={p} />)}
-      </Svg>
-    </View>
+    <FieldCanvas viewW={FIELD.vbW} viewH={FIELD.vbH} fill={fill} bg={FE.turfD}>
+      <Rect x={0} y={0} width={FIELD.vbW} height={FIELD.vbH} fill={FE.turfD} />
+      {STRIPES.map((s, i) => (
+        <Rect key={`st${i}`} x={s.x} y={FIELD.bandTop} width={FIELD.stripeW} height={FIELD.bandH} fill={s.fill} />
+      ))}
+      {YDLINES.map((x, i) => (
+        <Line key={`yd${i}`} x1={x} y1={FIELD.bandTop} x2={x} y2={FIELD.bandBot} stroke={FE.chalk} strokeWidth={1.2} opacity={0.8} />
+      ))}
+      {overlay}
+      <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
+      <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
+      {players.map(p => <Dot key={p.id} p={p} />)}
+    </FieldCanvas>
+  );
+}
+
+// ── Soccer pitch (attacking LEFT→RIGHT; defenders defend the RIGHT goal; NO line of scrimmage) ──
+// viewBox 680×420. Paint only (boundary/halfway/center circle/right penalty+6-yd box/right goal);
+// the module supplies the DYNAMIC layer (moving players, ball, offside lines) as `children` on top —
+// the pitch is topic-agnostic, exactly like FootballField is to Box Count.
+export const PITCH = { vbW: 680, vbH: 420, stripeW: 68, stripeCount: 10 };
+const SOCCER = { turfD: '#2f7a44', turfL: '#358a4c', chalk: '#F4F4EE' };
+const PITCH_STRIPES = Array.from({ length: PITCH.stripeCount }, (_, i) => ({
+  x: i * PITCH.stripeW, fill: i % 2 ? SOCCER.turfD : SOCCER.turfL,
+}));
+
+export function SoccerPitch({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={PITCH.vbW} viewH={PITCH.vbH} fill={fill} bg={SOCCER.turfD}>
+      {PITCH_STRIPES.map((s, i) => (
+        <Rect key={`ps${i}`} x={s.x} y={0} width={PITCH.stripeW} height={PITCH.vbH} fill={s.fill} />
+      ))}
+      {/* boundary */}
+      <Rect x={6} y={6} width={668} height={408} fill="none" stroke={SOCCER.chalk} strokeWidth={2} opacity={0.7} />
+      {/* halfway line + center circle */}
+      <Line x1={340} y1={6} x2={340} y2={414} stroke={SOCCER.chalk} strokeWidth={2} opacity={0.55} />
+      <Circle cx={340} cy={210} r={44} fill="none" stroke={SOCCER.chalk} strokeWidth={2} opacity={0.45} />
+      {/* right penalty box + 6-yard box + goal (the attacking target) */}
+      <Rect x={578} y={110} width={96} height={200} fill="none" stroke={SOCCER.chalk} strokeWidth={2} opacity={0.7} />
+      <Rect x={634} y={160} width={40} height={100} fill="none" stroke={SOCCER.chalk} strokeWidth={2} opacity={0.7} />
+      <Rect x={674} y={180} width={6} height={60} fill={SOCCER.chalk} opacity={0.85} />
+      {children}
+    </FieldCanvas>
   );
 }
 
@@ -210,13 +256,10 @@ export function NextButton({ visible, label, onPress }: { visible: boolean; labe
   );
 }
 
-// Field paint styles — FIXED (the turf is green in any theme).
+// Field wrapper style — FIXED. The per-viewBox sizing (width/height + aspectRatio) lives inline in
+// FieldCanvas so each renderer sizes to its OWN viewBox (gridiron 680×380 / soccer pitch 680×420).
 const fieldStyles = StyleSheet.create({
   wrap: { borderRadius: 14, overflow: 'hidden' },
-  svg: { width: '100%', aspectRatio: FIELD.vbW / FIELD.vbH, backgroundColor: FE.turfD },
-  // Height-driven (landscape): the wrapper takes the row's full height, width derives from the ratio.
-  wrapH: { height: '100%', aspectRatio: FIELD.vbW / FIELD.vbH },
-  svgH: { width: '100%', height: '100%', backgroundColor: FE.turfD },
 });
 
 // Chrome styles — THEMED (native to Coach's Corner).
