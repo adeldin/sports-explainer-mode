@@ -17,6 +17,10 @@ export interface Theme {
 
   textPrimary: string;
   textSecondary: string;
+  // Secondary text tuned for DARK surfaces (field-module chrome / navy cards). In the dark theme
+  // textSecondary (#6b7690) is too dark on navy; this is a lighter value that clears AA. In the light
+  // theme it equals the normal secondary (its surfaces are light). Use on themed-card secondary text.
+  textSecondaryOnDark: string;
   textMuted: string;
   placeholderText: string;
 
@@ -75,6 +79,7 @@ export const darkTheme: Theme = {
   borderStrong: '#3a4d75',
   textPrimary: '#ffffff',
   textSecondary: '#6b7690',
+  textSecondaryOnDark: '#aab4cb',
   textMuted: '#6b7690',
   placeholderText: '#8b94a8',
   accent: '#E87722',
@@ -110,6 +115,7 @@ export const lightTheme: Theme = {
   borderStrong: '#d4d8df',
   textPrimary: '#11151c',
   textSecondary: '#5b6573',
+  textSecondaryOnDark: '#5b6573',
   textMuted: '#95a0ad',
   placeholderText: '#8896a8',
   accent: '#E87722',
