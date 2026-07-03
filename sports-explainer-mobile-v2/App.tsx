@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -65,6 +66,10 @@ export default function App() {
 
   const notificationListener = useRef<import('expo-notifications').Subscription | null>(null);
   const responseListener = useRef<import('expo-notifications').Subscription | null>(null);
+
+  // Base orientation: portrait everywhere. app.json is now "default" (so field-game screens can opt
+  // into LANDSCAPE via GameHost); this root lock keeps every OTHER screen portrait, unchanged.
+  useEffect(() => { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP); }, []);
 
   // --- Gate keys (onboarding + cinematic). Shared state is loaded by the provider. ---
   useEffect(() => {

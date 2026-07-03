@@ -7,7 +7,7 @@ import type { Sport, Level } from "./api";
 import { sportsWithContent, resolveBank } from "./makeTheCall";
 
 // The pieces a sport can offer in Coach's Corner.
-export type CCPieceId = "make-the-call" | "formations" | "read-the-play";
+export type CCPieceId = "make-the-call" | "formations" | "read-the-play" | "box-count";
 
 // Formations + read-the-play are soccer-only by construction.
 const SOCCER_KEYS: Sport[] = ["soccer", "epl", "laliga", "worldcup"];
@@ -21,6 +21,8 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   const bank = resolveBank(sport);
   if (bank && sportsWithContent(level).includes(bank)) pieces.push("make-the-call");
   if (isSoccer(sport)) { pieces.push("formations", "read-the-play"); }
+  // Box Count — NFL field module, content at every level (all four difficulties authored).
+  if (sport === "nfl") pieces.push("box-count");
   return pieces;
 }
 

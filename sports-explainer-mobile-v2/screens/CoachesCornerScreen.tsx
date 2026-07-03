@@ -17,21 +17,24 @@ import StrategyTipCard from '../components/StrategyTipCard';
 import FormationBrowser from '../components/FormationBrowser';
 import MakeTheCallGame from '../components/academy/MakeTheCallGame';
 import FormationQuizGame from '../components/academy/FormationQuizGame';
+import BoxCountGame from '../components/academy/BoxCountGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
-// The two GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
+// The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
 // icon/title + the Component), so the id is just a local label; `as any` at the call site keeps it off
 // the Academy-only AcademyGameId union. Both Components take AcademyGameProps. ('formations' is NOT
 // here — it's a visual browser, mounted with its own back bar below.)
 const PIECE_GAME = {
   'make-the-call': { id: 'cc-make-the-call', title: 'Make the Call', icon: '📋', blurb: 'Judgment quiz', Component: MakeTheCallGame },
   'read-the-play': { id: 'cc-read-the-play', title: 'Read the Play', icon: '🎯', blurb: 'Name the shape / weakness', Component: FormationQuizGame },
+  'box-count':     { id: 'cc-box-count', title: 'Box Count', icon: '🏈', blurb: 'Read the box, call run/pass', Component: BoxCountGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'make-the-call': { icon: '📋', title: 'Make the Call' },
   'formations':    { icon: '🗺️', title: 'Formations' },
   'read-the-play': { icon: '🎯', title: 'Read the Play' },
+  'box-count':     { icon: '🏈', title: 'Box Count' },
 };
 
 export default function CoachesCornerScreen() {

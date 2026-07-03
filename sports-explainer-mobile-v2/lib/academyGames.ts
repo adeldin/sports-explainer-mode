@@ -29,6 +29,9 @@ export interface AcademyGame {
   // ONLY for categories whose sportKeys intersect this list; if ABSENT, the game shows
   // for ALL sports (default). Lets a sport surface only the games it can actually run.
   supportedSports?: Sport[];
+  // Opt into LANDSCAPE while this game is open (field/diamond modules whose canvas is wider than
+  // tall). GameHost locks landscape on focus and restores portrait on blur/exit. Default: portrait.
+  landscape?: boolean;
 }
 
 export const ACADEMY_GAMES: AcademyGame[] = [

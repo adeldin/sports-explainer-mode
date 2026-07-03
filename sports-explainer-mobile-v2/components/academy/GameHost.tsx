@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { Sport } from '../../lib/api';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGame } from '../../lib/academyGames';
@@ -15,6 +17,19 @@ export default function GameHost({
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const Game = game.Component;
+
+  // Orientation: field/diamond games opt into LANDSCAPE via `game.landscape`. Locked on focus,
+  // restored to PORTRAIT on blur — which fires on BOTH exiting the game (unmount) AND switching
+  // tabs while it's open (the parent tab blurs), so no other screen is left sideways. Portrait games
+  // no-op. useFocusEffect (not a bare useEffect) is what makes the tab-switch case correct.
+  useFocusEffect(
+    useCallback(() => {
+      if (game.landscape) ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      return () => {
+        if (game.landscape) ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      };
+    }, [game.landscape])
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
