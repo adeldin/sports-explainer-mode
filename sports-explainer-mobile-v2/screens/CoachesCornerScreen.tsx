@@ -18,6 +18,7 @@ import FormationBrowser from '../components/FormationBrowser';
 import MakeTheCallGame from '../components/academy/MakeTheCallGame';
 import FormationQuizGame from '../components/academy/FormationQuizGame';
 import BoxCountGame from '../components/academy/BoxCountGame';
+import OnsideOrOffGame from '../components/academy/OnsideOrOffGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -28,6 +29,7 @@ const PIECE_GAME = {
   'make-the-call': { id: 'cc-make-the-call', title: 'Make the Call', icon: '📋', blurb: 'Judgment quiz', Component: MakeTheCallGame },
   'read-the-play': { id: 'cc-read-the-play', title: 'Read the Play', icon: '🎯', blurb: 'Name the shape / weakness', Component: FormationQuizGame },
   'box-count':     { id: 'cc-box-count', title: 'Box Count', icon: '🏈', blurb: 'Read the box, call run/pass', Component: BoxCountGame, landscape: true },
+  'onside-or-off': { id: 'cc-onside-or-off', title: 'Onside or Off?', icon: '🚩', blurb: 'Judge it live, rewind like a fan', Component: OnsideOrOffGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -35,6 +37,7 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'formations':    { icon: '🗺️', title: 'Formations' },
   'read-the-play': { icon: '🎯', title: 'Read the Play' },
   'box-count':     { icon: '🏈', title: 'Box Count' },
+  'onside-or-off': { icon: '🚩', title: 'Onside or Off?' },
 };
 
 export default function CoachesCornerScreen() {
@@ -60,6 +63,22 @@ export default function CoachesCornerScreen() {
     });
     return unsub;
   }, [navigation, activePiece]);
+
+  // Full-screen landscape pieces HIDE the bottom tab bar. The bar is surface-colored, so inside a dark
+  // landscape module it blends into the field's navy background and reads as empty space — an incidental
+  // touch on the (active) Coach's Corner tab down there fires the tap-active-tab→root listener above,
+  // dropping the user out (and rotating back to portrait as the piece/GameHost unmounts). Hiding it
+  // removes that phantom target and gives the module the full screen. Portrait pieces + the main view
+  // keep the bar. The visible style mirrors App.tsx's tabBarStyle so it restores identically.
+  const activePieceGame = activePiece && activePiece !== 'formations' ? PIECE_GAME[activePiece] : undefined;
+  const activeIsLandscape = !!(activePieceGame && 'landscape' in activePieceGame && activePieceGame.landscape);
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: activeIsLandscape
+        ? { display: 'none' }
+        : { backgroundColor: theme.surface, borderTopColor: theme.border, borderTopWidth: 1 },
+    });
+  }, [navigation, activeIsLandscape, theme]);
 
   // Guard: if a level change (made inside a piece) dropped the selected sport from the content list,
   // fall back to the first available — keeps the strip highlight + pieces consistent without an effect.
