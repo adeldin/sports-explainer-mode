@@ -1,13 +1,12 @@
 import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import type { Level } from '../../lib/api';
 import { useAppState } from '../../lib/appState';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGameProps } from '../../lib/academyGames';
-import { FootballField, ScenarioPills, VerdictCard, NextButton, FieldPlayer } from '../FieldEngine';
+import { FootballField, ScenarioPills, VerdictCard, NextButton, LandscapeGameShell, FOOTBALL_FIELD_RATIO, FieldPlayer } from '../FieldEngine';
 import { SCENARIOS, OFFENSE, BOX, BLOCKERS, inBox, type Call } from '../../lib/boxCount';
 
 // Box Count's OWN state-highlight colors (the engine is agnostic about what these mean):
@@ -15,8 +14,6 @@ import { SCENARIOS, OFFENSE, BOX, BLOCKERS, inBox, type Call } from '../../lib/b
 const TAP_RING = '#F5A623';   // amber — ungraded "you marked this" ring + the box-zone overlay fill
 const IN_BOX_RING = '#16a37f'; // green — reveal ring on the COMPUTED in-box defenders
 const RUN_TEAL = '#14B8A6';   // distinct call-button hue for Run (Pass uses the app accent)
-const FIELD_RATIO = 680 / 380; // engine viewBox aspect (kept in sync with FIELD)
-const LS_CUSHION = 24;         // navy cushion between the field and the controls/card (real margin)
 const LS_HINT_RESERVE = 34;    // navy room reserved UNDER the field for the "👆 tap defenders" hint
 
 // Box Count — pre-snap diagnose-and-call teaching module. First tenant of FieldEngine.
@@ -34,7 +31,6 @@ export default function BoxCountGame(_props: AcademyGameProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const landscape = width > height;
 
   const [current, setCurrent] = useState<string>(SCENARIOS[0].key);
@@ -42,14 +38,6 @@ export default function BoxCountGame(_props: AcademyGameProps) {
   const [answered, setAnswered] = useState(false);
   const [tapped, setTapped] = useState<Set<number>>(new Set());
   const [lastCall, setLastCall] = useState<Call | null>(null);
-  // Landscape only: measure the field+controls row so we can reserve a wide-enough controls column
-  // (tiers on one line) and size the field to fill the rest without overflowing height.
-  const [ls, setLs] = useState({ w: 0, h: 0 });
-  const controlW = ls.w ? Math.round(Math.max(300, Math.min(380, ls.w * 0.42))) : 0;
-  // Field sizes to fit BOTH the remaining width (after the reserved controls column + cushion) AND
-  // the body height minus the reserved hint strip — so a navy band shows left of the card and under
-  // the field. Reserving the hint height always (not just pre-tap) keeps the field size stable.
-  const fieldW = ls.w ? Math.round(Math.min((ls.h - LS_HINT_RESERVE) * FIELD_RATIO, ls.w - controlW - LS_CUSHION)) : 0;
 
   const scenario = SCENARIOS.find(s => s.key === current) ?? SCENARIOS[0];
   const trueBox = scenario.defense.filter(inBox).length;      // COMPUTED, never trusted from data
@@ -143,44 +131,32 @@ export default function BoxCountGame(_props: AcademyGameProps) {
     />
   );
 
-  // ── Landscape: pills on top, field-left / controls-right; the field fills the height, no page-scroll.
+  // ── Landscape: the shared LandscapeGameShell. Top band = pills (left) + count READOUT (right, only
+  // once tapped/revealed). Field-left with the pre-tap 👆 hint in the reserved strip under it. Controls-
+  // right: PRE-CALL the two CALL buttons (+ Reset); POST-CALL they UNMOUNT and Reset + Next stay. No
+  // pinned footer here — Box Count keeps Reset/Next in the scroll flow (the verdict card fits).
   if (landscape) {
     return (
-      <View style={[styles.lsRoot, { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
-        {/* Top band: pills (left) + count READOUT (right). The readout appears only once you've tapped
-            or on reveal ("You've marked N" → "In the box: N"). The pre-tap instructional hint lives
-            UNDER the field (below), pointing UP at the defenders — not here. */}
-        <View style={styles.lsTopBar}>
-          <View style={styles.lsPills}>{pills}</View>
-          {(answered || tapped.size > 0) && (
-            <View style={styles.lsCountPill}><Text style={styles.countPillText} numberOfLines={1}>{countText}</Text></View>
-          )}
-        </View>
-        <View style={styles.lsBody} onLayout={e => setLs({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-          {fieldW > 0 && (
-            // Left column = field + (pre-tap) the 👆 hint in the reserved navy strip under it. The
-            // column's marginRight is the navy cushion between the field and the controls/card.
-            <View style={[styles.lsFieldCol, { width: fieldW }]}>
-              {field}
-              {!answered && tapped.size === 0 && (
-                <Text style={styles.lsHintUnder}>👆 Optional: tap defenders to help you see the box</Text>
-              )}
-            </View>
-          )}
-          {controlW > 0 && (
-            // Controls column at a RESERVED width (so Rookie/Beginner/Intermediate/Expert fit one
-            // line — widened rather than shrunk further). ScrollView is an anti-clip safety net only.
-            <ScrollView style={[styles.lsControls, { width: controlW }]} contentContainerStyle={styles.lsControlsContent} showsVerticalScrollIndicator={false}>
-              {/* PRE-CALL: Call Run + Call Pass (+ Reset). POST-CALL: the two CALL buttons UNMOUNT to
-                  free room for the full verdict card; Reset + Next scenario STAY (the forward path). */}
-              {!answered && runBtn}
-              {!answered && passBtn}
-              {verdict}
-              <View style={styles.lsResetRow}>{resetBtn}{nextBtn}</View>
-            </ScrollView>
-          )}
-        </View>
-      </View>
+      <LandscapeGameShell
+        aspectRatio={FOOTBALL_FIELD_RATIO}
+        belowFieldReserve={LS_HINT_RESERVE}
+        pills={pills}
+        topRight={(answered || tapped.size > 0)
+          ? <View style={styles.lsCountPill}><Text style={styles.countPillText} numberOfLines={1}>{countText}</Text></View>
+          : undefined}
+        field={field}
+        belowField={!answered && tapped.size === 0
+          ? <Text style={styles.lsHintUnder}>👆 Optional: tap defenders to help you see the box</Text>
+          : undefined}
+        controls={
+          <>
+            {!answered && runBtn}
+            {!answered && passBtn}
+            {verdict}
+            <View style={styles.lsResetRow}>{resetBtn}{nextBtn}</View>
+          </>
+        }
+      />
     );
   }
 
@@ -217,18 +193,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   callText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   resetBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   resetText: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
-  // Landscape layout.
-  lsRoot: { flex: 1, backgroundColor: t.background, paddingVertical: 10 },
-  // Top band: pills (left, wrap) + count pill (right), fixed natural height — never grows (that was
-  // the bug: a horizontal scroll ballooned and starved the field).
-  lsTopBar: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0, flexGrow: 0 },
-  lsPills: { flex: 1 },
+  // Landscape module-specific bits (the layout scaffold itself is LandscapeGameShell). The count pill
+  // rides the shell's top-right slot; the hint rides its belowField slot; Reset/Next ride the controls scroll.
   lsCountPill: { flexShrink: 0, backgroundColor: t.surfaceActive, borderWidth: 1, borderColor: t.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  lsBody: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
-  // Left column (field + under-field hint). marginRight = the navy cushion to the controls/card.
-  lsFieldCol: { marginRight: LS_CUSHION },
   lsHintUnder: { marginTop: 8, color: t.textSecondaryOnDark, fontSize: 12.5, fontWeight: '600' },
-  lsControls: { flexShrink: 0 },
-  lsControlsContent: { gap: 10, paddingBottom: 12 },
   lsResetRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
 });

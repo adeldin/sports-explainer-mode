@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { Sport } from '../../lib/api';
 import { useTheme, Theme } from '../../lib/theme';
@@ -16,19 +17,30 @@ export default function GameHost({
 }: { game: AcademyGame; sportKeys: Sport[]; categoryEmoji?: string; onBack: () => void; backLabel?: string }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const navigation = useNavigation<BottomTabNavigationProp<any>>();
   const Game = game.Component;
 
-  // Orientation: field/diamond games opt into LANDSCAPE via `game.landscape`. Locked on focus,
-  // restored to PORTRAIT on blur — which fires on BOTH exiting the game (unmount) AND switching
-  // tabs while it's open (the parent tab blurs), so no other screen is left sideways. Portrait games
-  // no-op. useFocusEffect (not a bare useEffect) is what makes the tab-switch case correct.
+  // Orientation + tab bar: field/diamond games opt into LANDSCAPE via `game.landscape`. On focus we
+  // lock landscape AND hide the bottom tab bar; on blur (exit-unmount OR tab-switch) we restore portrait
+  // and the bar. Hiding the bar isn't cosmetic — it's surface-colored, so in a dark landscape module it
+  // blends into the field and an incidental touch on the (active) tab fires that tab's tap-active→root
+  // listener, dropping the user out (and rotating back as we unmount). Owning both here means every
+  // landscape piece, on any host tab, inherits the fix — no per-screen wiring. Portrait games no-op.
+  // useFocusEffect (not a bare useEffect) is what makes the tab-switch case correct. The restore style
+  // mirrors App.tsx's tabBarStyle so the bar returns identically.
   useFocusEffect(
     useCallback(() => {
-      if (game.landscape) ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      if (game.landscape) {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        navigation.setOptions({ tabBarStyle: { display: 'none' } });
+      }
       return () => {
-        if (game.landscape) ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        if (game.landscape) {
+          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          navigation.setOptions({ tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border, borderTopWidth: 1 } });
+        }
       };
-    }, [game.landscape])
+    }, [game.landscape, navigation, theme])
   );
 
   return (

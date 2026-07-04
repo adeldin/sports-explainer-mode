@@ -1,13 +1,12 @@
 import { memo, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Circle, Line, Text as SvgText } from 'react-native-svg';
 import Slider from '@react-native-community/slider';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGameProps } from '../../lib/academyGames';
-import { SoccerPitch, ScenarioPills, NextButton, FE } from '../FieldEngine';
+import { SoccerPitch, ScenarioPills, NextButton, LandscapeGameShell, SOCCER_PITCH_RATIO, FE } from '../FieldEngine';
 import { SCENARIOS, posAt, computeVerdict, offsideLineAt, R, type Call } from '../../lib/onsideOrOff';
 
 // Onside or Off? — soccer diagnose-live/rewind-like-a-fan module. Judge blind (like a linesman),
@@ -17,8 +16,6 @@ const ATT = '#E87722', DEF = '#3B6FE0', GK_C = '#8e44ad', OFFLINE = '#ffd23f', A
 const NAVY = '#0d1b3e', BALL = '#ffffff', OUTLINE = '#1b3a1b';
 const F_BOLD = 'SpaceGrotesk_700Bold';
 const SPEEDS = [0.5, 1, 2];
-const PITCH_RATIO = 680 / 420;
-const LS_CUSHION = 24;        // navy band between pitch and controls (real margin)
 const LS_SCRUB_RESERVE = 64;  // reserved height UNDER the pitch for the scrubber + tinfo (stable pitch size)
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp = (v: number) => Math.max(0, Math.min(100, v));
@@ -48,7 +45,6 @@ export default function OnsideOrOffGame(_props: AcademyGameProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const landscape = width > height;
 
   const [idx, setIdx] = useState(0);
@@ -58,7 +54,6 @@ export default function OnsideOrOffGame(_props: AcademyGameProps) {
   const [judged, setJudged] = useState(false);    // call made → scrubber unlocks + lines draw + verdict
   const [call, setCall] = useState<Call | null>(null);
   const [speedI, setSpeedI] = useState(1);
-  const [ls, setLs] = useState({ w: 0, h: 0 });
   const rafRef = useRef<number | null>(null);
   const playingRef = useRef(false);
 
@@ -215,44 +210,27 @@ export default function OnsideOrOffGame(_props: AcademyGameProps) {
     <View style={styles.lsPostRow}>
       <TouchableOpacity style={styles.ghostBtnC} activeOpacity={0.8} onPress={resetScenario}><Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text></TouchableOpacity>
       <TouchableOpacity style={styles.ghostBtnC} activeOpacity={0.8} onPress={() => { setT(0); playFrom(0, false); }}><Text style={styles.ghostTxt} numberOfLines={1}>↻ Replay</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.lsNextBtn} activeOpacity={0.85} onPress={nextScenario}><Text style={styles.lsNextTxt} numberOfLines={1}>Next →</Text></TouchableOpacity>
+      {/* Primary forward action — the shared NextButton, filled variant, flex-filling the row (proving
+          the NextButton variant+style seam: composed into a row instead of hand-rolled). */}
+      <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
     </View>
   );
 
-  // ── LANDSCAPE: pills top, pitch-left (scrubber under it), prompt/verdict + actions right ──
-  const controlW = ls.w ? Math.round(Math.max(300, Math.min(380, ls.w * 0.42))) : 0;
-  const fieldW = ls.w ? Math.round(Math.min((ls.h - LS_SCRUB_RESERVE) * PITCH_RATIO, ls.w - controlW - LS_CUSHION)) : 0;
+  // ── LANDSCAPE: the shared LandscapeGameShell. Pitch-left with the scrubber + state line in the
+  // reserved strip under it; prompt/verdict + actions in the right column. The shell is layout-only —
+  // the `judged` split (what scrolls vs. what pins) lives HERE: post-call the verdict (+ legend) scrolls
+  // and the Reset · Replay · Next footer pins; pre-call everything scrolls with no footer.
   if (landscape) {
     return (
-      <View style={[styles.lsRoot, { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
-        <View style={styles.lsTopBar}><View style={styles.lsPills}>{pills}</View></View>
-        <View style={styles.lsBody} onLayout={e => setLs({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-          {fieldW > 0 && (
-            <View style={[styles.lsFieldCol, { width: fieldW }]}>
-              {pitch}
-              {scrubber}
-              {tinfo}
-            </View>
-          )}
-          {controlW > 0 && (judged ? (
-            // POST-CALL: full-height column — verdict (+ legend) scrolls internally, footer row pinned
-            // at the bottom so Reset · Replay · Next are always visible even for a long verdict (VAR 4).
-            <View style={[styles.lsControls, styles.lsControlsCol, { width: controlW }]}>
-              <ScrollView style={styles.lsVerdictScroll} contentContainerStyle={styles.lsVerdictScrollContent} showsVerticalScrollIndicator={false}>
-                {promptOrVerdict}
-                {legend}
-              </ScrollView>
-              {lsPostRow}
-            </View>
-          ) : (
-            <ScrollView style={[styles.lsControls, { width: controlW }]} contentContainerStyle={styles.lsControlsContent} showsVerticalScrollIndicator={false}>
-              {promptOrVerdict}
-              {actions}
-              {legend}
-            </ScrollView>
-          ))}
-        </View>
-      </View>
+      <LandscapeGameShell
+        aspectRatio={SOCCER_PITCH_RATIO}
+        belowFieldReserve={LS_SCRUB_RESERVE}
+        pills={pills}
+        field={pitch}
+        belowField={<>{scrubber}{tinfo}</>}
+        controls={judged ? <>{promptOrVerdict}{legend}</> : <>{promptOrVerdict}{actions}{legend}</>}
+        controlsFooter={judged ? lsPostRow : undefined}
+      />
     );
   }
 
@@ -309,21 +287,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   postRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 10 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
-  // Landscape.
-  lsRoot: { flex: 1, backgroundColor: t.background, paddingVertical: 10 },
-  lsTopBar: { flexDirection: 'row', alignItems: 'center', flexShrink: 0, flexGrow: 0 },
-  lsPills: { flex: 1 },
-  lsBody: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
-  lsFieldCol: { marginRight: LS_CUSHION },
-  lsControls: { flexShrink: 0 },
-  lsControlsContent: { gap: 10, paddingBottom: 12 },
-  // Post-call control column: verdict scrolls, footer pins. alignSelf stretch → fill lsBody's height so
-  // the inner ScrollView (flex:1) is bounded and the footer sits at the bottom.
-  lsControlsCol: { alignSelf: 'stretch', flexDirection: 'column' },
-  lsVerdictScroll: { flex: 1 },
-  lsVerdictScrollContent: { gap: 10, paddingBottom: 10 },
+  // Landscape module-specific bits (the scaffold itself is LandscapeGameShell). The pinned footer rides
+  // the shell's controlsFooter slot; lsNextFill lets the shared filled NextButton flex-fill the row and
+  // overrides its standalone alignSelf:'flex-start' so it sits centered like the Reset/Replay buttons.
   lsPostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border },
   ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  lsNextBtn: { flex: 1, backgroundColor: t.accent, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  lsNextTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  lsNextFill: { flex: 1, alignSelf: 'center', alignItems: 'center', paddingVertical: 10 },
 });

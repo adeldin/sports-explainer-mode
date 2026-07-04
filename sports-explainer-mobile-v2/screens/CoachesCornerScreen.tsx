@@ -64,21 +64,8 @@ export default function CoachesCornerScreen() {
     return unsub;
   }, [navigation, activePiece]);
 
-  // Full-screen landscape pieces HIDE the bottom tab bar. The bar is surface-colored, so inside a dark
-  // landscape module it blends into the field's navy background and reads as empty space — an incidental
-  // touch on the (active) Coach's Corner tab down there fires the tap-active-tab→root listener above,
-  // dropping the user out (and rotating back to portrait as the piece/GameHost unmounts). Hiding it
-  // removes that phantom target and gives the module the full screen. Portrait pieces + the main view
-  // keep the bar. The visible style mirrors App.tsx's tabBarStyle so it restores identically.
-  const activePieceGame = activePiece && activePiece !== 'formations' ? PIECE_GAME[activePiece] : undefined;
-  const activeIsLandscape = !!(activePieceGame && 'landscape' in activePieceGame && activePieceGame.landscape);
-  useEffect(() => {
-    navigation.setOptions({
-      tabBarStyle: activeIsLandscape
-        ? { display: 'none' }
-        : { backgroundColor: theme.surface, borderTopColor: theme.border, borderTopWidth: 1 },
-    });
-  }, [navigation, activeIsLandscape, theme]);
+  // (The bottom-tab-bar hide for full-screen landscape pieces now lives in GameHost, tied to the same
+  // `game.landscape` flag as the orientation lock — so every landscape piece inherits it centrally.)
 
   // Guard: if a level change (made inside a piece) dropped the selected sport from the content list,
   // fall back to the first available — keeps the strip highlight + pieces consistent without an effect.

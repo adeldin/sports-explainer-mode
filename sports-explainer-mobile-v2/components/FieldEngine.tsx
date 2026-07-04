@@ -1,5 +1,7 @@
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { useTheme, Theme } from '../lib/theme';
 import type { Level } from '../lib/api';
@@ -26,6 +28,10 @@ export const FIELD = {
   bandTop: 30, bandBot: 350, bandH: 320,
   stripeX0: 20, stripeW: 47, stripeCount: 14, ydStep: 47, ydMax: 660,
 };
+
+// The gridiron's own viewBox aspect ratio. Exported so a module (or LandscapeGameShell) sizes the
+// field without recomputing 680/380 in two places — one source of truth, tied to FIELD.
+export const FOOTBALL_FIELD_RATIO = FIELD.vbW / FIELD.vbH;
 
 // Fixed FIELD palette — theme-independent, from the spike. FIELD-INTRINSIC colors only: turf, dots,
 // lines, default dot-label colors, and the verdict-chip semantics (engine-owned scaffolding). Any
@@ -145,6 +151,8 @@ export function FootballField({ players, overlay, fill = 'width' }: {
 // the module supplies the DYNAMIC layer (moving players, ball, offside lines) as `children` on top —
 // the pitch is topic-agnostic, exactly like FootballField is to Box Count.
 export const PITCH = { vbW: 680, vbH: 420, stripeW: 68, stripeCount: 10 };
+// The pitch's own viewBox aspect ratio — the soccer counterpart to FOOTBALL_FIELD_RATIO.
+export const SOCCER_PITCH_RATIO = PITCH.vbW / PITCH.vbH;
 const SOCCER = { turfD: '#2f7a44', turfL: '#358a4c', chalk: '#F4F4EE' };
 const PITCH_STRIPES = Array.from({ length: PITCH.stripeCount }, (_, i) => ({
   x: i * PITCH.stripeW, fill: i % 2 ? SOCCER.turfD : SOCCER.turfL,
@@ -244,15 +252,80 @@ export function VerdictCard({ visible, correct, tagText, modeText, title, level,
   );
 }
 
-// Advance-to-next control (shown after a call). Generic label + press.
-export function NextButton({ visible, label, onPress }: { visible: boolean; label: string; onPress: () => void }) {
+// Advance-to-next control (shown after a call). `variant`: 'outline' (default, the standalone look) or
+// 'filled' (accent fill — a primary/emphasized action, e.g. the pinned Next in a footer row). `style`
+// lets a caller compose it into a row (e.g. flex:1) — the base bakes alignSelf:'flex-start' for the
+// standalone case, so a row-composed caller overrides alignSelf via `style`.
+export function NextButton({ visible, label, onPress, variant = 'outline', style }: {
+  visible: boolean; label: string; onPress: () => void; variant?: 'outline' | 'filled'; style?: StyleProp<ViewStyle>;
+}) {
   const { theme } = useTheme();
   const s = useMemo(() => chromeStyles(theme), [theme]);
   if (!visible) return null;
+  const filled = variant === 'filled';
   return (
-    <TouchableOpacity style={s.nextBtn} activeOpacity={0.8} onPress={onPress}>
-      <Text style={s.nextBtnText}>{label}</Text>
+    <TouchableOpacity style={[s.nextBtn, filled && s.nextBtnFilled, style]} activeOpacity={0.8} onPress={onPress}>
+      <Text style={[s.nextBtnText, filled && s.nextBtnTextFilled]} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+// ── LandscapeGameShell ─────────────────────────────────────────────────────
+// The shared landscape scaffold, extracted from Box Count + Onside/Off (proven against both). It is
+// LAYOUT-ONLY: it measures the body, computes the field/controls split, and renders slots. It knows
+// NOTHING about verdicts, scrubbers, judged-state, or any module concept — the module fills the slots
+// and owns all of that. A module wanting a different landscape layout simply does NOT use this and
+// renders its own tree (it's an ordinary component, not a mandate).
+//
+// Layout: pills (+ optional topRight accessory) across the top; below, a row of
+//   [ field column: {field} + optional {belowField} ]  ‖cushion‖  [ controls column ].
+// The field column is width-sized so the art (fill='width') fits BOTH the leftover width and the body
+// height minus belowFieldReserve. The controls column is a fixed reserved width; {controls} scroll
+// internally, and an optional {controlsFooter} pins to the bottom (always reachable, never clipped).
+const SHELL_CUSHION = 24; // transparent navy gap between the field and the controls (a real margin, not space-between)
+export function LandscapeGameShell({
+  aspectRatio, belowFieldReserve = 0, pills, topRight, field, belowField, controls, controlsFooter,
+}: {
+  aspectRatio: number;          // the field renderer's OWN viewBox ratio (FOOTBALL_FIELD_RATIO / SOCCER_PITCH_RATIO)
+  belowFieldReserve?: number;   // height reserved under the field for {belowField} (keeps the art size stable)
+  pills: ReactNode;
+  topRight?: ReactNode;         // optional top-bar accessory (e.g. a count pill)
+  field: ReactNode;             // the field/pitch element (rendered with its default fill='width')
+  belowField?: ReactNode;       // optional content in the reserved strip under the field (hint / scrubber)
+  controls: ReactNode;          // right-column content — scrolls internally
+  controlsFooter?: ReactNode;   // optional pinned footer under the scroll (e.g. Reset · Replay · Next)
+}) {
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const s = useMemo(() => shellStyles(theme), [theme]);
+  const [ls, setLs] = useState({ w: 0, h: 0 });
+  // Reserve a controls column wide enough for its content (tiers/verdict on one line), then size the
+  // field to fill the rest — bounded by BOTH the leftover width and the body height (minus the reserve).
+  const controlW = ls.w ? Math.round(Math.max(300, Math.min(380, ls.w * 0.42))) : 0;
+  const fieldW = ls.w ? Math.round(Math.min((ls.h - belowFieldReserve) * aspectRatio, ls.w - controlW - SHELL_CUSHION)) : 0;
+  return (
+    <View style={[s.root, { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
+      <View style={s.topBar}>
+        <View style={s.pills}>{pills}</View>
+        {topRight}
+      </View>
+      <View style={s.body} onLayout={e => setLs({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+        {fieldW > 0 && (
+          <View style={[s.fieldCol, { width: fieldW }]}>
+            {field}
+            {belowField}
+          </View>
+        )}
+        {controlW > 0 && (
+          <View style={[s.controlsCol, { width: controlW }]}>
+            <ScrollView style={s.controlsScroll} contentContainerStyle={s.controlsScrollContent} showsVerticalScrollIndicator={false}>
+              {controls}
+            </ScrollView>
+            {controlsFooter}
+          </View>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -293,4 +366,22 @@ const chromeStyles = (t: Theme) => StyleSheet.create({
   verdictBodyCompact: { fontSize: 12.5, lineHeight: 18 },
   nextBtn: { borderWidth: 1, borderColor: t.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, alignSelf: 'flex-start' },
   nextBtnText: { color: t.accentText, fontSize: 13, fontWeight: '600' },
+  nextBtnFilled: { backgroundColor: t.accent, borderColor: t.accent },
+  nextBtnTextFilled: { color: '#ffffff', fontWeight: '800' },
+});
+
+// Shell styles — THEMED chrome (the field/turf is fixed and lives in the renderers, not here).
+const shellStyles = (t: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: t.background, paddingVertical: 10 },
+  // Top band: pills (left, wrap) + optional accessory (right), fixed natural height — never grows
+  // (a horizontal scroll here would balloon and starve the field: the trap both modules hit).
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0, flexGrow: 0 },
+  pills: { flex: 1 },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
+  fieldCol: { marginRight: SHELL_CUSHION },
+  // Controls column fills the body height (stretch) so the inner ScrollView (flex:1) is bounded and a
+  // controlsFooter, if present, pins to the bottom instead of being pushed off by tall content.
+  controlsCol: { flexShrink: 0, alignSelf: 'stretch', flexDirection: 'column' },
+  controlsScroll: { flex: 1 },
+  controlsScrollContent: { gap: 10, paddingBottom: 12 },
 });
