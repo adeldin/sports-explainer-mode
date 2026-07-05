@@ -2,7 +2,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Rect, Line, Circle, Polygon, Text as SvgText } from 'react-native-svg';
 import { useTheme, Theme } from '../lib/theme';
 import type { Level } from '../lib/api';
 
@@ -178,6 +178,42 @@ export function SoccerPitch({ fill = 'width', children }: { fill?: 'width' | 'he
   );
 }
 
+// ── Baseball diamond (home at BOTTOM, outfield at TOP; NO line of scrimmage) ──
+// viewBox 680×560 — near-SQUARE (ratio ~1.21), unlike the wide pitches (this is the first field that
+// goes HEIGHT-bound in landscape; the shell's controls-absorb-slack handles the leftover width). Paint
+// only (grass stripes / dirt infield + mound + home circle / foul lines + dashed basepaths / four
+// bases); the module supplies the DYNAMIC layer (fielders, runners, ball, tap-targets) as `children`.
+// Geometry is the prototype's, verbatim; the module's data lib uses the SAME 680×560 base coordinates
+// so its dynamic layer lands on these painted bases (the shared-viewBox contract, as with FIELD).
+export const DIAMOND = { vbW: 680, vbH: 560 };
+export const BASEBALL_DIAMOND_RATIO = DIAMOND.vbW / DIAMOND.vbH;
+const BB = { grassD: '#2f7a44', grassL: '#358a4c', dirt: '#b06a3a', dirtD: '#9a5a2f', chalk: '#F4F4EE' };
+const BB_STRIPES = Array.from({ length: 8 }, (_, i) => ({ x: i * 85, fill: i % 2 ? BB.grassD : BB.grassL }));
+const BB_BASES: [number, number][] = [[490, 340], [340, 190], [190, 340], [340, 490]]; // first, second, third, home
+
+export function BaseballDiamond({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={DIAMOND.vbW} viewH={DIAMOND.vbH} fill={fill} bg={BB.grassD}>
+      {BB_STRIPES.map((s, i) => (
+        <Rect key={`bg${i}`} x={s.x} y={0} width={85} height={DIAMOND.vbH} fill={s.fill} />
+      ))}
+      {/* dirt infield + pitching mound + home-plate circle */}
+      <Polygon points="340,532 532,340 340,148 148,340" fill={BB.dirt} opacity={0.95} />
+      <Circle cx={340} cy={355} r={26} fill={BB.dirtD} />
+      <Circle cx={340} cy={490} r={30} fill={BB.dirtD} opacity={0.6} />
+      {/* foul lines (extended past the field, clipped by the viewBox) + dashed basepath square */}
+      <Line x1={340} y1={490} x2={865} y2={-35} stroke={BB.chalk} strokeWidth={2.5} opacity={0.85} />
+      <Line x1={340} y1={490} x2={-185} y2={-35} stroke={BB.chalk} strokeWidth={2.5} opacity={0.85} />
+      <Polygon points="340,490 490,340 340,190 190,340" fill="none" stroke={BB.chalk} strokeWidth={2} opacity={0.45} strokeDasharray="5 5" />
+      {/* four bases — 13×13 squares rotated 45° about their centers */}
+      {BB_BASES.map(([bx, by], i) => (
+        <Rect key={`base${i}`} x={bx - 6.5} y={by - 6.5} width={13} height={13} fill="#fff" stroke={FE.navy} strokeWidth={1.5} rotation={45} originX={bx} originY={by} />
+      ))}
+      {children}
+    </FieldCanvas>
+  );
+}
+
 // Numberless scenario pills. Active = accent; the module owns the item list + selection.
 // `wrap`: default false → a horizontal ScrollView (portrait). true → a compact flex-WRAP row that
 // takes only its natural height (for a landscape header, where a horizontal ScrollView placed in a
@@ -280,9 +316,11 @@ export function NextButton({ visible, label, onPress, variant = 'outline', style
 // Layout: pills (+ optional topRight accessory) across the top; below, a row of
 //   [ field column: {field} + optional {belowField} ]  ‖cushion‖  [ controls column ].
 // The field column is width-sized so the art (fill='width') fits BOTH the leftover width and the body
-// height minus belowFieldReserve. The controls column is a fixed reserved width; {controls} scroll
-// internally, and an optional {controlsFooter} pins to the bottom (always reachable, never clipped).
-const SHELL_CUSHION = 24; // transparent navy gap between the field and the controls (a real margin, not space-between)
+// height minus belowFieldReserve. The controls column has a reserved width that GROWS to absorb any
+// horizontal slack a near-square field leaves (so the field stays hard-left and the controls meet the
+// right edge); {controls} scroll internally, and an optional {controlsFooter} pins to the bottom.
+const SHELL_CUSHION = 24;      // transparent navy gap between the field and the controls (a real margin, not space-between)
+const SHELL_CONTROL_MAX = 480; // controls may grow to here to absorb slack from a near-square field (wide fields never reach it)
 export function LandscapeGameShell({
   aspectRatio, belowFieldReserve = 0, pills, topRight, field, belowField, controls, controlsFooter,
 }: {
@@ -300,9 +338,17 @@ export function LandscapeGameShell({
   const s = useMemo(() => shellStyles(theme), [theme]);
   const [ls, setLs] = useState({ w: 0, h: 0 });
   // Reserve a controls column wide enough for its content (tiers/verdict on one line), then size the
-  // field to fill the rest — bounded by BOTH the leftover width and the body height (minus the reserve).
-  const controlW = ls.w ? Math.round(Math.max(300, Math.min(380, ls.w * 0.42))) : 0;
-  const fieldW = ls.w ? Math.round(Math.min((ls.h - belowFieldReserve) * aspectRatio, ls.w - controlW - SHELL_CUSHION)) : 0;
+  // field to fill the rest — bounded by BOTH the leftover width (availW) and the body height (heightFillW).
+  const controlWBase = ls.w ? Math.round(Math.max(300, Math.min(380, ls.w * 0.42))) : 0;
+  const availW = ls.w - controlWBase - SHELL_CUSHION;            // width left for the field after the reserve
+  const heightFillW = (ls.h - belowFieldReserve) * aspectRatio;  // width at which the art fills the body height
+  const fieldW = ls.w ? Math.round(Math.min(heightFillW, availW)) : 0;
+  // A near-square field (heightFillW < availW) fills the height and leaves horizontal slack. Give that
+  // slack to the controls column (grow past its reserve, capped at SHELL_CONTROL_MAX) so the field stays
+  // hard-left and the controls meet the right edge. Wide fields are width-bound → slack ≤ 0 → NO-OP:
+  // controlW == controlWBase and fieldW == round(availW), identical to before this tweak.
+  const slack = ls.w ? Math.max(0, Math.round(availW - heightFillW)) : 0;
+  const controlW = ls.w ? Math.min(SHELL_CONTROL_MAX, controlWBase + slack) : 0;
   return (
     <View style={[s.root, { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
       <View style={s.topBar}>
