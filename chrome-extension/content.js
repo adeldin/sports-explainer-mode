@@ -158,6 +158,8 @@
     if (expEl) { expEl.style.color = t.text; expEl.style.fontSize = fontSize; }
     const whyEl = document.getElementById('se-why');
     if (whyEl) { whyEl.style.color = t.subtext; whyEl.style.borderTopColor = t.border; }
+    const ruleEl = document.getElementById('se-rule');
+    if (ruleEl) { ruleEl.style.color = t.subtext; ruleEl.style.borderTopColor = t.border; }
     const gameSection = document.getElementById('se-game-section');
     if (gameSection) gameSection.style.borderTopColor = t.border;
     const gameSelect = document.getElementById('se-game-select');
@@ -230,6 +232,8 @@
           </div>
 
           <div id="se-why" style="display:none!important;font-size:11px!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
+
+          <div id="se-rule" style="display:none!important;font-size:11px!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
         </div>
 
         <div id="se-game-section" style="padding:4px 12px 8px!important;border-top:1px solid ${t.border}!important;">
@@ -350,6 +354,29 @@
     }
   }
 
+  // response.state is gone from the backend — derive the polling bucket from the
+  // human gameContext string (e.g. "Yankees vs Rays — Bot 1st" / "... — Final").
+  // Maps to the buckets restartPollInterval() already understands:
+  //   'post' → stop, 'pre' → 5m, 'mid' → 2m, 'in' → live default.
+  // No match → 'in' (live cadence) so we NEVER freeze a live game.
+  function deriveStateFromContext(gameContext) {
+    const ctx = String(gameContext || '');
+    if (/\bFinal\b/i.test(ctx)) return 'post';
+    if (/Halftime|End\s|Mid\s|Delay/i.test(ctx)) return 'mid';
+    if (/\bPre\b|Scheduled/i.test(ctx)) return 'pre';
+    return 'in'; // live (Top/Bot/quarter/clock) or unmatched → safe live cadence
+  }
+
+  // Cleaned status label from gameContext: prefer the part after the "—"
+  // ("... — Bot 1st" → "📡 Bot 1st"). Neutral "📡 Live" when unavailable.
+  function statusLabelFromContext(gameContext) {
+    const ctx = String(gameContext || '').trim();
+    if (!ctx) return '📡 Live';
+    const dashIdx = ctx.lastIndexOf('—');
+    const tail = dashIdx >= 0 ? ctx.slice(dashIdx + 1).trim() : '';
+    return tail ? `📡 ${tail}` : '📡 Live';
+  }
+
   async function loadGamesIntoOverlay() {
     const gameSelect = document.getElementById('se-game-select');
     if (!gameSelect) return;
@@ -382,6 +409,7 @@
     const typeEl = document.getElementById('se-play-type');
     const teamEl = document.getElementById('se-teams');
     const whyEl = document.getElementById('se-why');
+    const ruleEl = document.getElementById('se-rule');
     const sourceBox = document.getElementById('se-source-box');
 
     setStatusFetching();
@@ -392,8 +420,9 @@
       });
 
       if (response) {
-        // Update game state for smart polling
-        const newState = response.state || 'in';
+        // Update game state for smart polling — derived from gameContext now
+        // that response.state is gone (parse "... — Bot 1st" / "... — Final").
+        const newState = deriveStateFromContext(response.gameContext);
         if (newState !== currentGameState) {
           currentGameState = newState;
           restartPollInterval(); // Re-adjust timer frequency
@@ -403,7 +432,7 @@
         typeEl.textContent = response.playType || '';
         if (teamEl && response.homeTeam) teamEl.textContent = `${response.awayTeam} @ ${response.homeTeam}`;
         
-        if (sourceBox) sourceBox.textContent = response.rawPlay || response.play || 'No raw data available.';
+        if (sourceBox) sourceBox.textContent = response.playType || 'No source play available.';
 
         if (whyEl && response.whyItMatters) {
           whyEl.textContent = `💡 ${response.whyItMatters}`;
@@ -412,11 +441,15 @@
           whyEl.style.display = 'none';
         }
 
-        // Set status label based on state
-        let stateLabel = '📡 ESPN';
-        if (currentGameState === 'pre') stateLabel = '🕐 Pre-game';
-        if (currentGameState === 'post') stateLabel = '✅ Final';
-        if (currentGameState === 'halftime' || currentGameState === 'mid') stateLabel = '⏸️ Halftime';
+        if (ruleEl && response.showRule === true && response.ruleDetail) {
+          ruleEl.textContent = `⚖️ ${response.ruleDetail}`;
+          ruleEl.style.display = 'block';
+        } else if (ruleEl) {
+          ruleEl.style.display = 'none';
+        }
+
+        // Status label = cleaned gameContext (part after "—"), or a neutral fallback.
+        const stateLabel = statusLabelFromContext(response.gameContext);
 
         setStatusReady(!!response.homeTeam, stateLabel);
       }
