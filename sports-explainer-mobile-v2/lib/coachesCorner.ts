@@ -7,7 +7,7 @@ import type { Sport, Level } from "./api";
 import { sportsWithContent, resolveBank } from "./makeTheCall";
 
 // The pieces a sport can offer in Coach's Corner.
-export type CCPieceId = "make-the-call" | "formations" | "read-the-play" | "box-count" | "onside-or-off";
+export type CCPieceId = "make-the-call" | "formations" | "read-the-play" | "box-count" | "onside-or-off" | "wheres-the-play";
 
 // Formations + read-the-play are soccer-only by construction.
 const SOCCER_KEYS: Sport[] = ["soccer", "epl", "laliga", "worldcup"];
@@ -23,6 +23,9 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (isSoccer(sport)) { pieces.push("formations", "read-the-play", "onside-or-off"); }
   // Box Count — NFL field module, content at every level (all four difficulties authored).
   if (sport === "nfl") pieces.push("box-count");
+  // Where's the Play? — MLB field module, tier-independent (situation tabs, no difficulty tiers). Pushed
+  // at every level, so MLB now has content at Rookie too and no longer greys out there — intended.
+  if (sport === "mlb") pieces.push("wheres-the-play");
   return pieces;
 }
 
