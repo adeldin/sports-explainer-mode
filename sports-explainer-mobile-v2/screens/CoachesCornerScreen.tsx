@@ -20,6 +20,7 @@ import FormationQuizGame from '../components/academy/FormationQuizGame';
 import BoxCountGame from '../components/academy/BoxCountGame';
 import OnsideOrOffGame from '../components/academy/OnsideOrOffGame';
 import WheresThePlayGame from '../components/academy/WheresThePlayGame';
+import FindTheOpenMan from '../components/academy/FindTheOpenMan';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -32,6 +33,7 @@ const PIECE_GAME = {
   'box-count':     { id: 'cc-box-count', title: 'Box Count', icon: '🏈', blurb: 'Read the box, call run/pass', Component: BoxCountGame, landscape: true },
   'onside-or-off': { id: 'cc-onside-or-off', title: 'Onside or Off?', icon: '🚩', blurb: 'Judge it live, rewind like a fan', Component: OnsideOrOffGame, landscape: true },
   'wheres-the-play': { id: 'cc-wheres-the-play', title: "Where's the Play?", icon: '⚾', blurb: 'Watch the grounder, read the force', Component: WheresThePlayGame, landscape: true },
+  'find-the-open-man': { id: 'cc-find-the-open-man', title: 'Find the Open Man', icon: '🎯', blurb: 'Read the coverage, hit the open receiver', Component: FindTheOpenMan, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -41,6 +43,7 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'box-count':     { icon: '🏈', title: 'Box Count' },
   'onside-or-off': { icon: '🚩', title: 'Onside or Off?' },
   'wheres-the-play': { icon: '⚾', title: "Where's the Play?" },
+  'find-the-open-man': { icon: '🎯', title: 'Find the Open Man' },
 };
 
 export default function CoachesCornerScreen() {

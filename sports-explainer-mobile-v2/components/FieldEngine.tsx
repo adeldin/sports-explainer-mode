@@ -126,8 +126,12 @@ function FieldCanvas({ viewW, viewH, fill = 'width', bg, children }: {
 }
 
 // The gridiron: turf → stripes → yard lines → [overlay slot, UNDER players] → LOS → players.
-export function FootballField({ players, overlay, fill = 'width' }: {
-  players: FieldPlayer[]; overlay?: ReactNode; fill?: 'width' | 'height';
+// `showLos` (default true) draws the engine's line-of-scrimmage on top of the overlay. A module that
+// puts tappable art (dots) in the overlay can pass showLos={false} and draw the LOS as its FIRST overlay
+// element instead, so the line sits UNDER its dots rather than slicing them. Default preserves the
+// original behavior for existing consumers (Box Count passes nothing → LOS drawn as before).
+export function FootballField({ players, overlay, fill = 'width', showLos = true }: {
+  players: FieldPlayer[]; overlay?: ReactNode; fill?: 'width' | 'height'; showLos?: boolean;
 }) {
   return (
     <FieldCanvas viewW={FIELD.vbW} viewH={FIELD.vbH} fill={fill} bg={FE.turfD}>
@@ -139,8 +143,12 @@ export function FootballField({ players, overlay, fill = 'width' }: {
         <Line key={`yd${i}`} x1={x} y1={FIELD.bandTop} x2={x} y2={FIELD.bandBot} stroke={FE.chalk} strokeWidth={1.2} opacity={0.8} />
       ))}
       {overlay}
-      <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
-      <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
+      {showLos && (
+        <>
+          <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
+          <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
+        </>
+      )}
       {players.map(p => <Dot key={p.id} p={p} />)}
     </FieldCanvas>
   );
