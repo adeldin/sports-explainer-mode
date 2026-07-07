@@ -15,6 +15,8 @@
   let lastUpdatedTimer = null;
   let sourceVisible = false;
   let currentGameState = 'in'; // Track game state for smart polling
+  let lastInteraction = Date.now(); // last overlay interaction — drives idle-pause
+  let idlePaused = false;           // true while polling is paused for inactivity
   let selectorOpen = false;
   let selectorPanelEl = null;
   let currentGames = []; // enriched score-card game list for the rail
@@ -32,6 +34,10 @@
   };
 
   const FONT_SIZES = { small: '11px', medium: '13px', large: '16px', xlarge: '19px' };
+
+  // Pause auto-poll after this much overlay-inactivity to stop wasting /api/explain (AI) calls
+  // while nobody's interacting. Tune here.
+  const IDLE_TIMEOUT_MS = 20000; // TEMP: 20s for testing — SET BACK TO 15 * 60 * 1000 before commit
 
   // SportsWise brand mark — inline SVG (transparent, mirrors logo.svg with the full-canvas
   // navy rect removed), sized to the header (22px) so it needs no manifest/web_accessible_resources
@@ -277,6 +283,8 @@
     overlayVisible = true;
     isMinimized = false;
     sourceVisible = false;
+    idlePaused = false;
+    lastInteraction = Date.now(); // opening the overlay starts a fresh idle window
 
     const t = getThemeColors();
     const fontSize = FONT_SIZES[settings.fontSize] || '13px';
@@ -394,16 +402,22 @@
     document.body.appendChild(overlayEl);
 
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        if (pollInterval) clearInterval(pollInterval);
+      lastInteraction = Date.now(); // a visibility change counts as activity (resets the idle window)
+      if (document.visibilityState === 'hidden') {
+        // Trigger 1: tab/window hidden → pause polling (no /api/explain until visible again).
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
       } else if (overlayVisible) {
-        restartPollInterval();
+        resumeFromPause(); // back in view → one immediate fetch, then restart the cadence
       }
     });
 
     setTimeout(() => {
       document.getElementById('se-close').addEventListener('click', hideOverlay);
-      document.getElementById('se-manual-refresh').addEventListener('click', fetchLatestPlay);
+      document.getElementById('se-manual-refresh').addEventListener('click', () => {
+        const wasIdle = idlePaused;
+        markActivity();                   // counts as activity; if idle-paused this resumes (fetch + restart)
+        if (!wasIdle) fetchLatestPlay();  // otherwise it's just a normal manual refresh
+      });
       
       document.getElementById('se-source-toggle').addEventListener('click', () => {
         const box = document.getElementById('se-source-box');
@@ -422,11 +436,13 @@
           overlayEl.style.height = 'auto';
           minBtn.textContent = '−';
           isMinimized = false;
+          resumeFromPause();  // un-minimized → one immediate fetch + restart cadence
         } else {
           body.style.display = 'none';
           overlayEl.style.height = 'auto';
           minBtn.textContent = '+';
           isMinimized = true;
+          if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } // pause while minimized
         }
       });
 
@@ -515,6 +531,11 @@
 
       window.addEventListener('resize', () => { if (selectorOpen) positionSelectorPanel(); });
 
+      // Trigger 2: any interaction inside the overlay (click/tap/scroll/hover) marks activity and
+      // wakes an idle pause. mousemove is high-frequency but markActivity is cheap (timestamp only).
+      ['click', 'pointerdown', 'wheel', 'mousemove'].forEach(evt =>
+        overlayEl.addEventListener(evt, markActivity, { passive: true }));
+
       makeDraggable(overlayEl);
       // (Initial explanation fetch is chained off loadGamesIntoOverlay above, once a game is selected.)
       restartPollInterval();
@@ -525,10 +546,10 @@
   // SMART POLLING LOGIC
   // ─────────────────────────────────────────
   function restartPollInterval() {
-    if (pollInterval) clearInterval(pollInterval);
-    
-    // Don't poll if tab is hidden or overlay is gone
-    if (document.hidden || !overlayVisible) return;
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+
+    // Don't poll if tab is hidden, overlay is gone, minimized, or idle-paused.
+    if (document.hidden || !overlayVisible || isMinimized || idlePaused) return;
 
     let intervalMs = settings.refreshInterval * 1000;
 
@@ -542,8 +563,41 @@
     }
 
     if (intervalMs > 0) {
-      pollInterval = setInterval(fetchLatestPlay, intervalMs);
+      pollInterval = setInterval(pollTick, intervalMs);
     }
+  }
+
+  // Each poll tick: if the overlay has gone untouched past IDLE_TIMEOUT_MS, pause instead of
+  // fetching (saves /api/explain tokens). Otherwise do the normal fetch.
+  function pollTick() {
+    if (Date.now() - lastInteraction >= IDLE_TIMEOUT_MS) { pauseForIdle(); return; }
+    fetchLatestPlay();
+  }
+
+  // Trigger 2 pause: stop the timer and show an unobtrusive paused state in the status line.
+  function pauseForIdle() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    idlePaused = true;
+    const spinner = document.getElementById('se-status-spinner');
+    if (spinner) spinner.style.display = 'none';
+    const source = document.getElementById('se-status-source');
+    if (source) { source.textContent = '⏸ Paused — click to resume'; source.style.color = getThemeColors().subtext; }
+  }
+
+  // Shared resume for ALL three triggers: one immediate fetch, then restart the cadence.
+  // No-ops the fetch while still hidden/minimized (that trigger will resume later).
+  function resumeFromPause() {
+    idlePaused = false;
+    lastInteraction = Date.now();
+    if (document.hidden || !overlayVisible || isMinimized) return;
+    fetchLatestPlay();      // ONE immediate fetch on resume
+    restartPollInterval();  // then the normal gameContext-derived cadence
+  }
+
+  // Record overlay activity; wake an idle pause. Cheap enough to run on every mousemove.
+  function markActivity() {
+    lastInteraction = Date.now();
+    if (idlePaused) resumeFromPause();
   }
 
   // response.state is gone from the backend — derive the polling bucket from the
