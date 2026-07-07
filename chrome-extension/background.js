@@ -2,7 +2,7 @@
 // VALID VALUES FOR MESSAGE VALIDATION
 // ─────────────────────────────────────────
 const VALID_SPORTS = ['nfl', 'mlb', 'nba', 'nhl', 'soccer', 'worldcup', 'rugby'];
-const VALID_LEVELS = ['kid', 'beginner', 'intermediate'];
+const VALID_LEVELS = ['kid', 'beginner', 'intermediate', 'expert'];
 const VALID_LANGUAGES = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
 
 // ─────────────────────────────────────────
