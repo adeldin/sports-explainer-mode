@@ -23,7 +23,7 @@
   // ─────────────────────────────────────────
   let settings = {
     theme: 'dark',
-    accentColor: '#cc0000',
+    accentColor: '#e87722',
     fontSize: 'medium',
     language: 'en',
     refreshInterval: 30,
@@ -31,6 +31,31 @@
   };
 
   const FONT_SIZES = { small: '11px', medium: '13px', large: '16px', xlarge: '19px' };
+
+  // SportsWise brand mark — inline SVG (transparent, mirrors logo.svg with the full-canvas
+  // navy rect removed), sized to the header (22px) so it needs no manifest/web_accessible_resources
+  // change and scales cleanly on the navy header. Rendered in the #se-logo slot beside "Sports Explainer".
+  const SPORTSWISE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="22" height="22" style="flex-shrink:0">
+    <defs><style>.st0{fill:#f5ecd7;}.st1{fill:#fff;}.st2{fill:#e87722;}</style></defs>
+    <g>
+      <polygon class="st1" points="484.9 768.91 498.85 769.83 484.87 770.41 484.9 768.91"/>
+      <polygon class="st1" points="707.29 682.93 705.23 684.8 707.18 682.58 707.29 682.93"/>
+      <polygon class="st1" points="498.88 769.83 511.3 769.3 511.28 770.65 498.88 769.83"/>
+      <g>
+        <path class="st2" d="M668.41,630.2c-53.42,21.65-101.79,47.1-145.85,76.73l3.54-277.29,50.32,1,.16,3.2c1.16,24.55,6.79,44.38,12.66,62.14l.18.53c11.05,31,27.91,60.58,51.54,90.37,11.18,15.22,20.14,29.34,27.44,43.32Z"/>
+        <polygon class="st2" points="526.46 402.31 526.46 403.21 526.06 403.21 526.04 402.34 526.46 402.31"/>
+        <path class="st2" d="M499.67,429.75l-3.67,287.91c-40.81-28.94-84.68-53.84-133.11-75.41,6.77-15.81,15.44-31.66,26.4-48.39,18.5-26.83,32.01-53.26,41.23-80.77l.13-.4c9.73-30.74,13.4-55.66,11.89-80.85l57.12-2.09Z"/>
+        <path class="st2" d="M405.47,504.68c-8.46,25.24-20.93,49.58-38.09,74.43-11.92,18.16-21.38,35.44-28.78,52.76-16.78-6.9-34.1-13.43-52.04-19.61-25.22-43.95-37.35-94.7-34.1-146.08,45.22-21.46,99.51-26.7,152.03-31.77,3.94-.37,7.82-.74,11.71-1.14,1.32,21.86-2.01,43.93-10.73,71.42Z"/>
+        <polygon class="st2" points="577.34 404.16 578.58 404.27 577.34 404.24 575.2 404.19 575.2 404 577.34 404.16"/>
+        <path class="st2" d="M772.04,482.37c-.21,42.95-10.57,84.5-29.87,121.32-16.78,5.31-33.09,10.92-48.98,16.86-8.22-16.18-18.4-32.33-31.21-49.74-21.96-27.59-37.53-54.79-47.63-83.15-6.11-18.42-10.39-34.92-11.34-55.08,45.91,3.44,127.58,14.43,169.03,49.8Z"/>
+        <path class="st2" d="M499.63,403.29l-58.62,2.14-1.35.05c-.03-.34-.05-.71-.11-1.06-6.21-63.25-42.16-104.45-100.09-115.87,44.72-39.14,98.93-61.58,157.18-65.07l2.99,179.81Z"/>
+        <path class="st2" d="M671.41,277.56c-60.31,15.73-91.93,58.23-94.07,126.6-.03.03-.03.05,0,.08l-2.14-.05-48.74-.98h-.4l-.03-.87-2.96-179.07c53.92,2.46,105.12,21.17,148.33,54.29Z"/>
+        <path class="st2" d="M769.47,448.22c-46.2-27.67-113.15-38.17-164.51-42l-1.24-.08c1.61-63.62,31.03-97.58,92.43-106.68,40.7,41.47,66,92.83,73.32,148.75Z"/>
+        <path class="st2" d="M413.26,406.99l-11.29,1.11c-49.24,4.76-99.96,9.62-145.61,27.59,8.7-46.36,28.76-87.91,59.63-123.59,57.99,3.83,91.58,36.61,97.27,94.89Z"/>
+      </g>
+      <path class="st0" d="M805.17,617.04c-114.04,30.86-214.34,73.31-303.62,142.02-83.43-63.78-173.18-103.95-280.24-133.71v44.84c88.47,14.87,164.04,40.62,233.33,79.29-75.36-20.38-149.46-34.91-258.24-42.2v53.09c105.95-5.58,177.73-3.17,253.43,4.83,8.55,22.06,29.71,35.99,52.65,35.53,22.32-.44,42.18-13.83,50.5-35.6,85.78-8.84,164.04-10.75,274.61-2.53v-57.4c-115.13,6.4-197.31,21.97-280.2,44.62,77.82-43.11,161.6-69.89,257.78-84.97v-47.79Z"/>
+    </g>
+  </svg>`;
 
   const LANGUAGES = [
     { code: 'en', label: '🇺🇸 English' },
@@ -109,25 +134,32 @@
   // ─────────────────────────────────────────
   function getThemeColors() {
     const dark = {
-      bg: '#0f0f0f', bodyBg: '#0f0f0f', footerBg: '#0a0a0a',
-      text: 'rgba(255,255,255,0.9)', subtext: '#aaa', label: '#666',
-      border: '#1a1a1a', inputBg: '#1a1a1a', inputBorder: '#333',
-      inputText: 'white', answerBg: '#1a1a1a', selectBg: '#1a1a1a',
-      settingsBg: '#111', settingsItemBg: '#1a1a1a', settingsItemBorder: '#2a2a2a',
-      statusBg: '#080808', statusText: '#555', statusDot: '#333',
-      sourceBg: '#151515'
+      bg: '#0d1b3e', bodyBg: '#0d1b3e', footerBg: '#0a1530',
+      text: 'rgba(245,236,215,0.92)', subtext: '#a9b4c9', label: '#d8c9a8',
+      border: '#1e2f52', inputBg: '#152444', inputBorder: '#2a3d63',
+      inputText: '#f5ecd7', answerBg: '#152444', selectBg: '#152444',
+      settingsBg: '#0a1530', settingsItemBg: '#152444', settingsItemBorder: '#22345a',
+      statusBg: '#081025', statusText: '#7f8ca6', statusDot: '#2a3d63',
+      sourceBg: '#132140'
     };
     const light = {
-      bg: '#ffffff', bodyBg: '#ffffff', footerBg: '#f5f5f5',
-      text: '#111111', subtext: '#555', label: '#888',
-      border: '#e0e0e0', inputBg: '#f0f0f0', inputBorder: '#ccc',
-      inputText: '#111', answerBg: '#f0f0f0', selectBg: '#f0f0f0',
-      settingsBg: '#fafafa', settingsItemBg: '#f0f0f0', settingsItemBorder: '#ddd',
-      statusBg: '#f0f0f0', statusText: '#999', statusDot: '#ccc',
-      sourceBg: '#f9f9f9'
+      bg: '#f5ecd7', bodyBg: '#f5ecd7', footerBg: '#efe4c9',
+      text: '#0d1b3e', subtext: '#3f4a63', label: '#5a5340',
+      border: '#e0d3b3', inputBg: '#efe4c9', inputBorder: '#d8c9a8',
+      inputText: '#0d1b3e', answerBg: '#efe4c9', selectBg: '#efe4c9',
+      settingsBg: '#f0e7cf', settingsItemBg: '#efe4c9', settingsItemBorder: '#e0d3b3',
+      statusBg: '#efe4c9', statusText: '#5a5340', statusDot: '#d8c9a8',
+      sourceBg: '#f0e7cf'
     };
     return settings.theme === 'light' ? light : dark;
   }
+
+  // Section headers + teams title are theme-aware for contrast: brand orange headers /
+  // gold title on the DARK navy card; navy on the LIGHT cream card (strong on both).
+  // #e87722 (bright brand orange) chosen over the deeper #d9661f — on the very dark navy
+  // #0d1b3e the brighter orange has higher contrast and reads crisper for small bold caps.
+  function sectionHeaderColor() { return settings.theme === 'light' ? '#0d1b3e' : '#e87722'; }
+  function teamsTitleColor() { return settings.theme === 'light' ? '#0d1b3e' : '#facc15'; }
 
   // ─────────────────────────────────────────
   // STATUS BAR HELPERS
@@ -184,14 +216,16 @@
     // Font-size scales the WHOLE card: set the base on the root; children use em.
     overlayEl.style.fontSize = fontSize;
     const header = document.getElementById('se-header');
-    if (header) header.style.background = settings.accentColor;
+    if (header) header.style.background = '#0d1b3e'; // brand navy bar (logo reads on it)
+    const teamsEl = document.getElementById('se-teams');
+    if (teamsEl) teamsEl.style.color = teamsTitleColor();
     const expEl = document.getElementById('se-explanation');
     if (expEl) { expEl.style.color = t.text; }
     const whyEl = document.getElementById('se-why');
     if (whyEl) { whyEl.style.color = t.subtext; whyEl.style.borderTopColor = t.border; }
     const ruleEl = document.getElementById('se-rule');
     if (ruleEl) { ruleEl.style.color = t.subtext; ruleEl.style.borderTopColor = t.border; }
-    overlayEl.querySelectorAll('.se-section-h').forEach(el => { el.style.color = t.label; });
+    overlayEl.querySelectorAll('.se-section-h').forEach(el => { el.style.color = sectionHeaderColor(); });
     const gameSection = document.getElementById('se-game-section');
     if (gameSection) gameSection.style.borderTopColor = t.border;
     const gameSelect = document.getElementById('se-game-select');
@@ -260,8 +294,11 @@
     `;
 
     overlayEl.innerHTML = `
-      <div id="se-header" style="display:flex!important;justify-content:space-between!important;align-items:center!important;background:${settings.accentColor}!important;padding:9px 12px!important;cursor:grab!important;user-select:none!important;border-radius:10px 10px 0 0!important;position:sticky!important;top:0!important;z-index:10!important;">
-        <span style="font-weight:800!important;font-size:13px!important;color:white!important;">🏟️ SPORTS EXPLAINER</span>
+      <div id="se-header" style="display:flex!important;justify-content:space-between!important;align-items:center!important;background:#0d1b3e!important;padding:9px 12px!important;cursor:grab!important;user-select:none!important;border-radius:10px 10px 0 0!important;position:sticky!important;top:0!important;z-index:10!important;">
+        <div style="display:flex!important;align-items:center!important;gap:7px!important;min-width:0!important;">
+          ${SPORTSWISE_LOGO_SVG ? `<span id="se-logo" style="display:inline-flex!important;align-items:center!important;flex:0 0 auto!important;line-height:0!important;">${SPORTSWISE_LOGO_SVG}</span>` : ''}
+          <span style="font-weight:800!important;font-size:13px!important;color:#f5ecd7!important;white-space:nowrap!important;">Sports Explainer</span>
+        </div>
         <div style="display:flex!important;gap:6px!important;">
           <button id="se-selector-btn" title="Change sport / game / level" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">🎯</button>
           <button id="se-settings-btn" title="Settings" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">⚙️</button>
@@ -309,15 +346,15 @@
 
       <div id="se-body">
         <div style="padding: 10px 12px 6px !important;">
-          <div id="se-teams" style="font-size:0.85em!important;color:#facc15!important;font-weight:600!important;margin-bottom:7px!important;text-transform:uppercase!important;">Loading game...</div>
+          <div id="se-teams" style="font-size:0.85em!important;color:${teamsTitleColor()}!important;font-weight:600!important;margin-bottom:7px!important;text-transform:uppercase!important;">Loading game...</div>
 
-          <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
+          <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
           <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
 
-          <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
+          <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
           <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
 
-          <div id="se-h-rule" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">The Rule</div>
+          <div id="se-h-rule" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">The Rule</div>
           <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
 
           <div id="se-source-container" style="margin-bottom:4px!important;">
