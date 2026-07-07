@@ -28,7 +28,7 @@
     level: 'beginner'
   };
 
-  const FONT_SIZES = { small: '11px', medium: '13px', large: '15px' };
+  const FONT_SIZES = { small: '11px', medium: '13px', large: '16px', xlarge: '19px' };
 
   const LANGUAGES = [
     { code: 'en', label: '🇺🇸 English' },
@@ -68,6 +68,14 @@
       currentSport = msg.sport;
       currentGameId = msg.gameId || null;
       loadSettings(() => {
+        // Bug fix 1: the popup's chosen level must win over the stored default.
+        // Apply it AFTER loadSettings' merge (which would otherwise overwrite it),
+        // persist it, and let the next fetch (which reads settings.level) use it.
+        if (msg.level) {
+          settings.level = msg.level;
+          currentLevel = msg.level;
+          saveSettings();
+        }
         overlayVisible ? hideOverlay() : showOverlay();
       });
       sendResponse({ status: 'ok' });
@@ -152,10 +160,12 @@
     const fontSize = FONT_SIZES[settings.fontSize] || '13px';
     overlayEl.style.background = t.bg;
     overlayEl.style.color = t.text;
+    // Font-size scales the WHOLE card: set the base on the root; children use em.
+    overlayEl.style.fontSize = fontSize;
     const header = document.getElementById('se-header');
     if (header) header.style.background = settings.accentColor;
     const expEl = document.getElementById('se-explanation');
-    if (expEl) { expEl.style.color = t.text; expEl.style.fontSize = fontSize; }
+    if (expEl) { expEl.style.color = t.text; }
     const whyEl = document.getElementById('se-why');
     if (whyEl) { whyEl.style.color = t.subtext; whyEl.style.borderTopColor = t.border; }
     const ruleEl = document.getElementById('se-rule');
@@ -180,6 +190,16 @@
     if (sourceBox) { sourceBox.style.background = t.sourceBg; sourceBox.style.color = t.subtext; }
     const sourceToggle = document.getElementById('se-source-toggle');
     if (sourceToggle) sourceToggle.style.color = settings.accentColor;
+    // Settings panel + its controls (so a live theme toggle re-themes them too).
+    const settingsPanel = document.getElementById('se-settings-panel');
+    if (settingsPanel) settingsPanel.style.background = t.settingsBg;
+    ['se-lang-select', 'se-theme-select', 'se-fontsize-select'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.background = t.selectBg; el.style.color = t.inputText; el.style.borderColor = t.inputBorder; }
+    });
+    const settingsLinks = document.getElementById('se-settings-links');
+    if (settingsLinks) settingsLinks.style.borderTopColor = t.settingsItemBorder;
+    overlayEl.querySelectorAll('.se-ext-link').forEach(el => { el.style.color = t.subtext; });
   }
 
   // ─────────────────────────────────────────
@@ -202,6 +222,7 @@
       max-width: 90vw !important; max-height: 90vh !important; z-index: 2147483647 !important;
       background: ${t.bg} !important; color: ${t.text} !important; border-radius: 10px !important;
       box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; font-family: system-ui, sans-serif !important;
+      font-size: ${fontSize} !important;
       border: 1px solid rgba(128,128,128,0.2) !important; resize: both !important; overflow: auto !important;
     `;
 
@@ -217,46 +238,78 @@
 
       <div id="se-settings-panel" style="display:none!important;padding:12px!important;background:${t.settingsBg}!important;overflow-y:auto!important;">
         <div style="font-size:11px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;margin-bottom:10px!important;">⚙️ Settings</div>
+
+        <div style="margin-bottom:10px!important;">
+          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;">Language</label>
+          <select id="se-lang-select" style="width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;">
+            ${LANGUAGES.map(l => `<option value="${l.code}"${settings.language === l.code ? ' selected' : ''}>${l.label}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom:10px!important;">
+          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;">Theme</label>
+          <select id="se-theme-select" style="width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;">
+            <option value="dark"${settings.theme === 'dark' ? ' selected' : ''}>🌙 Dark</option>
+            <option value="light"${settings.theme === 'light' ? ' selected' : ''}>☀️ Light</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:10px!important;">
+          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;">Font Size</label>
+          <select id="se-fontsize-select" style="width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;">
+            <option value="small"${settings.fontSize === 'small' ? ' selected' : ''}>Small</option>
+            <option value="medium"${settings.fontSize === 'medium' ? ' selected' : ''}>Medium</option>
+            <option value="large"${settings.fontSize === 'large' ? ' selected' : ''}>Large</option>
+            <option value="xlarge"${settings.fontSize === 'xlarge' ? ' selected' : ''}>Extra Large</option>
+          </select>
+        </div>
+
+        <div id="se-settings-links" style="border-top:1px solid ${t.settingsItemBorder}!important;margin-top:10px!important;padding-top:10px!important;margin-bottom:12px!important;display:flex!important;flex-direction:column!important;gap:7px!important;">
+          <button class="se-ext-link" data-url="https://explainer-privacy.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Privacy Policy</button>
+          <button class="se-ext-link" data-url="https://explainer-terms.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Terms &amp; Conditions</button>
+          <button class="se-ext-link" data-url="https://apps.apple.com/app/id6781028656" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Also on iOS ↗</button>
+        </div>
+
         <button id="se-settings-done" style="width:100%!important;padding:8px!important;background:${settings.accentColor}!important;color:white!important;border:none!important;border-radius:8px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;">✓ Done</button>
       </div>
 
       <div id="se-body">
         <div style="padding: 10px 12px 6px !important;">
-          <div id="se-teams" style="font-size:11px!important;color:#facc15!important;font-weight:600!important;margin-bottom:2px!important;text-transform:uppercase!important;">Loading game...</div>
-          <span id="se-play-type" style="display:block!important;font-size:10px!important;font-weight:700!important;color:#34d399!important;text-transform:uppercase!important;letter-spacing:0.05em!important;margin-bottom:6px!important;"></span>
-          <p id="se-explanation" style="font-size:${fontSize}!important;line-height:1.5!important;margin:0 0 6px!important;color:${t.text}!important;">Fetching latest play...</p>
+          <div id="se-teams" style="font-size:0.85em!important;color:#facc15!important;font-weight:600!important;margin-bottom:2px!important;text-transform:uppercase!important;">Loading game...</div>
+          <span id="se-play-type" style="display:block!important;font-size:0.77em!important;font-weight:700!important;color:#34d399!important;text-transform:uppercase!important;letter-spacing:0.05em!important;margin-bottom:6px!important;"></span>
+          <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 6px!important;color:${t.text}!important;">Fetching latest play...</p>
           
           <div id="se-source-container" style="margin-bottom:8px!important;">
-            <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:10px!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
-            <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:11px!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
+            <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
+            <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
           </div>
 
-          <div id="se-why" style="display:none!important;font-size:11px!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
+          <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
 
-          <div id="se-rule" style="display:none!important;font-size:11px!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
+          <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
         </div>
 
         <div id="se-game-section" style="padding:4px 12px 8px!important;border-top:1px solid ${t.border}!important;">
-          <select id="se-game-select" style="width:100%!important;padding:5px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:11px!important;cursor:pointer!important;">
+          <select id="se-game-select" style="width:100%!important;padding:5px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:0.85em!important;cursor:pointer!important;">
             <option value="">Loading games...</option>
           </select>
         </div>
 
         <div id="se-ask-section" style="padding:8px 12px 10px!important;border-top:1px solid ${t.border}!important;background:${t.footerBg}!important;">
           <div style="display:flex!important;gap:6px!important;">
-            <input id="se-question-input" type="text" placeholder="Ask anything..." style="flex:1!important;padding:6px 10px!important;background:${t.inputBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;outline:none!important;"/>
-            <button id="se-ask-btn" style="padding:6px 12px!important;background:${settings.accentColor}!important;color:white!important;border:none!important;border-radius:6px!important;font-size:12px!important;font-weight:700!important;cursor:pointer!important;">Ask</button>
+            <input id="se-question-input" type="text" placeholder="Ask anything..." style="flex:1!important;padding:6px 10px!important;background:${t.inputBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:0.92em!important;outline:none!important;"/>
+            <button id="se-ask-btn" style="padding:6px 12px!important;background:${settings.accentColor}!important;color:white!important;border:none!important;border-radius:6px!important;font-size:0.92em!important;font-weight:700!important;cursor:pointer!important;">Ask</button>
           </div>
-          <div id="se-answer-box" style="display:none!important;margin-top:7px!important;padding:8px 10px!important;background:${t.answerBg}!important;border-radius:6px!important;border-left:3px solid ${settings.accentColor}!important;font-size:12px!important;line-height:1.5!important;color:${t.text}!important;"></div>
+          <div id="se-answer-box" style="display:none!important;margin-top:7px!important;padding:8px 10px!important;background:${t.answerBg}!important;border-radius:6px!important;border-left:3px solid ${settings.accentColor}!important;font-size:0.92em!important;line-height:1.5!important;color:${t.text}!important;"></div>
         </div>
 
         <div id="se-status-bar" style="display:flex!important;align-items:center!important;justify-content:space-between!important;padding:5px 12px!important;background:${t.statusBg}!important;border-top:1px solid ${t.border}!important;border-radius:0 0 10px 10px!important;gap:6px!important;">
           <div style="display:flex!important;align-items:center!important;gap:8px!important;">
             <span id="se-status-spinner" style="display:none!important;width:8px!important;height:8px!important;border:2px solid ${t.statusDot}!important;border-top-color:${settings.accentColor}!important;border-radius:50%!important;animation:se-spin 0.7s linear infinite!important;"></span>
-            <span id="se-status-timestamp" style="font-size:9px!important;color:${t.statusText}!important;">—</span>
-            <button id="se-manual-refresh" title="Refresh Now" style="background:none!important;border:none!important;padding:0!important;cursor:pointer!important;font-size:12px!important;color:${t.statusText}!important;line-height:1!important;">↻</button>
+            <span id="se-status-timestamp" style="font-size:0.69em!important;color:${t.statusText}!important;">—</span>
+            <button id="se-manual-refresh" title="Refresh Now" style="background:none!important;border:none!important;padding:0!important;cursor:pointer!important;font-size:0.92em!important;color:${t.statusText}!important;line-height:1!important;">↻</button>
           </div>
-          <span id="se-status-source" style="font-size:9px!important;color:#555!important;"></span>
+          <span id="se-status-source" style="font-size:0.69em!important;color:#555!important;"></span>
         </div>
       </div>
       <style>@keyframes se-spin { to { transform: rotate(360deg); } }</style>
@@ -313,6 +366,37 @@
         document.getElementById('se-settings-panel').style.display = 'none';
         document.getElementById('se-body').style.display = 'block';
         settingsOpen = false;
+      });
+
+      // ── Settings controls (wired to existing settings/applyTheme plumbing) ──
+      document.getElementById('se-lang-select').addEventListener('change', (e) => {
+        settings.language = e.target.value;
+        saveSettings();
+        fetchLatestPlay(); // re-fetch so the next explanation uses the new language
+      });
+
+      document.getElementById('se-theme-select').addEventListener('change', (e) => {
+        settings.theme = e.target.value;
+        saveSettings();
+        applyTheme(); // live
+      });
+
+      document.getElementById('se-fontsize-select').addEventListener('change', (e) => {
+        settings.fontSize = e.target.value;
+        saveSettings();
+        applyTheme(); // live — applyTheme sets FONT_SIZES base on the root; card scales via em
+      });
+
+      // External links MUST open a new tab (never navigate the host page, which
+      // would close the game the user is watching). Own click handler + window.open
+      // with noopener — no raw <a href> that could trip host-page CSP.
+      overlayEl.querySelectorAll('.se-ext-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const url = link.getAttribute('data-url');
+          if (url) window.open(url, '_blank', 'noopener');
+        });
       });
 
       document.getElementById('se-ask-btn').addEventListener('click', handleAskQuestion);
@@ -431,6 +515,9 @@
         expEl.textContent = response.simple || 'Waiting for next play...';
         typeEl.textContent = response.playType || '';
         if (teamEl && response.homeTeam) teamEl.textContent = `${response.awayTeam} @ ${response.homeTeam}`;
+
+        // Bug fix 2: keep the on-screen play as Ask context (was always empty).
+        currentPlayText = [response.playType, response.simple].filter(Boolean).join(' — ');
         
         if (sourceBox) sourceBox.textContent = response.playType || 'No source play available.';
 
