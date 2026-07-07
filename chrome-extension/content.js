@@ -15,6 +15,8 @@
   let lastUpdatedTimer = null;
   let sourceVisible = false;
   let currentGameState = 'in'; // Track game state for smart polling
+  let selectorOpen = false;
+  let selectorPanelEl = null;
 
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
@@ -41,6 +43,25 @@
     { code: 'ko', label: '🇰🇷 Korean' },
     { code: 'it', label: '🇮🇹 Italian' },
     { code: 'ar', label: '🇸🇦 Arabic' }
+  ];
+
+  // In-overlay selector data. SAME keys the popup/backend use. Sport labels mirror
+  // popup.html; difficulty uses the display-rename rule (label "Rookie" → key "kid").
+  const SPORTS = [
+    { key: 'nfl', label: '🏈 NFL' },
+    { key: 'mlb', label: '⚾ MLB' },
+    { key: 'nba', label: '🏀 NBA' },
+    { key: 'nhl', label: '🏒 NHL' },
+    { key: 'soccer', label: '⚽ MLS' },
+    { key: 'worldcup', label: '🌍 World Cup' },
+    { key: 'rugby', label: '🏉 Rugby' }
+  ];
+
+  const LEVELS = [
+    { key: 'kid', label: 'Rookie' },
+    { key: 'beginner', label: 'Beginner' },
+    { key: 'intermediate', label: 'Intermediate' },
+    { key: 'expert', label: 'Expert' }
   ];
 
   // ─────────────────────────────────────────
@@ -200,6 +221,17 @@
     const settingsLinks = document.getElementById('se-settings-links');
     if (settingsLinks) settingsLinks.style.borderTopColor = t.settingsItemBorder;
     overlayEl.querySelectorAll('.se-ext-link').forEach(el => { el.style.color = t.subtext; });
+    // Selector panel (floating sibling) — re-theme its shell + controls when present.
+    if (selectorPanelEl) {
+      selectorPanelEl.style.background = t.settingsBg;
+      selectorPanelEl.style.color = t.text;
+      selectorPanelEl.style.borderColor = settings.accentColor;
+      ['se-sel-sport', 'se-sel-game'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.style.background = t.selectBg; el.style.color = t.inputText; el.style.borderColor = t.inputBorder; }
+      });
+      refreshSelectorPills();
+    }
   }
 
   // ─────────────────────────────────────────
@@ -230,6 +262,7 @@
       <div id="se-header" style="display:flex!important;justify-content:space-between!important;align-items:center!important;background:${settings.accentColor}!important;padding:9px 12px!important;cursor:grab!important;user-select:none!important;border-radius:10px 10px 0 0!important;position:sticky!important;top:0!important;z-index:10!important;">
         <span style="font-weight:800!important;font-size:13px!important;color:white!important;">🏟️ SPORTS EXPLAINER</span>
         <div style="display:flex!important;gap:6px!important;">
+          <button id="se-selector-btn" title="Change sport / game / level" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">🎯</button>
           <button id="se-settings-btn" title="Settings" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">⚙️</button>
           <button id="se-minimize" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">−</button>
           <button id="se-close" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">✕</button>
@@ -404,8 +437,38 @@
 
       loadGamesIntoOverlay();
       document.getElementById('se-game-select').addEventListener('change', (e) => {
-        if (e.target.value) { currentGameId = e.target.value; fetchLatestPlay(); }
+        if (e.target.value) selectGame(e.target.value);
       });
+
+      // ── In-overlay selector panel (sport / game / difficulty) ──
+      selectorPanelEl = buildSelectorPanel();
+      document.body.appendChild(selectorPanelEl);
+
+      document.getElementById('se-selector-btn').addEventListener('click', () => toggleSelector());
+      selectorPanelEl.querySelector('#se-selector-close').addEventListener('click', () => toggleSelector(false));
+
+      document.getElementById('se-sel-sport').addEventListener('change', (e) => {
+        currentSport = e.target.value;   // KEY (nfl/mlb/…), same as popup
+        currentGameId = null;
+        loadGamesIntoOverlay();          // refills both game dropdowns for the new sport
+        fetchLatestPlay();               // immediate refresh (null gameId → backend picks live/first)
+      });
+
+      document.getElementById('se-sel-game').addEventListener('change', (e) => {
+        if (e.target.value) selectGame(e.target.value);
+      });
+
+      selectorPanelEl.querySelectorAll('.se-sel-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          settings.level = pill.dataset.level;  // KEY (kid/beginner/intermediate/expert), never the label
+          currentLevel = settings.level;
+          saveSettings();
+          refreshSelectorPills();
+          fetchLatestPlay();                    // re-explain at the new difficulty
+        });
+      });
+
+      window.addEventListener('resize', () => { if (selectorOpen) positionSelectorPanel(); });
 
       makeDraggable(overlayEl);
       fetchLatestPlay();
@@ -462,27 +525,136 @@
   }
 
   async function loadGamesIntoOverlay() {
-    const gameSelect = document.getElementById('se-game-select');
-    if (!gameSelect) return;
+    // Fills BOTH the body dropdown (#se-game-select) and, when present, the
+    // selector panel's game dropdown (#se-sel-game) from a single fetch.
+    const targets = [document.getElementById('se-game-select'), document.getElementById('se-sel-game')].filter(Boolean);
+    if (!targets.length) return;
     try {
       const response = await chrome.runtime.sendMessage({ action: 'fetchGames', sport: currentSport });
       const games = response?.games || [];
-      gameSelect.innerHTML = '';
-      if (games.length === 0) { gameSelect.innerHTML = '<option value="">No games today</option>'; return; }
-      games.forEach(game => {
-        const option = document.createElement('option');
-        option.value = game.id;
-        option.textContent = `${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}`;
-        if (game.id === currentGameId) option.selected = true;
-        gameSelect.appendChild(option);
+      targets.forEach(gameSelect => {
+        gameSelect.innerHTML = '';
+        if (games.length === 0) { gameSelect.innerHTML = '<option value="">No games today</option>'; return; }
+        games.forEach(game => {
+          const option = document.createElement('option');
+          option.value = game.id;
+          option.textContent = `${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}`;
+          if (game.id === currentGameId) option.selected = true;
+          gameSelect.appendChild(option);
+        });
       });
     } catch (err) { console.error('Load games error:', err); }
+  }
+
+  // ─────────────────────────────────────────
+  // IN-OVERLAY SELECTOR PANEL (sport / game / difficulty)
+  // Floating sibling of the settings panel; attaches to the card edge with
+  // smart left/right side-detection so it never runs off-screen.
+  // ─────────────────────────────────────────
+  function buildSelectorPanel() {
+    const t = getThemeColors();
+    const panel = document.createElement('div');
+    panel.id = 'se-selector-panel';
+    panel.style.cssText = `
+      position: fixed !important; display: none !important; top: 0 !important; left: 0 !important;
+      width: 240px !important; max-height: 80vh !important; overflow-y: auto !important;
+      z-index: 2147483647 !important; background: ${t.settingsBg} !important; color: ${t.text} !important;
+      border: 1px solid ${settings.accentColor} !important; border-radius: 10px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; font-family: system-ui, sans-serif !important;
+      font-size: 13px !important; padding: 12px !important;
+    `;
+    const labelStyle = `display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;`;
+    const selectStyle = `width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;`;
+    const pillStyle = (active) => `flex:1!important;padding:6px 4px!important;border-radius:6px!important;border:1px solid ${active ? settings.accentColor : t.inputBorder}!important;background:${active ? settings.accentColor : t.selectBg}!important;color:${active ? 'white' : t.subtext}!important;font-size:10px!important;font-weight:600!important;cursor:pointer!important;text-align:center!important;`;
+
+    panel.innerHTML = `
+      <div style="display:flex!important;justify-content:space-between!important;align-items:center!important;margin-bottom:10px!important;">
+        <span style="font-size:11px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;">🎯 Change</span>
+        <button id="se-selector-close" style="background:none!important;border:none!important;color:${t.subtext}!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;line-height:1!important;">✕</button>
+      </div>
+
+      <div style="margin-bottom:10px!important;">
+        <label style="${labelStyle}">Sport</label>
+        <select id="se-sel-sport" style="${selectStyle}">
+          ${SPORTS.map(s => `<option value="${s.key}"${currentSport === s.key ? ' selected' : ''}>${s.label}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="margin-bottom:10px!important;">
+        <label style="${labelStyle}">Game</label>
+        <select id="se-sel-game" style="${selectStyle}">
+          <option value="">Loading games...</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:2px!important;">
+        <label style="${labelStyle}">Difficulty</label>
+        <div id="se-sel-levels" style="display:flex!important;gap:5px!important;">
+          ${LEVELS.map(l => `<div class="se-sel-pill" data-level="${l.key}" style="${pillStyle(settings.level === l.key)}">${l.label}</div>`).join('')}
+        </div>
+      </div>
+    `;
+    return panel;
+  }
+
+  // Re-tint the difficulty pills to reflect the current settings.level (the KEY).
+  function refreshSelectorPills() {
+    if (!selectorPanelEl) return;
+    const t = getThemeColors();
+    selectorPanelEl.querySelectorAll('.se-sel-pill').forEach(pill => {
+      const active = pill.dataset.level === settings.level;
+      pill.style.background = active ? settings.accentColor : t.selectBg;
+      pill.style.color = active ? 'white' : t.subtext;
+      pill.style.borderColor = active ? settings.accentColor : t.inputBorder;
+    });
+  }
+
+  // Smart side-detection: open on whichever side of the card has full room for the
+  // 240px panel; if neither does, use the side with more space (clamped on-screen).
+  function positionSelectorPanel() {
+    if (!overlayEl || !selectorPanelEl) return;
+    const rect = overlayEl.getBoundingClientRect();
+    const pw = 240, gap = 8;
+    const spaceRight = window.innerWidth - rect.right;
+    const spaceLeft = rect.left;
+    let left;
+    if (spaceRight >= pw + gap) left = rect.right + gap;
+    else if (spaceLeft >= pw + gap) left = rect.left - gap - pw;
+    else left = spaceRight >= spaceLeft ? (window.innerWidth - pw - gap) : gap;
+    const ph = selectorPanelEl.offsetHeight || 280;
+    const top = Math.max(8, Math.min(rect.top, window.innerHeight - ph - 8));
+    selectorPanelEl.style.left = Math.max(8, left) + 'px';
+    selectorPanelEl.style.top = top + 'px';
+  }
+
+  function toggleSelector(open) {
+    if (!selectorPanelEl) return;
+    selectorOpen = (open === undefined) ? !selectorOpen : open;
+    if (selectorOpen) {
+      selectorPanelEl.style.display = 'block';
+      positionSelectorPanel();
+      // Populate the selector's game list on first open (or if empty).
+      const g = document.getElementById('se-sel-game');
+      if (g && g.querySelectorAll('option').length <= 1) loadGamesIntoOverlay();
+    } else {
+      selectorPanelEl.style.display = 'none';
+    }
+  }
+
+  // Set the current game from either dropdown, keep both in sync, and re-fetch.
+  function selectGame(id) {
+    currentGameId = id || null;
+    const b = document.getElementById('se-game-select'); if (b) b.value = currentGameId || '';
+    const s = document.getElementById('se-sel-game'); if (s) s.value = currentGameId || '';
+    fetchLatestPlay();
   }
 
   function hideOverlay() {
     overlayVisible = false;
     if (overlayEl) overlayEl.remove();
     overlayEl = null;
+    if (selectorPanelEl) { selectorPanelEl.remove(); selectorPanelEl = null; }
+    selectorOpen = false;
     if (pollInterval) clearInterval(pollInterval);
     if (lastUpdatedTimer) clearInterval(lastUpdatedTimer);
   }
@@ -575,7 +747,7 @@
     const header = document.getElementById('se-header');
     let isDragging = false, startX, startY, startLeft, startTop;
     header.addEventListener('mousedown', (e) => {
-      if (['se-close','se-minimize','se-settings-btn'].includes(e.target.id)) return;
+      if (['se-close','se-minimize','se-settings-btn','se-selector-btn'].includes(e.target.id)) return;
       const rect = el.getBoundingClientRect();
       startLeft = rect.left; startTop = rect.top;
       isDragging = true; startX = e.clientX; startY = e.clientY;
