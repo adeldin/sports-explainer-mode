@@ -37,7 +37,7 @@
 
   // Pause auto-poll after this much overlay-inactivity to stop wasting /api/explain (AI) calls
   // while nobody's interacting. Tune here.
-  const IDLE_TIMEOUT_MS = 20000; // TEMP: 20s for testing — SET BACK TO 15 * 60 * 1000 before commit
+  const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
   // SportsWise brand mark — inline SVG (transparent, mirrors logo.svg with the full-canvas
   // navy rect removed), sized to the header (22px) so it needs no manifest/web_accessible_resources
