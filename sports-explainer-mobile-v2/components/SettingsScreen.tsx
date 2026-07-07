@@ -188,7 +188,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
           </TouchableOpacity>
 
           <View style={styles.versionBox}>
-            <Text style={styles.versionText}>SportsWise v1.0</Text>
+            <Text style={styles.versionText}>SportsWise v1.4</Text>
             <Text style={styles.versionText}>{S.poweredBy}</Text>
           </View>
         </ScrollView>
