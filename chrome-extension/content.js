@@ -17,6 +17,7 @@
   let currentGameState = 'in'; // Track game state for smart polling
   let selectorOpen = false;
   let selectorPanelEl = null;
+  let currentGames = []; // enriched score-card game list for the rail
 
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
@@ -226,10 +227,9 @@
     const ruleEl = document.getElementById('se-rule');
     if (ruleEl) { ruleEl.style.color = t.subtext; ruleEl.style.borderTopColor = t.border; }
     overlayEl.querySelectorAll('.se-section-h').forEach(el => { el.style.color = sectionHeaderColor(); });
-    const gameSection = document.getElementById('se-game-section');
-    if (gameSection) gameSection.style.borderTopColor = t.border;
-    const gameSelect = document.getElementById('se-game-select');
-    if (gameSelect) { gameSelect.style.background = t.selectBg; gameSelect.style.color = t.inputText; gameSelect.style.borderColor = t.inputBorder; }
+    const scSection = document.getElementById('se-scorecard-section');
+    if (scSection) scSection.style.borderBottomColor = t.border;
+    if (currentGames.length) renderScorecards(); // rebuild cards with the new theme tokens
     const askSection = document.getElementById('se-ask-section');
     if (askSection) { askSection.style.borderTopColor = t.border; askSection.style.background = t.footerBg; }
     const questionInput = document.getElementById('se-question-input');
@@ -345,6 +345,14 @@
       </div>
 
       <div id="se-body">
+        <div id="se-scorecard-section" style="padding:8px 10px 6px!important;border-bottom:1px solid ${t.border}!important;">
+          <div id="se-scorecard-note" style="display:none!important;font-size:0.68em!important;color:${t.subtext}!important;margin-bottom:5px!important;"></div>
+          <div id="se-scorecard-rail" style="display:flex!important;gap:7px!important;overflow-x:auto!important;padding-bottom:3px!important;">
+            <div style="font-size:0.72em!important;color:${t.subtext}!important;padding:6px 2px!important;">Loading games…</div>
+          </div>
+          <div id="se-scorecard-channel" style="display:none!important;font-size:0.7em!important;color:${t.subtext}!important;margin-top:5px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;"></div>
+        </div>
+
         <div style="padding: 10px 12px 6px !important;">
           <div id="se-teams" style="font-size:0.85em!important;color:${teamsTitleColor()}!important;font-weight:600!important;margin-bottom:7px!important;text-transform:uppercase!important;">Loading game...</div>
 
@@ -361,12 +369,6 @@
             <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
             <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
           </div>
-        </div>
-
-        <div id="se-game-section" style="padding:4px 12px 8px!important;border-top:1px solid ${t.border}!important;">
-          <select id="se-game-select" style="width:100%!important;padding:5px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:0.85em!important;cursor:pointer!important;">
-            <option value="">Loading games...</option>
-          </select>
         </div>
 
         <div id="se-ask-section" style="padding:8px 12px 10px!important;border-top:1px solid ${t.border}!important;background:${t.footerBg}!important;">
@@ -476,9 +478,12 @@
       document.getElementById('se-ask-btn').addEventListener('click', handleAskQuestion);
       document.getElementById('se-question-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleAskQuestion(); });
 
-      loadGamesIntoOverlay();
-      document.getElementById('se-game-select').addEventListener('change', (e) => {
-        if (e.target.value) selectGame(e.target.value);
+      // Load today's games → auto-select → THEN fetch the explanation (guarantees a valid gameId).
+      loadGamesIntoOverlay().then(() => fetchLatestPlay());
+      // Delegated click on the score-card rail → select that game (survives re-renders).
+      document.getElementById('se-scorecard-rail').addEventListener('click', (e) => {
+        const card = e.target.closest('.se-scorecard');
+        if (card && card.dataset.id) selectGame(card.dataset.id);
       });
 
       // ── In-overlay selector panel (sport / game / difficulty) ──
@@ -490,9 +495,8 @@
 
       document.getElementById('se-sel-sport').addEventListener('change', (e) => {
         currentSport = e.target.value;   // KEY (nfl/mlb/…), same as popup
-        currentGameId = null;
-        loadGamesIntoOverlay();          // refills both game dropdowns for the new sport
-        fetchLatestPlay();               // immediate refresh (null gameId → backend picks live/first)
+        currentGameId = null;            // force auto-select of the new sport's first live/today game
+        loadGamesIntoOverlay().then(() => fetchLatestPlay()); // reload rail → auto-select → fetch
       });
 
       document.getElementById('se-sel-game').addEventListener('change', (e) => {
@@ -512,7 +516,7 @@
       window.addEventListener('resize', () => { if (selectorOpen) positionSelectorPanel(); });
 
       makeDraggable(overlayEl);
-      fetchLatestPlay();
+      // (Initial explanation fetch is chained off loadGamesIntoOverlay above, once a game is selected.)
       restartPollInterval();
     }, 50);
   }
@@ -565,26 +569,126 @@
     return tail ? `📡 ${tail}` : '📡 Live';
   }
 
+  // Live-first ordering for the rail + selector: in-progress, then scheduled, then final.
+  const GAME_ORDER = { in: 0, pre: 1, post: 2 };
+  function sortedGames() {
+    return currentGames.slice().sort((a, b) =>
+      (GAME_ORDER[a.state] ?? 3) - (GAME_ORDER[b.state] ?? 3));
+  }
+
+  // Is this ESPN event date (ISO) today, in the viewer's local time? Bad/absent date → false.
+  function isTodayLocal(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  }
+
+  // Only today's slate belongs on the rail: any LIVE game (defensive vs. TZ-boundary rolls) plus
+  // today's scheduled/finals. ESPN returns the full future schedule (Sept games in July) — drop it.
+  function todaysGames(games) {
+    return games.filter(g => g.state === 'in' || isTodayLocal(g.date));
+  }
+
+  // Load this sport's games, filter to today, render the rail + selector dropdown, and AUTO-SELECT
+  // a game (first live, else first) whenever the current selection isn't a valid today-game — so an
+  // explanation always loads. Does NOT fetch itself; the caller chains fetchLatestPlay() when a
+  // fresh explanation is wanted (initial load / sport change), NOT on a mere selector-open refresh.
   async function loadGamesIntoOverlay() {
-    // Fills BOTH the body dropdown (#se-game-select) and, when present, the
-    // selector panel's game dropdown (#se-sel-game) from a single fetch.
-    const targets = [document.getElementById('se-game-select'), document.getElementById('se-sel-game')].filter(Boolean);
-    if (!targets.length) return;
     try {
       const response = await chrome.runtime.sendMessage({ action: 'fetchGames', sport: currentSport });
-      const games = response?.games || [];
-      targets.forEach(gameSelect => {
-        gameSelect.innerHTML = '';
-        if (games.length === 0) { gameSelect.innerHTML = '<option value="">No games today</option>'; return; }
-        games.forEach(game => {
-          const option = document.createElement('option');
-          option.value = game.id;
-          option.textContent = `${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}`;
-          if (game.id === currentGameId) option.selected = true;
-          gameSelect.appendChild(option);
-        });
+      currentGames = todaysGames(response?.games || []);
+    } catch (err) {
+      console.error('Load games error:', err);
+      currentGames = [];
+    }
+    // Auto-select so the fetch has a real, current gameId (BUG 1: the rail is now the selector).
+    const valid = currentGameId && currentGames.some(g => g.id === currentGameId);
+    if (!valid && currentGames.length) currentGameId = sortedGames()[0].id;
+
+    renderScorecards();
+    // Selector panel's game dropdown (still present) — fill from the same data.
+    const sel = document.getElementById('se-sel-game');
+    if (sel) {
+      sel.innerHTML = '';
+      if (!currentGames.length) { sel.innerHTML = '<option value="">No games today</option>'; }
+      else sortedGames().forEach(game => {
+        const option = document.createElement('option');
+        option.value = game.id;
+        option.textContent = `${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}`;
+        if (game.id === currentGameId) option.selected = true;
+        sel.appendChild(option);
       });
-    } catch (err) { console.error('Load games error:', err); }
+    }
+  }
+
+  // Render the horizontal score-card rail (live games first). Each card carries data-id;
+  // a delegated click on the rail drives selectGame(). Re-rendered on theme change.
+  function renderScorecards() {
+    const rail = document.getElementById('se-scorecard-rail');
+    const note = document.getElementById('se-scorecard-note');
+    if (!rail) return;
+    const t = getThemeColors();
+    const games = sortedGames();
+
+    if (!games.length) {
+      rail.innerHTML = `<div style="font-size:0.72em!important;color:${t.subtext}!important;padding:6px 2px!important;">No games today</div>`;
+      if (note) note.style.display = 'none';
+      const ch = document.getElementById('se-scorecard-channel');
+      if (ch) ch.style.display = 'none';
+      return;
+    }
+
+    // No live games → still show the slate with a small note (fixes the "no games" emptiness).
+    if (note) {
+      const anyLive = games.some(g => g.state === 'in');
+      if (anyLive) { note.style.display = 'none'; }
+      else { note.textContent = "No live games — today's slate:"; note.style.display = 'block'; }
+    }
+
+    const teamRow = (logo, abbrev, score) => `
+      <div style="display:flex!important;align-items:center!important;gap:5px!important;margin-top:2px!important;">
+        ${logo ? `<img src="${logo}" width="18" height="18" style="flex:0 0 auto!important;object-fit:contain!important;" referrerpolicy="no-referrer"/>` : `<span style="width:18px!important;display:inline-block!important;"></span>`}
+        <span style="font-size:0.74em!important;font-weight:700!important;color:${t.text}!important;">${abbrev || '?'}</span>
+        <span style="margin-left:auto!important;font-size:0.82em!important;font-weight:800!important;color:${t.text}!important;">${score || ''}</span>
+      </div>`;
+
+    rail.innerHTML = games.map(g => {
+      const selected = g.id === currentGameId;
+      const isLive = g.state === 'in';
+      const label = g.statusLabel || (g.state === 'post' ? 'Final' : g.state === 'pre' ? 'Scheduled' : '');
+      return `<div class="se-scorecard" data-id="${g.id}" style="flex:0 0 auto!important;width:126px!important;box-sizing:border-box!important;border:1px solid ${selected ? settings.accentColor : t.inputBorder}!important;border-radius:8px!important;padding:6px 8px!important;background:${t.selectBg}!important;cursor:pointer!important;">
+        <div style="display:flex!important;align-items:center!important;gap:4px!important;margin-bottom:3px!important;">
+          ${isLive ? `<span style="width:6px!important;height:6px!important;border-radius:50%!important;background:${settings.accentColor}!important;flex:0 0 auto!important;"></span>` : ''}
+          <span style="font-size:0.62em!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:0.04em!important;color:${isLive ? settings.accentColor : t.subtext}!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;">${label}</span>
+        </div>
+        ${teamRow(g.awayLogo, g.awayAbbrev, g.awayScore)}
+        ${teamRow(g.homeLogo, g.homeAbbrev, g.homeScore)}
+      </div>`;
+    }).join('');
+
+    updateChannelLine();
+  }
+
+  // Channel line under the rail reflects the SELECTED game's broadcasts; hidden when none.
+  function updateChannelLine() {
+    const ch = document.getElementById('se-scorecard-channel');
+    if (!ch) return;
+    const g = currentGames.find(x => x.id === currentGameId);
+    if (g && g.broadcasts) { ch.textContent = `📺 ${g.broadcasts}`; ch.style.display = 'block'; }
+    else { ch.style.display = 'none'; }
+  }
+
+  // Re-tint card borders to reflect the current selection (cheaper than a full re-render).
+  function highlightSelectedCard() {
+    const rail = document.getElementById('se-scorecard-rail');
+    if (!rail) return;
+    const t = getThemeColors();
+    rail.querySelectorAll('.se-scorecard').forEach(card => {
+      card.style.borderColor = card.getAttribute('data-id') === currentGameId ? settings.accentColor : t.inputBorder;
+    });
+    updateChannelLine();
   }
 
   // ─────────────────────────────────────────
@@ -682,11 +786,12 @@
     }
   }
 
-  // Set the current game from either dropdown, keep both in sync, and re-fetch.
+  // Set the current game from a score card or the selector dropdown, keep the rail +
+  // selector dropdown in sync, and re-fetch the explanation.
   function selectGame(id) {
     currentGameId = id || null;
-    const b = document.getElementById('se-game-select'); if (b) b.value = currentGameId || '';
     const s = document.getElementById('se-sel-game'); if (s) s.value = currentGameId || '';
+    highlightSelectedCard();
     fetchLatestPlay();
   }
 

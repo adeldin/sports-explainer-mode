@@ -146,6 +146,42 @@ async function handleAskQuestion(sport, level, question, context, language = 'en
 // FETCH TODAY'S GAMES FOR POPUP GAME LIST
 // ─────────────────────────────────────────
 async function handleFetchGames(sport) {
+  // Normalize one ESPN competition into an enriched score-card game. Mirrors the app's
+  // lib/scoreboard.ts extractors (abbrev / logo / score-string-or-object / broadcasts).
+  // Keeps the legacy fields (home/away displayName, state, detail, home/awayScore) so
+  // popup.js + the selector dropdown keep working, and ADDS the score-card fields.
+  const buildGame = (id, competition, statusType, dateStr) => {
+    const comp = competition || {};
+    const home = comp.competitors?.find(c => c.homeAway === 'home');
+    const away = comp.competitors?.find(c => c.homeAway === 'away');
+    const abbrev = c => c?.team?.abbreviation || c?.team?.shortDisplayName || c?.team?.displayName || '?';
+    const name = c => c?.team?.displayName || abbrev(c);
+    const scoreOf = c => {
+      const s = c?.score;
+      if (s == null) return '';
+      return typeof s === 'object' ? String(s.displayValue ?? s.value ?? '') : String(s);
+    };
+    const logoOf = c => c?.team?.logo || c?.team?.logos?.[0]?.href || '';
+    const broadcastsOf = () => {
+      const names = [];
+      for (const b of (comp.broadcasts || [])) for (const n of (b?.names || [])) if (n) names.push(String(n));
+      for (const g of (comp.geoBroadcasts || [])) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
+      return Array.from(new Set(names)).join(', ');
+    };
+    const state = statusType?.state || 'pre';
+    const statusLabel = statusType?.shortDetail || statusType?.description || '';
+    return {
+      id: String(id),
+      home: name(home), away: name(away),                 // legacy (displayName) — popup/selector
+      homeAbbrev: abbrev(home), awayAbbrev: abbrev(away),
+      homeScore: scoreOf(home), awayScore: scoreOf(away),
+      homeLogo: logoOf(home), awayLogo: logoOf(away),
+      state, detail: statusLabel, statusLabel,
+      broadcasts: broadcastsOf(),
+      date: dateStr || '',   // ESPN event.date (ISO) — used to filter to today's slate
+    };
+  };
+
   const SPORT_CONFIG = {
     nfl:      { sport: 'football',   league: 'nfl' },
     mlb:      { sport: 'baseball',   league: 'mlb' },
@@ -172,15 +208,7 @@ async function handleFetchGames(sport) {
     const games = await Promise.all(items.map(async (item) => {
       const eventRes = await fetch(item.$ref, { cache: 'no-store' });
       const eventData = await eventRes.json();
-      const competition = eventData.competitions?.[0];
-      const home = competition?.competitors?.find(t => t.homeAway === 'home')?.team?.displayName || '?';
-      const away = competition?.competitors?.find(t => t.homeAway === 'away')?.team?.displayName || '?';
-      const state = eventData.status?.type?.state || 'pre';
-      const detail = eventData.status?.type?.shortDetail || '';
-      const homeScore = competition?.competitors?.find(t => t.homeAway === 'home')?.score || '';
-      const awayScore = competition?.competitors?.find(t => t.homeAway === 'away')?.score || '';
-
-      return { id: eventData.id, home, away, state, detail, homeScore, awayScore };
+      return buildGame(eventData.id, eventData.competitions?.[0], eventData.status?.type, eventData.date);
     }));
 
     return { games };
@@ -195,17 +223,9 @@ async function handleFetchGames(sport) {
   const scoreboardData = await scoreboardRes.json();
   const events = scoreboardData.events || [];
 
-  const games = events.map(event => {
-    const competition = event.competitions?.[0];
-    const home = competition?.competitors?.find(t => t.homeAway === 'home')?.team?.displayName || '?';
-    const away = competition?.competitors?.find(t => t.homeAway === 'away')?.team?.displayName || '?';
-    const state = event.status?.type?.state || 'pre';
-    const detail = event.status?.type?.shortDetail || '';
-    const homeScore = competition?.competitors?.find(t => t.homeAway === 'home')?.score || '';
-    const awayScore = competition?.competitors?.find(t => t.homeAway === 'away')?.score || '';
-
-    return { id: event.id, home, away, state, detail, homeScore, awayScore };
-  });
+  const games = events.map(event =>
+    buildGame(event.id, event.competitions?.[0], event.status?.type, event.date)
+  );
 
   return { games };
 }
