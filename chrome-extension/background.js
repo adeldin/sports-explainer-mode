@@ -40,6 +40,16 @@ function validateFetchPlayMsg(msg) {
   return { sport, level, gameId, language };
 }
 
+function validateRecapMsg(msg) {
+  const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
+  const level = VALID_LEVELS.includes(msg.level) ? msg.level : 'beginner';
+  const language = VALID_LANGUAGES.includes(msg.language) ? msg.language : 'en';
+  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+  // A recap is for a SPECIFIC finished game — both sport AND gameId are required.
+  if (!sport || !gameId) return null;
+  return { sport, level, gameId, language };
+}
+
 function validateAskQuestionMsg(msg) {
   const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
   const level = VALID_LEVELS.includes(msg.level) ? msg.level : 'beginner';
@@ -101,6 +111,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── RECAP (finished/Final games) ──
+  if (msg.action === 'recap') {
+    const validated = validateRecapMsg(msg);
+    if (!validated) {
+      sendResponse({ error: 'Invalid recap message — sport and gameId are required.' });
+      return true;
+    }
+    handleRecap(validated.sport, validated.level, validated.gameId, validated.language)
+      .then(sendResponse)
+      .catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
+
   // ── FETCH GAMES ──
   if (msg.action === 'fetchGames') {
     const validated = validateFetchGamesMsg(msg);
@@ -124,6 +147,21 @@ async function handleFetchPlay(sport, level, gameId, language) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sport, level, gameId, language })
+  });
+  if (!res.ok) throw new Error(`API returned ${res.status}`);
+  return await res.json();
+}
+
+// ─────────────────────────────────────────
+// POST-GAME RECAP (Final games) — mirrors handleFetchPlay with action:'recap'.
+// The 3 Pro narrative fields come back empty for the extension (no isPro); we render
+// score + story + articleLink only.
+// ─────────────────────────────────────────
+async function handleRecap(sport, level, gameId, language) {
+  const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'recap', sport, gameId, level, language })
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();

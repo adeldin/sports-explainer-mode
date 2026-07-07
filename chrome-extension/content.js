@@ -233,6 +233,12 @@
     const ruleEl = document.getElementById('se-rule');
     if (ruleEl) { ruleEl.style.color = t.subtext; ruleEl.style.borderTopColor = t.border; }
     overlayEl.querySelectorAll('.se-section-h').forEach(el => { el.style.color = sectionHeaderColor(); });
+    const recapScore = document.getElementById('se-recap-score');
+    if (recapScore) recapScore.style.color = t.text;
+    const recapStory = document.getElementById('se-recap-story');
+    if (recapStory) recapStory.style.color = t.text;
+    const recapLink = document.getElementById('se-recap-link');
+    if (recapLink) recapLink.style.color = settings.accentColor;
     const scSection = document.getElementById('se-scorecard-section');
     if (scSection) scSection.style.borderBottomColor = t.border;
     if (currentGames.length) renderScorecards(); // rebuild cards with the new theme tokens
@@ -364,18 +370,32 @@
         <div style="padding: 10px 12px 6px !important;">
           <div id="se-teams" style="font-size:0.85em!important;color:${teamsTitleColor()}!important;font-weight:600!important;margin-bottom:7px!important;text-transform:uppercase!important;">Loading game...</div>
 
-          <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
-          <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
+          <!-- LIVE / scheduled content — hidden and replaced by the recap block for Final games -->
+          <div id="se-live-content">
+            <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
+            <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
 
-          <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
-          <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
+            <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
+            <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
 
-          <div id="se-h-rule" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">The Rule</div>
-          <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
+            <div id="se-h-rule" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">The Rule</div>
+            <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
 
-          <div id="se-source-container" style="margin-bottom:4px!important;">
-            <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
-            <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
+            <div id="se-source-container" style="margin-bottom:4px!important;">
+              <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
+              <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
+            </div>
+          </div>
+
+          <!-- RECAP content — shown INSTEAD of live content when the selected game is Final ('post') -->
+          <div id="se-recap-content" style="display:none!important;">
+            <div id="se-h-recap" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 4px!important;">Recap</div>
+            <div id="se-recap-score" style="display:none!important;font-size:1.15em!important;font-weight:800!important;color:${t.text}!important;margin:0 0 8px!important;"></div>
+            <p id="se-recap-story" style="display:none!important;font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;"></p>
+            <!-- Pro-upsell teaser goes HERE: response.turningPoint / keyPerformance / whyItMattered are
+                 Pro-gated and ALWAYS empty for the free extension → intentionally NOT rendered today.
+                 When entitlement lands, render these as locked/teaser rows in this spot. -->
+            <button id="se-recap-link" style="display:none!important;background:none!important;border:none!important;padding:0!important;font-size:0.85em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Read full recap ↗</button>
           </div>
         </div>
 
@@ -550,6 +570,11 @@
 
     // Don't poll if tab is hidden, overlay is gone, minimized, or idle-paused.
     if (document.hidden || !overlayVisible || isMinimized || idlePaused) return;
+
+    // Final games are static — never poll them (recap is fetched once). Uses the rail's
+    // authoritative state, so it holds even before a fetch sets currentGameState.
+    const selForPoll = currentGames.find(g => g.id === currentGameId);
+    if (selForPoll && selForPoll.state === 'post') return;
 
     let intervalMs = settings.refreshInterval * 1000;
 
@@ -859,8 +884,78 @@
     if (lastUpdatedTimer) clearInterval(lastUpdatedTimer);
   }
 
+  // Fetch + render the post-game RECAP for a Final game. Called ONCE (no repeat interval).
+  // Renders score + story + article link only; the 3 Pro fields are always empty (see comment below).
+  async function fetchRecapAndRender(game) {
+    if (!chrome.runtime?.id) return;
+    // A Final game is static — make sure no poll interval is running.
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+
+    const liveEl = document.getElementById('se-live-content');
+    const recapEl = document.getElementById('se-recap-content');
+    if (liveEl) liveEl.style.display = 'none';
+    if (recapEl) recapEl.style.display = 'block';
+
+    // Teams title (recap payload carries no team names — use the selected rail game).
+    const teamEl = document.getElementById('se-teams');
+    if (teamEl && game) teamEl.textContent = `${game.awayAbbrev} @ ${game.homeAbbrev} — FINAL`;
+
+    setStatusFetching();
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'recap', sport: currentSport, gameId: currentGameId, level: settings.level, language: settings.language
+      });
+      if (response) {
+        const scoreEl = document.getElementById('se-recap-score');
+        const storyEl = document.getElementById('se-recap-story');
+        const linkEl = document.getElementById('se-recap-link');
+
+        // Score — prominent. Guard: only render when non-empty.
+        if (scoreEl) {
+          if (response.score) { scoreEl.textContent = response.score; scoreEl.style.display = 'block'; }
+          else scoreEl.style.display = 'none';
+        }
+        // Story — render whatever came back (quality varies, may be thin). Guard non-empty.
+        if (storyEl) {
+          if (response.story) { storyEl.textContent = response.story; storyEl.style.display = 'block'; }
+          else storyEl.style.display = 'none';
+        }
+        // "Read full recap ↗" — ONLY when articleLink is non-empty (it's sometimes ''). New tab, noopener.
+        if (linkEl) {
+          if (response.articleLink) {
+            linkEl.style.display = 'inline-block';
+            linkEl.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.open(response.articleLink, '_blank', 'noopener'); };
+          } else {
+            linkEl.style.display = 'none';
+            linkEl.onclick = null;
+          }
+        }
+
+        // NOTE: response.turningPoint / keyPerformance / whyItMattered are Pro-gated and ALWAYS
+        // empty for the free extension — intentionally NOT rendered. Future Pro-upsell teaser (locked
+        // rows) belongs in the marked spot in the #se-recap-content markup above.
+
+        currentPlayText = [response.score, response.story].filter(Boolean).join(' — '); // Ask context
+        setStatusReady(!!response.score, '✅ Final');
+      }
+    } catch (err) {
+      setStatusError('Recap failed');
+    }
+  }
+
   async function fetchLatestPlay() {
     if (!chrome.runtime?.id) return;
+
+    // Final games → show a RECAP once, not a live play (and no polling — see restartPollInterval).
+    const selected = currentGames.find(g => g.id === currentGameId);
+    if (selected && selected.state === 'post') { fetchRecapAndRender(selected); return; }
+
+    // Live / scheduled → ensure live content is visible and the recap block is hidden.
+    const liveEl = document.getElementById('se-live-content');
+    const recapEl = document.getElementById('se-recap-content');
+    if (liveEl) liveEl.style.display = 'block';
+    if (recapEl) recapEl.style.display = 'none';
+
     const expEl = document.getElementById('se-explanation');
     const teamEl = document.getElementById('se-teams');
     const whyEl = document.getElementById('se-why');
