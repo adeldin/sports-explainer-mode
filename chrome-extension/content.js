@@ -191,6 +191,7 @@
     if (whyEl) { whyEl.style.color = t.subtext; whyEl.style.borderTopColor = t.border; }
     const ruleEl = document.getElementById('se-rule');
     if (ruleEl) { ruleEl.style.color = t.subtext; ruleEl.style.borderTopColor = t.border; }
+    overlayEl.querySelectorAll('.se-section-h').forEach(el => { el.style.color = t.label; });
     const gameSection = document.getElementById('se-game-section');
     if (gameSection) gameSection.style.borderTopColor = t.border;
     const gameSelect = document.getElementById('se-game-select');
@@ -308,18 +309,21 @@
 
       <div id="se-body">
         <div style="padding: 10px 12px 6px !important;">
-          <div id="se-teams" style="font-size:0.85em!important;color:#facc15!important;font-weight:600!important;margin-bottom:2px!important;text-transform:uppercase!important;">Loading game...</div>
-          <span id="se-play-type" style="display:block!important;font-size:0.77em!important;font-weight:700!important;color:#34d399!important;text-transform:uppercase!important;letter-spacing:0.05em!important;margin-bottom:6px!important;"></span>
-          <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 6px!important;color:${t.text}!important;">Fetching latest play...</p>
-          
-          <div id="se-source-container" style="margin-bottom:8px!important;">
+          <div id="se-teams" style="font-size:0.85em!important;color:#facc15!important;font-weight:600!important;margin-bottom:7px!important;text-transform:uppercase!important;">Loading game...</div>
+
+          <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
+          <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
+
+          <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
+          <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
+
+          <div id="se-h-rule" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">The Rule</div>
+          <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
+
+          <div id="se-source-container" style="margin-bottom:4px!important;">
             <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
             <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
           </div>
-
-          <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
-
-          <div id="se-rule" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;border-top:1px solid ${t.border}!important;padding-top:6px!important;margin-bottom:4px!important;line-height:1.4!important;"></div>
         </div>
 
         <div id="se-game-section" style="padding:4px 12px 8px!important;border-top:1px solid ${t.border}!important;">
@@ -662,7 +666,6 @@
   async function fetchLatestPlay() {
     if (!chrome.runtime?.id) return;
     const expEl = document.getElementById('se-explanation');
-    const typeEl = document.getElementById('se-play-type');
     const teamEl = document.getElementById('se-teams');
     const whyEl = document.getElementById('se-why');
     const ruleEl = document.getElementById('se-rule');
@@ -685,26 +688,34 @@
         }
 
         expEl.textContent = response.simple || 'Waiting for next play...';
-        typeEl.textContent = response.playType || '';
         if (teamEl && response.homeTeam) teamEl.textContent = `${response.awayTeam} @ ${response.homeTeam}`;
 
         // Bug fix 2: keep the on-screen play as Ask context (was always empty).
         currentPlayText = [response.playType, response.simple].filter(Boolean).join(' — ');
-        
+
+        // Raw play text lives ONLY in the Show Source Play box now (no redundant top sub-label).
         if (sourceBox) sourceBox.textContent = response.playType || 'No source play available.';
 
+        // WHY IT MATTERS — header + body toggle together; never a labeled empty section.
+        const whyHeader = document.getElementById('se-h-why');
         if (whyEl && response.whyItMatters) {
-          whyEl.textContent = `💡 ${response.whyItMatters}`;
+          whyEl.textContent = response.whyItMatters;
           whyEl.style.display = 'block';
-        } else if (whyEl) {
-          whyEl.style.display = 'none';
+          if (whyHeader) whyHeader.style.display = 'block';
+        } else {
+          if (whyEl) whyEl.style.display = 'none';
+          if (whyHeader) whyHeader.style.display = 'none';
         }
 
+        // THE RULE — header + body only when showRule is true AND ruleDetail is non-empty.
+        const ruleHeader = document.getElementById('se-h-rule');
         if (ruleEl && response.showRule === true && response.ruleDetail) {
-          ruleEl.textContent = `⚖️ ${response.ruleDetail}`;
+          ruleEl.textContent = response.ruleDetail;
           ruleEl.style.display = 'block';
-        } else if (ruleEl) {
-          ruleEl.style.display = 'none';
+          if (ruleHeader) ruleHeader.style.display = 'block';
+        } else {
+          if (ruleEl) ruleEl.style.display = 'none';
+          if (ruleHeader) ruleHeader.style.display = 'none';
         }
 
         // Status label = cleaned gameContext (part after "—"), or a neutral fallback.

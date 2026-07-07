@@ -115,10 +115,12 @@ toggleBtn.addEventListener('click', async () => {
       gameId: selectedGameId
     }, (response) => {
       if (chrome.runtime.lastError) {
+        // Keep the popup open so the user can see the failure.
         statusEl.textContent = '❌ ' + chrome.runtime.lastError.message;
       } else {
+        // Overlay is showing — dismiss the launcher so it doesn't sit on top of it.
         statusEl.textContent = response?.status === 'ok' ? '✅ Overlay active!' : 'Ready';
-        setTimeout(() => statusEl.textContent = 'Ready', 2000);
+        window.close();
       }
     });
   } catch (err) {
