@@ -21,6 +21,9 @@
   let selectorPanelEl = null;
   let currentGames = []; // enriched score-card game list for the rail
   let answerGameId = null; // which game the Ask/chip answer belongs to (clear on game change)
+  let currentPlays = [];       // play-by-play list for the selected game (Tier D)
+  let pbpExpanded = false;     // is the Play-by-Play section expanded
+  let selectedPlayText = null; // a manually-tapped play's text — pauses polling until "back to live"
 
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
@@ -97,6 +100,9 @@
     { key: 'expert', label: 'Expert' }
   ];
 
+  // Sports whose ESPN feed exposes a plays[] list (Tier D). Others hide the Play-by-Play section.
+  const PLAYS_SPORTS = ['nfl', 'mlb', 'nba', 'nhl'];
+
   // "Ask a follow-up" quick-question chips (play-specific — hidden in recap mode). Each sends
   // its canned prompt through the SAME ask path a typed question uses.
   const CHIPS = [
@@ -157,7 +163,10 @@
       inputText: '#f5ecd7', answerBg: '#152444', selectBg: '#152444',
       settingsBg: '#0a1530', settingsItemBg: '#152444', settingsItemBorder: '#22345a',
       statusBg: '#081025', statusText: '#7f8ca6', statusDot: '#2a3d63',
-      sourceBg: '#132140'
+      sourceBg: '#132140',
+      // Teal = secondary/navigational accent (back-to-live, scoring dots). Balanced teal that
+      // reads on both navy and cream. TODO: swap to the app's exact teal if Anthony provides it.
+      teal: '#14b8a6'
     };
     const light = {
       bg: '#f5ecd7', bodyBg: '#f5ecd7', footerBg: '#efe4c9',
@@ -166,7 +175,10 @@
       inputText: '#0d1b3e', answerBg: '#efe4c9', selectBg: '#efe4c9',
       settingsBg: '#f0e7cf', settingsItemBg: '#efe4c9', settingsItemBorder: '#e0d3b3',
       statusBg: '#efe4c9', statusText: '#5a5340', statusDot: '#d8c9a8',
-      sourceBg: '#f0e7cf'
+      sourceBg: '#f0e7cf',
+      // Teal = secondary/navigational accent (back-to-live, scoring dots). Same hex on both themes.
+      // TODO: swap to the app's exact teal if Anthony provides it.
+      teal: '#14b8a6'
     };
     return settings.theme === 'light' ? light : dark;
   }
@@ -259,6 +271,17 @@
     overlayEl.querySelectorAll('.se-chip').forEach(chip => {
       chip.style.background = t.selectBg; chip.style.color = t.text; chip.style.borderColor = t.inputBorder;
     });
+    const pbpSection = document.getElementById('se-pbp-section');
+    if (pbpSection) pbpSection.style.borderTopColor = t.border;
+    const pbpHint = document.getElementById('se-pbp-hint');
+    if (pbpHint) pbpHint.style.color = t.subtext;
+    const pbpChevron = document.getElementById('se-pbp-chevron');
+    if (pbpChevron) pbpChevron.style.color = t.subtext;
+    const backLive = document.getElementById('se-back-to-live');
+    if (backLive) backLive.style.color = t.teal; // secondary/navigational = teal
+    const pbpLegendDot = document.getElementById('se-pbp-legend-dot');
+    if (pbpLegendDot) pbpLegendDot.style.color = t.teal;
+    if (pbpExpanded && currentPlays.length) renderPlays(); // rebuild rows with new theme tokens (highlight + teal dot)
     const questionInput = document.getElementById('se-question-input');
     if (questionInput) { questionInput.style.background = t.inputBg; questionInput.style.color = t.inputText; questionInput.style.borderColor = t.inputBorder; }
     const askBtn = document.getElementById('se-ask-btn');
@@ -388,6 +411,7 @@
 
           <!-- LIVE / scheduled content — hidden and replaced by the recap block for Final games -->
           <div id="se-live-content">
+            <button id="se-back-to-live" style="display:none!important;background:none!important;border:none!important;padding:0!important;margin:0 0 6px!important;font-size:0.72em!important;font-weight:700!important;color:${t.teal}!important;cursor:pointer!important;">▶ Back to live</button>
             <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
             <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
 
@@ -400,6 +424,16 @@
             <div id="se-source-container" style="margin-bottom:4px!important;">
               <button id="se-source-toggle" style="background:none!important;border:none!important;padding:0!important;font-size:0.77em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Show Source Play</button>
               <div id="se-source-box" style="display:none!important;margin-top:5px!important;padding:8px!important;background:${t.sourceBg}!important;border-radius:6px!important;font-size:0.85em!important;font-style:italic!important;line-height:1.4!important;color:${t.subtext}!important;"></div>
+            </div>
+
+            <!-- PLAY-BY-PLAY (Tier D) — collapsed by default; only for plays-capable sports (see PLAYS_SPORTS) -->
+            <div id="se-pbp-section" style="display:none!important;margin-top:8px!important;border-top:1px solid ${t.border}!important;padding-top:7px!important;">
+              <div id="se-pbp-header" style="display:flex!important;align-items:center!important;gap:6px!important;cursor:pointer!important;user-select:none!important;">
+                <span id="se-h-pbp" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;">Play-by-Play</span>
+                <span id="se-pbp-chevron" style="font-size:0.7em!important;color:${t.subtext}!important;">▸</span>
+              </div>
+              <div id="se-pbp-hint" style="display:none!important;font-size:0.62em!important;color:${t.subtext}!important;margin:4px 0 6px!important;">Tap any play to explain it&nbsp;·&nbsp;<span id="se-pbp-legend-dot" style="color:${t.teal}!important;">●</span>&nbsp;scoring play</div>
+              <div id="se-pbp-list" style="display:none!important;max-height:180px!important;overflow-y:auto!important;overscroll-behavior:contain!important;"></div>
             </div>
           </div>
 
@@ -544,6 +578,17 @@
         });
       });
 
+      // Play-by-Play: header toggles the list; delegated tap on a row explains that play; back-to-live resumes.
+      document.getElementById('se-pbp-header').addEventListener('click', togglePbp);
+      document.getElementById('se-pbp-list').addEventListener('click', (e) => {
+        const row = e.target.closest('.se-pbp-row');
+        if (row && row.dataset.idx != null) {
+          const p = currentPlays[Number(row.dataset.idx)];
+          if (p) selectPlay(p.text);
+        }
+      });
+      document.getElementById('se-back-to-live').addEventListener('click', backToLive);
+
       // Load today's games → auto-select → THEN fetch the explanation (guarantees a valid gameId).
       loadGamesIntoOverlay().then(() => fetchLatestPlay());
       // Delegated click on the score-card rail → select that game (survives re-renders).
@@ -562,6 +607,8 @@
       document.getElementById('se-sel-sport').addEventListener('change', (e) => {
         currentSport = e.target.value;   // KEY (nfl/mlb/…), same as popup
         currentGameId = null;            // force auto-select of the new sport's first live/today game
+        clearAskAnswer();
+        resetPlayByPlay();               // drop the old sport's play list + any manual play selection
         loadGamesIntoOverlay().then(() => fetchLatestPlay()); // reload rail → auto-select → fetch
       });
 
@@ -600,6 +647,10 @@
 
     // Don't poll if tab is hidden, overlay is gone, minimized, or idle-paused.
     if (document.hidden || !overlayVisible || isMinimized || idlePaused) return;
+
+    // A manually-selected play (Tier D) is static — never poll it (the poll would overwrite the
+    // user's chosen play with the latest).
+    if (selectedPlayText) return;
 
     // Final games are static — never poll them (recap is fetched once). Uses the rail's
     // authoritative state, so it holds even before a fetch sets currentGameState.
@@ -911,8 +962,110 @@
     currentGameId = id || null;
     const s = document.getElementById('se-sel-game'); if (s) s.value = currentGameId || '';
     clearAskAnswer(); // stale answer belongs to the previous game — drop it immediately
+    resetPlayByPlay(); // drop the old game's play list + any manual play selection
     highlightSelectedCard();
     fetchLatestPlay();
+  }
+
+  // ─────────────────────────────────────────
+  // PLAY-BY-PLAY (Tier D)
+  // ─────────────────────────────────────────
+  // Reset PBP state on any game change: clear selection (resume live), collapse, empty the list.
+  function resetPlayByPlay() {
+    selectedPlayText = null;
+    currentPlays = [];
+    pbpExpanded = false;
+    const back = document.getElementById('se-back-to-live'); if (back) back.style.display = 'none';
+    const list = document.getElementById('se-pbp-list'); if (list) { list.innerHTML = ''; list.style.display = 'none'; }
+    const hint = document.getElementById('se-pbp-hint'); if (hint) hint.style.display = 'none';
+    const chevron = document.getElementById('se-pbp-chevron'); if (chevron) chevron.textContent = '▸';
+  }
+
+  function togglePbp() {
+    pbpExpanded = !pbpExpanded;
+    const list = document.getElementById('se-pbp-list');
+    const hint = document.getElementById('se-pbp-hint');
+    const chevron = document.getElementById('se-pbp-chevron');
+    if (list) list.style.display = pbpExpanded ? 'block' : 'none';
+    if (hint) hint.style.display = pbpExpanded ? 'block' : 'none';
+    if (chevron) chevron.textContent = pbpExpanded ? '▾' : '▸';
+    if (pbpExpanded) loadPlays(); // lazy — only hit ESPN when the user opens the list
+  }
+
+  async function loadPlays() {
+    const list = document.getElementById('se-pbp-list');
+    const t = getThemeColors();
+    if (list) list.innerHTML = `<div style="padding:6px 4px!important;font-size:0.72em!important;color:${t.subtext}!important;">Loading plays…</div>`;
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'fetchPlays', sport: currentSport, gameId: currentGameId });
+      currentPlays = response?.plays || [];
+    } catch (err) {
+      currentPlays = [];
+    }
+    renderPlays();
+  }
+
+  // Render the tappable play list (built via DOM, so play text needs no HTML-escaping).
+  function renderPlays() {
+    const list = document.getElementById('se-pbp-list');
+    if (!list) return;
+    const t = getThemeColors();
+    list.innerHTML = '';
+    if (!currentPlays.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = `padding:6px 4px!important;font-size:0.72em!important;color:${t.subtext}!important;`;
+      empty.textContent = 'No plays available yet.';
+      list.appendChild(empty);
+      return;
+    }
+    currentPlays.forEach((p, i) => {
+      const selected = selectedPlayText != null && p.text === selectedPlayText; // match by text (how selection is tracked)
+      const row = document.createElement('div');
+      row.className = 'se-pbp-row';
+      row.dataset.idx = String(i);
+      // Selected play: orange (primary accent) left border + subtly highlighted bg. Every row keeps a
+      // 3px left border (transparent when unselected) so text alignment is identical selected/unselected.
+      row.style.cssText = `padding:5px 4px 5px 6px!important;border-bottom:1px solid ${t.border}!important;border-left:3px solid ${selected ? settings.accentColor : 'transparent'}!important;background:${selected ? t.selectBg : 'transparent'}!important;cursor:pointer!important;display:flex!important;align-items:flex-start!important;gap:6px!important;`;
+
+      const dot = document.createElement('span');
+      // Scoring dot uses TEAL (secondary accent), not the primary orange.
+      dot.style.cssText = `flex:0 0 auto!important;width:6px!important;height:6px!important;border-radius:50%!important;margin-top:5px!important;background:${p.scoring ? t.teal : 'transparent'}!important;`;
+      row.appendChild(dot);
+
+      const txt = document.createElement('span');
+      txt.style.cssText = `flex:1!important;font-size:0.78em!important;line-height:1.35!important;color:${t.text}!important;`;
+      txt.textContent = p.text;
+      row.appendChild(txt);
+
+      const per = document.createElement('span');
+      per.style.cssText = `flex:0 0 auto!important;font-size:0.62em!important;color:${t.subtext}!important;white-space:nowrap!important;margin-top:2px!important;`;
+      per.textContent = p.period || '';
+      row.appendChild(per);
+
+      list.appendChild(row);
+    });
+  }
+
+  // Tapping a play → explain THAT play (via playText) and PAUSE polling so the live poll
+  // doesn't clobber the user's selection.
+  function selectPlay(text) {
+    if (!text) return;
+    selectedPlayText = text;
+    const back = document.getElementById('se-back-to-live');
+    if (back) back.style.display = 'inline-block';
+    renderPlays(); // re-render so the tapped row shows the selected highlight
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } // stop the live poll
+    fetchLatestPlay(); // sends playText: selectedPlayText → explains this specific play
+  }
+
+  // Clear the manual selection and resume normal latest-play polling.
+  function backToLive() {
+    selectedPlayText = null;
+    const back = document.getElementById('se-back-to-live');
+    if (back) back.style.display = 'none';
+    renderPlays();         // clear the selected-row highlight
+    fetchLatestPlay();     // latest play
+    restartPollInterval(); // resume cadence
   }
 
   function hideOverlay() {
@@ -1007,6 +1160,9 @@
     if (recapEl) recapEl.style.display = 'none';
     const chipsRow = document.getElementById('se-chips-row');
     if (chipsRow) chipsRow.style.display = 'block'; // play-specific chips make sense for live games
+    // Play-by-Play only for plays-capable sports (hidden for soccer/worldcup/rugby; recap hides it via #se-live-content).
+    const pbpSection = document.getElementById('se-pbp-section');
+    if (pbpSection) pbpSection.style.display = PLAYS_SPORTS.includes(currentSport) ? 'block' : 'none';
 
     const expEl = document.getElementById('se-explanation');
     const teamEl = document.getElementById('se-teams');
@@ -1018,7 +1174,8 @@
 
     try {
       const response = await chrome.runtime.sendMessage({
-        action: 'fetchPlay', sport: currentSport, level: settings.level, gameId: currentGameId, language: settings.language
+        action: 'fetchPlay', sport: currentSport, level: settings.level, gameId: currentGameId, language: settings.language,
+        playText: selectedPlayText || undefined // Tier D: explain a manually-tapped play instead of the latest
       });
 
       if (response) {
