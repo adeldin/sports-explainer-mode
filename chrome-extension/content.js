@@ -123,6 +123,10 @@
         settings = { ...settings, ...data.seSettings };
         currentLevel = settings.level;
       }
+      // accentColor is NOT user-facing (no accent picker) — it only landed in storage accidentally.
+      // Force the brand orange AFTER the merge so a pre-brand-pass stored red ('#cc0000') can't win.
+      // Self-heals every accent element; re-persists as orange on the next saveSettings.
+      settings.accentColor = '#e87722';
       if (callback) callback();
     });
   }
