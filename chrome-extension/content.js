@@ -20,6 +20,7 @@
   let selectorOpen = false;
   let selectorPanelEl = null;
   let currentGames = []; // enriched score-card game list for the rail
+  let answerGameId = null; // which game the Ask/chip answer belongs to (clear on game change)
 
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
@@ -94,6 +95,15 @@
     { key: 'beginner', label: 'Beginner' },
     { key: 'intermediate', label: 'Intermediate' },
     { key: 'expert', label: 'Expert' }
+  ];
+
+  // "Ask a follow-up" quick-question chips (play-specific — hidden in recap mode). Each sends
+  // its canned prompt through the SAME ask path a typed question uses.
+  const CHIPS = [
+    { label: '🤔 Why it mattered', q: 'Why did that play matter?' },
+    { label: '📜 Explain the rule', q: 'Explain the rule behind what just happened.' },
+    { label: '🧒 Explain simply', q: 'Explain what just happened in the simplest possible terms.' },
+    { label: "👀 What's next?", q: "What's likely to happen next in this game?" }
   ];
 
   // ─────────────────────────────────────────
@@ -244,6 +254,11 @@
     if (currentGames.length) renderScorecards(); // rebuild cards with the new theme tokens
     const askSection = document.getElementById('se-ask-section');
     if (askSection) { askSection.style.borderTopColor = t.border; askSection.style.background = t.footerBg; }
+    const chipsLabel = document.getElementById('se-chips-label');
+    if (chipsLabel) chipsLabel.style.color = t.label;
+    overlayEl.querySelectorAll('.se-chip').forEach(chip => {
+      chip.style.background = t.selectBg; chip.style.color = t.text; chip.style.borderColor = t.inputBorder;
+    });
     const questionInput = document.getElementById('se-question-input');
     if (questionInput) { questionInput.style.background = t.inputBg; questionInput.style.color = t.inputText; questionInput.style.borderColor = t.inputBorder; }
     const askBtn = document.getElementById('se-ask-btn');
@@ -305,15 +320,16 @@
       box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; font-family: system-ui, sans-serif !important;
       font-size: ${fontSize} !important;
       border: 1px solid rgba(128,128,128,0.2) !important; resize: both !important; overflow: auto !important;
+      overscroll-behavior: contain !important;
     `;
 
     overlayEl.innerHTML = `
       <div id="se-header" style="display:flex!important;justify-content:space-between!important;align-items:center!important;background:#0d1b3e!important;padding:9px 12px!important;cursor:grab!important;user-select:none!important;border-radius:10px 10px 0 0!important;position:sticky!important;top:0!important;z-index:10!important;">
         <div style="display:flex!important;align-items:center!important;gap:7px!important;min-width:0!important;">
           ${SPORTSWISE_LOGO_SVG ? `<span id="se-logo" style="display:inline-flex!important;align-items:center!important;flex:0 0 auto!important;line-height:0!important;">${SPORTSWISE_LOGO_SVG}</span>` : ''}
-          <span style="font-weight:800!important;font-size:13px!important;color:#f5ecd7!important;white-space:nowrap!important;">Sports Explainer</span>
+          <span style="font-weight:800!important;font-size:13px!important;color:#f5ecd7!important;white-space:nowrap!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;">Sports Explainer</span>
         </div>
-        <div style="display:flex!important;gap:6px!important;">
+        <div style="display:flex!important;gap:6px!important;flex:0 0 auto!important;">
           <button id="se-selector-btn" title="Change sport / game / level" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">🎯</button>
           <button id="se-settings-btn" title="Settings" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">⚙️</button>
           <button id="se-minimize" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">−</button>
@@ -361,7 +377,7 @@
       <div id="se-body">
         <div id="se-scorecard-section" style="padding:8px 10px 6px!important;border-bottom:1px solid ${t.border}!important;">
           <div id="se-scorecard-note" style="display:none!important;font-size:0.68em!important;color:${t.subtext}!important;margin-bottom:5px!important;"></div>
-          <div id="se-scorecard-rail" style="display:flex!important;gap:7px!important;overflow-x:auto!important;padding-bottom:3px!important;">
+          <div id="se-scorecard-rail" style="display:flex!important;gap:7px!important;overflow-x:auto!important;overscroll-behavior-x:contain!important;overscroll-behavior:contain!important;padding-bottom:3px!important;">
             <div style="font-size:0.72em!important;color:${t.subtext}!important;padding:6px 2px!important;">Loading games…</div>
           </div>
           <div id="se-scorecard-channel" style="display:none!important;font-size:0.7em!important;color:${t.subtext}!important;margin-top:5px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;"></div>
@@ -400,6 +416,12 @@
         </div>
 
         <div id="se-ask-section" style="padding:8px 12px 10px!important;border-top:1px solid ${t.border}!important;background:${t.footerBg}!important;">
+          <div id="se-chips-row" style="margin-bottom:8px!important;">
+            <div id="se-chips-label" style="font-size:0.62em!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin-bottom:5px!important;">Ask a follow-up</div>
+            <div style="display:flex!important;flex-wrap:wrap!important;gap:5px!important;">
+              ${CHIPS.map(c => `<button class="se-chip" data-q="${c.q}" style="background:${t.selectBg}!important;color:${t.text}!important;border:1px solid ${t.inputBorder}!important;border-radius:12px!important;padding:4px 9px!important;font-size:0.72em!important;font-weight:600!important;cursor:pointer!important;white-space:nowrap!important;">${c.label}</button>`).join('')}
+            </div>
+          </div>
           <div style="display:flex!important;gap:6px!important;">
             <input id="se-question-input" type="text" placeholder="Ask anything..." style="flex:1!important;padding:6px 10px!important;background:${t.inputBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:0.92em!important;outline:none!important;"/>
             <button id="se-ask-btn" style="padding:6px 12px!important;background:${settings.accentColor}!important;color:white!important;border:none!important;border-radius:6px!important;font-size:0.92em!important;font-weight:700!important;cursor:pointer!important;">Ask</button>
@@ -513,6 +535,14 @@
 
       document.getElementById('se-ask-btn').addEventListener('click', handleAskQuestion);
       document.getElementById('se-question-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleAskQuestion(); });
+
+      // Quick-question chips → same ask path with the chip's canned prompt.
+      overlayEl.querySelectorAll('.se-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const q = chip.getAttribute('data-q');
+          if (q) handleAskQuestion(q);
+        });
+      });
 
       // Load today's games → auto-select → THEN fetch the explanation (guarantees a valid gameId).
       loadGamesIntoOverlay().then(() => fetchLatestPlay());
@@ -865,11 +895,22 @@
     }
   }
 
+  // Clear + hide the Ask/chip answer and the question input. The answer box only ever shows
+  // content for the currently-selected game.
+  function clearAskAnswer() {
+    const answerBox = document.getElementById('se-answer-box');
+    if (answerBox) { answerBox.textContent = ''; answerBox.style.display = 'none'; }
+    const input = document.getElementById('se-question-input');
+    if (input) input.value = '';
+    answerGameId = null;
+  }
+
   // Set the current game from a score card or the selector dropdown, keep the rail +
   // selector dropdown in sync, and re-fetch the explanation.
   function selectGame(id) {
     currentGameId = id || null;
     const s = document.getElementById('se-sel-game'); if (s) s.value = currentGameId || '';
+    clearAskAnswer(); // stale answer belongs to the previous game — drop it immediately
     highlightSelectedCard();
     fetchLatestPlay();
   }
@@ -891,10 +932,16 @@
     // A Final game is static — make sure no poll interval is running.
     if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 
+    // Drop a stale answer from a different game when switching into this recap.
+    if (answerGameId && answerGameId !== currentGameId) clearAskAnswer();
+
     const liveEl = document.getElementById('se-live-content');
     const recapEl = document.getElementById('se-recap-content');
     if (liveEl) liveEl.style.display = 'none';
     if (recapEl) recapEl.style.display = 'block';
+    // Hide the play-specific chips in recap mode (their prompts reference "that play" / "what's next").
+    const chipsRow = document.getElementById('se-chips-row');
+    if (chipsRow) chipsRow.style.display = 'none';
 
     // Teams title (recap payload carries no team names — use the selected rail game).
     const teamEl = document.getElementById('se-teams');
@@ -950,11 +997,16 @@
     const selected = currentGames.find(g => g.id === currentGameId);
     if (selected && selected.state === 'post') { fetchRecapAndRender(selected); return; }
 
+    // Drop a stale answer from a DIFFERENT game (but keep it across poll refreshes of the same game).
+    if (answerGameId && answerGameId !== currentGameId) clearAskAnswer();
+
     // Live / scheduled → ensure live content is visible and the recap block is hidden.
     const liveEl = document.getElementById('se-live-content');
     const recapEl = document.getElementById('se-recap-content');
     if (liveEl) liveEl.style.display = 'block';
     if (recapEl) recapEl.style.display = 'none';
+    const chipsRow = document.getElementById('se-chips-row');
+    if (chipsRow) chipsRow.style.display = 'block'; // play-specific chips make sense for live games
 
     const expEl = document.getElementById('se-explanation');
     const teamEl = document.getElementById('se-teams');
@@ -1019,15 +1071,20 @@
     }
   }
 
-  async function handleAskQuestion() {
+  // Shared ask path for BOTH the text input and the quick-question chips. A chip passes its
+  // canned prompt as `presetQuestion` (a string); the text-input handlers pass no string
+  // (the click Event they pass is ignored by the typeof check), so the input value is used.
+  async function handleAskQuestion(presetQuestion) {
     const input = document.getElementById('se-question-input');
     const answerBox = document.getElementById('se-answer-box');
     const askBtn = document.getElementById('se-ask-btn');
-    const question = input?.value?.trim();
+    const preset = typeof presetQuestion === 'string' ? presetQuestion.trim() : null;
+    const question = preset || input?.value?.trim();
     if (!question || !answerBox) return;
 
     askBtn.textContent = '...';
     askBtn.disabled = true;
+    setChipsDisabled(true);   // same loading behavior for chips as the text Ask
     answerBox.style.display = 'block';
     answerBox.textContent = 'Thinking...';
 
@@ -1036,13 +1093,25 @@
         action: 'askQuestion', sport: currentSport, level: settings.level, question, context: currentPlayText, language: settings.language
       });
       answerBox.textContent = response?.answer || '⚠️ Could not get an answer.';
-      input.value = '';
+      answerGameId = currentGameId; // this answer belongs to the current game (survives poll refreshes)
+      if (!preset && input) input.value = ''; // only clear the typed input, not on chip taps
     } catch (err) {
       answerBox.textContent = '⚠️ Request timed out.';
     } finally {
       askBtn.textContent = 'Ask';
       askBtn.disabled = false;
+      setChipsDisabled(false);
     }
+  }
+
+  // Enable/disable the quick-question chips (during an in-flight ask).
+  function setChipsDisabled(disabled) {
+    if (!overlayEl) return;
+    overlayEl.querySelectorAll('.se-chip').forEach(chip => {
+      chip.disabled = disabled;
+      chip.style.opacity = disabled ? '0.5' : '1';
+      chip.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    });
   }
 
   function makeDraggable(el) {
