@@ -24,6 +24,8 @@
   let currentPlays = [];       // play-by-play list for the selected game (Tier D)
   let pbpExpanded = false;     // is the Play-by-Play section expanded
   let selectedPlayText = null; // a manually-tapped play's text — pauses polling until "back to live"
+  let openGlossaryTerm = null;  // which glossary term's definition box is open (Tier E)
+  let lastRenderedSimple = null; // last explanation text rendered (skip re-segmenting identical polls)
 
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
@@ -250,6 +252,16 @@
     if (teamsEl) teamsEl.style.color = teamsTitleColor();
     const expEl = document.getElementById('se-explanation');
     if (expEl) { expEl.style.color = t.text; }
+    // Glossary accent is brand orange in BOTH themes (guaranteed, not the possibly-stale settings.accentColor).
+    overlayEl.querySelectorAll('.se-gloss-term').forEach(el => { el.style.color = '#e87722'; });
+    const gBox = document.getElementById('se-glossary-box');
+    if (gBox) { gBox.style.background = t.answerBg; gBox.style.borderLeftColor = '#e87722'; }
+    const gTerm = document.getElementById('se-glossary-term');
+    if (gTerm) gTerm.style.color = '#e87722';
+    const gDef = document.getElementById('se-glossary-def');
+    if (gDef) gDef.style.color = t.text;
+    const gClose = document.getElementById('se-glossary-close');
+    if (gClose) gClose.style.color = t.subtext;
     const whyEl = document.getElementById('se-why');
     if (whyEl) { whyEl.style.color = t.subtext; whyEl.style.borderTopColor = t.border; }
     const ruleEl = document.getElementById('se-rule');
@@ -414,6 +426,15 @@
             <button id="se-back-to-live" style="display:none!important;background:none!important;border:none!important;padding:0!important;margin:0 0 6px!important;font-size:0.72em!important;font-weight:700!important;color:${t.teal}!important;cursor:pointer!important;">▶ Back to live</button>
             <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
             <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
+
+            <!-- Glossary definition box (Tier E) — single shared box, shown when a tappable term is tapped -->
+            <div id="se-glossary-box" style="display:none!important;margin:0 0 8px!important;padding:8px 10px!important;background:${t.answerBg}!important;border-radius:6px!important;border-left:4px solid #e87722!important;">
+              <div style="display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:6px!important;">
+                <span id="se-glossary-term" style="font-weight:800!important;font-size:0.82em!important;color:#e87722!important;"></span>
+                <button id="se-glossary-close" style="background:none!important;border:none!important;color:${t.subtext}!important;cursor:pointer!important;font-size:0.85em!important;font-weight:700!important;line-height:1!important;padding:0 2px!important;">✕</button>
+              </div>
+              <div id="se-glossary-def" style="font-size:0.8em!important;line-height:1.4!important;color:${t.text}!important;margin-top:3px!important;"></div>
+            </div>
 
             <div id="se-h-why" class="se-section-h" style="display:none!important;font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">Why It Matters</div>
             <div id="se-why" style="display:none!important;font-size:0.85em!important;color:${t.subtext}!important;margin-bottom:8px!important;line-height:1.4!important;"></div>
@@ -589,6 +610,13 @@
       });
       document.getElementById('se-back-to-live').addEventListener('click', backToLive);
 
+      // Glossary (Tier E): delegated tap on a term span toggles the shared definition box.
+      document.getElementById('se-explanation').addEventListener('click', (e) => {
+        const span = e.target.closest('.se-gloss-term');
+        if (span) toggleGlossary(span.dataset.term, span.dataset.def);
+      });
+      document.getElementById('se-glossary-close').addEventListener('click', closeGlossary);
+
       // Load today's games → auto-select → THEN fetch the explanation (guarantees a valid gameId).
       loadGamesIntoOverlay().then(() => fetchLatestPlay());
       // Delegated click on the score-card rail → select that game (survives re-renders).
@@ -609,6 +637,7 @@
         currentGameId = null;            // force auto-select of the new sport's first live/today game
         clearAskAnswer();
         resetPlayByPlay();               // drop the old sport's play list + any manual play selection
+        closeGlossary(); lastRenderedSimple = null; // drop stale term box; force re-render for the new sport
         loadGamesIntoOverlay().then(() => fetchLatestPlay()); // reload rail → auto-select → fetch
       });
 
@@ -963,6 +992,7 @@
     const s = document.getElementById('se-sel-game'); if (s) s.value = currentGameId || '';
     clearAskAnswer(); // stale answer belongs to the previous game — drop it immediately
     resetPlayByPlay(); // drop the old game's play list + any manual play selection
+    closeGlossary(); lastRenderedSimple = null; // drop stale term box; force re-render for the new game
     highlightSelectedCard();
     fetchLatestPlay();
   }
@@ -1143,6 +1173,61 @@
     }
   }
 
+  // ─────────────────────────────────────────
+  // GLOSSARY (Tier E) — render tappable terms in the main explanation + a shared definition box.
+  // ─────────────────────────────────────────
+  // Rebuild #se-explanation with tappable glossary terms. English-only; falls back to plain text for
+  // other languages / sports with no list. Built via DOM (textContent) — never innerHTML of response text.
+  function renderExplanation(simpleText) {
+    const expEl = document.getElementById('se-explanation');
+    if (!expEl) return;
+    const text = simpleText || 'Waiting for next play...';
+    if (text === lastRenderedSimple) return; // unchanged (same poll) → keep DOM + any open term box
+    lastRenderedSimple = text;
+    closeGlossary(); // a NEW explanation loaded → drop any stale term box
+
+    const segs = (settings.language === 'en' && window.SE_segmentText)
+      ? window.SE_segmentText(text, currentSport)
+      : [{ type: 'text', value: text }];
+
+    expEl.textContent = ''; // clear
+    segs.forEach(s => {
+      if (s.type === 'term') {
+        const span = document.createElement('span');
+        span.className = 'se-gloss-term';
+        span.textContent = s.value;          // safe: textContent, not innerHTML
+        span.dataset.term = s.term;
+        span.dataset.def = s.def;
+        // Brand orange in BOTH themes (hardcoded, not settings.accentColor — a pre-brand-pass stored
+        // accent could be the old muted red, which reads low-contrast on navy). Matches the app.
+        span.style.cssText = `color:#e87722!important;text-decoration:underline!important;cursor:pointer!important;`;
+        expEl.appendChild(span);
+      } else {
+        expEl.appendChild(document.createTextNode(s.value));
+      }
+    });
+  }
+
+  // Single shared definition box: tap a term to open; tap the same term (or ✕) to close; a different
+  // term swaps the content. Mirrors the app's toggle behavior.
+  function toggleGlossary(term, def) {
+    if (openGlossaryTerm === term) { closeGlossary(); return; }
+    const box = document.getElementById('se-glossary-box');
+    const termEl = document.getElementById('se-glossary-term');
+    const defEl = document.getElementById('se-glossary-def');
+    if (!box || !termEl || !defEl) return;
+    openGlossaryTerm = term;
+    termEl.textContent = term;
+    defEl.textContent = def;
+    box.style.display = 'block';
+  }
+
+  function closeGlossary() {
+    openGlossaryTerm = null;
+    const box = document.getElementById('se-glossary-box');
+    if (box) box.style.display = 'none';
+  }
+
   async function fetchLatestPlay() {
     if (!chrome.runtime?.id) return;
 
@@ -1187,7 +1272,7 @@
           restartPollInterval(); // Re-adjust timer frequency
         }
 
-        expEl.textContent = response.simple || 'Waiting for next play...';
+        renderExplanation(response.simple); // Tier E: tappable glossary terms (English only)
         if (teamEl && response.homeTeam) teamEl.textContent = `${response.awayTeam} @ ${response.homeTeam}`;
 
         // Bug fix 2: keep the on-screen play as Ask context (was always empty).
