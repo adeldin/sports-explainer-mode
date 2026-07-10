@@ -35,9 +35,21 @@ function validateFetchPlayMsg(msg) {
   const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId)
     ? msg.gameId
     : null;
+  // Optional (Tier D): explain a SPECIFIC historical play by its text. When present the backend
+  // explains THAT play instead of the latest. Trimmed + capped for safety; null → latest-play behavior.
+  const playText = typeof msg.playText === 'string' && msg.playText.trim()
+    ? msg.playText.trim().slice(0, 500)
+    : null;
 
   if (!sport) return null; // sport is required — reject if invalid
-  return { sport, level, gameId, language };
+  return { sport, level, gameId, language, playText };
+}
+
+function validateFetchPlaysMsg(msg) {
+  const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
+  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+  if (!sport || !gameId) return null; // a play list needs a specific game
+  return { sport, gameId };
 }
 
 function validateRecapMsg(msg) {
@@ -92,7 +104,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       currentLevel: validated.level,
       currentLanguage: validated.language
     });
-    handleFetchPlay(validated.sport, validated.level, validated.gameId, validated.language)
+    handleFetchPlay(validated.sport, validated.level, validated.gameId, validated.language, validated.playText)
+      .then(sendResponse)
+      .catch(err => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  // ── FETCH PLAYS (play-by-play list for a game) ──
+  if (msg.action === 'fetchPlays') {
+    const validated = validateFetchPlaysMsg(msg);
+    if (!validated) {
+      sendResponse({ error: 'Invalid fetchPlays message — sport and gameId are required.' });
+      return true;
+    }
+    handleFetchPlays(validated.sport, validated.gameId)
       .then(sendResponse)
       .catch(err => sendResponse({ error: err.message }));
     return true;
@@ -142,14 +167,48 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ─────────────────────────────────────────
 // FETCH PLAY EXPLANATION
 // ─────────────────────────────────────────
-async function handleFetchPlay(sport, level, gameId, language) {
+async function handleFetchPlay(sport, level, gameId, language, playText) {
+  const body = { sport, level, gameId, language };
+  if (playText) body.playText = playText; // present → backend explains THAT play, not the latest
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sport, level, gameId, language })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();
+}
+
+// ─────────────────────────────────────────
+// PLAY-BY-PLAY LIST (Tier D) — ESPN summary plays[] for the 4 plays-capable sports.
+// Filters empty-text + period-marker entries, most-recent-first, cap 40. Soccer/rugby → [].
+// ─────────────────────────────────────────
+const PLAYS_SUMMARY_PATHS = {
+  nfl: 'football/nfl', mlb: 'baseball/mlb', nba: 'basketball/nba', nhl: 'hockey/nhl',
+};
+
+async function handleFetchPlays(sport, gameId) {
+  const path = PLAYS_SUMMARY_PATHS[sport];
+  if (!path) return { plays: [] }; // soccer/worldcup/rugby have no plays[] — section hides
+  const res = await fetch(
+    `https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`,
+    { cache: 'no-store' }
+  );
+  if (!res.ok) throw new Error(`ESPN summary returned ${res.status}`);
+  const data = await res.json();
+  const raw = Array.isArray(data?.plays) ? data.plays : [];
+
+  const plays = [];
+  for (const p of raw) {
+    const text = (p && typeof p.text === 'string') ? p.text.trim() : '';
+    // Drop empty-text entries (present per data recon) and pure period markers (not tappable plays).
+    if (!text || /inning|^start of|^end of|game end/i.test(text)) continue;
+    const per = p.period || {};
+    const period = per.displayValue || (per.number ? `Period ${per.number}` : '');
+    plays.push({ id: String(p.id ?? plays.length), text, period, scoring: !!p.scoringPlay });
+  }
+  plays.reverse(); // ESPN returns oldest-first → flip to most-recent-first
+  return { plays: plays.slice(0, 40) };
 }
 
 // ─────────────────────────────────────────
