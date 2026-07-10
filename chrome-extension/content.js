@@ -404,6 +404,11 @@
           </select>
         </div>
 
+        <div id="se-account-section" style="margin-bottom:12px!important;padding-top:10px!important;border-top:1px solid ${t.settingsItemBorder}!important;">
+          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:6px!important;">Account</label>
+          <div id="se-account-body"><!-- rendered by renderAccount() --></div>
+        </div>
+
         <div id="se-settings-links" style="border-top:1px solid ${t.settingsItemBorder}!important;margin-top:10px!important;padding-top:10px!important;margin-bottom:12px!important;display:flex!important;flex-direction:column!important;gap:7px!important;">
           <button class="se-ext-link" data-url="https://explainer-privacy.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Privacy Policy</button>
           <button class="se-ext-link" data-url="https://explainer-terms.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Terms &amp; Conditions</button>
@@ -553,6 +558,7 @@
         settingsOpen = !settingsOpen;
         panel.style.display = settingsOpen ? 'block' : 'none';
         body.style.display = settingsOpen ? 'none' : 'block';
+        if (settingsOpen) refreshAccountState(); // reflect stored session in the Account section
       });
 
       document.getElementById('se-settings-done').addEventListener('click', () => {
@@ -889,6 +895,127 @@
   // Floating sibling of the settings panel; attaches to the card edge with
   // smart left/right side-detection so it never runs off-screen.
   // ─────────────────────────────────────────
+  // ─────────────────────────────────────────
+  // ACCOUNT (Phase 2 4a — sign in + persist session + show status. Identity only:
+  // NO feature gating (4c) and NO entitlement check (4b). Pro badge shows "Free" for everyone.)
+  // ─────────────────────────────────────────
+  let seAuthPhase = 'email';    // 'email' → 'code' → (signed in)
+  let seAuthPendingEmail = '';
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function setAuthMsg(text) {
+    const el = document.getElementById('se-auth-msg');
+    if (el) el.textContent = text || '';
+  }
+
+  // Renders the Account section based on current auth state. Styles use !important to match the
+  // overlay's host-page-CSS defense (every sibling in the panel does the same).
+  function renderAccount(state) {
+    const box = document.getElementById('se-account-body');
+    if (!box) return;
+    const t = getThemeColors();          // no-arg accessor (reads settings.theme internally)
+    const accent = settings.accentColor;
+
+    const inputStyle =
+      `width:100%!important;box-sizing:border-box!important;background:${t.selectBg}!important;color:${t.inputText}!important;` +
+      `border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;padding:7px 8px!important;margin-bottom:6px!important;`;
+    const btnStyle =
+      `width:100%!important;box-sizing:border-box!important;background:${accent}!important;color:#fff!important;border:none!important;border-radius:6px!important;` +
+      `font-size:12px!important;font-weight:700!important;padding:8px!important;cursor:pointer!important;`;
+    const linkStyle =
+      `background:none!important;border:none!important;color:${t.subtext}!important;font-size:11px!important;cursor:pointer!important;padding:0!important;text-decoration:underline!important;`;
+
+    if (state && state.signedIn) {
+      // Signed-in view. Pro badge is "Free" until 4b wires entitlement.
+      const badgeColor = state.isPro ? t.teal : t.subtext;
+      const badgeText = state.isPro ? 'Pro' : 'Free';
+      box.innerHTML =
+        `<div style="font-size:12px!important;color:${t.text}!important;margin-bottom:4px!important;">Signed in as <strong>${escapeHtml(state.email)}</strong></div>` +
+        `<div style="display:flex!important;align-items:center!important;gap:8px!important;">` +
+          `<span style="font-size:10px!important;font-weight:700!important;color:#fff!important;background:${badgeColor}!important;padding:2px 8px!important;border-radius:10px!important;">${badgeText}</span>` +
+          `<button id="se-signout-btn" style="${linkStyle}">Sign out</button>` +
+        `</div>`;
+      document.getElementById('se-signout-btn').addEventListener('click', doSignOut);
+      return;
+    }
+
+    if (seAuthPhase === 'code') {
+      box.innerHTML =
+        `<div style="font-size:11px!important;color:${t.subtext}!important;margin-bottom:6px!important;">Code sent to ${escapeHtml(seAuthPendingEmail)}</div>` +
+        `<input id="se-code-input" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="${inputStyle}" />` +
+        `<button id="se-verify-btn" style="${btnStyle}">Verify</button>` +
+        `<div style="margin-top:6px!important;"><button id="se-code-back" style="${linkStyle}">Use a different email</button></div>` +
+        `<div id="se-auth-msg" style="font-size:11px!important;color:${t.subtext}!important;margin-top:6px!important;"></div>`;
+      document.getElementById('se-verify-btn').addEventListener('click', doVerifyCode);
+      document.getElementById('se-code-back').addEventListener('click', () => {
+        seAuthPhase = 'email'; renderAccount({ signedIn: false });
+      });
+      return;
+    }
+
+    // Default: email entry
+    box.innerHTML =
+      `<input id="se-email-input" type="email" placeholder="you@email.com" style="${inputStyle}" />` +
+      `<button id="se-sendcode-btn" style="${btnStyle}">Send code</button>` +
+      `<div id="se-auth-msg" style="font-size:11px!important;color:${t.subtext}!important;margin-top:6px!important;"></div>`;
+    document.getElementById('se-sendcode-btn').addEventListener('click', doSendCode);
+  }
+
+  function doSendCode() {
+    const input = document.getElementById('se-email-input');
+    const email = (input ? input.value : '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAuthMsg('Enter a valid email.'); return; }
+    setAuthMsg('Sending…');
+    chrome.runtime.sendMessage({ action: 'authRequestCode', email }, (res) => {
+      if (res && res.error) { setAuthMsg(res.error); return; }
+      // request-code always returns generic ok; move to code entry regardless.
+      seAuthPendingEmail = email;
+      seAuthPhase = 'code';
+      renderAccount({ signedIn: false });
+    });
+  }
+
+  function doVerifyCode() {
+    const input = document.getElementById('se-code-input');
+    const code = (input ? input.value : '').trim();
+    if (!/^\d{6}$/.test(code)) { setAuthMsg('Enter the 6-digit code.'); return; }
+    setAuthMsg('Verifying…');
+    chrome.runtime.sendMessage(
+      { action: 'authVerifyCode', email: seAuthPendingEmail, code },
+      (res) => {
+        if (res && res.ok) {
+          seAuthPhase = 'email';
+          renderAccount({ signedIn: true, email: res.email, isPro: false }); // isPro wired in 4b
+        } else {
+          setAuthMsg('Incorrect or expired code.');
+        }
+      },
+    );
+  }
+
+  function doSignOut() {
+    chrome.runtime.sendMessage({ action: 'authSignOut' }, () => {
+      seAuthPhase = 'email';
+      renderAccount({ signedIn: false });
+    });
+  }
+
+  // Call when the settings panel opens to reflect the stored session.
+  function refreshAccountState() {
+    chrome.runtime.sendMessage({ action: 'authCheckSession' }, (res) => {
+      if (res && res.signedIn) {
+        renderAccount({ signedIn: true, email: res.email, isPro: false }); // isPro in 4b
+      } else {
+        seAuthPhase = 'email';
+        renderAccount({ signedIn: false });
+      }
+    });
+  }
+
   function buildSelectorPanel() {
     const t = getThemeColors();
     const panel = document.createElement('div');

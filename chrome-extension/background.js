@@ -5,6 +5,9 @@ const VALID_SPORTS = ['nfl', 'mlb', 'nba', 'nhl', 'soccer', 'worldcup', 'rugby']
 const VALID_LEVELS = ['kid', 'beginner', 'intermediate', 'expert'];
 const VALID_LANGUAGES = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
 
+// Auth endpoints (Phase 2 4a — email magic-link sign-in).
+const AUTH_BASE = 'https://sports-explainer-mode.vercel.app/api/auth';
+
 // ─────────────────────────────────────────
 // CHROME.STORAGE STATE HELPERS (Fix #11)
 // MV3 service workers can be suspended at any time.
@@ -19,6 +22,24 @@ async function getState() {
 async function setState(updates) {
   return new Promise((resolve) => {
     chrome.storage.local.set(updates, resolve);
+  });
+}
+
+// --- Auth storage (seAuth = { email, session }) ---
+// Same Promise-wrapped chrome.storage.local pattern as getState/setState.
+async function getAuth() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['seAuth'], (r) => resolve(r.seAuth || null));
+  });
+}
+async function setAuth(auth) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ seAuth: auth }, resolve);
+  });
+}
+async function clearAuth() {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove(['seAuth'], resolve);
   });
 }
 
@@ -83,6 +104,22 @@ function validateFetchGamesMsg(msg) {
   const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
   if (!sport) return null;
   return { sport };
+}
+
+// --- Auth validators (Phase 2 4a) ---
+function normalizeEmailMsg(raw) {
+  return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+}
+function validateAuthRequestCodeMsg(msg) {
+  const email = normalizeEmailMsg(msg.email);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return null;
+  return { email };
+}
+function validateAuthVerifyCodeMsg(msg) {
+  const email = normalizeEmailMsg(msg.email);
+  const code = typeof msg.code === 'string' ? msg.code.trim() : '';
+  if (!email || !/^\d{6}$/.test(code)) return null;
+  return { email, code };
 }
 
 // ─────────────────────────────────────────
@@ -162,6 +199,38 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── AUTH: request code ──
+  if (msg.action === 'authRequestCode') {
+    const v = validateAuthRequestCodeMsg(msg);
+    if (!v) { sendResponse({ error: 'Invalid email.' }); return true; }
+    handleAuthRequestCode(v.email)
+      .then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  // ── AUTH: verify code ──
+  if (msg.action === 'authVerifyCode') {
+    const v = validateAuthVerifyCodeMsg(msg);
+    if (!v) { sendResponse({ error: 'Enter a valid email and 6-digit code.' }); return true; }
+    handleAuthVerifyCode(v.email, v.code)
+      .then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  // ── AUTH: check stored session (whoami) ──
+  if (msg.action === 'authCheckSession') {
+    handleAuthCheckSession()
+      .then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
+  // ── AUTH: sign out ──
+  if (msg.action === 'authSignOut') {
+    handleAuthSignOut()
+      .then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
 });
 
 // ─────────────────────────────────────────
@@ -237,6 +306,64 @@ async function handleAskQuestion(sport, level, question, context, language = 'en
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();
+}
+
+// ─────────────────────────────────────────
+// AUTH (Phase 2 4a — email magic-link sign-in; identity only, no entitlement yet)
+// ─────────────────────────────────────────
+async function handleAuthRequestCode(email) {
+  const res = await fetch(`${AUTH_BASE}/request-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  // request-code always returns a generic { ok:true } — pass it through.
+  return res.json();
+}
+
+async function handleAuthVerifyCode(email, code) {
+  const res = await fetch(`${AUTH_BASE}/verify-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await res.json();
+  if (data && data.ok && data.session) {
+    // Persist the session so the user stays signed in across launches.
+    await setAuth({ email: data.email, session: data.session });
+    return { ok: true, email: data.email };
+  }
+  return { ok: false };
+}
+
+async function handleAuthCheckSession() {
+  // Validate the stored session with whoami; if invalid/expired, clear it.
+  const auth = await getAuth();
+  if (!auth || !auth.session) return { signedIn: false };
+  try {
+    const res = await fetch(`${AUTH_BASE}/whoami`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: auth.session }),
+    });
+    const data = await res.json();
+    if (data && data.ok && data.email) {
+      // Keep storage in sync with the server's view of the email.
+      if (data.email !== auth.email) await setAuth({ email: data.email, session: auth.session });
+      return { signedIn: true, email: data.email };
+    }
+  } catch (e) {
+    // Network error — treat as unknown, but don't wipe the session on a transient failure.
+    return { signedIn: true, email: auth.email, stale: true };
+  }
+  // whoami said not-ok → session invalid/expired → clear it.
+  await clearAuth();
+  return { signedIn: false };
+}
+
+async function handleAuthSignOut() {
+  await clearAuth();
+  return { ok: true };
 }
 
 // ─────────────────────────────────────────
