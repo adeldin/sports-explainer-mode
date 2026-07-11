@@ -23,18 +23,21 @@ export interface Game {
   sport: string;
   state: 'pre' | 'in' | 'post';
   startTime?: number;
+  venue?: string;   // canonical Game.venue — retained when present
+  stage?: string;   // canonical Game.stage — e.g. "Pool A"; retained when present
 }
 
 // --- Defensive parsing (the feed may mix string/number; never blanket-cast) ---
 const asStr = (v: any): string => (v == null ? '' : String(v));
 
-// Map a raw fixture status label → coarse state. Zyla's exact vocabulary is UNVERIFIED until the first
-// live RUGBY_LIVE=1 test; this is a tolerant matcher (unknown → 'pre', the safe default).
+// Map a raw fixture status label → coarse state. Zyla's status vocabulary is CONFIRMED (the API's
+// fields dictionary): "Not Started", "First Half", "Half Time", "Second Half", "Full Time",
+// "Postponed", "Cancelled", "Result". Matched case-insensitively + trimmed for defense.
 function deriveState(raw: string): 'pre' | 'in' | 'post' {
-  const s = raw.toLowerCase();
-  if (/\b(ft|full[\s-]?time|finished|ended|final|aet|after extra time|post|complete)\b/.test(s)) return 'post';
-  if (/(1st|2nd|first half|second half|\bht\b|half[\s-]?time|live|in[\s-]?play|playing|in progress|\d+')/.test(s)) return 'in';
-  return 'pre';
+  const s = raw.trim().toLowerCase();
+  if (s === 'full time' || s === 'result') return 'post';
+  if (s === 'first half' || s === 'half time' || s === 'second half') return 'in';
+  return 'pre'; // "Not Started" / "Postponed" / "Cancelled" / any unknown → 'pre'
 }
 
 // --- Request helper: single Authorization: Bearer header (Zyla direct, NOT RapidAPI-fronted) + the
@@ -73,6 +76,8 @@ export async function getNationsCupBoard(): Promise<Game[]> {
         const rawStatus = asStr(f?.status);
         const state = deriveState(rawStatus);
         const ms = Date.parse(asStr(f?.date));
+        const venue = asStr(f?.venue);
+        const stage = asStr(f?.stage);
         games.push({
           id: asStr(f?.id),
           homeTeam: asStr(f?.home),
@@ -84,6 +89,8 @@ export async function getNationsCupBoard(): Promise<Game[]> {
           sport: 'nationscup',
           state,
           startTime: Number.isFinite(ms) ? ms : undefined,
+          ...(venue ? { venue } : {}),
+          ...(stage ? { stage } : {}),
         });
       } catch {
         continue; // skip a single malformed fixture rather than drop the whole board
