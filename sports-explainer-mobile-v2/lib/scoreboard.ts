@@ -460,3 +460,33 @@ export async function discoverGameDays(
 
   return { anchor, gameDays: Array.from(all).sort(), previousGameDay, nextGameDay };
 }
+
+// ============================================================================
+// Multi-league RUGBY board (Phase 1 Gate 1) — fetch + merge ESPN's existing rugby
+// leagues under the one "Rugby" tile. Each league is its own app Sport key, so we
+// fetch them separately and CONCAT: every game keeps its OWN .sport (URC → 'rugby',
+// MLR → 'mlr'), because fetchScoreboard stamps the arg into Game.sport. We never
+// re-stamp/normalize to a single key — the per-game key is what the explain/recap
+// backend routing needs. Mirrors watchNext.gatherWatchCandidates' allSettled+concat;
+// per-league dedup already happens inside fetchScoreboard. No date param (Phase 1 has
+// no date strip — the core −3d…+7d window is exactly what we want).
+// ============================================================================
+export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
+  { sportKey: 'rugby', label: 'URC' },
+  { sportKey: 'mlr', label: 'MLR' },
+];
+
+export async function fetchRugbyBoard(
+  isCancelled: () => boolean = () => false,
+): Promise<Game[]> {
+  const results = await Promise.allSettled(
+    RUGBY_LEAGUES.map(l => fetchScoreboard(l.sportKey, isCancelled)),
+  );
+  if (isCancelled()) return [];
+  const out: Game[] = [];
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue; // one slow/failed league can't sink the board
+    out.push(...r.value);                   // keep each game's own .sport — no normalize
+  }
+  return out;
+}
