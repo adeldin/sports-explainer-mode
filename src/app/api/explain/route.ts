@@ -36,7 +36,9 @@ const sportContext: Record<string, string> = {
 // ESPN endpoint config. `core` sports are NOT on the normal scoreboard API and
 // need the two-step Core-API $ref fetch (see fetchGameData). Soccer/World Cup
 // use the normal site API with their own league slugs.
-type EspnCfg = { sport: string; league: string; core?: boolean; learnMode?: boolean };
+// `provider` selects the data source: absent/'espn' = ESPN base (default). `sport`/`league` are
+// optional so a 'zyla' entry needn't supply meaningless ESPN values (every ESPN entry still sets both).
+type EspnCfg = { sport?: string; league?: string; core?: boolean; learnMode?: boolean; provider?: 'espn' | 'zyla' };
 const espnConfig: Record<string, EspnCfg> = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
@@ -108,6 +110,13 @@ export function buildSystemPrompt(sport: string, level: string, language: string
 // Pull current game context + the latest play text for any configured sport.
 // Site-API sports read the scoreboard (+ a summary deep-dive for MLB play-by-play
 // and soccer key events); Core-API sports (rugby) use the two-step $ref fetch.
+// Zyla-provider base fetch (Gate 1 stub — provider seam only; NO sport uses 'zyla' yet, so this is
+// unreachable). Returns the EXACT shape fetchGameData's !cfg early-return produces so types align.
+// TODO Gate 4: fetch rugby teams/play/events from Zyla and normalize into this shape.
+async function fetchZylaGameData(sport: string, gameId?: string) {
+  return { play: 'A key play just happened', gameContext: 'Live game in progress', homeTeam: '', awayTeam: '' };
+}
+
 async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = false) {
   let play = 'A key play just happened';
   let gameContext = 'Live game in progress';
@@ -115,6 +124,8 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
 
   const cfg = espnConfig[sport];
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
+  // Zyla-provider sports divert BEFORE the ESPN learnMode/core/site branches.
+  if (cfg.provider === 'zyla') return await fetchZylaGameData(sport, gameId);
 
   // Learn Mode (tennis/golf): tournament-shaped, not head-to-head. Build a
   // context string from the current tournament rather than home/away teams.

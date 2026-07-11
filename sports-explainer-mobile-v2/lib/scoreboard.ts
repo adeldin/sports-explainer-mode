@@ -59,7 +59,8 @@ export interface Game {
 // Golf keeps learnMode:true (its Q&A/FAQ/Academy stay) AND gains liveFormat:'leaderboard'. Tennis
 // likewise keeps learnMode:true AND gains liveFormat:'tennis' (its live matches come from the
 // /api/tennis-live endpoint, not ESPN — fetchScoreboard still returns [] for it).
-export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' | 'tennis' };
+// `provider` selects the data source: absent/'espn' = ESPN base (default). Future: 'sportradar'.
+export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' | 'tennis'; provider?: 'espn' | 'zyla' };
 export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   mlb: { espnSport: 'baseball', league: 'mlb' },
   nhl: { espnSport: 'hockey', league: 'nhl' },
@@ -83,6 +84,16 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
 // is also why the Watch Next gatherer can call this for every sport safely.
 // `isCancelled` is checked once after the network work so a superseded caller commits
 // nothing; the LiveScreen wrapper ALSO checks before setState (identical behavior).
+// Zyla-provider board (Gate 1 stub — provider seam only; NO sport uses 'zyla' yet, so this is
+// unreachable). TODO Gate 2: GET the backend /api/rugby-live endpoint and return normalized Game[].
+async function fetchZylaBoard(
+  sport: Sport,
+  isCancelled: () => boolean = () => false,
+  date?: Date,
+): Promise<Game[]> {
+  return [];
+}
+
 export async function fetchScoreboard(
   sport: Sport,
   isCancelled: () => boolean = () => false,
@@ -90,6 +101,9 @@ export async function fetchScoreboard(
 ): Promise<Game[]> {
   const cfg = SPORT_CONFIG[sport];
   if (!cfg || cfg.learnMode) return [];
+  // Zyla-provider sports bypass the entire ESPN path — placed BEFORE the off-season guard on purpose
+  // (isOffSeason reads ESPN-shaped SEASON_WINDOWS, which would wrongly short-circuit a Zyla sport).
+  if (cfg.provider === 'zyla') return fetchZylaBoard(sport, isCancelled, date);
   // Off-season → [] for the DEFAULT (today) fetch; an explicit date bypasses this, since the date
   // strip only asks for days discoverGameDays already found to have games (incl. across an
   // offseason gap — e.g. tapping a preseason day for a currently-out-of-season league).
