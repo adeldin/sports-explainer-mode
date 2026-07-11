@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
+import { getNationsCupMatch } from './zylaProvider';
 import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
@@ -114,11 +115,13 @@ export function buildSystemPrompt(sport: string, level: string, language: string
 // Pull current game context + the latest play text for any configured sport.
 // Site-API sports read the scoreboard (+ a summary deep-dive for MLB play-by-play
 // and soccer key events); Core-API sports (rugby) use the two-step $ref fetch.
-// Zyla-provider base fetch (Gate 1 stub — provider seam only; NO sport uses 'zyla' yet, so this is
-// unreachable). Returns the EXACT shape fetchGameData's !cfg early-return produces so types align.
-// TODO Gate 4: fetch rugby teams/play/events from Zyla and normalize into this shape.
+// Zyla-provider base fetch (Gate 4): delegates to getNationsCupMatch, which returns the same
+// { play, gameContext, homeTeam, awayTeam, ... } shape fetchGameData produces. The rich event narrative
+// + team stats are baked INTO gameContext (the `else`/fetchGameData branch reads gameContext, not a
+// separate events array — the "Recent events:" injection is enriched-path-only). Best-effort: on any
+// Zyla failure getNationsCupMatch returns sane non-empty defaults, so the explain is never blank.
 async function fetchZylaGameData(sport: string, gameId?: string) {
-  return { play: 'A key play just happened', gameContext: 'Live game in progress', homeTeam: '', awayTeam: '' };
+  return await getNationsCupMatch(gameId || '');
 }
 
 async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = false) {
