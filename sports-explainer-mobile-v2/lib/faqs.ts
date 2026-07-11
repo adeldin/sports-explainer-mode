@@ -806,6 +806,10 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
     },
     questions: BASE_FAQS.rugby.questions,
   },
+  nationscup: {
+    label: allEn(`Common Rugby Questions`),
+    questions: BASE_FAQS.rugby.questions,
+  },
   tennis: {
     label: allEn(`Common Tennis Questions`),
     questions: [

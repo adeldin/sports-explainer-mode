@@ -18,6 +18,7 @@ export const SPORTS: SportTab[] = [
   { key: 'laliga', emoji: '⚽', label: 'La Liga' },
   { key: 'rugby', emoji: '🏉', label: 'URC' },
   { key: 'mlr', emoji: '🏉', label: 'MLR' },
+  { key: 'nationscup', emoji: '🏉', label: 'Rugby' },
   { key: 'tennis', emoji: '🎾', label: 'Tennis' },
   { key: 'golf', emoji: '⛳', label: 'Golf' },
   { key: 'cricket', emoji: '🏏', label: 'Cricket' },
@@ -29,7 +30,7 @@ export const SPORT_FULL_NAME: Record<Sport, keyof UIStrings> = {
   mlb: 'spBaseball', nfl: 'spFootball', nba: 'spBasketball', nhl: 'spHockey',
   soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
   wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
-  tennis: 'spTennis', golf: 'spGolf', cricket: 'spCricket',
+  tennis: 'spTennis', golf: 'spGolf', cricket: 'spCricket', nationscup: 'spNationsCup',
 };
 
 // Reorder SPORTS by a user's saved key order (from AsyncStorage). Keeps saved

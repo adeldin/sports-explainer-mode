@@ -77,6 +77,14 @@ const FACTS: Record<Sport, string[]> = {
     "The USA Rugby team is nicknamed the Eagles.",
     "The Chicago Hounds play at SeatGeek Stadium in Bridgeview, Illinois."
   ],
+  nationscup: [
+    "The World Rugby Nations Cup is an international tournament for emerging rugby nations like the USA, Uruguay, Georgia and Portugal.",
+    "It gives 'tier 2' nations regular high-level fixtures — a stepping stone toward the Rugby World Cup.",
+    "Georgia's national team, nicknamed the Lelos, has become a powerhouse among Europe's emerging rugby nations.",
+    "Uruguay's side is nicknamed Los Teros, after a bold local bird that fiercely defends its ground.",
+    "Portugal's flair-filled running rugby made them one of the breakout stories of the 2023 Rugby World Cup.",
+    "A try is worth 5 points, with a 2-point conversion kick to follow — the same scoring used across world rugby."
+  ],
   wnba: [
     "The WNBA was founded in 1996 and played its first season in 1997.",
     "A WNBA basketball is slightly smaller than an NBA ball — 28.5 inches vs 29.5 inches.",
@@ -698,6 +706,16 @@ export const QUIZ: Record<Sport, QuizQuestion[]> = {
     { q: "What is the 'fairway'?", options: ["The mown short-grass route from tee to green","The area around the hole","The sand trap","The starting area"], answer: 0, explanation: "The fairway is the closely-mown stretch between tee and green; landing there gives the cleanest shot at the hole.", difficulty: "intermediate" },
     { q: "What does 'under par' mean for a round?", options: ["Fewer strokes than the course's expected total","More strokes than expected","Exactly the expected total","A disqualification"], answer: 0, explanation: "Shooting under par means taking fewer strokes than the course par — the goal, since lower scores win in golf.", difficulty: "intermediate" },
     { q: "What is a 'wedge' used for?", options: ["Short, high shots near the green","Long drives off the tee","Putting","Hitting out of water"], answer: 0, explanation: "Wedges are high-lofted clubs for short approach shots, chips, and bunker play around the green.", difficulty: "intermediate" },
+  ],
+  nationscup: [
+    { q: "The World Rugby Nations Cup is a tournament for which kind of teams?", options: ["Emerging (tier 2) national teams","Club teams only","College teams","Sevens teams"], answer: 0, explanation: "The Nations Cup gives emerging rugby nations regular international fixtures.", difficulty: "beginner" },
+    { q: "How many points is a try worth in rugby union?", options: ["3","4","5","6"], answer: 2, explanation: "A try is worth 5 points.", difficulty: "beginner" },
+    { q: "What is Georgia's national rugby team nicknamed?", options: ["The Lelos","The Eagles","Los Teros","The Wolfhounds"], answer: 0, explanation: "Georgia are known as the Lelos, after a traditional Georgian ball game.", difficulty: "intermediate" },
+    { q: "What does a yellow card mean in rugby union?", options: ["Ejection for the match","A 10-minute sin bin","A warning only","A penalty try"], answer: 1, explanation: "A yellow card sends a player to the sin bin for 10 minutes.", difficulty: "intermediate" },
+    { q: "What is 'jackling' at the breakdown?", options: ["A kick from the ruck","A turnover technique where a player on their feet steals the ball after a tackle","A lineout lift","A scrum push"], answer: 1, explanation: "Jackling is contesting the ball over a tackled player while staying on your feet — being off your feet concedes a penalty.", difficulty: "expert" },
+    { q: "What is a 'drift defense'?", options: ["Defenders sliding outward toward the touchline to deny space","A rush-up blitz","A deep kicking game","A maul defense"], answer: 0, explanation: "In a drift defense, defenders slide outward to shut down width and force play into the corner.", difficulty: "expert" },
+    { q: "How does a team score a 'try'?", options: ["By touching the ball down over the other team's goal line","By kicking it into the crowd","By sitting on the ball","By dropping it and walking away"], answer: 0, explanation: "A try is carrying the ball over the line and putting it down, like planting a flag on new land.", difficulty: "kid" },
+    { q: "What shape is a rugby ball?", options: ["Oval, like a chubby egg","A perfect circle","A flat square","A tiny marble"], answer: 0, explanation: "Rugby uses an oval ball that's easy to hug and carry while you run.", difficulty: "kid" },
   ],
   cricket: [
     { q: "How many players are in a cricket team?", options: ["9","10","11","12"], answer: 2, explanation: "A cricket team has 11 players.", difficulty: "beginner" },
