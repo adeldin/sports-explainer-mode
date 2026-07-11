@@ -119,15 +119,14 @@ const MATCH_EMPTY: MatchDetail = { play: 'A key play just happened', gameContext
 const MATCH_TTL = 120_000; // 120s — Gate 5 adds durable Upstash + a longer TTL for finished ('Result') matches
 const matchCache = new Map<string, { t: number; data: MatchDetail }>();
 
-// Pull one high-signal value from a Zyla team_stats group. Shape is UNVERIFIED until a real /538 response
-// is captured: team_stats is assumed to be an array of { stat_name, stat_array:[{stat,value}] } groups.
-// Defensive — returns the first non-empty value in the group whose stat_name contains `groupName`, else ''.
-function pickStat(teamStats: any, groupName: string): string {
-  const groups: any[] = Array.isArray(teamStats) ? teamStats : [];
-  const g = groups.find((x) => asStr(x?.stat_name).toLowerCase().includes(groupName));
-  const arr: any[] = Array.isArray(g?.stat_array) ? g.stat_array : [];
-  for (const s of arr) { const v = asStr(s?.value); if (v) return v; }
-  return '';
+// Pull one value from a Zyla team_stats block. CONFIRMED shape: team_stats is a DICT keyed by group
+// (attack/defence/discipline/kicking/breakdown/lineouts/scrums/possession), each group a LIST of
+// { stat: string, value: string } pairs. Defensive — missing group/stat → undefined, never throws.
+function getStat(teamStats: any, group: string, statName: string): string | undefined {
+  const arr = teamStats?.[group];
+  if (!Array.isArray(arr)) return undefined;
+  const hit = arr.find((p: any) => p?.stat === statName);
+  return hit ? asStr(hit.value) : undefined;
 }
 
 // Per-match detail for the explain path — real Zyla events + team stats, baked into gameContext.
@@ -165,14 +164,39 @@ export async function getNationsCupMatch(matchId: string): Promise<MatchDetail> 
       `Penalties: ${asStr(m?.home_penalties)}-${asStr(m?.away_penalties)}, ` +
       `Drop goals: ${asStr(m?.home_drop_goals)}-${asStr(m?.away_drop_goals)}. `;
 
-    // "Match stats:" line — possession + discipline, only when BOTH sides expose a value (else omit).
+    // "Match stats:" line — each sub-part is included ONLY when BOTH sides expose the value (else omit).
+    const hs = results?.home?.team_stats;
+    const as = results?.away?.team_stats;
     let statsLine = '';
-    const hPoss = pickStat(results?.home?.team_stats, 'possession');
-    const aPoss = pickStat(results?.away?.team_stats, 'possession');
-    if (hPoss && aPoss) statsLine += `Possession — ${homeName} ${hPoss} / ${awayName} ${aPoss}. `;
-    const hDisc = pickStat(results?.home?.team_stats, 'discipline');
-    const aDisc = pickStat(results?.away?.team_stats, 'discipline');
-    if (hDisc && aDisc) statsLine += `Discipline — ${homeName} ${hDisc} / ${awayName} ${aDisc}. `;
+
+    // Possession: a decimal fraction string ("0.56") → percent.
+    const hPoss = getStat(hs, 'possession', 'possession');
+    const aPoss = getStat(as, 'possession', 'possession');
+    const pct = (v: string): string | undefined => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? `${Math.round(n * 100)}%` : undefined;
+    };
+    if (hPoss !== undefined && aPoss !== undefined) {
+      const hp = pct(hPoss), ap = pct(aPoss);
+      if (hp && ap) statsLine += `Possession ${homeName} ${hp} / ${awayName} ${ap}. `;
+    }
+
+    // Penalties conceded: plain integer string.
+    const hPen = getStat(hs, 'discipline', 'penalties_conceded');
+    const aPen = getStat(as, 'discipline', 'penalties_conceded');
+    if (hPen !== undefined && aPen !== undefined) {
+      statsLine += `Penalties conceded ${homeName} ${hPen} / ${awayName} ${aPen}. `;
+    }
+
+    // Cards: yellow + red, shown together as "1Y 0R" — only when both sides expose BOTH counts.
+    const hY = getStat(hs, 'discipline', 'yellow_cards');
+    const aY = getStat(as, 'discipline', 'yellow_cards');
+    const hR = getStat(hs, 'discipline', 'red_cards');
+    const aR = getStat(as, 'discipline', 'red_cards');
+    if (hY !== undefined && aY !== undefined && hR !== undefined && aR !== undefined) {
+      statsLine += `Cards ${homeName} ${hY}Y ${hR}R / ${awayName} ${aY}Y ${aR}R. `;
+    }
+
     if (statsLine) gameContext += `Match stats: ${statsLine}`;
 
     // Recent events narrative, baked into gameContext (chronological, capped to bound the prompt).
