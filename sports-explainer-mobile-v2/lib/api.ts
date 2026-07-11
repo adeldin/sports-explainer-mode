@@ -32,7 +32,7 @@ export interface Play {
   scoring: boolean; // true for scoring plays (home run, goal, etc.)
 }
 
-const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
+export const API_URL = 'https://sports-explainer-mode.vercel.app/api/explain';
 
 // Live golf leaderboard lives at a SIBLING endpoint (/api/leaderboard) on the same host. API_URL
 // hardcodes the full /api/explain path, so derive the sibling rather than reusing it verbatim.

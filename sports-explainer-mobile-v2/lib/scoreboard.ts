@@ -5,7 +5,7 @@
 // its own LiveScreen-only bits: learn-context, favorites sort, setGames, auto-select).
 // Watch Next (lib/watchNext.ts) reuses this same function to gather candidates.
 
-import { Sport } from './api';
+import { Sport, API_URL } from './api';
 import { isOffSeason } from './sports';
 
 // A probable starter (MLB probable pitcher today; other sports have no analog). `record` is ESPN's
@@ -84,14 +84,25 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
 // is also why the Watch Next gatherer can call this for every sport safely.
 // `isCancelled` is checked once after the network work so a superseded caller commits
 // nothing; the LiveScreen wrapper ALSO checks before setState (identical behavior).
-// Zyla-provider board (Gate 1 stub — provider seam only; NO sport uses 'zyla' yet, so this is
-// unreachable). TODO Gate 2: GET the backend /api/rugby-live endpoint and return normalized Game[].
+// Zyla-provider board (Gate 2): the World Rugby Nations Cup board comes from OUR backend, which holds
+// the Zyla key server-side and returns already-normalized canonical Game[]. This client holds NO key
+// and does NO re-normalize — it only calls the backend. Best-effort: any failure → [] (never throws),
+// and when RUGBY_LIVE is unset the backend returns { matches: [] }, so this naturally yields [].
+// Backend endpoint derived from the shared API_URL (single source of truth in lib/api.ts).
+const RUGBY_LIVE_URL = API_URL.replace('/api/explain', '/api/rugby-live');
 async function fetchZylaBoard(
   sport: Sport,
   isCancelled: () => boolean = () => false,
   date?: Date,
 ): Promise<Game[]> {
-  return [];
+  try {
+    const response = await fetch(RUGBY_LIVE_URL, { method: 'GET' });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.matches) ? data.matches : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchScoreboard(
