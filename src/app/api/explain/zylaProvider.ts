@@ -118,7 +118,7 @@ export async function getNationsCupBoard(): Promise<Game[]> {
 // route's fetchGameData/`else` branch consumes gameContext ONLY — the "Recent events:" injection is
 // enriched-path (soccer/mlb) exclusive and does NOT fire for nationscup. So the event narrative + stats
 // are baked INTO gameContext here; `events` is returned for shape parity / future Match-Timeline use.
-type MatchDetail = { play: string; gameContext: string; homeTeam: string; awayTeam: string; events: MatchEvent[] };
+type MatchDetail = { play: string; gameContext: string; homeTeam: string; awayTeam: string; events: MatchEvent[]; homeStats?: RugbyTeamStats; awayStats?: RugbyTeamStats };
 
 // Sane non-empty fallback (matches fetchGameData's !cfg defaults) → the explain is never blank/thin even
 // on total Zyla failure; the LLM still has sportContext.nationscup to work from.
@@ -135,6 +135,70 @@ function getStat(teamStats: any, group: string, statName: string): string | unde
   if (!Array.isArray(arr)) return undefined;
   const hit = arr.find((p: any) => p?.stat === statName);
   return hit ? asStr(hit.value) : undefined;
+}
+
+// Structured per-side rugby stats for the (future) Coach's Read path. All optional: a missing group or
+// stat stays undefined. Numbers throughout. NOTE the confirmed Zyla quirks preserved in the mapper:
+// some keys live cross-group (turnovers_won under 'defence', turnovers_conceded under 'attack'), the
+// lineout-lost key is misspelled 'lineouts_Lost' (capital L), and offloads is singular 'offload'.
+export interface RugbyTeamStats {
+  possessionPct?: number;
+  penaltiesConceded?: number;
+  yellowCards?: number;
+  redCards?: number;
+  turnoversWon?: number;
+  turnoversConceded?: number;
+  lineoutsWon?: number;
+  lineoutsLost?: number;
+  lineoutSuccessPct?: number;
+  scrumsWon?: number;
+  scrumsLost?: number;
+  rucksWon?: number;
+  rucksTotal?: number;
+  carriesMetres?: number;
+  cleanBreaks?: number;
+  offloads?: number;
+  defendersBeaten?: number;
+  gainLineCrossed?: number;
+  gainLineFailed?: number;
+  tackles?: number;
+  missedTackles?: number;
+}
+
+// Map one side's raw Zyla team_stats block → structured RugbyTeamStats. Every field is best-effort:
+// a missing group/stat or non-numeric value → undefined (never throws). Keys are the EXACT confirmed
+// /538 spellings — do not "correct" 'lineouts_Lost' (capital L) or 'offload' (singular).
+function buildRugbyTeamStats(teamStats: any): RugbyTeamStats {
+  const num = (v: string | undefined): number | undefined => {
+    if (v === undefined) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const poss = num(getStat(teamStats, 'possession', 'possession'));
+  const lineoutSucc = num(getStat(teamStats, 'lineouts', 'lineout_success'));
+  return {
+    possessionPct: poss == null ? undefined : Math.round(poss * 100),
+    penaltiesConceded: num(getStat(teamStats, 'discipline', 'penalties_conceded')),
+    yellowCards: num(getStat(teamStats, 'discipline', 'yellow_cards')),
+    redCards: num(getStat(teamStats, 'discipline', 'red_cards')),
+    turnoversWon: num(getStat(teamStats, 'defence', 'turnovers_won')),        // cross-group: under 'defence'
+    turnoversConceded: num(getStat(teamStats, 'attack', 'turnovers_conceded')), // cross-group: under 'attack'
+    lineoutsWon: num(getStat(teamStats, 'lineouts', 'lineouts_won')),
+    lineoutsLost: num(getStat(teamStats, 'lineouts', 'lineouts_Lost')),        // Zyla typo — capital L, match exactly
+    lineoutSuccessPct: lineoutSucc == null ? undefined : Math.round(lineoutSucc * 100),
+    scrumsWon: num(getStat(teamStats, 'scrums', 'scrums_won')),
+    scrumsLost: num(getStat(teamStats, 'scrums', 'scrums_lost')),
+    rucksWon: num(getStat(teamStats, 'breakdown', 'rucks_won')),
+    rucksTotal: num(getStat(teamStats, 'breakdown', 'rucks_total')),
+    carriesMetres: num(getStat(teamStats, 'attack', 'carries_metres')),
+    cleanBreaks: num(getStat(teamStats, 'attack', 'clean_breaks')),
+    offloads: num(getStat(teamStats, 'attack', 'offload')),                   // singular 'offload'
+    defendersBeaten: num(getStat(teamStats, 'attack', 'defenders_beaten')),
+    gainLineCrossed: num(getStat(teamStats, 'attack', 'carries_crossed_gain_line')),
+    gainLineFailed: num(getStat(teamStats, 'attack', 'carries_not_made_gain_line')),
+    tackles: num(getStat(teamStats, 'defence', 'tackles')),
+    missedTackles: num(getStat(teamStats, 'defence', 'missed_tackles')),
+  };
 }
 
 // Per-match detail for the explain path — real Zyla events + team stats, baked into gameContext.
@@ -179,6 +243,10 @@ export async function getNationsCupMatch(matchId: string): Promise<MatchDetail> 
       // "Match stats:" line — each sub-part is included ONLY when BOTH sides expose the value (else omit).
       const hs = results?.home?.team_stats;
       const as = results?.away?.team_stats;
+      // Structured per-side stats for the (future) Coach's Read path — purely additive, ignored by the
+      // explain path (which reads only play/gameContext/homeTeam/awayTeam).
+      const homeStats = hs ? buildRugbyTeamStats(hs) : undefined;
+      const awayStats = as ? buildRugbyTeamStats(as) : undefined;
       let statsLine = '';
 
       // Possession: a decimal fraction string ("0.56") → percent.
@@ -228,6 +296,8 @@ export async function getNationsCupMatch(matchId: string): Promise<MatchDetail> 
         homeTeam: homeName,
         awayTeam: awayName,
         events,
+        homeStats,
+        awayStats,
       };
     });
     matchCache.set(matchId, { t: now, data: detail });   // write-through L1
