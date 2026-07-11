@@ -108,6 +108,31 @@ export async function cacheDelete(key: string): Promise<void> {
   }
 }
 
+// --- Generic read-through wrapper -----------------------------------------------------------------
+// L2 (Upstash) cache around ANY upstream `fetcher`, for callers that key their OWN namespaces (e.g. the
+// Zyla rugby provider). Reuses cacheGet/cacheSet, so it inherits the CACHE_ENABLED master gate for free:
+// when the switch is OFF, cacheGet returns null with NO Upstash call and cacheSet no-ops, so this
+// collapses to a plain `await fetcher()` — behavior byte-identical to no cache. Best-effort: a corrupt
+// cached value falls through to a fresh fetch; Upstash errors are swallowed by cacheGet/cacheSet.
+// NEVER-CACHE-FAILURES contract: `fetcher` must THROW on upstream failure (not return a sentinel) —
+// cacheSet runs only after a successful fetch, so failures are never written; the throw propagates to
+// the caller, which supplies its own default. `T` must be JSON-serializable.
+export async function cachedFetch<T>(
+  namespace: string,
+  key: string,
+  ttlSeconds: number,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const fullKey = `${namespace}:${key}`;
+  const hit = await cacheGet(fullKey);              // null when disabled / miss / error
+  if (hit != null) {
+    try { return JSON.parse(hit) as T; } catch { /* corrupt entry → fall through to a fresh fetch */ }
+  }
+  const fresh = await fetcher();                    // throws on upstream failure → nothing is cached
+  try { await cacheSet(fullKey, JSON.stringify(fresh), ttlSeconds); } catch { /* caching must never lose a good fetch */ }
+  return fresh;
+}
+
 // --- Pure key-builders (no I/O) ------------------------------------------------------------------
 
 // §2b helper — PHASE BUCKET (soccer match minute → phase). Exact thresholds per §2b. A null/<=0

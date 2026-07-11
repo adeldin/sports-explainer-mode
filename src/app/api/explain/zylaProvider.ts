@@ -6,6 +6,7 @@
 // (Gate 4) will import getNationsCupMatch. nationscup (comp_id 726) is now wired to provider:'zyla'.
 
 import { type MatchEvent } from './dataProvider';
+import { cachedFetch } from './explanationCache';
 
 const KEY = process.env.ZYLA_API_KEY;
 const BASE = 'https://zylalabs.com/api/796/rugby+live+data+api';
@@ -63,46 +64,53 @@ let boardCache: { t: number; data: Game[] } | null = null;
 // --- Public API ---
 
 // The full World Rugby Nations Cup board (comp_id 726, season 2026), normalized to canonical Game[].
-// Best-effort: no key / fetch error / non-200 / bad JSON → [] (never throws). Cached ~60s.
+// Best-effort: no key / fetch error / non-200 / bad JSON → [] (never throws). L1 in-memory 60s; L2
+// Upstash 45s flat (Gate 5) when CACHE_ENABLED=1.
 export async function getNationsCupBoard(): Promise<Game[]> {
   if (!KEY) return [];
   const now = Date.now();
-  if (boardCache && now - boardCache.t < BOARD_TTL) return boardCache.data;
+  if (boardCache && now - boardCache.t < BOARD_TTL) return boardCache.data;   // L1 (in-memory) first
   try {
-    const res = await zylaFetch('/534/get+fixtures?comp_id=726&season=2026');
-    if (!res.ok) return [];
-    const json: any = await res.json();
-    const fixtures: any[] = Array.isArray(json?.results) ? json.results : [];
-    const games: Game[] = [];
-    for (const f of fixtures) {
-      try {
-        const rawStatus = asStr(f?.status);
-        const state = deriveState(rawStatus);
-        const ms = Date.parse(asStr(f?.date));
-        const venue = asStr(f?.venue);
-        const stage = asStr(f?.stage);
-        games.push({
-          id: asStr(f?.id),
-          homeTeam: asStr(f?.home),
-          awayTeam: asStr(f?.away),
-          homeScore: asStr(f?.home_score),
-          awayScore: asStr(f?.away_score),
-          status: rawStatus,
-          isLive: state === 'in',
-          sport: 'nationscup',
-          state,
-          startTime: Number.isFinite(ms) ? ms : undefined,
-          ...(venue ? { venue } : {}),
-          ...(stage ? { stage } : {}),
-        });
-      } catch {
-        continue; // skip a single malformed fixture rather than drop the whole board
+    // L1 miss → L2 (Upstash, 45s — board carries live games, must stay fresh) → Zyla. cachedFetch no-ops
+    // when CACHE_ENABLED is unset, collapsing to Gate-4's direct fetch. The fetcher THROWS on failure so
+    // a bad fetch is never cached; a legit empty board (off-season) IS cacheable and self-heals in 45s.
+    const games = await cachedFetch('zyla_board', 'nationscup:2026', 45, async (): Promise<Game[]> => {
+      const res = await zylaFetch('/534/get+fixtures?comp_id=726&season=2026');
+      if (!res.ok) throw new Error(`zyla board ${res.status}`);
+      const json: any = await res.json();
+      const fixtures: any[] = Array.isArray(json?.results) ? json.results : [];
+      const out: Game[] = [];
+      for (const f of fixtures) {
+        try {
+          const rawStatus = asStr(f?.status);
+          const state = deriveState(rawStatus);
+          const ms = Date.parse(asStr(f?.date));
+          const venue = asStr(f?.venue);
+          const stage = asStr(f?.stage);
+          out.push({
+            id: asStr(f?.id),
+            homeTeam: asStr(f?.home),
+            awayTeam: asStr(f?.away),
+            homeScore: asStr(f?.home_score),
+            awayScore: asStr(f?.away_score),
+            status: rawStatus,
+            isLive: state === 'in',
+            sport: 'nationscup',
+            state,
+            startTime: Number.isFinite(ms) ? ms : undefined,
+            ...(venue ? { venue } : {}),
+            ...(stage ? { stage } : {}),
+          });
+        } catch {
+          continue; // skip a single malformed fixture rather than drop the whole board
+        }
       }
-    }
-    boardCache = { t: now, data: games };
+      return out;
+    });
+    boardCache = { t: now, data: games };   // write-through L1
     return games;
   } catch {
-    return []; // best-effort: timeout / network / parse error → [], never throw
+    return []; // best-effort: upstream/cache failure → [], never throw (failure NOT cached)
   }
 }
 
@@ -116,7 +124,7 @@ type MatchDetail = { play: string; gameContext: string; homeTeam: string; awayTe
 // on total Zyla failure; the LLM still has sportContext.nationscup to work from.
 const MATCH_EMPTY: MatchDetail = { play: 'A key play just happened', gameContext: 'Live game in progress', homeTeam: '', awayTeam: '', events: [] };
 
-const MATCH_TTL = 120_000; // 120s — Gate 5 adds durable Upstash + a longer TTL for finished ('Result') matches
+const MATCH_TTL = 120_000; // 120s L1 — Gate 5 adds L2 Upstash (60s flat); Path A later makes finished ('Result') matches long-lived
 const matchCache = new Map<string, { t: number; data: MatchDetail }>();
 
 // Pull one value from a Zyla team_stats block. CONFIRMED shape: team_stats is a DICT keyed by group
@@ -130,96 +138,101 @@ function getStat(teamStats: any, group: string, statName: string): string | unde
 }
 
 // Per-match detail for the explain path — real Zyla events + team stats, baked into gameContext.
-// Best-effort: no key / no id / non-200 / bad JSON → MATCH_EMPTY (never throws). Cached ~120s.
+// Best-effort: no key / no id / non-200 / bad JSON → MATCH_EMPTY (never throws). L1 in-memory 120s; L2
+// Upstash 60s flat (Gate 5) when CACHE_ENABLED=1.
 export async function getNationsCupMatch(matchId: string): Promise<MatchDetail> {
   if (!KEY || !matchId) return MATCH_EMPTY;
   const now = Date.now();
   const cached = matchCache.get(matchId);
-  if (cached && now - cached.t < MATCH_TTL) return cached.data;
+  if (cached && now - cached.t < MATCH_TTL) return cached.data;   // L1 (in-memory) first
   try {
-    const res = await zylaFetch(`/538/get+match+data?match_id=${encodeURIComponent(matchId)}`);
-    if (!res.ok) return MATCH_EMPTY;
-    const json: any = await res.json();
-    const results: any = json?.results ?? {};
-    const m: any = results?.match ?? {};
-    const evs: any[] = Array.isArray(results?.events) ? results.events : [];
+    // L1 miss → L2 (Upstash, 60s flat) → Zyla. cachedFetch no-ops when CACHE_ENABLED is unset, so this
+    // collapses to Gate-4's direct fetch. The fetcher THROWS on failure → a bad fetch is never cached.
+    const detail = await cachedFetch('zyla_match', matchId, 60, async (): Promise<MatchDetail> => {
+      const res = await zylaFetch(`/538/get+match+data?match_id=${encodeURIComponent(matchId)}`);
+      if (!res.ok) throw new Error(`zyla match ${res.status}`);
+      const json: any = await res.json();
+      const results: any = json?.results ?? {};
+      const m: any = results?.match ?? {};
+      const evs: any[] = Array.isArray(results?.events) ? results.events : [];
 
-    const homeName = asStr(m?.home_team);
-    const awayName = asStr(m?.away_team);
+      const homeName = asStr(m?.home_team);
+      const awayName = asStr(m?.away_team);
 
-    // events → MatchEvent[] ({ minute?, type?, team?, player?, detail? } — route.ts:24 shape).
-    const events: MatchEvent[] = evs.map((e: any): MatchEvent => ({
-      minute: asNum(e?.time),
-      type: asStr(e?.type),
-      team: asStr(e?.home_or_away) === 'home' ? homeName : awayName,
-      player: asStr(e?.player_1_name) + (e?.player_2_name ? ` (for ${asStr(e?.player_2_name)})` : ''),
-      detail: asStr(e?.type),
-    }));
+      // events → MatchEvent[] ({ minute?, type?, team?, player?, detail? } — route.ts:24 shape).
+      const events: MatchEvent[] = evs.map((e: any): MatchEvent => ({
+        minute: asNum(e?.time),
+        type: asStr(e?.type),
+        team: asStr(e?.home_or_away) === 'home' ? homeName : awayName,
+        player: asStr(e?.player_1_name) + (e?.player_2_name ? ` (for ${asStr(e?.player_2_name)})` : ''),
+        detail: asStr(e?.type),
+      }));
 
-    // gameContext: score + the rugby scoring breakdown.
-    let gameContext =
-      `${homeName} ${asStr(m?.home_score)} - ${asStr(m?.away_score)} ${awayName} (${asStr(m?.status)}). ` +
-      `Tries: ${asStr(m?.home_tries)}-${asStr(m?.away_tries)}, ` +
-      `Conversions: ${asStr(m?.home_conversions)}-${asStr(m?.away_conversions)}, ` +
-      `Penalties: ${asStr(m?.home_penalties)}-${asStr(m?.away_penalties)}, ` +
-      `Drop goals: ${asStr(m?.home_drop_goals)}-${asStr(m?.away_drop_goals)}. `;
+      // gameContext: score + the rugby scoring breakdown.
+      let gameContext =
+        `${homeName} ${asStr(m?.home_score)} - ${asStr(m?.away_score)} ${awayName} (${asStr(m?.status)}). ` +
+        `Tries: ${asStr(m?.home_tries)}-${asStr(m?.away_tries)}, ` +
+        `Conversions: ${asStr(m?.home_conversions)}-${asStr(m?.away_conversions)}, ` +
+        `Penalties: ${asStr(m?.home_penalties)}-${asStr(m?.away_penalties)}, ` +
+        `Drop goals: ${asStr(m?.home_drop_goals)}-${asStr(m?.away_drop_goals)}. `;
 
-    // "Match stats:" line — each sub-part is included ONLY when BOTH sides expose the value (else omit).
-    const hs = results?.home?.team_stats;
-    const as = results?.away?.team_stats;
-    let statsLine = '';
+      // "Match stats:" line — each sub-part is included ONLY when BOTH sides expose the value (else omit).
+      const hs = results?.home?.team_stats;
+      const as = results?.away?.team_stats;
+      let statsLine = '';
 
-    // Possession: a decimal fraction string ("0.56") → percent.
-    const hPoss = getStat(hs, 'possession', 'possession');
-    const aPoss = getStat(as, 'possession', 'possession');
-    const pct = (v: string): string | undefined => {
-      const n = parseFloat(v);
-      return Number.isFinite(n) ? `${Math.round(n * 100)}%` : undefined;
-    };
-    if (hPoss !== undefined && aPoss !== undefined) {
-      const hp = pct(hPoss), ap = pct(aPoss);
-      if (hp && ap) statsLine += `Possession ${homeName} ${hp} / ${awayName} ${ap}. `;
-    }
+      // Possession: a decimal fraction string ("0.56") → percent.
+      const hPoss = getStat(hs, 'possession', 'possession');
+      const aPoss = getStat(as, 'possession', 'possession');
+      const pct = (v: string): string | undefined => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? `${Math.round(n * 100)}%` : undefined;
+      };
+      if (hPoss !== undefined && aPoss !== undefined) {
+        const hp = pct(hPoss), ap = pct(aPoss);
+        if (hp && ap) statsLine += `Possession ${homeName} ${hp} / ${awayName} ${ap}. `;
+      }
 
-    // Penalties conceded: plain integer string.
-    const hPen = getStat(hs, 'discipline', 'penalties_conceded');
-    const aPen = getStat(as, 'discipline', 'penalties_conceded');
-    if (hPen !== undefined && aPen !== undefined) {
-      statsLine += `Penalties conceded ${homeName} ${hPen} / ${awayName} ${aPen}. `;
-    }
+      // Penalties conceded: plain integer string.
+      const hPen = getStat(hs, 'discipline', 'penalties_conceded');
+      const aPen = getStat(as, 'discipline', 'penalties_conceded');
+      if (hPen !== undefined && aPen !== undefined) {
+        statsLine += `Penalties conceded ${homeName} ${hPen} / ${awayName} ${aPen}. `;
+      }
 
-    // Cards: yellow + red, shown together as "1Y 0R" — only when both sides expose BOTH counts.
-    const hY = getStat(hs, 'discipline', 'yellow_cards');
-    const aY = getStat(as, 'discipline', 'yellow_cards');
-    const hR = getStat(hs, 'discipline', 'red_cards');
-    const aR = getStat(as, 'discipline', 'red_cards');
-    if (hY !== undefined && aY !== undefined && hR !== undefined && aR !== undefined) {
-      statsLine += `Cards ${homeName} ${hY}Y ${hR}R / ${awayName} ${aY}Y ${aR}R. `;
-    }
+      // Cards: yellow + red, shown together as "1Y 0R" — only when both sides expose BOTH counts.
+      const hY = getStat(hs, 'discipline', 'yellow_cards');
+      const aY = getStat(as, 'discipline', 'yellow_cards');
+      const hR = getStat(hs, 'discipline', 'red_cards');
+      const aR = getStat(as, 'discipline', 'red_cards');
+      if (hY !== undefined && aY !== undefined && hR !== undefined && aR !== undefined) {
+        statsLine += `Cards ${homeName} ${hY}Y ${hR}R / ${awayName} ${aY}Y ${aR}R. `;
+      }
 
-    if (statsLine) gameContext += `Match stats: ${statsLine}`;
+      if (statsLine) gameContext += `Match stats: ${statsLine}`;
 
-    // Recent events narrative, baked into gameContext (chronological, capped to bound the prompt).
-    // Mirrors the enriched-path injection's `<minute>' <type> <player>` format for consistency.
-    if (events.length) {
-      const recent = [...events]
-        .sort((a, b) => (a.minute ?? Infinity) - (b.minute ?? Infinity))
-        .slice(0, 14)
-        .map((e) => `${e.minute ?? '?'}' ${e.type}${e.player ? ` ${e.player}` : ''}`)
-        .join('; ');
-      if (recent) gameContext += ` Recent events: ${recent}`;
-    }
+      // Recent events narrative, baked into gameContext (chronological, capped to bound the prompt).
+      // Mirrors the enriched-path injection's `<minute>' <type> <player>` format for consistency.
+      if (events.length) {
+        const recent = [...events]
+          .sort((a, b) => (a.minute ?? Infinity) - (b.minute ?? Infinity))
+          .slice(0, 14)
+          .map((e) => `${e.minute ?? '?'}' ${e.type}${e.player ? ` ${e.player}` : ''}`)
+          .join('; ');
+        if (recent) gameContext += ` Recent events: ${recent}`;
+      }
 
-    const detail: MatchDetail = {
-      play: homeName && awayName ? `${homeName} v ${awayName}` : MATCH_EMPTY.play,
-      gameContext: gameContext.trim() || MATCH_EMPTY.gameContext,
-      homeTeam: homeName,
-      awayTeam: awayName,
-      events,
-    };
-    matchCache.set(matchId, { t: now, data: detail });
+      return {
+        play: homeName && awayName ? `${homeName} v ${awayName}` : MATCH_EMPTY.play,
+        gameContext: gameContext.trim() || MATCH_EMPTY.gameContext,
+        homeTeam: homeName,
+        awayTeam: awayName,
+        events,
+      };
+    });
+    matchCache.set(matchId, { t: now, data: detail });   // write-through L1
     return detail;
   } catch {
-    return MATCH_EMPTY; // best-effort: timeout / network / parse error → sane defaults, never throw
+    return MATCH_EMPTY; // best-effort: upstream/cache failure → sane defaults, never throw (not cached)
   }
 }
