@@ -30,6 +30,8 @@ const sportContext: Record<string, string> = {
   laliga: "La Liga — Spain's top soccer (association football) division. Key concepts: goal, assist, offside, penalty kick, free kick, corner, yellow/red card, possession, formation, relegation.",
   mlr: 'Major League Rugby (MLR) — the premier professional rugby union league in the United States and Canada. Key concepts: try (5 points), conversion (2 points), penalty kick (3 points), drop goal (3 points), scrum, lineout, ruck, maul, offside, tackle, breakdown.',
   nationscup: 'The World Rugby Nations Cup — an international rugby union tournament for emerging nations (e.g. USA, Uruguay, Georgia, Portugal, Samoa, Tonga, Romania, Spain). Rugby union basics for a newcomer: a try (5 points) is scored by grounding the ball over the opponent\'s line, then a conversion kick (2 points) follows; a penalty kick or drop goal is worth 3 points. Play restarts with a scrum (forwards bind and push for the ball) or a lineout (a throw-in down a tunnel of lifted players). Yellow cards mean 10 minutes in the sin bin; a red card is a send-off. Other key terms: ruck, maul, knock-on, offside, breakdown, tackle.',
+  sixnations: 'The Six Nations — the annual international rugby union championship between England, France, Ireland, Italy, Scotland and Wales. Key concepts: try (5 points), conversion (2 points), penalty kick (3 points), drop goal (3 points), scrum, lineout, ruck, maul, knock-on, offside, breakdown, tackle.',
+  nationschamp: 'The Rugby Nations Championship — an international rugby union competition between the top national teams. Key concepts: try (5 points), conversion (2 points), penalty kick (3 points), drop goal (3 points), scrum, lineout, ruck, maul, knock-on, offside, breakdown, tackle.',
   tennis: "Tennis is an individual racket sport. Scoring: love=0, 15, 30, 40, game. Sets won by first to 6 games (win by 2). Tiebreak at 6-6. Match won by best of 3 or 5 sets. Key terms: ace, fault, deuce, advantage, break, hold, rally, volley, baseline, net.",
   golf: 'Golf is an individual sport where players complete 18 holes using as few strokes as possible. Scoring relative to par: eagle=-2, birdie=-1, par=0, bogey=+1, double bogey=+2. Key terms: fairway, rough, green, hazard, bunker, driver, iron, wedge, putter, handicap, cut, stroke play, match play.',
   cricket: 'Cricket is a bat-and-ball sport between two teams of eleven. Key concepts: wicket, over (6 balls), runs, boundary (4/6), batting, bowling, LBW, duck, innings; formats include Test (up to 5 days), ODI, and T20.',
@@ -57,6 +59,9 @@ const espnConfig: Record<string, EspnCfg> = {
   // World Rugby Nations Cup (internal key 'nationscup', Zyla comp_id 726): NOT on ESPN. The
   // provider:'zyla' branch in fetchGameData diverts to fetchZylaGameData (Gate-1 stub until Gate 4).
   nationscup: { provider: 'zyla' },
+  // Filter-only ESPN rugby leagues (no top-level tile): same Core-API two-step fetch as URC/MLR.
+  sixnations: { sport: 'rugby', league: '180659', core: true },
+  nationschamp: { sport: 'rugby', league: '17567', core: true },
   // Drop-in site-API leagues sharing existing logic: WNBA uses the generic
   // scoreboard lastPlay (like NBA); EPL/La Liga reuse the soccer keyEvents path.
   wnba: { sport: 'basketball', league: 'wnba' },

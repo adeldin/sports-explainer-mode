@@ -24,7 +24,7 @@ export interface WatchCandidate {
 // keys are league-level. Without this, La Liga would rank as discovery after EPL.
 export const LEAGUE_TO_SPORT: Partial<Record<Sport, string>> = {
   epl: 'soccer', laliga: 'soccer', soccer: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', nationscup: 'rugby',
   nba: 'basketball', wnba: 'basketball',
   // mlb, nhl, nfl, tennis, golf, cricket → each its own parent (fallback to the key).
 };

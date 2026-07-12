@@ -810,6 +810,14 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
     label: allEn(`Common Rugby Questions`),
     questions: BASE_FAQS.rugby.questions,
   },
+  sixnations: {
+    label: allEn(`Common Rugby Questions`),
+    questions: BASE_FAQS.rugby.questions,
+  },
+  nationschamp: {
+    label: allEn(`Common Rugby Questions`),
+    questions: BASE_FAQS.rugby.questions,
+  },
   tennis: {
     label: allEn(`Common Tennis Questions`),
     questions: [

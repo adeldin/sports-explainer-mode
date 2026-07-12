@@ -76,6 +76,10 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   // World Rugby Nations Cup (internal key 'nationscup', comp_id 726) — Zyla-sourced, NOT on ESPN.
   // The provider:'zyla' branch in fetchScoreboard diverts to fetchZylaBoard before the ESPN path.
   nationscup: { provider: 'zyla' },
+  // Filter-only ESPN rugby leagues (NO top-level tile) — folded into the Rugby board via the league
+  // filter in a later gate. Same Core-API two-step fetch as URC/MLR (espnSport 'rugby').
+  sixnations: { espnSport: 'rugby', league: '180659', core: true },
+  nationschamp: { espnSport: 'rugby', league: '17567', core: true },
   // Learn Mode sports — tennis/golf fetch tournament context; cricket has no data source.
   tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
   golf: { espnSport: 'golf', league: 'pga', learnMode: true, liveFormat: 'leaderboard' },

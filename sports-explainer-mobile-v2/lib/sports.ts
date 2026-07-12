@@ -31,6 +31,7 @@ export const SPORT_FULL_NAME: Record<Sport, keyof UIStrings> = {
   soccer: 'spSoccer', worldcup: 'spWorldCup', rugby: 'spRugby',
   wnba: 'spWnba', epl: 'spPremierLeague', laliga: 'spLaLiga', mlr: 'spMlr',
   tennis: 'spTennis', golf: 'spGolf', cricket: 'spCricket', nationscup: 'spNationsCup',
+  sixnations: 'spSixNations', nationschamp: 'spNationsChamp',
 };
 
 // Reorder SPORTS by a user's saved key order (from AsyncStorage). Keeps saved

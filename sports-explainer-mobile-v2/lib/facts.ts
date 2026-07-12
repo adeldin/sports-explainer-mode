@@ -4,6 +4,17 @@ import { Sport } from './api';
 // "Quick Quiz". English-only for v1 (no translation layer yet); flag for native
 // localization before launch alongside the tennis/golf/cricket FAQ sets.
 
+// Rugby (URC) content, shared by the ESPN rugby leagues that reuse it (filter-only sixnations/nationschamp).
+const RUGBY_FACTS: string[] = [
+  "Rugby was invented in 1823 when William Webb Ellis picked up a soccer ball and ran with it.",
+  "The Rugby World Cup trophy is named the Webb Ellis Cup.",
+  "A rugby player runs approximately 4-7 km per game.",
+  "New Zealand's All Blacks have the best win percentage of any national team in any sport.",
+  "The haka performed by the All Blacks is a traditional Maori war dance.",
+  "A rugby ball is oval-shaped to make it easier to carry while running.",
+  "The 2023 Rugby World Cup was watched by over 2 billion people worldwide."
+];
+
 const FACTS: Record<Sport, string[]> = {
   mlb: [
     "A baseball has exactly 108 stitches — always hand-sewn.",
@@ -59,15 +70,9 @@ const FACTS: Record<Sport, string[]> = {
     "VAR was first used at the 2018 World Cup in Russia.",
     "The 2026 World Cup is hosted by USA, Canada, and Mexico."
   ],
-  rugby: [
-    "Rugby was invented in 1823 when William Webb Ellis picked up a soccer ball and ran with it.",
-    "The Rugby World Cup trophy is named the Webb Ellis Cup.",
-    "A rugby player runs approximately 4-7 km per game.",
-    "New Zealand's All Blacks have the best win percentage of any national team in any sport.",
-    "The haka performed by the All Blacks is a traditional Maori war dance.",
-    "A rugby ball is oval-shaped to make it easier to carry while running.",
-    "The 2023 Rugby World Cup was watched by over 2 billion people worldwide."
-  ],
+  rugby: RUGBY_FACTS,
+  sixnations: RUGBY_FACTS,
+  nationschamp: RUGBY_FACTS,
   mlr: [
     "Major League Rugby was founded in 2018 — one of the newest professional leagues in the USA.",
     "MLR is the first Division 1 professional rugby union league in the United States.",
@@ -150,6 +155,38 @@ export type QuizQuestion = {
   explanation: string;
   difficulty: 'kid' | 'beginner' | 'intermediate' | 'expert';
 };
+
+// Rugby (URC) quiz, shared by the ESPN rugby leagues that reuse it (filter-only sixnations/nationschamp).
+const RUGBY_QUIZ: QuizQuestion[] = [
+  { q: "How many players are on the field per team in rugby union?", options: ["13","14","15","16"], answer: 2, explanation: "Each rugby union team fields 15 players.", difficulty: "beginner" },
+  { q: "How many points is a try worth in rugby union?", options: ["3","4","5","6"], answer: 2, explanation: "A try is worth 5 points.", difficulty: "beginner" },
+  { q: "What does URC stand for?", options: ["United Rugby Championship","Universal Rugby Competition","United Rugby Cup","Unified Rugby Confederation"], answer: 0, explanation: "URC is the United Rugby Championship.", difficulty: "beginner" },
+  { q: "What is a 'scrum'?", options: ["A high tackle","A restart where the two packs of forwards bind and push for the ball","A type of kick","A scoring play"], answer: 1, explanation: "A scrum restarts play after a minor infringement — the forwards bind together and push to win the ball.", difficulty: "beginner" },
+  { q: "What is a 'maul' in rugby union?", options: ["A high tackle","A phase where the ball carrier is held up and players from both teams bind on, on their feet","A contested lineout","A collapsed scrum"], answer: 1, explanation: "A maul forms when the ball carrier is held up and teammates and opponents bind on while still on their feet.", difficulty: "intermediate" },
+  { q: "Which South African franchise won the inaugural URC title in 2021-22?", options: ["Lions","Sharks","Bulls","Stormers"], answer: 3, explanation: "The Stormers won the first United Rugby Championship in 2021-22.", difficulty: "intermediate" },
+  { q: "What does a yellow card mean in rugby union?", options: ["Ejection for the match","A 10-minute sin bin","A 5-minute suspension","A warning only"], answer: 1, explanation: "A yellow card sends a player to the sin bin for 10 minutes.", difficulty: "intermediate" },
+  { q: "When a player knocks the ball forward (a 'knock-on'), which team gets the scrum?", options: ["The team that knocked on","The opposing team","The team last touching the ball","The referee decides"], answer: 1, explanation: "A knock-on hands a scrum to the opposing team.", difficulty: "intermediate" },
+  { q: "What is 'pod' rugby in modern attacking tactics?", options: ["A fast-break three-man unit","Splitting forwards into small groups across the field to create multiple attack options","A kicking strategy","A defensive formation"], answer: 1, explanation: "Pod-based attack spreads forwards into small groups across the pitch, creating several simultaneous attacking threats.", difficulty: "expert" },
+  { q: "What is 'jackling' at the breakdown?", options: ["Kicking from behind the ruck","A turnover technique where a player on their feet steals the ball after a tackle","A maul formation","A counter-rucking move"], answer: 1, explanation: "Jackling is contesting the ball over a tackled player while staying on your feet — risky, since being off your feet concedes a penalty.", difficulty: "expert" },
+  { q: "What is a 'drift defense'?", options: ["Defenders pushing outward toward the touchline to deny space","Cover defense drifting to the ball carrier","A rush-up blitz","A maul defense"], answer: 0, explanation: "In a drift defense, defenders slide outward toward the touchline to shut down width and force play into the corner.", difficulty: "expert" },
+  { q: "What kind of ball is used in rugby?", options: ["An oval ball with pointy ends","A tiny marble","A flat square","A round bowling ball"], answer: 0, explanation: "Rugby uses an oval ball that looks like a chubby brown rocket you can hug and carry.", difficulty: "kid" },
+  { q: "What is the main goal in a rugby game?", options: ["Score more points than the other team","Sit on the grass the longest","Spin in circles","Yell the loudest"], answer: 0, explanation: "Both teams race to a bigger number on the big scoreboard.", difficulty: "kid" },
+  { q: "How does a team score a 'try' in rugby?", options: ["By touching the ball down over the other team's goal line","By kicking it into the crowd","By dropping the ball and walking away","By sitting on the ball"], answer: 0, explanation: "A try is carrying the ball over the line and putting it down, like planting a flag on new land.", difficulty: "kid" },
+  { q: "Where do rugby teams play?", options: ["On a big grassy field","On an icy rink","On a sandy beach","On a wooden stage"], answer: 0, explanation: "Rugby is played on a big grass field, like a giant backyard made for running.", difficulty: "kid" },
+  { q: "What do players mostly use to carry the ball?", options: ["Their hands and arms","Only their feet","Only their head","Only their knees"], answer: 0, explanation: "Players hug the ball with their hands and arms, like carrying a stuffed animal while you run.", difficulty: "kid" },
+  { q: "Which way are players allowed to pass the ball to teammates?", options: ["Sideways or backwards","Straight up into the sky","Only straight forward","Only into the crowd"], answer: 0, explanation: "You pass sideways or backwards, like handing a snack to the friend behind you in line.", difficulty: "kid" },
+  { q: "Can rugby players run while holding the ball?", options: ["Yes, they can carry it","No, they must roll it","Only if they hop on one foot","Only the referee can carry it"], answer: 0, explanation: "Players carry the ball and zoom forward like they're in a playground chase.", difficulty: "kid" },
+  { q: "What do teammates often do with the ball?", options: ["Pass it to each other","Hide it under the grass","Put it in a backpack","Trade it for snacks"], answer: 0, explanation: "Passing is like sharing a toy so the whole team can help.", difficulty: "kid" },
+  { q: "What does the other team try to do when someone has the ball?", options: ["Stop them safely","Give them a balloon","Move the field away","Sit down and clap"], answer: 0, explanation: "Stopping the runner is like a careful game of tag with rules.", difficulty: "kid" },
+  { q: "What are the tall H-shaped posts at each end of the field called?", options: ["Goalposts","Tree trunks","Flag poles","Ladders"], answer: 0, explanation: "The tall H-shaped posts are the goalposts — like giant doors you try to kick the ball through.", difficulty: "kid" },
+  { q: "What happens when a player kicks the ball through the goalposts?", options: ["Their team scores points","The game ends right away","Everyone must sit down","The ball isn't allowed anymore"], answer: 0, explanation: "Kicking it through the posts scores points, like winning bonus stars.", difficulty: "kid" },
+  { q: "What happens after a team scores a try?", options: ["They may get a special kick for extra points","Everyone switches to basketball","The ball turns blue","The game ends"], answer: 0, explanation: "After a try, the team may try a kick for extra points, like a bonus round.", difficulty: "kid" },
+  { q: "How many players are on the field for one rugby union team?", options: ["Fifteen","Three","Nine","Twenty"], answer: 0, explanation: "Fifteen players per team, like a whole class split into two big squads.", difficulty: "kid" },
+  { q: "What do rugby players wear on their feet to grip the grass?", options: ["Cleats","Ice skates","Slippers","Swim fins"], answer: 0, explanation: "Cleats have little grips underneath, like tiny teeth for the field.", difficulty: "kid" },
+  { q: "How does a rugby ball bounce?", options: ["In funny, surprising directions","Only straight up every time","Only backward into a box","It can't bounce at all"], answer: 0, explanation: "Because of its oval shape, the ball can bounce like it has a sneaky plan.", difficulty: "kid" },
+  { q: "What does a referee do in rugby?", options: ["Helps keep the game fair","Sells popcorn","Paints the goalposts","Chooses everyone's shoes"], answer: 0, explanation: "The referee is like a fair playground helper who watches the action.", difficulty: "kid" },
+  { q: "Where did rugby first begin, according to a popular story?", options: ["At Rugby School in England","On a spaceship","Under the ocean","In a treehouse"], answer: 0, explanation: "The story says a kid at Rugby School grabbed the ball and ran — starting a whole new game!", difficulty: "kid" },
+];
 
 export const QUIZ: Record<Sport, QuizQuestion[]> = {
   mlb: [
@@ -492,36 +529,9 @@ export const QUIZ: Record<Sport, QuizQuestion[]> = {
     { q: "What is a 'golden generation' in World Cup talk?", options: ["An unusually talented group of players from one nation at once","The oldest squad","The first-ever team","A youth tournament"], answer: 0, explanation: "A 'golden generation' describes a rare cluster of elite players a country produces around the same era, raising title hopes.", difficulty: "intermediate" },
     { q: "What does 'qualifying' for the World Cup involve?", options: ["Regional tournaments before the finals to earn a spot","An invitation only","A draft","Buying entry"], answer: 0, explanation: "Nations compete in confederation-based qualifying campaigns over months to earn one of the finals berths.", difficulty: "intermediate" },
   ],
-  rugby: [
-    { q: "How many players are on the field per team in rugby union?", options: ["13","14","15","16"], answer: 2, explanation: "Each rugby union team fields 15 players.", difficulty: "beginner" },
-    { q: "How many points is a try worth in rugby union?", options: ["3","4","5","6"], answer: 2, explanation: "A try is worth 5 points.", difficulty: "beginner" },
-    { q: "What does URC stand for?", options: ["United Rugby Championship","Universal Rugby Competition","United Rugby Cup","Unified Rugby Confederation"], answer: 0, explanation: "URC is the United Rugby Championship.", difficulty: "beginner" },
-    { q: "What is a 'scrum'?", options: ["A high tackle","A restart where the two packs of forwards bind and push for the ball","A type of kick","A scoring play"], answer: 1, explanation: "A scrum restarts play after a minor infringement — the forwards bind together and push to win the ball.", difficulty: "beginner" },
-    { q: "What is a 'maul' in rugby union?", options: ["A high tackle","A phase where the ball carrier is held up and players from both teams bind on, on their feet","A contested lineout","A collapsed scrum"], answer: 1, explanation: "A maul forms when the ball carrier is held up and teammates and opponents bind on while still on their feet.", difficulty: "intermediate" },
-    { q: "Which South African franchise won the inaugural URC title in 2021-22?", options: ["Lions","Sharks","Bulls","Stormers"], answer: 3, explanation: "The Stormers won the first United Rugby Championship in 2021-22.", difficulty: "intermediate" },
-    { q: "What does a yellow card mean in rugby union?", options: ["Ejection for the match","A 10-minute sin bin","A 5-minute suspension","A warning only"], answer: 1, explanation: "A yellow card sends a player to the sin bin for 10 minutes.", difficulty: "intermediate" },
-    { q: "When a player knocks the ball forward (a 'knock-on'), which team gets the scrum?", options: ["The team that knocked on","The opposing team","The team last touching the ball","The referee decides"], answer: 1, explanation: "A knock-on hands a scrum to the opposing team.", difficulty: "intermediate" },
-    { q: "What is 'pod' rugby in modern attacking tactics?", options: ["A fast-break three-man unit","Splitting forwards into small groups across the field to create multiple attack options","A kicking strategy","A defensive formation"], answer: 1, explanation: "Pod-based attack spreads forwards into small groups across the pitch, creating several simultaneous attacking threats.", difficulty: "expert" },
-    { q: "What is 'jackling' at the breakdown?", options: ["Kicking from behind the ruck","A turnover technique where a player on their feet steals the ball after a tackle","A maul formation","A counter-rucking move"], answer: 1, explanation: "Jackling is contesting the ball over a tackled player while staying on your feet — risky, since being off your feet concedes a penalty.", difficulty: "expert" },
-    { q: "What is a 'drift defense'?", options: ["Defenders pushing outward toward the touchline to deny space","Cover defense drifting to the ball carrier","A rush-up blitz","A maul defense"], answer: 0, explanation: "In a drift defense, defenders slide outward toward the touchline to shut down width and force play into the corner.", difficulty: "expert" },
-    { q: "What kind of ball is used in rugby?", options: ["An oval ball with pointy ends","A tiny marble","A flat square","A round bowling ball"], answer: 0, explanation: "Rugby uses an oval ball that looks like a chubby brown rocket you can hug and carry.", difficulty: "kid" },
-    { q: "What is the main goal in a rugby game?", options: ["Score more points than the other team","Sit on the grass the longest","Spin in circles","Yell the loudest"], answer: 0, explanation: "Both teams race to a bigger number on the big scoreboard.", difficulty: "kid" },
-    { q: "How does a team score a 'try' in rugby?", options: ["By touching the ball down over the other team's goal line","By kicking it into the crowd","By dropping the ball and walking away","By sitting on the ball"], answer: 0, explanation: "A try is carrying the ball over the line and putting it down, like planting a flag on new land.", difficulty: "kid" },
-    { q: "Where do rugby teams play?", options: ["On a big grassy field","On an icy rink","On a sandy beach","On a wooden stage"], answer: 0, explanation: "Rugby is played on a big grass field, like a giant backyard made for running.", difficulty: "kid" },
-    { q: "What do players mostly use to carry the ball?", options: ["Their hands and arms","Only their feet","Only their head","Only their knees"], answer: 0, explanation: "Players hug the ball with their hands and arms, like carrying a stuffed animal while you run.", difficulty: "kid" },
-    { q: "Which way are players allowed to pass the ball to teammates?", options: ["Sideways or backwards","Straight up into the sky","Only straight forward","Only into the crowd"], answer: 0, explanation: "You pass sideways or backwards, like handing a snack to the friend behind you in line.", difficulty: "kid" },
-    { q: "Can rugby players run while holding the ball?", options: ["Yes, they can carry it","No, they must roll it","Only if they hop on one foot","Only the referee can carry it"], answer: 0, explanation: "Players carry the ball and zoom forward like they're in a playground chase.", difficulty: "kid" },
-    { q: "What do teammates often do with the ball?", options: ["Pass it to each other","Hide it under the grass","Put it in a backpack","Trade it for snacks"], answer: 0, explanation: "Passing is like sharing a toy so the whole team can help.", difficulty: "kid" },
-    { q: "What does the other team try to do when someone has the ball?", options: ["Stop them safely","Give them a balloon","Move the field away","Sit down and clap"], answer: 0, explanation: "Stopping the runner is like a careful game of tag with rules.", difficulty: "kid" },
-    { q: "What are the tall H-shaped posts at each end of the field called?", options: ["Goalposts","Tree trunks","Flag poles","Ladders"], answer: 0, explanation: "The tall H-shaped posts are the goalposts — like giant doors you try to kick the ball through.", difficulty: "kid" },
-    { q: "What happens when a player kicks the ball through the goalposts?", options: ["Their team scores points","The game ends right away","Everyone must sit down","The ball isn't allowed anymore"], answer: 0, explanation: "Kicking it through the posts scores points, like winning bonus stars.", difficulty: "kid" },
-    { q: "What happens after a team scores a try?", options: ["They may get a special kick for extra points","Everyone switches to basketball","The ball turns blue","The game ends"], answer: 0, explanation: "After a try, the team may try a kick for extra points, like a bonus round.", difficulty: "kid" },
-    { q: "How many players are on the field for one rugby union team?", options: ["Fifteen","Three","Nine","Twenty"], answer: 0, explanation: "Fifteen players per team, like a whole class split into two big squads.", difficulty: "kid" },
-    { q: "What do rugby players wear on their feet to grip the grass?", options: ["Cleats","Ice skates","Slippers","Swim fins"], answer: 0, explanation: "Cleats have little grips underneath, like tiny teeth for the field.", difficulty: "kid" },
-    { q: "How does a rugby ball bounce?", options: ["In funny, surprising directions","Only straight up every time","Only backward into a box","It can't bounce at all"], answer: 0, explanation: "Because of its oval shape, the ball can bounce like it has a sneaky plan.", difficulty: "kid" },
-    { q: "What does a referee do in rugby?", options: ["Helps keep the game fair","Sells popcorn","Paints the goalposts","Chooses everyone's shoes"], answer: 0, explanation: "The referee is like a fair playground helper who watches the action.", difficulty: "kid" },
-    { q: "Where did rugby first begin, according to a popular story?", options: ["At Rugby School in England","On a spaceship","Under the ocean","In a treehouse"], answer: 0, explanation: "The story says a kid at Rugby School grabbed the ball and ran — starting a whole new game!", difficulty: "kid" },
-  ],
+  rugby: RUGBY_QUIZ,
+  sixnations: RUGBY_QUIZ,
+  nationschamp: RUGBY_QUIZ,
   mlr: [
     { q: "What does MLR stand for?", options: ["Major League Rugby","Major League Rugby Americas","Modern League Rugby","Major League Rugby Union"], answer: 0, explanation: "MLR is Major League Rugby, the top professional rugby union league in the United States.", difficulty: "beginner" },
     { q: "In what year was Major League Rugby founded?", options: ["2014","2016","2018","2020"], answer: 2, explanation: "Major League Rugby was founded in 2018.", difficulty: "beginner" },
