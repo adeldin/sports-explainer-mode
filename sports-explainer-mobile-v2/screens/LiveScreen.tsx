@@ -157,6 +157,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // game is in `games`.
   const selectedGame = games.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
+  // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
+  // coach/ask/feedback route by the tapped game — not the screen/tile sport. Falls back to the screen
+  // sport when no game is selected. Today (pre-merge) selectedGame.sport === sport, so this is a no-op;
+  // it installs the plumbing the merged Rugby board (B3) needs. Board/tile-level calls keep `sport`.
+  const selectedSport = (selectedGame?.sport as Sport | undefined) ?? sport;
   // Date strip anchors: today (labeled "TODAY" + centered) and the active day (selectedDate, or
   // today when null). Kept as local day-strings so they match the strip cells + the fetch filter.
   const todayDay = toLocalDayString(new Date());
@@ -298,7 +303,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     if (!selectedGameId) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const data = await fetchExplanation(sport, level, selectedGameId, language);
+      const data = await fetchExplanation(selectedSport, level, selectedGameId, language);
       if (isCancelled()) return; // superseded — don't commit a stale explanation
       // Fresh play, fresh card: clear live Q&A only when the play genuinely changed. A
       // same-play 60s refresh keeps the same key, so answers persist (matches the
@@ -335,7 +340,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setRefreshing(false);
       // (cap state handled above — see the recordExplanation gate)
     }
-  }, [sport, level, selectedGameId, language, caps.recordExplanation]);
+  }, [sport, selectedSport, level, selectedGameId, language, caps.recordExplanation]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -428,7 +433,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     if (feedbackGiven) return;
     setFeedbackGiven(true);
     fetchFeedback({
-      sport, level, language,
+      sport: selectedSport, level, language,
       gameId: selectedGameId,
       playKey: lastPlayKeyRef.current,
       playType: result?.playType ?? result?.rawPlay ?? '',
@@ -489,7 +494,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // states — off-season, or rugby/MLR with no games) so general questions like
       // "how long is a rugby match?" still get a sport+level answer, like Academy/FAQ.
       const context = result ? `${result.simple} ${result.whyItMatters || ''}` : '';
-      const answer = await askQuestion(question, sport, level, context, language);
+      const answer = await askQuestion(question, selectedSport, level, context, language);
       setAnswers(prev => prev.map(a => (a.id === id ? { ...a, answer, status: 'done' } : a)));
     } catch {
       setAnswers(prev => prev.map(a => (a.id === id ? { ...a, answer: S.answerError, status: 'error' } : a)));
@@ -621,7 +626,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setRecap(null); setRecapLoading(true);
     (async () => {
       try {
-        const r = await fetchRecap(sport, selectedGameId, level, language, caps.isPro);
+        const r = await fetchRecap(selectedSport, selectedGameId, level, language, caps.isPro);
         if (cancelled()) return;
         setRecap(r);
       } catch (e) {
@@ -633,7 +638,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       }
     })();
     return () => { recapReqRef.current++; };
-  }, [selectedGameId, sport, level, language, isFinal, caps.isPro]);
+  }, [selectedGameId, sport, selectedSport, level, language, isFinal, caps.isPro]);
   // Cached FAQ answers are specific to sport/level/language — reset when they change.
   useEffect(() => {
     setActiveFaq(null); setFaqAnswers({}); setFaqExpanded(false);
@@ -968,7 +973,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
               </View>
             ) : recap && hasRecapContent(recap) ? (
-              <RecapCard recap={recap} isPro={caps.isPro} sport={sport} language={language} onUnlock={presentPaywall} />
+              <RecapCard recap={recap} isPro={caps.isPro} sport={selectedSport} language={language} onUnlock={presentPaywall} />
             ) : !recapLoading ? (
               <View style={styles.capCard}><Text style={styles.capBody}>{S.recapNoData}</Text></View>
             ) : null
@@ -1036,8 +1041,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   // collapsed (the paid Groq read fires only on the user's next expand — bounds cost).
                   // Same-play 60s refreshes keep the same key (lastPlayKeyRef only changes on a new
                   // play, set before setResult), so the card doesn't churn on routine polls.
-                  key={`coach|${sport}|${selectedGameId}|${lastPlayKeyRef.current}|${level}|${language}`}
-                  sport={sport}
+                  key={`coach|${selectedSport}|${selectedGameId}|${lastPlayKeyRef.current}|${level}|${language}`}
+                  sport={selectedSport}
                   gameId={selectedGameId}
                   level={level}
                   language={language}
