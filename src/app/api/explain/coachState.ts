@@ -209,9 +209,86 @@ ${userGuardLine} Substance or honest brevity; never platitudes, never invented d
   return { system, user };
 }
 
+// Rugby (nationscup) — the Pro 'full' coaching read, built from the RugbyPulse (structured Zyla team
+// stats + minute) ONLY. Same {strategicRead, whatItSetsUp} JSON shape. These are REAL stats, so the
+// guardrail is "cite the numbers, never invent" — but rugby-union-specific tactical meaning + hard
+// anti-fabrication rules (no invented territory geography, phases, players, subs, momentum).
+export function buildRugbyCoachPrompt(s: CoachSituation, level: string, language: string) {
+  const langLine = language && language !== 'en' ? ` Respond entirely in ${langNamesMap[language] || language}.` : '';
+  const rp = s.rugbyPulse!;
+  const hs = rp.homeStats;
+  const as = rp.awayStats;
+  const home = s.homeTeam, away = s.awayTeam;
+
+  const facts: string[] = [];
+  const minute = rp.minute ? `${rp.minute}'` : (s.statusDetail || 'Live');
+  facts.push(`Score: ${home} ${s.homeScore} - ${away} ${s.awayScore} (${minute})`);
+
+  // A stat line is included ONLY when BOTH sides expose the value (mirrors soccer's both-present gate).
+  const both = (pick: (t: RugbyTeamStats) => number | undefined): [number, number] | null => {
+    const h = hs ? pick(hs) : undefined;
+    const a = as ? pick(as) : undefined;
+    return (h != null && a != null) ? [h, a] : null;
+  };
+  let v: [number, number] | null;
+  if ((v = both(t => t.possessionPct)))       facts.push(`Possession: ${home} ${v[0]}% - ${away} ${v[1]}%`);
+  if ((v = both(t => t.penaltiesConceded)))   facts.push(`Penalties conceded: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if (hs && as && hs.yellowCards != null && hs.redCards != null && as.yellowCards != null && as.redCards != null)
+    facts.push(`Cards: ${home} ${hs.yellowCards}Y ${hs.redCards}R - ${away} ${as.yellowCards}Y ${as.redCards}R`);
+  if ((v = both(t => t.turnoversWon)))        facts.push(`Turnovers won: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if ((v = both(t => t.turnoversConceded)))   facts.push(`Turnovers conceded: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if (hs && as && hs.lineoutsWon != null && hs.lineoutsLost != null && as.lineoutsWon != null && as.lineoutsLost != null)
+    facts.push(`Lineouts: ${home} ${hs.lineoutsWon} won / ${hs.lineoutsLost} lost - ${away} ${as.lineoutsWon} won / ${as.lineoutsLost} lost`);
+  if (hs && as && hs.scrumsWon != null && hs.scrumsLost != null && as.scrumsWon != null && as.scrumsLost != null)
+    facts.push(`Scrums: ${home} ${hs.scrumsWon} won / ${hs.scrumsLost} lost - ${away} ${as.scrumsWon} won / ${as.scrumsLost} lost`);
+  if (hs && as && hs.gainLineCrossed != null && hs.gainLineFailed != null && as.gainLineCrossed != null && as.gainLineFailed != null)
+    facts.push(`Gain-line: ${home} ${hs.gainLineCrossed} made / ${hs.gainLineFailed} not - ${away} ${as.gainLineCrossed} made / ${as.gainLineFailed} not`);
+  if ((v = both(t => t.cleanBreaks)))         facts.push(`Clean breaks: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if ((v = both(t => t.carriesMetres)))       facts.push(`Metres carried: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if ((v = both(t => t.offloads)))            facts.push(`Offloads: ${home} ${v[0]} - ${away} ${v[1]}`);
+  if (hs && as && hs.tackles != null && hs.missedTackles != null && as.tackles != null && as.missedTackles != null)
+    facts.push(`Tackles: ${home} ${hs.tackles} (${hs.missedTackles} missed) - ${away} ${as.tackles} (${as.missedTackles} missed)`);
+
+  const hasStats = facts.length > 2;
+  const thinNote = hasStats ? '' : ' Only the scoreline and clock are available this update (no paired team stats) — reason from those alone and keep it brief.';
+
+  const system = `You are a knowledgeable rugby union coach sitting beside a ${level}-level fan, teaching like Khan Academy — NOT a hype broadcaster.${langLine}
+Your job: the STRATEGIC WHY of the match RIGHT NOW — what the scoreline, clock, and the team stats reveal about how each side is winning or losing the tactical battle — then what to watch next. Walk the reasoning out loud so the viewer could read the next moment themselves. Meet them at their level: ${levelGuide[level] || levelGuide.beginner}.
+RUGBY UNION TACTICAL LOGIC (reason from the stats using these meanings):
+- High penalties conceded = handing over territory, kickable points, lineout platforms, pressure relief; costly near own line.
+- Turnovers WON = breakdown pressure, kills opponent multi-phase attack, short-field chances. Turnovers CONCEDED = attack failing to secure ruck ball. ALWAYS state who wins vs concedes — never confuse them.
+- Lost OWN lineouts = major platform problem (lineout is a designed restart; losing your throw loses a clean attack/exit).
+- Scrum losses = wrecked exits, conceded penalties, shaky restarts.
+- Possession without a clean-breaks/metres edge = territorial/patient control or organized-but-blunt attack, NOT necessarily dominance. Lower possession + higher clean breaks = efficient, dangerous in transition.
+- Many tackles + many missed = long defensive stretches + leakage; high tackle count alone is NOT praise.
+- Kicking is a tactical CHOICE (territory, chase pressure, forcing exits) — never frame it as weakness.
+HARD RULES (never break):
+- This is rugby UNION (15s), NOT league: no "six tackles," no play-the-ball, no league possession cycles.
+- Reason ONLY from the stats + scoreline + minute provided. NEVER invent field zones/territory geography, specific plays, players, phases, momentum, crowd, weather, referee, injuries, or subs not in the facts.
+- Possession does NOT equal control. Do NOT claim exact territory (you MAY say "this may be handing over field position," never exact geography).
+- Mention at most 2-3 tactical levers — do NOT list every stat.
+- Only use "momentum" if multiple stats concretely support it.
+- Prefer causal wording ("because," "which suggests"). If the evidence is mixed, say so.
+- NEVER invent a player, a play, or a stat that is not in the facts. Explain any jargon in plain terms.
+HOW TO WRITE THE READ (craft — this is what separates a real read from filler):
+- LEAD WITH THE INSIGHT, not the setup. Open with the strategic point itself and weave the state in. Do NOT open with a "Given the score…", "Since [team] leads…", or "With 40 minutes played…" preamble. Vary the opening — never reuse the same scaffolding.
+- ANCHOR ON THE STAT THAT MATTERS. When one lever is clearly driving the game — a lopsided penalty count, lost lineouts, a turnover edge — TEACH from it concretely (e.g. lost own lineouts → "losing your own throw hands back the clean attacking platform and forces scrappy exits"), instead of vaguely noting "the stats are interesting."
+- LOW-ANGLE STATES → BE BRIEF, NOT PADDED. When the stats are even and nothing is forcing a hand, the CORRECT read is ONE crisp sentence stating that plainly — never three sentences of hedging. Honest brevity is the GOAL for a flat state, not a fallback.
+- BANNED FILLER — never write these or anything close to them: "feeling okay about their chances", "won't change their approach too much", "crucial to watch", "the next phase will be important", "introduce an element of unpredictability", "both teams will be looking to", "anything can happen", "it's all to play for", "big moments".`;
+  const user = `Here is the live match data (the ONLY facts you may use):
+${facts.join('\n')}
+
+Respond as JSON with EXACTLY these fields: { "strategicRead", "whatItSetsUp" }.
+- "strategicRead": the strategic why of the CURRENT state at a ${level} level — 2-4 sentences (roughly: one on the game state, one on the clearest tactical driver in the stats, one on why it matters for a newcomer). LEAD with the point (no "given the situation" preamble). If the state is flat/even: ONE crisp honest sentence.${thinNote}
+- "whatItSetsUp": what to watch for NEXT and why — 1-2 sentences tied to a real next tactical consequence of the stats above, NOT a dressed-up prediction.
+Empty string for a field if there is nothing honest to say. Substance or honest brevity; never platitudes, never invented detail.`;
+  return { system, user };
+}
+
 // Khan-voiced, never-platitude, never-fabricate coaching prompt. Pure.
 export function buildCoachPrompt(s: CoachSituation, sport: string, level: string, language: string) {
   if (SOCCER.has(sport) && s.pulse) return buildSoccerCoachPrompt(s, level, language);   // Gate C: pulse-derived read
+  if (sport === 'nationscup' && s.rugbyPulse) return buildRugbyCoachPrompt(s, level, language);   // rugby: Zyla-stats read
   const langNames: Record<string, string> = { es: 'Spanish', fr: 'French', pt: 'Portuguese', de: 'German', it: 'Italian', ja: 'Japanese', zh: 'Chinese', ko: 'Korean', ar: 'Arabic' };
   const langLine = language && language !== 'en' ? ` Respond entirely in ${langNames[language] || language}.` : '';
   const facts: string[] = [`${s.awayTeam} ${s.awayScore} – ${s.homeTeam} ${s.homeScore}`];
