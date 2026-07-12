@@ -27,6 +27,17 @@
   let openGlossaryTerm = null;  // which glossary term's definition box is open (Tier E)
   let lastRenderedSimple = null; // last explanation text rendered (skip re-segmenting identical polls)
 
+  // ── Entitlement + free-tier caps (mirrors the iOS app: lib/entitlement.tsx + lib/caps.ts) ──
+  // sePro is the ONE boolean every gate consults. Kept current by refreshProState() and by the
+  // Account flows (sign-in / sign-out). Trials count as Pro, exactly as on iOS.
+  let sePro = false;
+  // Persisted cap counters (raw, isPro-agnostic — the decision lives in caps.js, never here).
+  let seDailyCap = { date: '', count: 0, keys: [] };  // seeded from SE_CAPS.EMPTY_DAILY on load
+  let seGameQA = { gameId: '', count: 0 };            // seeded from SE_CAPS.EMPTY_GAME on load
+  // NOTE: these client counters are COSMETIC — they drive the experience (the "N left" pill, the
+  // upsell), not security. They're trivially bypassable by editing chrome.storage.local. Real
+  // enforcement is a later server-side phase; don't ship to paying users until it exists.
+
   // ─────────────────────────────────────────
   // DEFAULT SETTINGS
   // ─────────────────────────────────────────
@@ -118,7 +129,10 @@
   // LOAD SETTINGS
   // ─────────────────────────────────────────
   function loadSettings(callback) {
-    chrome.storage.local.get(['seSettings'], (data) => {
+    // One get for settings + the two cap counters + the entitlement cache (written by
+    // background.js). Reading the cache here means sePro is already right on the FIRST fetch —
+    // refreshProState() then revalidates it against the server in the background.
+    chrome.storage.local.get(['seSettings', 'seDailyCap', 'seGameQA', 'seEntitlement'], (data) => {
       if (data.seSettings) {
         settings = { ...settings, ...data.seSettings };
         currentLevel = settings.level;
@@ -127,12 +141,34 @@
       // Force the brand orange AFTER the merge so a pre-brand-pass stored red ('#cc0000') can't win.
       // Self-heals every accent element; re-persists as orange on the next saveSettings.
       settings.accentColor = '#e87722';
+
+      const CAPS = window.SE_CAPS;
+      seDailyCap = data.seDailyCap || (CAPS ? { ...CAPS.EMPTY_DAILY } : { date: '', count: 0, keys: [] });
+      seGameQA = data.seGameQA || (CAPS ? { ...CAPS.EMPTY_GAME } : { gameId: '', count: 0 });
+      sePro = !!(data.seEntitlement && data.seEntitlement.isPro);
+
+      refreshProState();   // revalidate entitlement (async; updates sePro + re-renders indicators)
       if (callback) callback();
     });
   }
 
   function saveSettings() {
     chrome.storage.local.set({ seSettings: settings });
+  }
+
+  // Cap-counter persistence — same fire-and-forget style as saveSettings.
+  function saveDailyCap() { chrome.storage.local.set({ seDailyCap }); }
+  function saveGameQA() { chrome.storage.local.set({ seGameQA }); }
+
+  // Pull the current entitlement from background (15-min cached there; force=false). Safe to call
+  // often. Not signed in → not Pro.
+  function refreshProState() {
+    if (!chrome.runtime?.id) return;
+    chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
+      if (chrome.runtime.lastError) return;         // service worker asleep / no receiver — keep cache
+      sePro = !!(ent && ent.isPro);
+      renderCapIndicators();                        // Pro → pills disappear immediately
+    });
   }
 
   // ─────────────────────────────────────────
@@ -187,6 +223,75 @@
       teal: '#14b8a6'
     };
     return settings.theme === 'light' ? light : dark;
+  }
+
+  // ─────────────────────────────────────────
+  // PRO-GATE VISUALS (shared by the daily-cap card, the ask-cap row, and the recap locked rows,
+  // so "🔒 locked header = Pro content" is learned ONCE — mirrors the app's <LockedSection>).
+  // Every rule carries !important: host-page-CSS defense, same as the rest of the overlay.
+  // ─────────────────────────────────────────
+  const AMBER = '#f0a500';   // scarcity pill — warning, not error (never red)
+
+  // A locked Pro section: 🔒 title over greyed skeleton bars. No real content, no fetch.
+  function lockedRowHtml(label) {
+    const t = getThemeColors();
+    const bar = (w) => `<div style="height:8px!important;width:${w}!important;background:${t.settingsItemBg}!important;border:1px solid ${t.settingsItemBorder}!important;border-radius:4px!important;margin-bottom:4px!important;"></div>`;
+    return `<div style="margin:0 0 9px!important;">` +
+      `<div class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${t.subtext}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 4px!important;">🔒 ${label}</div>` +
+      bar('92%') + bar('78%') +
+    `</div>`;
+  }
+
+  // An unlocked (Pro) recap section — same eyebrow rhythm as the rest of the card. Built via DOM
+  // with textContent (NEVER innerHTML of response text — same rule as renderExplanation).
+  function proRowEl(label, text) {
+    const t = getThemeColors();
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin:0 0 9px!important;';
+    const h = document.createElement('div');
+    h.className = 'se-section-h';
+    h.style.cssText = `font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;`;
+    h.textContent = label;
+    const body = document.createElement('div');
+    body.style.cssText = `font-size:0.85em!important;line-height:1.4!important;color:${t.subtext}!important;`;
+    body.textContent = text;
+    wrap.appendChild(h); wrap.appendChild(body);
+    return wrap;
+  }
+
+  // The one primary "go Pro" button style (accent-filled).
+  function proBtnHtml(id, label) {
+    return `<button id="${id}" style="width:100%!important;box-sizing:border-box!important;padding:8px!important;margin-top:4px!important;background:${settings.accentColor}!important;color:#fff!important;border:none!important;border-radius:6px!important;font-size:0.85em!important;font-weight:700!important;cursor:pointer!important;">${label}</button>`;
+  }
+
+  // ONE upgrade entry point for every Pro CTA (cap card, ask row, recap). When the real purchase
+  // flow lands (signed-in email as app_user_id + force-refresh entitlement on return), it changes
+  // HERE and nowhere else.
+  const PURCHASE_LINK_URL = ''; // TODO: wire the App Store / web purchase link, then this opens it.
+  function openUpgrade() {
+    markActivity();
+    if (PURCHASE_LINK_URL) {
+      window.open(PURCHASE_LINK_URL, '_blank', 'noopener');
+      return;
+    }
+    showToast('Pro is coming soon — thanks for your interest!');
+  }
+
+  // Minimal transient toast inside the overlay (used by the openUpgrade stub).
+  function showToast(text) {
+    if (!overlayEl) return;
+    const t = getThemeColors();
+    let el = document.getElementById('se-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'se-toast';
+      el.style.cssText = `position:absolute!important;left:50%!important;bottom:14px!important;transform:translateX(-50%)!important;z-index:10!important;padding:7px 12px!important;border-radius:14px!important;background:${t.settingsBg}!important;color:${t.text}!important;border:1px solid ${t.border}!important;font-size:0.75em!important;font-weight:600!important;box-shadow:0 3px 12px rgba(0,0,0,0.28)!important;pointer-events:none!important;`;
+      overlayEl.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.display = 'block';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => { if (el) el.style.display = 'none'; }, 2600);
   }
 
   // Section headers + teams title are theme-aware for contrast: brand orange headers /
@@ -433,6 +538,21 @@
           <!-- LIVE / scheduled content — hidden and replaced by the recap block for Final games -->
           <div id="se-live-content">
             <button id="se-back-to-live" style="display:none!important;background:none!important;border:none!important;padding:0!important;margin:0 0 6px!important;font-size:0.72em!important;font-weight:700!important;color:${t.teal}!important;cursor:pointer!important;">▶ Back to live</button>
+
+            <!-- 6a. DAILY-CAP CARD — replaces the explanation when a free user hits the daily limit.
+                 Positive framing + locked rows echoing the real card + one Pro CTA + a still-free
+                 surface (play-by-play). Shown/hidden by showDailyCapCard()/hideDailyCapCard(). -->
+            <div id="se-cap-card" style="display:none!important;">
+              <div class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 4px!important;">🔒 Daily limit reached</div>
+              <p id="se-cap-body" style="font-size:0.92em!important;line-height:1.5!important;margin:0 0 10px!important;color:${t.text}!important;">You've explored ${window.SE_CAPS ? window.SE_CAPS.DAILY_FREE : 5} plays today — nice work. Keep going with Pro for unlimited explanations.</p>
+              ${lockedRowHtml('What Happened')}${lockedRowHtml('Why It Matters')}${lockedRowHtml('The Rule')}
+              ${proBtnHtml('se-cap-upgrade', 'Unlock unlimited with Pro')}
+              <button id="se-cap-pbp" style="width:100%!important;background:none!important;border:none!important;padding:7px 0 0!important;font-size:0.75em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Browse the play-by-play — still free →</button>
+            </div>
+
+            <!-- 6d. Scarcity pill — amber, only when a free user has ≤2 explanations left today. -->
+            <div id="se-cap-pill" style="display:none!important;margin:0 0 6px!important;"><span id="se-cap-pill-text" style="display:inline-block!important;font-size:0.62em!important;font-weight:700!important;color:#0d1b3e!important;background:${AMBER}!important;padding:2px 8px!important;border-radius:10px!important;letter-spacing:0.04em!important;"></span></div>
+
             <div id="se-h-what" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 3px!important;">What Happened</div>
             <p id="se-explanation" style="font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;">Fetching latest play...</p>
 
@@ -472,9 +592,10 @@
             <div id="se-h-recap" class="se-section-h" style="font-size:0.68em!important;font-weight:700!important;color:${sectionHeaderColor()}!important;text-transform:uppercase!important;letter-spacing:0.08em!important;margin:0 0 4px!important;">Recap</div>
             <div id="se-recap-score" style="display:none!important;font-size:1.15em!important;font-weight:800!important;color:${t.text}!important;margin:0 0 8px!important;"></div>
             <p id="se-recap-story" style="display:none!important;font-size:1em!important;line-height:1.5!important;margin:0 0 8px!important;color:${t.text}!important;"></p>
-            <!-- Pro-upsell teaser goes HERE: response.turningPoint / keyPerformance / whyItMattered are
-                 Pro-gated and ALWAYS empty for the free extension → intentionally NOT rendered today.
-                 When entitlement lands, render these as locked/teaser rows in this spot. -->
+            <!-- The 3 Pro narrative fields (turningPoint / keyPerformance / whyItMattered).
+                 Pro → real sections; free → locked teaser rows + upsell. Filled by
+                 renderRecapProSections(); empty until a recap loads. -->
+            <div id="se-recap-pro" style="display:none!important;"></div>
             <button id="se-recap-link" style="display:none!important;background:none!important;border:none!important;padding:0!important;font-size:0.85em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Read full recap ↗</button>
           </div>
         </div>
@@ -486,10 +607,20 @@
               ${CHIPS.map(c => `<button class="se-chip" data-q="${c.q}" style="background:${t.selectBg}!important;color:${t.text}!important;border:1px solid ${t.inputBorder}!important;border-radius:12px!important;padding:4px 9px!important;font-size:0.72em!important;font-weight:600!important;cursor:pointer!important;white-space:nowrap!important;">${c.label}</button>`).join('')}
             </div>
           </div>
-          <div style="display:flex!important;gap:6px!important;">
+          <div id="se-ask-input-row" style="display:flex!important;gap:6px!important;">
             <input id="se-question-input" type="text" placeholder="Ask anything..." style="flex:1!important;padding:6px 10px!important;background:${t.inputBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:0.92em!important;outline:none!important;"/>
             <button id="se-ask-btn" style="padding:6px 12px!important;background:${settings.accentColor}!important;color:white!important;border:none!important;border-radius:6px!important;font-size:0.92em!important;font-weight:700!important;cursor:pointer!important;">Ask</button>
           </div>
+
+          <!-- 6b. ASK-CAP ROW — replaces the ask input when a free user hits the per-game limit. -->
+          <div id="se-ask-cap-row" style="display:none!important;padding:8px 10px!important;background:${t.answerBg}!important;border-radius:6px!important;border-left:3px solid ${AMBER}!important;">
+            <div style="font-size:0.8em!important;font-weight:700!important;color:${t.text}!important;margin-bottom:2px!important;">That's ${window.SE_CAPS ? window.SE_CAPS.QA_FREE_PER_GAME : 3} questions this game.</div>
+            <div style="font-size:0.75em!important;line-height:1.4!important;color:${t.subtext}!important;margin-bottom:6px!important;">Unlock unlimited questions with Pro — or pick another game for a fresh set.</div>
+            ${proBtnHtml('se-ask-cap-upgrade', 'Unlock unlimited questions →')}
+          </div>
+
+          <!-- 6d (Q&A). Scarcity hint — only when a free user has ≤1 question left in this game. -->
+          <div id="se-qa-hint" style="display:none!important;margin-top:5px!important;font-size:0.68em!important;font-weight:600!important;color:${AMBER}!important;"></div>
           <div id="se-answer-box" style="display:none!important;margin-top:7px!important;padding:8px 10px!important;background:${t.answerBg}!important;border-radius:6px!important;border-left:3px solid ${settings.accentColor}!important;font-size:0.92em!important;line-height:1.5!important;color:${t.text}!important;"></div>
         </div>
 
@@ -525,6 +656,17 @@
         if (!wasIdle) fetchLatestPlay();  // otherwise it's just a normal manual refresh
       });
       
+      // ── Pro CTAs (every one routes through the single openUpgrade()) ──
+      document.getElementById('se-cap-upgrade').addEventListener('click', openUpgrade);
+      document.getElementById('se-ask-cap-upgrade').addEventListener('click', openUpgrade);
+      // Capped users keep a free surface: jump to the (free) play-by-play list.
+      document.getElementById('se-cap-pbp').addEventListener('click', () => {
+        const section = document.getElementById('se-pbp-section');
+        if (section) section.style.display = 'block';
+        if (!pbpExpanded) togglePbp();
+        section?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+
       document.getElementById('se-source-toggle').addEventListener('click', () => {
         const box = document.getElementById('se-source-box');
         const btn = document.getElementById('se-source-toggle');
@@ -716,7 +858,7 @@
   // fetching (saves /api/explain tokens). Otherwise do the normal fetch.
   function pollTick() {
     if (Date.now() - lastInteraction >= IDLE_TIMEOUT_MS) { pauseForIdle(); return; }
-    fetchLatestPlay();
+    fetchLatestPlay(true);   // AUTO-refresh → never consumes a daily credit (see caps.js)
   }
 
   // Trigger 2 pause: stop the timer and show an unobtrusive paused state in the status line.
@@ -735,7 +877,7 @@
     idlePaused = false;
     lastInteraction = Date.now();
     if (document.hidden || !overlayVisible || isMinimized) return;
-    fetchLatestPlay();      // ONE immediate fetch on resume
+    fetchLatestPlay(true);  // ONE immediate fetch on resume — automatic, so it must not consume
     restartPollInterval();  // then the normal gameContext-derived cadence
   }
 
@@ -993,7 +1135,9 @@
           // was just cleared on sign-in) so the badge is correct without a panel reopen.
           renderAccount({ signedIn: true, email: res.email, isPro: false });
           chrome.runtime.sendMessage({ action: 'checkEntitlement', force: true }, (ent) => {
-            renderAccount({ signedIn: true, email: res.email, isPro: !!(ent && ent.isPro), isTrial: !!(ent && ent.isTrial) });
+            sePro = !!(ent && ent.isPro);   // gates unlock immediately on sign-in, no reload
+            renderAccount({ signedIn: true, email: res.email, isPro: sePro, isTrial: !!(ent && ent.isTrial) });
+            renderCapIndicators();
           });
         } else {
           setAuthMsg('Incorrect or expired code.');
@@ -1005,7 +1149,9 @@
   function doSignOut() {
     chrome.runtime.sendMessage({ action: 'authSignOut' }, () => {
       seAuthPhase = 'email';
+      sePro = false;              // back to the free tier immediately
       renderAccount({ signedIn: false });
+      renderCapIndicators();      // pills/limits reappear if the free allowance is spent
     });
   }
 
@@ -1018,10 +1164,14 @@
         chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
           if (ent && ent.signedIn === false) {
             seAuthPhase = 'email';
+            sePro = false;
             renderAccount({ signedIn: false });
+            renderCapIndicators();
             return;
           }
-          renderAccount({ signedIn: true, email: res.email, isPro: !!(ent && ent.isPro), isTrial: !!(ent && ent.isTrial) });
+          sePro = !!(ent && ent.isPro);
+          renderAccount({ signedIn: true, email: res.email, isPro: sePro, isTrial: !!(ent && ent.isTrial) });
+          renderCapIndicators();
         });
       } else {
         seAuthPhase = 'email';
@@ -1278,7 +1428,8 @@
     setStatusFetching();
     try {
       const response = await chrome.runtime.sendMessage({
-        action: 'recap', sport: currentSport, gameId: currentGameId, level: settings.level, language: settings.language
+        action: 'recap', sport: currentSport, gameId: currentGameId, level: settings.level, language: settings.language,
+        isPro: sePro   // backend withholds turningPoint/keyPerformance/whyItMattered unless true
       });
       if (response) {
         const scoreEl = document.getElementById('se-recap-score');
@@ -1306,12 +1457,14 @@
           }
         }
 
-        // NOTE: response.turningPoint / keyPerformance / whyItMattered are Pro-gated and ALWAYS
-        // empty for the free extension — intentionally NOT rendered. Future Pro-upsell teaser (locked
-        // rows) belongs in the marked spot in the #se-recap-content markup above.
+        // The 3 narrative fields are Pro-gated SERVER-side (the backend only sends them when
+        // isPro:true), so this is a real gate, not a cosmetic one. Pro → render them; free →
+        // locked teaser rows + upsell.
+        renderRecapProSections(response);
 
         currentPlayText = [response.score, response.story].filter(Boolean).join(' — '); // Ask context
         setStatusReady(!!response.score, '✅ Final');
+        renderCapIndicators();   // Ask is still per-game capped while viewing a recap
       }
     } catch (err) {
       setStatusError('Recap failed');
@@ -1373,7 +1526,128 @@
     if (box) box.style.display = 'none';
   }
 
-  async function fetchLatestPlay() {
+  // ─────────────────────────────────────────
+  // FREE-TIER CAP UX (gate → offer, never a hard block)
+  // ─────────────────────────────────────────
+  // The play sections the cap card stands in for. Play-by-Play is deliberately NOT hidden —
+  // it stays free and reachable, so a capped user still has somewhere to go.
+  const CAP_HIDDEN_IDS = ['se-h-what', 'se-explanation', 'se-glossary-box', 'se-h-why', 'se-why',
+                          'se-h-rule', 'se-rule', 'se-source-container', 'se-cap-pill'];
+
+  function showDailyCapCard() {
+    const card = document.getElementById('se-cap-card');
+    if (!card) return;
+    CAP_HIDDEN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    card.style.display = 'block';
+    // The free-surface link only makes sense where a play-by-play list exists (soccer/rugby/
+    // worldcup have none — the link would open an empty section).
+    const pbpLink = document.getElementById('se-cap-pbp');
+    if (pbpLink) pbpLink.style.display = PLAYS_SPORTS.includes(currentSport) ? 'block' : 'none';
+    lastRenderedSimple = null;   // force a fresh render when the user unblocks (re-read / Pro)
+  }
+
+  function hideDailyCapCard() {
+    const card = document.getElementById('se-cap-card');
+    if (card) card.style.display = 'none';
+    // Only restore the ALWAYS-shown sections; why/rule/glossary manage their own visibility in
+    // the render below (they're conditional on the response).
+    ['se-h-what', 'se-explanation', 'se-source-container'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'block';
+    });
+  }
+
+  function showAskCapRow() {
+    const row = document.getElementById('se-ask-cap-row');
+    const inputRow = document.getElementById('se-ask-input-row');
+    const hint = document.getElementById('se-qa-hint');
+    if (inputRow) inputRow.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    if (row) row.style.display = 'block';
+  }
+
+  function hideAskCapRow() {
+    const row = document.getElementById('se-ask-cap-row');
+    const inputRow = document.getElementById('se-ask-input-row');
+    if (row) row.style.display = 'none';
+    if (inputRow) inputRow.style.display = 'flex';
+  }
+
+  // The subtle scarcity indicators. Pro → dailyRemaining/gameQARemaining return Infinity, so both
+  // are hidden and the ask box is always restored. Safe to call often (idempotent).
+  function renderCapIndicators() {
+    const CAPS = window.SE_CAPS;
+    if (!CAPS || !overlayEl) return;
+
+    // Daily explanations — amber pill at ≤2 left.
+    const left = CAPS.dailyRemaining(seDailyCap, CAPS.localDateStr(new Date()), sePro);
+    const pill = document.getElementById('se-cap-pill');
+    const pillText = document.getElementById('se-cap-pill-text');
+    const capCardOpen = (document.getElementById('se-cap-card') || {}).style?.display === 'block';
+    if (pill && pillText) {
+      if (Number.isFinite(left) && left <= 2 && !capCardOpen) {
+        pillText.textContent = left === 1 ? '1 explanation left today' : `${left} explanations left today`;
+        pill.style.display = 'block';
+      } else {
+        pill.style.display = 'none';   // Pro (Infinity), plenty left, or the cap card already says it
+      }
+    }
+
+    // Per-game Q&A — hint at 1 left; swap in the cap row proactively at 0 (don't make them type
+    // a question just to be told no). handleAskQuestion still holds the authoritative check.
+    const hint = document.getElementById('se-qa-hint');
+    if (!currentGameId) { hideAskCapRow(); if (hint) hint.style.display = 'none'; return; }
+    const qaLeft = CAPS.gameQARemaining(seGameQA, currentGameId, sePro);
+    if (Number.isFinite(qaLeft) && qaLeft <= 0) {
+      showAskCapRow();
+      return;
+    }
+    hideAskCapRow();
+    if (hint) {
+      if (Number.isFinite(qaLeft) && qaLeft <= 1) {
+        hint.textContent = '1 question left in this game';
+        hint.style.display = 'block';
+      } else {
+        hint.style.display = 'none';
+      }
+    }
+  }
+
+  // Recap: the 3 narrative fields. Pro → real sections (server sent them); free → locked rows +
+  // one upsell. Server-enforced, so a free user genuinely has no text to leak here.
+  function renderRecapProSections(response) {
+    const box = document.getElementById('se-recap-pro');
+    if (!box) return;
+    box.textContent = '';   // clear
+    const FIELDS = [
+      { key: 'turningPoint', label: 'Turning Point' },
+      { key: 'keyPerformance', label: 'Key Performance' },
+      { key: 'whyItMattered', label: 'Why It Mattered' },
+    ];
+
+    if (sePro) {
+      // Only the non-empty ones — an empty field means the data didn't support it (never faked).
+      const present = FIELDS.filter(f => response && typeof response[f.key] === 'string' && response[f.key].trim());
+      if (!present.length) { box.style.display = 'none'; return; }
+      present.forEach(f => box.appendChild(proRowEl(f.label, response[f.key].trim())));
+      box.style.display = 'block';
+      return;
+    }
+
+    // FREE — always all three locks (the pull is "there's more here"), plus the honest caveat that
+    // each only appears when the game's data supports it. Static HTML only; no response text.
+    const t = getThemeColors();
+    box.innerHTML =
+      FIELDS.map(f => lockedRowHtml(f.label)).join('') +
+      `<div style="font-size:0.68em!important;line-height:1.35!important;color:${t.subtext}!important;margin:0 0 6px!important;">Included with Pro when the game's data supports them.</div>` +
+      proBtnHtml('se-recap-upgrade', 'Unlock the full recap with Pro');
+    box.style.display = 'block';
+    const btn = document.getElementById('se-recap-upgrade');
+    if (btn) btn.addEventListener('click', openUpgrade);
+  }
+
+  // `isRefresh` = this fetch was AUTOMATIC (the poll tick / idle-resume), not user-initiated.
+  // It never consumes a free daily credit — see the cap check below and caps.js.
+  async function fetchLatestPlay(isRefresh = false) {
     if (!chrome.runtime?.id) return;
 
     // Final games → show a RECAP once, not a live play (and no polling — see restartPollInterval).
@@ -1417,6 +1691,26 @@
           restartPollInterval(); // Re-adjust timer frequency
         }
 
+        // ── FREE-TIER DAILY CAP ──────────────────────────────────────────────
+        // Enforced HERE (post-fetch) because the per-(gameId, playKey) unit needs the response
+        // to identify the play — that's what tells a re-read (free) from a genuinely new play.
+        // Re-reads and auto-refreshes are allowed:true and don't consume; Pro always passes.
+        const CAPS = window.SE_CAPS;
+        if (CAPS) {
+          const today = CAPS.localDateStr(new Date());
+          const key = CAPS.playKeyFor(currentGameId, response.simple, response.playType);
+          const decision = CAPS.evaluateDailyExplanation(seDailyCap, today, key, { isPro: sePro, isRefresh });
+          if (!decision.allowed) {
+            // Free user, genuinely new play, at the limit → show the upsell INSTEAD of the
+            // explanation. Nothing is rendered from `response` and no state is consumed.
+            showDailyCapCard();
+            setStatusReady(false, '🔒 Daily limit reached');
+            return;
+          }
+          if (decision.nextState !== seDailyCap) { seDailyCap = decision.nextState; saveDailyCap(); }
+          hideDailyCapCard();
+        }
+
         renderExplanation(response.simple); // Tier E: tappable glossary terms (English only)
         if (teamEl && response.homeTeam) teamEl.textContent = `${response.awayTeam} @ ${response.homeTeam}`;
 
@@ -1452,6 +1746,7 @@
         const stateLabel = statusLabelFromContext(response.gameContext);
 
         setStatusReady(!!response.homeTeam, stateLabel);
+        renderCapIndicators();   // refresh the "N left today" pill (hidden for Pro)
       }
     } catch (err) {
       setStatusError('Fetch failed');
@@ -1468,6 +1763,21 @@
     const preset = typeof presetQuestion === 'string' ? presetQuestion.trim() : null;
     const question = preset || input?.value?.trim();
     if (!question || !answerBox) return;
+
+    // ── FREE-TIER PER-GAME Q&A CAP ────────────────────────────────────────────
+    // Gated BEFORE the fetch (no play key needed), and ONLY when a real game is selected.
+    // Gameless "learn mode" asks (no currentGameId — off-season, or a sport with no games today)
+    // stay UNGATED, exactly as on iOS. Chips and typed questions both land here, so they count
+    // equally — also matching the app.
+    const CAPS = window.SE_CAPS;
+    if (CAPS && currentGameId) {
+      const decision = CAPS.evaluateGameQA(seGameQA, currentGameId, { isPro: sePro });
+      if (!decision.allowed) {
+        showAskCapRow();   // upsell in place of the ask box; no request is sent
+        return;
+      }
+      if (decision.nextState !== seGameQA) { seGameQA = decision.nextState; saveGameQA(); }
+    }
 
     askBtn.textContent = '...';
     askBtn.disabled = true;
@@ -1488,6 +1798,7 @@
       askBtn.textContent = 'Ask';
       askBtn.disabled = false;
       setChipsDisabled(false);
+      renderCapIndicators();   // refresh the "1 question left" hint (hidden for Pro)
     }
   }
 
