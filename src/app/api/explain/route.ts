@@ -341,6 +341,40 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
   // No gameId → nothing to summarize. Return empty (graceful no-data path) — we do NOT scan a
   // scoreboard, since that only ever holds today's slate (the very bug this rewrite fixes).
   if (!gameId) return out;
+  // Zyla-provider (nationscup): the ESPN summary endpoint below has no valid sport/league for it, so
+  // divert to getNationsCupMatch — the SAME structured data the explain path uses — and map it into
+  // RecapData. Article fields stay '' → Branch B (score + stats-grounded short recap), like ESPN rugby.
+  if (cfg.provider === 'zyla') {
+    const m = await getNationsCupMatch(gameId);
+    if (!m || !m.homeTeam || !m.awayTeam) return out; // no data → honest empty (same as ESPN empty)
+    out.homeTeam = m.homeTeam;
+    out.awayTeam = m.awayTeam;
+    out.homeScore = m.homeScore != null ? String(m.homeScore) : '';
+    out.awayScore = m.awayScore != null ? String(m.awayScore) : '';
+    out.statusDetail = 'Final';
+    if (m.homeScore != null && m.awayScore != null && m.homeScore !== m.awayScore) {
+      out.winner = m.homeScore > m.awayScore ? m.homeTeam : m.awayTeam;
+    }
+    // summaryFacts (Branch B grounding) — factual only, no fabrication: events chronological, and a
+    // stat line only when BOTH sides expose the value (mirrors the explain path's "Match stats:").
+    const facts: string[] = [];
+    for (const e of [...(m.events || [])].sort((a, b) => (a.minute ?? Infinity) - (b.minute ?? Infinity)).slice(0, 8)) {
+      if (!e?.type) continue;
+      facts.push(`${e.minute ?? '?'}' ${e.type}${e.player ? ` — ${e.player}` : ''}`);
+    }
+    const hStats = m.homeStats, aStats = m.awayStats;
+    const pair = (label: string, h?: number, a?: number, suffix = '') => {
+      if (h != null && a != null) facts.push(`${label}: ${m.homeTeam} ${h}${suffix} / ${m.awayTeam} ${a}${suffix}`);
+    };
+    pair('Possession', hStats?.possessionPct, aStats?.possessionPct, '%');
+    pair('Penalties conceded', hStats?.penaltiesConceded, aStats?.penaltiesConceded);
+    pair('Turnovers won', hStats?.turnoversWon, aStats?.turnoversWon);
+    if (hStats?.lineoutsWon != null && hStats?.lineoutsLost != null && aStats?.lineoutsWon != null && aStats?.lineoutsLost != null) {
+      facts.push(`Lineouts: ${m.homeTeam} ${hStats.lineoutsWon} won / ${hStats.lineoutsLost} lost, ${m.awayTeam} ${aStats.lineoutsWon} won / ${aStats.lineoutsLost} lost`);
+    }
+    out.summaryFacts = facts;
+    return out;
+  }
   const teamName = (comp: any, side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
   const scoreOf = (comp: any, side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.score ?? '');
   try {
