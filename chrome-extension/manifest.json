@@ -29,7 +29,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["glossary.js", "content.js"],
+      "js": ["glossary.js", "caps.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
