@@ -9,6 +9,12 @@
 // normalizeCoachState returns null → the client renders "coming soon".
 import { getGameData, NormalizedGameData } from './dataProvider';
 import { computeSoccerPulse, detectTrigger, SoccerMatchPulse } from './soccerPulse';
+import { getNationsCupMatch, RugbyTeamStats } from './zylaProvider';
+
+// Rugby (nationscup, Zyla-sourced) — a carrier for structured team stats + minute, mirroring how
+// `pulse` carries soccer stats. Momentum/derived-tag computation can come later (like soccer's engine);
+// v1 just hands the coach prompt the real per-side stats.
+type RugbyPulse = { homeStats?: RugbyTeamStats; awayStats?: RugbyTeamStats; minute?: number; triggerReason?: string };
 
 // v1 rich sports only (all site-API). Absence here → null → client coming-soon. NOT a buried
 // allowlist in the gating logic — it's the input to "which fields to read"; sufficiency itself
@@ -31,6 +37,8 @@ export interface CoachSituation {
   // soccer — the deterministic SoccerMatchPulse (Gate B). Present only on the soccer path; the 4
   // rich sports never set it, so their CoachSituation is byte-identical to before.
   pulse?: SoccerMatchPulse;
+  // rugby (nationscup) — structured Zyla team stats + minute. Present only on the rugby path.
+  rugbyPulse?: RugbyPulse;
 }
 
 // Read the normalized game-state through dataProvider (ESPN base + any registered enrichment) and
@@ -81,8 +89,32 @@ async function normalizeSoccerCoachState(sport: string, gameId?: string): Promis
   }
 }
 
+// Rugby (nationscup) coach state — Zyla-sourced (getNationsCupMatch), NOT getGameData. LIVE-ONLY like
+// soccer: finished games get a recap instead, so Coach's Read only shows for state==='in'. SAFE-BY-
+// DEFAULT: not live / no teams / no stats / any error → null → client renders coming-soon (or recap).
+async function normalizeRugbyCoachState(gameId?: string): Promise<CoachSituation | null> {
+  try {
+    const d = await getNationsCupMatch(gameId || '');
+    if (!d || d.state !== 'in') return null;                       // finished/upcoming → recap/placeholder
+    if (!d.homeTeam || !d.awayTeam) return null;
+    if (!d.homeStats && !d.awayStats) return null;                 // no stats → nothing worth reading
+    const rugbyPulse: RugbyPulse = { homeStats: d.homeStats, awayStats: d.awayStats, minute: d.minute };
+    return {
+      sport: 'nationscup',
+      homeTeam: d.homeTeam, awayTeam: d.awayTeam,
+      homeScore: String(d.homeScore ?? ''), awayScore: String(d.awayScore ?? ''),
+      statusDetail: d.minute ? `${d.minute}'` : 'Live',
+      rugbyPulse,
+    };
+  } catch (e) {
+    console.error('normalizeRugbyCoachState failed — coming soon:', e);
+    return null;
+  }
+}
+
 export async function normalizeCoachState(sport: string, gameId?: string): Promise<CoachSituation | null> {
   if (SOCCER.has(sport)) return normalizeSoccerCoachState(sport, gameId);
+  if (sport === 'nationscup') return normalizeRugbyCoachState(gameId);
   if (!RICH[sport]) return null;
   const d = await getGameData(sport, gameId);
   if (!d || (!d.homeTeam && !d.awayTeam)) return null;

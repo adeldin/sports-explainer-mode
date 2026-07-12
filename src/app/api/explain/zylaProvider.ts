@@ -118,7 +118,7 @@ export async function getNationsCupBoard(): Promise<Game[]> {
 // route's fetchGameData/`else` branch consumes gameContext ONLY — the "Recent events:" injection is
 // enriched-path (soccer/mlb) exclusive and does NOT fire for nationscup. So the event narrative + stats
 // are baked INTO gameContext here; `events` is returned for shape parity / future Match-Timeline use.
-type MatchDetail = { play: string; gameContext: string; homeTeam: string; awayTeam: string; events: MatchEvent[]; homeStats?: RugbyTeamStats; awayStats?: RugbyTeamStats };
+type MatchDetail = { play: string; gameContext: string; homeTeam: string; awayTeam: string; events: MatchEvent[]; homeStats?: RugbyTeamStats; awayStats?: RugbyTeamStats; state?: 'pre' | 'in' | 'post'; minute?: number; homeScore?: number; awayScore?: number };
 
 // Sane non-empty fallback (matches fetchGameData's !cfg defaults) → the explain is never blank/thin even
 // on total Zyla failure; the LLM still has sportContext.nationscup to work from.
@@ -298,6 +298,12 @@ export async function getNationsCupMatch(matchId: string): Promise<MatchDetail> 
         events,
         homeStats,
         awayStats,
+        // Structured match state/score/minute for the (future) Coach's Read live-guard — additive,
+        // ignored by the explain path (reuses module-scope deriveState, same as the board).
+        state: deriveState(asStr(m?.status)),
+        minute: asNum(m?.match_minute),
+        homeScore: asNum(m?.home_score),
+        awayScore: asNum(m?.away_score),
       };
     });
     matchCache.set(matchId, { t: now, data: detail });   // write-through L1

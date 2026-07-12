@@ -4,6 +4,33 @@
 
 import { SoccerMatchPulse } from './soccerPulse';
 
+// Rugby (nationscup) — client mirror of the backend zylaProvider RugbyTeamStats + coachState RugbyPulse.
+// The two repos don't share code, so these are kept in sync by hand (like SoccerMatchPulse).
+export interface RugbyTeamStats {
+  possessionPct?: number;
+  penaltiesConceded?: number;
+  yellowCards?: number;
+  redCards?: number;
+  turnoversWon?: number;
+  turnoversConceded?: number;
+  lineoutsWon?: number;
+  lineoutsLost?: number;
+  lineoutSuccessPct?: number;
+  scrumsWon?: number;
+  scrumsLost?: number;
+  rucksWon?: number;
+  rucksTotal?: number;
+  carriesMetres?: number;
+  cleanBreaks?: number;
+  offloads?: number;
+  defendersBeaten?: number;
+  gainLineCrossed?: number;
+  gainLineFailed?: number;
+  tackles?: number;
+  missedTackles?: number;
+}
+export type RugbyPulse = { homeStats?: RugbyTeamStats; awayStats?: RugbyTeamStats; minute?: number; triggerReason?: string };
+
 export interface CoachSituation {
   sport: string;
   homeTeam: string; awayTeam: string; homeScore: string; awayScore: string;
@@ -12,6 +39,8 @@ export interface CoachSituation {
   balls?: number; strikes?: number; outs?: number; onBase?: string;
   // soccer (Gate B) — the deterministic SoccerMatchPulse; present only on the soccer path.
   pulse?: SoccerMatchPulse;
+  // rugby (nationscup) — structured Zyla team stats + minute; present only on the rugby path.
+  rugbyPulse?: RugbyPulse;
 }
 
 // Soccer league keys whose coach state carries a pulse (not the football/baseball situation fields).
@@ -24,6 +53,7 @@ export interface CoachFull { strategicRead: string; whatItSetsUp: string }
 export function hasSufficientState(sport: string, s: CoachSituation | null): boolean {
   if (!s) return false;
   if (SOCCER_KEYS.includes(sport)) return !!s.pulse;   // soccer (Gate B): a computed pulse is enough
+  if (sport === 'nationscup') return !!s.rugbyPulse;   // rugby: structured Zyla stats present
   if (sport === 'nfl') return typeof s.down === 'number' && s.down > 0;
   if (sport === 'mlb') return typeof s.balls === 'number' && typeof s.outs === 'number';
   if (sport === 'nba' || sport === 'wnba') return typeof s.period === 'number' && !!s.clock;
