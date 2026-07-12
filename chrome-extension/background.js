@@ -7,6 +7,8 @@ const VALID_LANGUAGES = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', '
 
 // Auth endpoints (Phase 2 4a — email magic-link sign-in).
 const AUTH_BASE = 'https://sports-explainer-mode.vercel.app/api/auth';
+// API root (Phase 2 4b — entitlement lives beside /auth, not under it).
+const API_BASE = 'https://sports-explainer-mode.vercel.app/api';
 
 // ─────────────────────────────────────────
 // CHROME.STORAGE STATE HELPERS (Fix #11)
@@ -40,6 +42,20 @@ async function setAuth(auth) {
 async function clearAuth() {
   return new Promise((resolve) => {
     chrome.storage.local.remove(['seAuth'], resolve);
+  });
+}
+
+// --- Entitlement cache (seEntitlement = { isPro, isTrial, checkedAt }) ---
+const ENTITLEMENT_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+async function getEntitlementCache() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['seEntitlement'], (r) => resolve(r.seEntitlement || null));
+  });
+}
+async function setEntitlementCache(ent) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ seEntitlement: ent }, resolve);
   });
 }
 
@@ -231,6 +247,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── ENTITLEMENT: is this user Pro? (15-min cache; msg.force bypasses it) ──
+  if (msg.action === 'checkEntitlement') {
+    handleCheckEntitlement(msg.force === true)
+      .then(sendResponse).catch((err) => sendResponse({ error: err.message }));
+    return true;
+  }
+
 });
 
 // ─────────────────────────────────────────
@@ -331,6 +354,8 @@ async function handleAuthVerifyCode(email, code) {
   if (data && data.ok && data.session) {
     // Persist the session so the user stays signed in across launches.
     await setAuth({ email: data.email, session: data.session });
+    // A new sign-in may be a different user — drop any entitlement cached for the old one.
+    await setEntitlementCache(null);
     return { ok: true, email: data.email };
   }
   return { ok: false };
@@ -363,7 +388,47 @@ async function handleAuthCheckSession() {
 
 async function handleAuthSignOut() {
   await clearAuth();
+  await setEntitlementCache(null);
   return { ok: true };
+}
+
+// ─────────────────────────────────────────
+// ENTITLEMENT (Phase 2 4b — is this signed-in user Pro?)
+// ─────────────────────────────────────────
+// Returns { isPro, isTrial, signedIn }. Uses 15-min cache unless force=true.
+async function handleCheckEntitlement(force) {
+  const auth = await getAuth();
+  if (!auth || !auth.session) return { isPro: false, signedIn: false };
+
+  if (!force) {
+    const cached = await getEntitlementCache();
+    if (cached && cached.checkedAt && (Date.now() - cached.checkedAt) < ENTITLEMENT_TTL_MS) {
+      return { isPro: !!cached.isPro, isTrial: !!cached.isTrial, signedIn: true, cached: true };
+    }
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/entitlement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: auth.session }),
+    });
+    const data = await res.json();
+    if (data && data.signedIn === false) {
+      // Session died — clear auth + entitlement cache.
+      await clearAuth();
+      await setEntitlementCache(null);
+      return { isPro: false, signedIn: false };
+    }
+    const ent = { isPro: !!data.isPro, isTrial: !!data.isTrial, checkedAt: Date.now() };
+    await setEntitlementCache(ent);
+    return { isPro: ent.isPro, isTrial: ent.isTrial, signedIn: true };
+  } catch (e) {
+    // On network error, fall back to cache if present (even if stale), else not-pro.
+    const cached = await getEntitlementCache();
+    if (cached) return { isPro: !!cached.isPro, isTrial: !!cached.isTrial, signedIn: true, stale: true };
+    return { isPro: false, signedIn: true, error: true };
+  }
 }
 
 // ─────────────────────────────────────────

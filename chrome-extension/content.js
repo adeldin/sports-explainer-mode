@@ -989,7 +989,12 @@
       (res) => {
         if (res && res.ok) {
           seAuthPhase = 'email';
-          renderAccount({ signedIn: true, email: res.email, isPro: false }); // isPro wired in 4b
+          // Paint signed-in immediately, then force a fresh entitlement check (the cache
+          // was just cleared on sign-in) so the badge is correct without a panel reopen.
+          renderAccount({ signedIn: true, email: res.email, isPro: false });
+          chrome.runtime.sendMessage({ action: 'checkEntitlement', force: true }, (ent) => {
+            renderAccount({ signedIn: true, email: res.email, isPro: !!(ent && ent.isPro), isTrial: !!(ent && ent.isTrial) });
+          });
         } else {
           setAuthMsg('Incorrect or expired code.');
         }
@@ -1008,7 +1013,16 @@
   function refreshAccountState() {
     chrome.runtime.sendMessage({ action: 'authCheckSession' }, (res) => {
       if (res && res.signedIn) {
-        renderAccount({ signedIn: true, email: res.email, isPro: false }); // isPro in 4b
+        // Render signed-in immediately with Free, then update the badge when entitlement returns.
+        renderAccount({ signedIn: true, email: res.email, isPro: false });
+        chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
+          if (ent && ent.signedIn === false) {
+            seAuthPhase = 'email';
+            renderAccount({ signedIn: false });
+            return;
+          }
+          renderAccount({ signedIn: true, email: res.email, isPro: !!(ent && ent.isPro), isTrial: !!(ent && ent.isTrial) });
+        });
       } else {
         seAuthPhase = 'email';
         renderAccount({ signedIn: false });
