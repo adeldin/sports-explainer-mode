@@ -37,7 +37,7 @@ import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedb
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
+import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, RUGBY_LEAGUES, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
@@ -78,6 +78,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [tennisDetail, setTennisDetail] = useState<TennisLiveMatch | null>(null); // selected match enriched w/ RapidAPI live overlay
   const [tennisRead, setTennisRead] = useState<ExplanationResponse | null>(null); // Gate-3 situational explanation
   const [tennisFilter, setTennisFilter] = useState<'all' | 'mens' | 'womens'>('all'); // category filter (All/Men's/Women's)
+  const [rugbyLeague, setRugbyLeague] = useState<string>('all'); // merged Rugby tile league filter ('all' | game.sport)
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
@@ -155,7 +156,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // games — a scheduled ('pre') game has no play yet, so no explanation fetch and no
   // PlayCard (just the "hasn't started" state below). `state` is undefined until the
   // game is in `games`.
-  const selectedGame = games.find(g => g.id === selectedGameId);
+  // Merged Rugby tile league filter: 'all' → the full merged board; a league key → just that league's
+  // games (each keeps its own .sport). No-op (returns raw `games`) for every non-rugby sport.
+  const displayGames = useMemo(() => {
+    if (sport !== 'nationscup' || rugbyLeague === 'all') return games;
+    return games.filter(g => g.sport === rugbyLeague);
+  }, [games, sport, rugbyLeague]);
+  const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
   // coach/ask/feedback route by the tapped game — not the screen/tile sport. Falls back to the screen
@@ -351,6 +358,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
+    setRugbyLeague('all'); // reset the merged-Rugby league filter — never carried across tiles
     setSelectedDate(null); // reset the date strip to today — a chosen day is per-sport, never carried across
     setResult(null);
     setGames([]);
@@ -540,6 +548,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     fetchGames(() => cancelled);
     return () => { cancelled = true; };
   }, [sport, favorites, selectedDate]);
+
+  // Merged Rugby tile: keep the selection valid within the active league filter. When the filter
+  // narrows past the current pick (or the league is empty), re-select the first live-preferred visible
+  // game, or clear. Only runs on the rugby tile; a no-op elsewhere (displayGames === games).
+  useEffect(() => {
+    if (sport !== 'nationscup') return;
+    if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) return;
+    const live = displayGames.find(g => g.isLive);
+    setSelectedGameId(displayGames.length ? (live?.id ?? displayGames[0].id) : null);
+  }, [displayGames, sport, selectedGameId]);
 
   // Date strip: compute the current sport's event-model game-days (prev/today/next, gap-skipping).
   // Per-sport (recomputed on switch); head-to-head site sports only. Today is always injected as
@@ -805,11 +823,29 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             />
           }>
 
+          {/* Rugby league filter — merged tile only. ALL leagues shown (even empty); selecting an
+              empty league shows a "no games" message below. Horizontal-scrollable chip row. */}
+          {sport === 'nationscup' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tFilterRow}>
+              {[{ key: 'all', label: S.tennisFilterAll }, ...RUGBY_LEAGUES.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  onPress={async () => { await Haptics.selectionAsync(); setRugbyLeague(opt.key); }}
+                  style={[styles.tFilterChip, rugbyLeague === opt.key && styles.tFilterChipActive]}
+                  activeOpacity={0.8}>
+                  <Text style={[styles.tFilterChipText, rugbyLeague === opt.key && styles.tFilterChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
           {/* Game Strip */}
-          {games.length > 0 ? (
+          {displayGames.length > 0 ? (
             <View style={styles.gameStripContainer}>
               <FlatList
-                data={games}
+                data={displayGames}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={g => g.id}
@@ -841,6 +877,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   />
                 )}
               />
+            </View>
+          ) : sport === 'nationscup' && rugbyLeague !== 'all' ? (
+            // Merged Rugby tile, a specific league selected with no games in-window → "no games".
+            <View style={styles.rugbyEmptyLeague}>
+              <Text style={styles.rugbyEmptyLeagueText}>
+                {S.noLeagueGames.replace('{league}', RUGBY_LEAGUES.find(l => l.sportKey === rugbyLeague)?.label ?? '')}
+              </Text>
             </View>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0 ? (
             // Live tennis — an arm of the in-ScrollView score slot (page scrolls as ONE, so the
@@ -1332,6 +1375,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tFilterChipActive: { backgroundColor: t.accent, borderColor: t.accent },
   tFilterChipText: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },
   tFilterChipTextActive: { color: '#ffffff' },
+  rugbyEmptyLeague: { paddingHorizontal: 16, paddingVertical: 28, alignItems: 'center' },
+  rugbyEmptyLeagueText: { color: t.textSecondary, fontSize: 15, fontWeight: '600', textAlign: 'center' },
   // Bounded "match list" well — subtle surfaceAlt band + hairline edges, clips its inner scroll so it
   // reads as a distinct compact list region within the page (inner tMatchCards keep their own chrome).
   // Transparent bounded list — the dark-blue tMatchCards show directly on the page bg (distinct cards,
