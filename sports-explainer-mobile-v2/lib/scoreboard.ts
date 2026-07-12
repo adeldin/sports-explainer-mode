@@ -506,6 +506,9 @@ export async function discoverGameDays(
 export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'rugby', label: 'URC' },
   { sportKey: 'mlr', label: 'MLR' },
+  { sportKey: 'nationscup', label: 'Nations Cup' },
+  { sportKey: 'sixnations', label: 'Six Nations' },
+  { sportKey: 'nationschamp', label: 'Nations Championship' },
 ];
 
 export async function fetchRugbyBoard(

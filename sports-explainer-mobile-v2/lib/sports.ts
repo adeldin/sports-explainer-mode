@@ -16,8 +16,9 @@ export const SPORTS: SportTab[] = [
   { key: 'worldcup', emoji: '🌍', label: 'World Cup' },
   { key: 'epl', emoji: '⚽', label: 'EPL' },
   { key: 'laliga', emoji: '⚽', label: 'La Liga' },
-  { key: 'rugby', emoji: '🏉', label: 'URC' },
-  { key: 'mlr', emoji: '🏉', label: 'MLR' },
+  // One combined Rugby tile (key 'nationscup') folds ALL rugby leagues via fetchRugbyBoard + the league
+  // filter. 'rugby' (URC) and 'mlr' stay valid Sport KEYS (RUGBY_LEAGUES + game.sport) but have NO
+  // standalone tile — omitted from SPORTS so the grid shows a single 🏉 Rugby tile.
   { key: 'nationscup', emoji: '🏉', label: 'Rugby' },
   { key: 'tennis', emoji: '🎾', label: 'Tennis' },
   { key: 'golf', emoji: '⛳', label: 'Golf' },

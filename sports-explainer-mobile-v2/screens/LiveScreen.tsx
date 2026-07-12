@@ -37,7 +37,7 @@ import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedb
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { Game, SPORT_CONFIG, fetchScoreboard, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
+import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
@@ -271,7 +271,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     setLeaderboard(null);
     setTennisMatches([]);
     try {
-      const parsed = await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
+      // The 'nationscup' tile is the combined "Rugby" tile → merged board across all five rugby
+      // leagues (each game keeps its own .sport). fetchRugbyBoard ignores date (Gate D's concern).
+      const parsed = sport === 'nationscup'
+        ? await fetchRugbyBoard(isCancelled)
+        : await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
       const sorted = [...parsed].sort((a, b) => {
