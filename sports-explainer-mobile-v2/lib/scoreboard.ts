@@ -226,14 +226,16 @@ export async function fetchScoreboard(
     // dedup. ESPN returns nested $ref URLs as cleartext http:// (iOS ATS blocks it) —
     // normalize every $ref to https before fetch.
     const httpsRef = (u: string) => u.replace(/^http:\/\//i, 'https://');
-    const today = new Date();
+    // Anchor the window on the selected date (date strip) when set, else today. SAME ±width — widening
+    // is D5's job. Only rugby leagues are core:true, so this only affects the merged Rugby board.
+    const anchor = date ?? new Date();
     // Build YYYYMMDD from LOCAL date parts — NOT toISOString() (UTC), which rolls the
     // day forward for users behind UTC and drops today's games off the window.
     const fmt = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
     const DAY = 24 * 60 * 60 * 1000;
-    const start = fmt(new Date(today.getTime() - 3 * DAY)); // -3d..+7d window
-    const end = fmt(new Date(today.getTime() + 7 * DAY));
+    const start = fmt(new Date(anchor.getTime() - 3 * DAY)); // -3d..+7d window
+    const end = fmt(new Date(anchor.getTime() + 7 * DAY));
     const evRes = await fetch(
       `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${start}-${end}`,
     );
@@ -513,9 +515,10 @@ export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
 
 export async function fetchRugbyBoard(
   isCancelled: () => boolean = () => false,
+  date?: Date,   // forwarded to each league — ESPN core anchors its window on it; Zyla ignores it (whole season)
 ): Promise<Game[]> {
   const results = await Promise.allSettled(
-    RUGBY_LEAGUES.map(l => fetchScoreboard(l.sportKey, isCancelled)),
+    RUGBY_LEAGUES.map(l => fetchScoreboard(l.sportKey, isCancelled, date)),
   );
   if (isCancelled()) return [];
   const out: Game[] = [];

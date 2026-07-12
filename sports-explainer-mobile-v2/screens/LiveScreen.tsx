@@ -159,9 +159,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Merged Rugby tile league filter: 'all' → the full merged board; a league key → just that league's
   // games (each keeps its own .sport). No-op (returns raw `games`) for every non-rugby sport.
   const displayGames = useMemo(() => {
-    if (sport !== 'nationscup' || rugbyLeague === 'all') return games;
-    return games.filter(g => g.sport === rugbyLeague);
-  }, [games, sport, rugbyLeague]);
+    if (sport !== 'nationscup') return games;
+    let out = games;
+    if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
+    if (selectedDate) {
+      const day = toLocalDayString(selectedDate);
+      out = out.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
+    }
+    return out;
+  }, [games, sport, rugbyLeague, selectedDate]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
@@ -281,7 +287,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // The 'nationscup' tile is the combined "Rugby" tile → merged board across all five rugby
       // leagues (each game keeps its own .sport). fetchRugbyBoard ignores date (Gate D's concern).
       const parsed = sport === 'nationscup'
-        ? await fetchRugbyBoard(isCancelled)
+        ? await fetchRugbyBoard(isCancelled, selectedDate ?? undefined)
         : await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
@@ -565,6 +571,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   useEffect(() => {
     let cancelled = false;
     const cfg = SPORT_CONFIG[sport];
+    if (sport === 'nationscup') return; // merged Rugby tile derives days from the board (effect below)
     if (!cfg || cfg.learnMode || cfg.core) { setGameDays([]); return; }
     (async () => {
       const disc = await discoverGameDays(sport);
@@ -575,6 +582,18 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     })();
     return () => { cancelled = true; };
   }, [sport]);
+
+  // Merged Rugby tile: derive the date strip's game-days from the board's OWN startTimes (discoverGameDays
+  // can't serve core/Zyla leagues). Recomputes as the merged board changes; always includes today so
+  // there's a "TODAY" cell to return to. Non-rugby sports are unaffected (guarded above + here).
+  useEffect(() => {
+    if (sport !== 'nationscup') return;
+    const days = Array.from(new Set(
+      games.filter(g => g.startTime).map(g => toLocalDayString(new Date(g.startTime!)))
+    ));
+    if (!days.includes(todayDay)) days.push(todayDay);
+    setGameDays(days.sort());
+  }, [sport, games, todayDay]);
 
   // Tap a strip day → show that day's games. Reset the selected game so the new day auto-selects
   // its first/live game (→ recap for a past final, countdown for a future 'pre', PlayCard for live).
