@@ -226,21 +226,22 @@ export async function fetchScoreboard(
     // dedup. ESPN returns nested $ref URLs as cleartext http:// (iOS ATS blocks it) —
     // normalize every $ref to https before fetch.
     const httpsRef = (u: string) => u.replace(/^http:\/\//i, 'https://');
-    // Anchor the window on the selected date (date strip) when set, else today. SAME ±width — widening
-    // is D5's job. Only rugby leagues are core:true, so this only affects the merged Rugby board.
+    // Anchor the window on the selected date (date strip) when set, else today. Wide -90d..+14d span (D5)
+    // so older ESPN-league finals are discoverable in the date strip. Only rugby leagues are core:true,
+    // so this only affects the merged Rugby board; rugby's low volume stays well under ESPN's caps.
     const anchor = date ?? new Date();
     // Build YYYYMMDD from LOCAL date parts — NOT toISOString() (UTC), which rolls the
     // day forward for users behind UTC and drops today's games off the window.
     const fmt = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
     const DAY = 24 * 60 * 60 * 1000;
-    const start = fmt(new Date(anchor.getTime() - 3 * DAY)); // -3d..+7d window
-    const end = fmt(new Date(anchor.getTime() + 7 * DAY));
+    const start = fmt(new Date(anchor.getTime() - 90 * DAY)); // -90d..+14d window (D5 widened reach)
+    const end = fmt(new Date(anchor.getTime() + 14 * DAY));
     const evRes = await fetch(
-      `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${start}-${end}`,
+      `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events?dates=${start}-${end}&limit=150`,
     );
     const evData = await evRes.json();
-    const items: any[] = (evData.items || []).slice(0, 25);
+    const items: any[] = (evData.items || []).slice(0, 150); // D5: raised from 25 so a 90-day rugby span isn't truncated
     const resolvedEvents = (await Promise.all(
       items.map(async (it: any) => {
         try {
