@@ -130,27 +130,52 @@
       border-color: #e87722;
     }
 
-    /* ── Account (header chip + entry-screen row) ────────────────────────────
-       Dark-only, reusing the popup's existing brand palette. The overlay's theme
-       system lives in content.js and is deliberately NOT ported here. */
-    .header .spacer { flex: 1; }
-
-    #account-chip {
+    /* ── Account status strip ────────────────────────────────────────────────
+       ONE strip under the header — never a header chip AND a body row saying the same
+       thing. Dark-only: the overlay's theme system lives in content.js and is
+       deliberately NOT ported here. */
+    #account-strip {
+      background: #152444;
+      border: 1px solid #2a3d63;
+      border-radius: 6px;
+      padding: 9px 10px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 700;
+      gap: 8px;
     }
-    .chip-badge {
-      padding: 2px 7px;
-      border-radius: 10px;
-      letter-spacing: 0.03em;
-      background: #2a3d63;
+    #account-strip .who {
+      flex: 1;
+      min-width: 0;
+      font-size: 11px;
+      line-height: 1.35;
       color: #a9b4c9;
     }
-    .chip-badge.pro { background: #14b8a6; color: #06251f; }
-    .chip-link {
+    /* Signed-out: "Start free" LEADS. Sign-in is the quiet secondary option — never a
+       big orange button, which would read as "you must sign in." You don't. */
+    #account-strip .free-first {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #f5ecd7;
+      margin-bottom: 2px;
+    }
+    /* inline-block + max-width so a long email ellipsizes but the " · Free/Pro" badge that
+       follows it stays on the same line and always stays visible. */
+    #account-strip .email {
+      display: inline-block;
+      max-width: 130px;
+      vertical-align: bottom;
+      color: #f5ecd7;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #account-strip .tier-pro { color: #14b8a6; font-weight: 700; }
+    #account-strip .tier-free { color: #a9b4c9; font-weight: 700; }
+
+    /* Quiet ghost link — the de-emphasized sign-in affordance. */
+    .link-btn {
       background: none;
       border: none;
       color: #e87722;
@@ -160,36 +185,35 @@
       text-decoration: underline;
       padding: 0;
     }
-
-    #account-row {
-      background: #152444;
-      border: 1px solid #2a3d63;
-      border-radius: 6px;
-      padding: 9px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-    #account-row .who {
-      font-size: 11px;
-      line-height: 1.4;
-      color: #a9b4c9;
-      word-break: break-all;
-    }
-    #account-row .who strong { color: #f5ecd7; font-weight: 700; }
-    #account-row .who .tier-pro { color: #14b8a6; font-weight: 700; }
-    #account-row button {
-      width: 100%;
-      padding: 7px;
+    /* Compact upgrade button — small, sits beside the status, not a full-width CTA. */
+    .upgrade-btn {
+      flex: 0 0 auto;
+      padding: 5px 9px;
       border: none;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       background: #e87722;
       color: white;
+      white-space: nowrap;
     }
-    #account-row button:hover { background: #c8611a; }
+    .upgrade-btn:hover { background: #c8611a; }
+    /* Sign out — secondary/muted by design. It's the escape hatch when the wrong account is
+       signed in, so it's always present, but it never competes with Upgrade. */
+    .signout-btn {
+      flex: 0 0 auto;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 10px;
+      font-weight: 600;
+      color: #a9b4c9;
+      cursor: pointer;
+      text-decoration: underline;
+      white-space: nowrap;
+    }
+    .signout-btn:hover { color: #f5ecd7; }
   </style>
 </head>
 <body>
@@ -216,15 +240,13 @@
       </g>
     </svg>
     <span style="color:#f5ecd7;">Sports Explainer</span>
-    <span class="spacer"></span>
-    <!-- Account chip — filled by renderAccountChip() in popup.js -->
-    <div id="account-chip"></div>
   </div>
 
   <div class="body">
 
-    <!-- Account row — sign-in nudge / Pro status / upgrade. Filled by renderAccountRow(). -->
-    <div id="account-row"></div>
+    <!-- Account status strip — free-first framing when signed out; Free/Pro + Upgrade when
+         signed in. Filled by renderAccount() in popup.js. -->
+    <div id="account-strip"></div>
 
     <!-- Sport Picker. The first option is a real placeholder (value="") so NOTHING is
          pre-selected — this is also what fixes the old bug where picking the already-

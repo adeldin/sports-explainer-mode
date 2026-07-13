@@ -558,6 +558,13 @@
       <div id="se-settings-panel" style="display:none!important;padding:12px!important;background:${t.settingsBg}!important;overflow-y:auto!important;">
         <div style="font-size:11px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;margin-bottom:10px!important;">⚙️ Settings</div>
 
+        <!-- ACCOUNT — FIRST. This panel is where the sign-in ACTION lives (the main-screen strip
+             only shows status), so it must be the first thing you see, not buried under Font Size. -->
+        <div id="se-account-section" style="margin-bottom:12px!important;padding-bottom:10px!important;border-bottom:1px solid ${t.settingsItemBorder}!important;">
+          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:6px!important;">Account</label>
+          <div id="se-account-body"><!-- rendered by renderAccount() --></div>
+        </div>
+
         <div style="margin-bottom:10px!important;">
           <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;">Language</label>
           <select id="se-lang-select" style="width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;">
@@ -583,11 +590,6 @@
           </select>
         </div>
 
-        <div id="se-account-section" style="margin-bottom:12px!important;padding-top:10px!important;border-top:1px solid ${t.settingsItemBorder}!important;">
-          <label style="display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:6px!important;">Account</label>
-          <div id="se-account-body"><!-- rendered by renderAccount() --></div>
-        </div>
-
         <div id="se-settings-links" style="border-top:1px solid ${t.settingsItemBorder}!important;margin-top:10px!important;padding-top:10px!important;margin-bottom:12px!important;display:flex!important;flex-direction:column!important;gap:7px!important;">
           <button class="se-ext-link" data-url="https://explainer-privacy.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Privacy Policy</button>
           <button class="se-ext-link" data-url="https://explainer-terms.sportswise.app" style="background:none!important;border:none!important;padding:0!important;text-align:left!important;font-size:11px!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;">Terms &amp; Conditions</button>
@@ -598,6 +600,17 @@
       </div>
 
       <div id="se-body">
+        <!-- ACCOUNT STRIP — directly under the header, above the slate. One thin line; filled by
+             renderAccountStrip(). Signed out leads with "start free" (an account is NOT required);
+             signed-in Free gets the game-independent Upgrade CTA. -->
+        <div id="se-account-strip" style="display:none!important;align-items:center!important;gap:8px!important;padding:6px 10px!important;border-bottom:1px solid ${t.border}!important;background:${t.footerBg}!important;">
+          <div id="se-account-strip-text" style="flex:1!important;min-width:0!important;font-size:0.68em!important;line-height:1.35!important;color:${t.subtext}!important;"></div>
+          <button id="se-account-strip-btn" style="display:none!important;flex:0 0 auto!important;padding:3px 8px!important;background:${settings.accentColor}!important;color:#fff!important;border:none!important;border-radius:5px!important;font-size:0.64em!important;font-weight:700!important;cursor:pointer!important;white-space:nowrap!important;">Upgrade to Pro</button>
+          <!-- Secondary action — a muted link, never a prominent button. It's the escape hatch when
+               the WRONG account is signed in, so it must be reachable without opening settings. -->
+          <button id="se-account-strip-signout" style="display:none!important;flex:0 0 auto!important;background:none!important;border:none!important;padding:0!important;font-size:0.64em!important;font-weight:600!important;color:${t.subtext}!important;cursor:pointer!important;text-decoration:underline!important;white-space:nowrap!important;">Sign out</button>
+        </div>
+
         <div id="se-scorecard-section" style="padding:8px 10px 6px!important;border-bottom:1px solid ${t.border}!important;">
           <div id="se-scorecard-note" style="display:none!important;font-size:0.68em!important;color:${t.subtext}!important;margin-bottom:5px!important;"></div>
           <div id="se-scorecard-rail" style="display:flex!important;gap:7px!important;overflow-x:auto!important;overscroll-behavior-x:contain!important;overscroll-behavior:contain!important;padding-bottom:3px!important;">
@@ -730,6 +743,10 @@
         if (!wasIdle) fetchLatestPlay();  // otherwise it's just a normal manual refresh
       });
       
+      // Paint the account strip immediately on open (don't wait for the first fetch); the
+      // entitlement refresh kicked off by loadSettings will repaint it a moment later.
+      renderAccountStrip();
+
       // ── Pro CTAs (every one routes through the single openUpgrade()) ──
       document.getElementById('se-cap-upgrade').addEventListener('click', openUpgrade);
       document.getElementById('se-ask-cap-upgrade').addEventListener('click', openUpgrade);
@@ -1146,22 +1163,35 @@
       `background:none!important;border:none!important;color:${t.subtext}!important;font-size:11px!important;cursor:pointer!important;padding:0!important;text-decoration:underline!important;`;
 
     if (state && state.signedIn) {
-      // Signed-in view. Pro badge is "Free" until 4b wires entitlement.
-      const badgeColor = state.isPro ? t.teal : t.subtext;
-      const badgeText = state.isPro ? 'Pro' : 'Free';
+      // SIGNED IN — compact, NOT a form. Same shape as the main-screen strip so the two read as
+      // one thing: status · tier, then the two actions (Upgrade only when Free).
+      const isPro = !!state.isPro;
+      const emailStyle =
+        `display:inline-block!important;max-width:150px!important;vertical-align:bottom!important;overflow:hidden!important;` +
+        `text-overflow:ellipsis!important;white-space:nowrap!important;color:${t.text}!important;font-weight:700!important;`;
+      const upgradeStyle =
+        `background:${accent}!important;color:#fff!important;border:none!important;border-radius:5px!important;` +
+        `padding:4px 9px!important;font-size:11px!important;font-weight:700!important;cursor:pointer!important;white-space:nowrap!important;`;
       box.innerHTML =
-        `<div style="font-size:12px!important;color:${t.text}!important;margin-bottom:4px!important;">Signed in as <strong>${escapeHtml(state.email)}</strong></div>` +
-        `<div style="display:flex!important;align-items:center!important;gap:8px!important;">` +
-          `<span style="font-size:10px!important;font-weight:700!important;color:#fff!important;background:${badgeColor}!important;padding:2px 8px!important;border-radius:10px!important;">${badgeText}</span>` +
+        `<div style="font-size:12px!important;color:${t.subtext}!important;margin-bottom:7px!important;">` +
+          `Signed in as <span title="${escapeHtml(state.email)}" style="${emailStyle}">${escapeHtml(state.email)}</span>` +
+          ` · <span style="font-weight:700!important;color:${isPro ? t.teal : t.subtext}!important;">${isPro ? 'Pro' : 'Free'}</span>` +
+        `</div>` +
+        `<div style="display:flex!important;align-items:center!important;gap:10px!important;">` +
+          (isPro ? '' : `<button id="se-acct-upgrade" style="${upgradeStyle}">Upgrade to Pro</button>`) +
           `<button id="se-signout-btn" style="${linkStyle}">Sign out</button>` +
         `</div>`;
+      const up = document.getElementById('se-acct-upgrade');
+      if (up) up.addEventListener('click', openUpgrade);
       document.getElementById('se-signout-btn').addEventListener('click', doSignOut);
       return;
     }
 
+    // STEP 2 — code entry. The old copy ("Code sent to …") never told the user to go LOOK.
     if (seAuthPhase === 'code') {
       box.innerHTML =
-        `<div style="font-size:11px!important;color:${t.subtext}!important;margin-bottom:6px!important;">Code sent to ${escapeHtml(seAuthPendingEmail)}</div>` +
+        `<div style="font-size:12px!important;font-weight:700!important;color:${t.text}!important;margin-bottom:2px!important;">Check your email for a 6-digit code</div>` +
+        `<div style="font-size:11px!important;color:${t.subtext}!important;margin-bottom:6px!important;">Sent to ${escapeHtml(seAuthPendingEmail)}</div>` +
         `<input id="se-code-input" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="${inputStyle}" />` +
         `<button id="se-verify-btn" style="${btnStyle}">Verify</button>` +
         `<div style="margin-top:6px!important;"><button id="se-code-back" style="${linkStyle}">Use a different email</button></div>` +
@@ -1173,10 +1203,11 @@
       return;
     }
 
-    // Default: email entry
+    // STEP 1 — email entry. The button is the ACTION the user wants ("Sign in"), not the
+    // mechanism ("Send code") — the code step is an implementation detail they meet next.
     box.innerHTML =
       `<input id="se-email-input" type="email" placeholder="you@email.com" style="${inputStyle}" />` +
-      `<button id="se-sendcode-btn" style="${btnStyle}">Send code</button>` +
+      `<button id="se-sendcode-btn" style="${btnStyle}">Sign in</button>` +
       `<div id="se-auth-msg" style="font-size:11px!important;color:${t.subtext}!important;margin-top:6px!important;"></div>`;
     document.getElementById('se-sendcode-btn').addEventListener('click', doSendCode);
   }
@@ -1658,9 +1689,72 @@
     if (inputRow) inputRow.style.display = 'flex';
   }
 
+  // Account status strip under the header. Three states; called on every render + whenever auth or
+  // entitlement changes, so it updates live on sign-in and on return from a purchase.
+  //   • signed out  → "Start free — no account needed." An account is NOT required; sign-in is a
+  //                   quiet link, never a demand.
+  //   • Free        → "Signed in as X · Free" + Upgrade (the ONLY upgrade path that doesn't
+  //                   require a live game — the others sit behind a cap or a recap).
+  //   • Pro         → "Signed in as X · Pro" (teal), no button.
+  function renderAccountStrip() {
+    const strip = document.getElementById('se-account-strip');
+    const textEl = document.getElementById('se-account-strip-text');
+    const btn = document.getElementById('se-account-strip-btn');
+    const signOut = document.getElementById('se-account-strip-signout');
+    if (!strip || !textEl || !btn || !signOut) return;
+    const t = getThemeColors();
+    strip.style.display = 'flex';
+    textEl.textContent = '';
+    btn.onclick = null;
+    signOut.onclick = null;
+    signOut.style.display = 'none';
+
+    if (!seAuthEmail) {
+      // One thin line — the overlay is content-dense, so no multi-line block here.
+      textEl.appendChild(document.createTextNode('Start free — no account needed. '));
+      const link = document.createElement('button');
+      link.textContent = 'Sign in';
+      link.style.cssText = `background:none!important;border:none!important;padding:0!important;font-size:1em!important;font-weight:700!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;`;
+      link.addEventListener('click', () => { markActivity(); openAccountSettings(); });
+      textEl.appendChild(link);
+      textEl.appendChild(document.createTextNode(' to sync Pro.'));
+      btn.style.display = 'none';
+      return;
+    }
+
+    // Signed in — email via textContent (never innerHTML of stored user data).
+    textEl.appendChild(document.createTextNode('Signed in as '));
+    const em = document.createElement('span');
+    em.textContent = seAuthEmail;
+    em.title = seAuthEmail;
+    em.style.cssText = `display:inline-block!important;max-width:140px!important;vertical-align:bottom!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:${t.text}!important;font-weight:700!important;`;
+    textEl.appendChild(em);
+    textEl.appendChild(document.createTextNode(' · '));
+    const tier = document.createElement('span');
+    tier.textContent = sePro ? 'Pro' : 'Free';
+    tier.style.cssText = `font-weight:700!important;color:${sePro ? t.teal : t.subtext}!important;`;
+    textEl.appendChild(tier);
+
+    // Sign out is always available when signed in — that's the fix for "wrong account, stuck".
+    signOut.style.display = 'inline-block';
+    signOut.onclick = () => { markActivity(); doSignOut(); };
+
+    if (sePro) {
+      btn.style.display = 'none';
+    } else {
+      btn.style.display = 'inline-block';
+      btn.onclick = openUpgrade;
+    }
+  }
+
   // The subtle scarcity indicators. Pro → dailyRemaining/gameQARemaining return Infinity, so both
   // are hidden and the ask box is always restored. Safe to call often (idempotent).
   function renderCapIndicators() {
+    // The account strip tracks the same state (sePro / seAuthEmail), so it refreshes wherever the
+    // indicators do — sign-in, sign-out, entitlement refresh, purchase return, every fetch.
+    // Deliberately BEFORE the guards below: the strip must render even if caps.js failed to load.
+    renderAccountStrip();
+
     const CAPS = window.SE_CAPS;
     if (!CAPS || !overlayEl) return;
 

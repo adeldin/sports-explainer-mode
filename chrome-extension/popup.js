@@ -8,8 +8,7 @@ const gameListSection = document.getElementById('game-list-section');
 const gamesLoading = document.getElementById('games-loading');
 const toggleBtn = document.getElementById('toggle-btn');
 const statusEl = document.getElementById('status');
-const accountChip = document.getElementById('account-chip');
-const accountRow = document.getElementById('account-row');
+const accountStrip = document.getElementById('account-strip');
 
 // ─────────────────────────────────────────
 // ACCOUNT (entry screen)
@@ -31,36 +30,43 @@ function renderAccount(state) {
   const isPro = !!(state && state.isPro);
   const email = (state && state.email) || '';
 
-  // Header chip.
-  if (signedIn) {
-    accountChip.innerHTML =
-      `<span class="chip-badge ${isPro ? 'pro' : ''}" title="${escapeHtml(email)}">${isPro ? 'Pro' : 'Free'}</span>`;
-  } else {
-    accountChip.innerHTML = `<button class="chip-link" id="chip-signin">Sign in</button>`;
-    document.getElementById('chip-signin').addEventListener('click', openAccountInOverlay);
+  // SIGNED OUT — an account is NOT required. Free works with no sign-in at all, so "Start free"
+  // is the loud line and sign-in is a quiet link. A big orange "Sign in" button here read as a
+  // wall in front of the product.
+  if (!signedIn) {
+    accountStrip.innerHTML =
+      `<div class="who">` +
+        `<span class="free-first">Start free — no account needed.</span>` +
+        `Sign in only to sync Pro. <button class="link-btn" id="strip-signin">Sign in</button>` +
+      `</div>`;
+    document.getElementById('strip-signin').addEventListener('click', openAccountInOverlay);
+    return;
   }
 
-  // Entry-screen row.
-  if (!signedIn) {
-    accountRow.innerHTML =
-      `<div class="who">Sign in to sync your Pro across devices.</div>` +
-      `<button id="row-signin">Sign in</button>`;
-    document.getElementById('row-signin').addEventListener('click', openAccountInOverlay);
-    return;
+  // SIGNED IN. Pro gets no Upgrade button; both get Sign out (the fix for "wrong account, stuck").
+  const who =
+    `<div class="who">Signed in as <span class="email" title="${escapeHtml(email)}">${escapeHtml(email)}</span>` +
+    ` · <span class="${isPro ? 'tier-pro' : 'tier-free'}">${isPro ? 'Pro' : 'Free'}</span></div>`;
+
+  // Free → the game-independent upgrade path: it works with no live game on, which is the whole
+  // reason this strip exists (the only other Upgrade CTAs sit behind a cap or a recap).
+  const upgrade = isPro ? '' : `<button class="upgrade-btn" id="strip-upgrade">Upgrade to Pro</button>`;
+  accountStrip.innerHTML = who + upgrade + `<button class="signout-btn" id="strip-signout">Sign out</button>`;
+
+  if (!isPro) {
+    document.getElementById('strip-upgrade').addEventListener('click', () => {
+      // Background opens the tab (it owns the purchase URL + the email as app_user_id). It must —
+      // the popup closes on click, which would kill a window.open() started here.
+      chrome.runtime.sendMessage({ action: 'openUpgrade' }, () => window.close());
+    });
   }
-  if (isPro) {
-    accountRow.innerHTML =
-      `<div class="who">Signed in as <strong>${escapeHtml(email)}</strong> · <span class="tier-pro">Pro</span></div>`;
-    return;
-  }
-  // Signed in + Free → the game-independent upgrade path (works with no live game on).
-  accountRow.innerHTML =
-    `<div class="who">Signed in as <strong>${escapeHtml(email)}</strong> · Free</div>` +
-    `<button id="row-upgrade">Upgrade to Pro</button>`;
-  document.getElementById('row-upgrade').addEventListener('click', () => {
-    // Background opens the tab (it owns the purchase URL + the email as app_user_id). It must —
-    // the popup closes on click, which would kill a window.open() started here.
-    chrome.runtime.sendMessage({ action: 'openUpgrade' }, () => window.close());
+
+  document.getElementById('strip-signout').addEventListener('click', () => {
+    // Background clears seAuth + the entitlement cache. Re-render in place (don't close the
+    // popup) so the user immediately sees they're signed out and can sign in as someone else.
+    chrome.runtime.sendMessage({ action: 'authSignOut' }, () => {
+      renderAccount({ signedIn: false });
+    });
   });
 }
 
