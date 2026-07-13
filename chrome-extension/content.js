@@ -157,7 +157,9 @@
       const CAPS = window.SE_CAPS;
       seDailyCap = data.seDailyCap || (CAPS ? { ...CAPS.EMPTY_DAILY } : { date: '', count: 0, keys: [] });
       seGameQA = data.seGameQA || (CAPS ? { ...CAPS.EMPTY_GAME } : { gameId: '', count: 0 });
-      sePro = !!(data.seEntitlement && data.seEntitlement.isPro);
+      // Startup: the overlay isn't up yet, so setPro's refresh is a no-op here (it guards on
+      // overlayVisible). Routed through it anyway so there's exactly one writer.
+      setPro(!!(data.seEntitlement && data.seEntitlement.isPro));
       seAuthEmail = (data.seAuth && data.seAuth.email) || null;
 
       refreshProState();   // revalidate entitlement (async; updates sePro + re-renders indicators)
@@ -179,7 +181,9 @@
     if (!chrome.runtime?.id) return;
     chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
       if (chrome.runtime.lastError) return;         // service worker asleep / no receiver — keep cache
-      sePro = !!(ent && ent.isPro);
+      // Pro bought elsewhere (another tab / the popup) lands HERE. setPro re-fetches a stale
+      // locked recap — which would otherwise never repair itself, since final games don't poll.
+      setPro(!!(ent && ent.isPro));
       renderCapIndicators();                        // Pro → pills disappear immediately
     });
   }
@@ -329,6 +333,35 @@
     refreshAccountState();
   }
 
+  // ── THE ONE PLACE sePro CHANGES VALUE ────────────────────────────────────────────────────
+  // Every entitlement path routes through here (startup cache, background refresh, sign-in,
+  // purchase return, settings panel), so the false→true flip is detected ONCE and consistently.
+  // Returns true only on a genuine gain — a user who was ALREADY Pro never triggers a re-fetch.
+  function setPro(next) {
+    const gained = !!next && !sePro;
+    sePro = !!next;
+    if (gained) refreshAfterProGained();
+    return gained;
+  }
+
+  let seProRefreshInFlight = false;   // one re-fetch per transition; never a loop
+
+  // Pro just arrived → whatever is on screen is stale and Pro-gated. Re-fetch it.
+  // This matters MOST for the recap: a Final game is a ONE-SHOT fetch (the poll interval is
+  // cleared for final games), so there is no next cycle to repair it — without this, the locked
+  // TURNING POINT / KEY PERFORMANCE / WHY IT MATTERED rows would stay locked until the user
+  // re-selected the game. The play view has the same problem with a stuck cap card.
+  // fetchLatestPlay() already routes Final games to fetchRecapAndRender(), so this ONE call
+  // covers both surfaces — and re-requests the recap with isPro:true, which is what makes the
+  // backend send the three narrative fields at all.
+  function refreshAfterProGained() {
+    if (seProRefreshInFlight || !overlayVisible) return;
+    seProRefreshInFlight = true;
+    Promise.resolve(fetchLatestPlay())
+      .catch(() => {})
+      .finally(() => { seProRefreshInFlight = false; });
+  }
+
   // Coming back from the checkout tab is the natural "they may have purchased" signal. Force a
   // fresh entitlement check (bypassing background's 15-min cache) so Pro unlocks immediately.
   window.addEventListener('focus', () => {
@@ -337,17 +370,12 @@
     if (!chrome.runtime?.id) return;
     chrome.runtime.sendMessage({ action: 'checkEntitlement', force: true }, (ent) => {
       if (chrome.runtime.lastError) return;
-      const wasPro = sePro;
-      sePro = !!(ent && ent.isPro);
+      // setPro fires the re-fetch on a flip (cap card → real explanation, locked recap rows →
+      // narrative fields). Don't ALSO call fetchLatestPlay here — that would double-fetch.
+      const gained = setPro(!!(ent && ent.isPro));
       renderCapIndicators();                       // pills/limits disappear the moment Pro lands
       if (settingsOpen) refreshAccountState();     // flip the Free → Pro badge
-      if (sePro && !wasPro) {
-        showToast("You're Pro — unlimited unlocked.");
-        // A cap card / ask-cap row may be on screen right now. Re-fetching re-runs the gate,
-        // which now passes, so the blocked surface is replaced by real content. Pro never
-        // consumes a credit, so this costs the user nothing.
-        if (overlayVisible) fetchLatestPlay();
-      }
+      if (gained) showToast("You're Pro — unlimited unlocked.");
     });
   });
 
@@ -1241,7 +1269,9 @@
           // was just cleared on sign-in) so the badge is correct without a panel reopen.
           renderAccount({ signedIn: true, email: res.email, isPro: false });
           chrome.runtime.sendMessage({ action: 'checkEntitlement', force: true }, (ent) => {
-            sePro = !!(ent && ent.isPro);   // gates unlock immediately on sign-in, no reload
+            // Signing in AS an existing Pro is a genuine false→true flip → setPro re-fetches, so a
+            // recap already on screen fills in its narrative rows without a reselect.
+            setPro(!!(ent && ent.isPro));   // gates unlock immediately on sign-in, no reload
             renderAccount({ signedIn: true, email: res.email, isPro: sePro, isTrial: !!(ent && ent.isTrial) });
             renderCapIndicators();
           });
@@ -1255,7 +1285,7 @@
   function doSignOut() {
     chrome.runtime.sendMessage({ action: 'authSignOut' }, () => {
       seAuthPhase = 'email';
-      sePro = false;              // back to the free tier immediately
+      setPro(false);              // back to the free tier immediately (never a "gain" → no re-fetch)
       seAuthEmail = null;         // no app_user_id → Unlock CTAs nudge to sign in, never purchase
       renderAccount({ signedIn: false });
       renderCapIndicators();      // pills/limits reappear if the free allowance is spent
@@ -1272,19 +1302,19 @@
         chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
           if (ent && ent.signedIn === false) {
             seAuthPhase = 'email';
-            sePro = false;
+            setPro(false);
             seAuthEmail = null;   // session died — don't purchase against a stale email
             renderAccount({ signedIn: false });
             renderCapIndicators();
             return;
           }
-          sePro = !!(ent && ent.isPro);
+          setPro(!!(ent && ent.isPro));   // flip → re-fetch a stale locked recap / cap card
           renderAccount({ signedIn: true, email: res.email, isPro: sePro, isTrial: !!(ent && ent.isTrial) });
           renderCapIndicators();
         });
       } else {
         seAuthPhase = 'email';
-        sePro = false;
+        setPro(false);
         seAuthEmail = null;
         renderAccount({ signedIn: false });
       }
