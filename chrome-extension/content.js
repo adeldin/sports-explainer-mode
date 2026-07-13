@@ -31,6 +31,12 @@
   // sePro is the ONE boolean every gate consults. Kept current by refreshProState() and by the
   // Account flows (sign-in / sign-out). Trials count as Pro, exactly as on iOS.
   let sePro = false;
+  // The signed-in email, mirrored from storage (background writes seAuth = { email, session }).
+  // Cached so openUpgrade() can show the "sign in first" nudge instantly without an async hop.
+  // Background re-checks the email authoritatively before opening the purchase tab.
+  let seAuthEmail = null;
+  // True while a purchase tab is open, so the focus handler knows to force-recheck on return.
+  let sePurchasePending = false;
   // Persisted cap counters (raw, isPro-agnostic — the decision lives in caps.js, never here).
   let seDailyCap = { date: '', count: 0, keys: [] };  // seeded from SE_CAPS.EMPTY_DAILY on load
   let seGameQA = { gameId: '', count: 0 };            // seeded from SE_CAPS.EMPTY_GAME on load
@@ -106,6 +112,12 @@
     { key: 'rugby', label: '🏉 Rugby' }
   ];
 
+  // CHANGE-panel width. Used by BOTH the panel's own CSS and positionSelectorPanel's placement
+  // math — they must agree, so it lives in one place. 320 (was 240) leaves real headroom for the
+  // four difficulty pills on one row: at 300 they total ~277px against ~276px usable, which would
+  // have wrapped "Expert" to a second line.
+  const SELECTOR_PANEL_W = 320;
+
   const LEVELS = [
     { key: 'kid', label: 'Rookie' },
     { key: 'beginner', label: 'Beginner' },
@@ -132,7 +144,7 @@
     // One get for settings + the two cap counters + the entitlement cache (written by
     // background.js). Reading the cache here means sePro is already right on the FIRST fetch —
     // refreshProState() then revalidates it against the server in the background.
-    chrome.storage.local.get(['seSettings', 'seDailyCap', 'seGameQA', 'seEntitlement'], (data) => {
+    chrome.storage.local.get(['seSettings', 'seDailyCap', 'seGameQA', 'seEntitlement', 'seAuth'], (data) => {
       if (data.seSettings) {
         settings = { ...settings, ...data.seSettings };
         currentLevel = settings.level;
@@ -146,6 +158,7 @@
       seDailyCap = data.seDailyCap || (CAPS ? { ...CAPS.EMPTY_DAILY } : { date: '', count: 0, keys: [] });
       seGameQA = data.seGameQA || (CAPS ? { ...CAPS.EMPTY_GAME } : { gameId: '', count: 0 });
       sePro = !!(data.seEntitlement && data.seEntitlement.isPro);
+      seAuthEmail = (data.seAuth && data.seAuth.email) || null;
 
       refreshProState();   // revalidate entitlement (async; updates sePro + re-renders indicators)
       if (callback) callback();
@@ -188,6 +201,19 @@
           saveSettings();
         }
         overlayVisible ? hideOverlay() : showOverlay();
+      });
+      sendResponse({ status: 'ok' });
+    }
+
+    // The popup's "Sign in" routes here rather than duplicating the email/code UI: show the
+    // overlay (if hidden) and open it straight to the Account section. NOT a toggle — clicking
+    // Sign in must never hide an overlay that's already up.
+    if (msg.action === 'openAccount') {
+      loadSettings(() => {
+        if (!overlayVisible) showOverlay();
+        // showOverlay attaches its listeners in a setTimeout(0); wait a tick so the settings
+        // panel + account body are live before we open them.
+        setTimeout(() => openAccountSettings(), 50);
       });
       sendResponse({ status: 'ok' });
     }
@@ -264,20 +290,68 @@
     return `<button id="${id}" style="width:100%!important;box-sizing:border-box!important;padding:8px!important;margin-top:4px!important;background:${settings.accentColor}!important;color:#fff!important;border:none!important;border-radius:6px!important;font-size:0.85em!important;font-weight:700!important;cursor:pointer!important;">${label}</button>`;
   }
 
-  // ONE upgrade entry point for every Pro CTA (cap card, ask row, recap). When the real purchase
-  // flow lands (signed-in email as app_user_id + force-refresh entitlement on return), it changes
-  // HERE and nowhere else.
-  const PURCHASE_LINK_URL = ''; // TODO: wire the App Store / web purchase link, then this opens it.
+  // ONE upgrade entry point for every Pro CTA (cap card, ask row, recap locked rows).
+  // The purchase URL itself lives in background.js (single source of truth — the popup needs it
+  // too). Background opens the tab, so there's no window.open/user-gesture dependency here.
   function openUpgrade() {
     markActivity();
-    if (PURCHASE_LINK_URL) {
-      window.open(PURCHASE_LINK_URL, '_blank', 'noopener');
+
+    // Fast local check so the sign-in nudge is instant. Background re-checks authoritatively.
+    if (!seAuthEmail) {
+      showToast('Sign in first to unlock Pro.');
+      openAccountSettings();
       return;
     }
-    showToast('Pro is coming soon — thanks for your interest!');
+
+    sePurchasePending = true;   // the focus handler re-checks entitlement when they come back
+    chrome.runtime.sendMessage({ action: 'openUpgrade' }, (res) => {
+      if (chrome.runtime.lastError) { sePurchasePending = false; return; }
+      if (res && res.ok === false) {
+        // Background found no stored email (e.g. session cleared in another tab) — don't leave
+        // the pending flag set for a tab that never opened.
+        sePurchasePending = false;
+        seAuthEmail = null;
+        showToast('Sign in first to unlock Pro.');
+        openAccountSettings();
+      }
+    });
   }
 
-  // Minimal transient toast inside the overlay (used by the openUpgrade stub).
+  // Open the settings panel (where the Account / sign-in section lives). Mirrors the ⚙️ button's
+  // own handler — no-op if the overlay isn't up.
+  function openAccountSettings() {
+    const panel = document.getElementById('se-settings-panel');
+    const body = document.getElementById('se-body');
+    if (!panel || !body || settingsOpen) return;
+    settingsOpen = true;
+    panel.style.display = 'block';
+    body.style.display = 'none';
+    refreshAccountState();
+  }
+
+  // Coming back from the checkout tab is the natural "they may have purchased" signal. Force a
+  // fresh entitlement check (bypassing background's 15-min cache) so Pro unlocks immediately.
+  window.addEventListener('focus', () => {
+    if (!sePurchasePending) return;
+    sePurchasePending = false;
+    if (!chrome.runtime?.id) return;
+    chrome.runtime.sendMessage({ action: 'checkEntitlement', force: true }, (ent) => {
+      if (chrome.runtime.lastError) return;
+      const wasPro = sePro;
+      sePro = !!(ent && ent.isPro);
+      renderCapIndicators();                       // pills/limits disappear the moment Pro lands
+      if (settingsOpen) refreshAccountState();     // flip the Free → Pro badge
+      if (sePro && !wasPro) {
+        showToast("You're Pro — unlimited unlocked.");
+        // A cap card / ask-cap row may be on screen right now. Re-fetching re-runs the gate,
+        // which now passes, so the blocked surface is replaced by real content. Pro never
+        // consumes a credit, so this costs the user nothing.
+        if (overlayVisible) fetchLatestPlay();
+      }
+    });
+  });
+
+  // Minimal transient toast inside the overlay (sign-in nudge, purchase confirmation).
   function showToast(text) {
     if (!overlayEl) return;
     const t = getThemeColors();
@@ -474,7 +548,7 @@
           <span style="font-weight:800!important;font-size:13px!important;color:#f5ecd7!important;white-space:nowrap!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;">Sports Explainer</span>
         </div>
         <div style="display:flex!important;gap:6px!important;flex:0 0 auto!important;">
-          <button id="se-selector-btn" title="Change sport / game / level" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">🎯</button>
+          <button id="se-selector-btn" title="Change sport &amp; game" aria-label="Change sport and game" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">🔄</button>
           <button id="se-settings-btn" title="Settings" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">⚙️</button>
           <button id="se-minimize" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">−</button>
           <button id="se-close" style="background:rgba(255,255,255,0.2)!important;border:none!important;color:white!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;padding:1px 8px!important;border-radius:4px!important;line-height:1.4!important;">✕</button>
@@ -1131,6 +1205,7 @@
       (res) => {
         if (res && res.ok) {
           seAuthPhase = 'email';
+          seAuthEmail = res.email || null;   // the app_user_id openUpgrade() will purchase against
           // Paint signed-in immediately, then force a fresh entitlement check (the cache
           // was just cleared on sign-in) so the badge is correct without a panel reopen.
           renderAccount({ signedIn: true, email: res.email, isPro: false });
@@ -1150,6 +1225,7 @@
     chrome.runtime.sendMessage({ action: 'authSignOut' }, () => {
       seAuthPhase = 'email';
       sePro = false;              // back to the free tier immediately
+      seAuthEmail = null;         // no app_user_id → Unlock CTAs nudge to sign in, never purchase
       renderAccount({ signedIn: false });
       renderCapIndicators();      // pills/limits reappear if the free allowance is spent
     });
@@ -1159,12 +1235,14 @@
   function refreshAccountState() {
     chrome.runtime.sendMessage({ action: 'authCheckSession' }, (res) => {
       if (res && res.signedIn) {
+        seAuthEmail = res.email || seAuthEmail;
         // Render signed-in immediately with Free, then update the badge when entitlement returns.
         renderAccount({ signedIn: true, email: res.email, isPro: false });
         chrome.runtime.sendMessage({ action: 'checkEntitlement' }, (ent) => {
           if (ent && ent.signedIn === false) {
             seAuthPhase = 'email';
             sePro = false;
+            seAuthEmail = null;   // session died — don't purchase against a stale email
             renderAccount({ signedIn: false });
             renderCapIndicators();
             return;
@@ -1175,6 +1253,8 @@
         });
       } else {
         seAuthPhase = 'email';
+        sePro = false;
+        seAuthEmail = null;
         renderAccount({ signedIn: false });
       }
     });
@@ -1184,21 +1264,27 @@
     const t = getThemeColors();
     const panel = document.createElement('div');
     panel.id = 'se-selector-panel';
+    // F1: 240px was too tight — "Expert" clipped to "Expe" and team pairs truncated to "Pi…".
     panel.style.cssText = `
       position: fixed !important; display: none !important; top: 0 !important; left: 0 !important;
-      width: 240px !important; max-height: 80vh !important; overflow-y: auto !important;
+      width: ${SELECTOR_PANEL_W}px !important; max-height: 80vh !important; overflow-y: auto !important;
       z-index: 2147483647 !important; background: ${t.settingsBg} !important; color: ${t.text} !important;
       border: 1px solid ${settings.accentColor} !important; border-radius: 10px !important;
       box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; font-family: system-ui, sans-serif !important;
       font-size: 13px !important; padding: 12px !important;
     `;
     const labelStyle = `display:block!important;font-size:10px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;letter-spacing:0.5px!important;margin-bottom:4px!important;`;
-    const selectStyle = `width:100%!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;`;
-    const pillStyle = (active) => `flex:1!important;padding:6px 4px!important;border-radius:6px!important;border:1px solid ${active ? settings.accentColor : t.inputBorder}!important;background:${active ? settings.accentColor : t.selectBg}!important;color:${active ? 'white' : t.subtext}!important;font-size:10px!important;font-weight:600!important;cursor:pointer!important;text-align:center!important;`;
+    // Long team pairs ellipsize rather than overflow — it's a native <select>, so the full name
+    // is visible the moment it's opened.
+    const selectStyle = `width:100%!important;box-sizing:border-box!important;padding:6px 8px!important;background:${t.selectBg}!important;color:${t.inputText}!important;border:1px solid ${t.inputBorder}!important;border-radius:6px!important;font-size:12px!important;cursor:pointer!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;`;
+    // flex:1 1 auto + nowrap: pills size to their text instead of being squeezed to a quarter each,
+    // so nothing clips. If a label ever outgrows the row, the container wraps to a second line
+    // rather than cutting the word.
+    const pillStyle = (active) => `flex:1 1 auto!important;min-width:56px!important;white-space:nowrap!important;padding:6px 6px!important;border-radius:6px!important;border:1px solid ${active ? settings.accentColor : t.inputBorder}!important;background:${active ? settings.accentColor : t.selectBg}!important;color:${active ? 'white' : t.subtext}!important;font-size:10px!important;font-weight:600!important;cursor:pointer!important;text-align:center!important;`;
 
     panel.innerHTML = `
       <div style="display:flex!important;justify-content:space-between!important;align-items:center!important;margin-bottom:10px!important;">
-        <span style="font-size:11px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;">🎯 Change</span>
+        <span style="font-size:11px!important;font-weight:700!important;color:${t.label}!important;text-transform:uppercase!important;">Change sport &amp; game</span>
         <button id="se-selector-close" style="background:none!important;border:none!important;color:${t.subtext}!important;cursor:pointer!important;font-size:14px!important;font-weight:700!important;line-height:1!important;">✕</button>
       </div>
 
@@ -1218,7 +1304,7 @@
 
       <div style="margin-bottom:2px!important;">
         <label style="${labelStyle}">Difficulty</label>
-        <div id="se-sel-levels" style="display:flex!important;gap:5px!important;">
+        <div id="se-sel-levels" style="display:flex!important;flex-wrap:wrap!important;gap:5px!important;">
           ${LEVELS.map(l => `<div class="se-sel-pill" data-level="${l.key}" style="${pillStyle(settings.level === l.key)}">${l.label}</div>`).join('')}
         </div>
       </div>
@@ -1238,12 +1324,12 @@
     });
   }
 
-  // Smart side-detection: open on whichever side of the card has full room for the
-  // 240px panel; if neither does, use the side with more space (clamped on-screen).
+  // Smart side-detection: open on whichever side of the card has full room for the panel;
+  // if neither does, use the side with more space (clamped on-screen).
   function positionSelectorPanel() {
     if (!overlayEl || !selectorPanelEl) return;
     const rect = overlayEl.getBoundingClientRect();
-    const pw = 240, gap = 8;
+    const pw = SELECTOR_PANEL_W, gap = 8;
     const spaceRight = window.innerWidth - rect.right;
     const spaceLeft = rect.left;
     let left;

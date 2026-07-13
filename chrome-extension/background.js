@@ -10,6 +10,13 @@ const AUTH_BASE = 'https://sports-explainer-mode.vercel.app/api/auth';
 // API root (Phase 2 4b — entitlement lives beside /auth, not under it).
 const API_BASE = 'https://sports-explainer-mode.vercel.app/api';
 
+// SINGLE SOURCE OF TRUTH for the web purchase link (SANDBOX). Lives here — not in content.js or
+// popup.js — because BOTH surfaces need it and a second copy would drift at the sandbox →
+// production swap. app_user_id = the signed-in email (URL-encoded) as the FINAL PATH SEGMENT, so
+// the purchase attaches to the same customer /api/entitlement reads.
+// SWAP THIS ONE LINE for the production link at launch.
+const PURCHASE_LINK_BASE = 'https://pay.rev.cat/sandbox/waracylgcjcmokss/';
+
 // ─────────────────────────────────────────
 // CHROME.STORAGE STATE HELPERS (Fix #11)
 // MV3 service workers can be suspended at any time.
@@ -257,6 +264,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // ── UPGRADE: open the purchase tab (email as app_user_id). Called by BOTH popup + overlay. ──
+  if (msg.action === 'openUpgrade') {
+    handleOpenUpgrade()
+      .then(sendResponse).catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
 });
 
 // ─────────────────────────────────────────
@@ -393,6 +407,20 @@ async function handleAuthCheckSession() {
 async function handleAuthSignOut() {
   await clearAuth();
   await setEntitlementCache(null);
+  return { ok: true };
+}
+
+// Open the purchase tab with the signed-in email as app_user_id. Opened from BACKGROUND
+// (chrome.tabs.create) rather than the caller, so it works identically from the popup — which
+// closes on click and would kill a window.open — and from the overlay.
+// Refuses without an email: an anonymous app_user_id would attach Pro to a customer we can
+// never match back to this user.
+async function handleOpenUpgrade() {
+  const auth = await getAuth();
+  const email = auth && auth.email ? auth.email : null;
+  if (!email) return { ok: false, reason: 'not_signed_in' };
+  const url = PURCHASE_LINK_BASE + encodeURIComponent(email);
+  await chrome.tabs.create({ url });
   return { ok: true };
 }
 

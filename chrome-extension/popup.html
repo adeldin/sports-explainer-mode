@@ -129,6 +129,67 @@
       color: white;
       border-color: #e87722;
     }
+
+    /* ── Account (header chip + entry-screen row) ────────────────────────────
+       Dark-only, reusing the popup's existing brand palette. The overlay's theme
+       system lives in content.js and is deliberately NOT ported here. */
+    .header .spacer { flex: 1; }
+
+    #account-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .chip-badge {
+      padding: 2px 7px;
+      border-radius: 10px;
+      letter-spacing: 0.03em;
+      background: #2a3d63;
+      color: #a9b4c9;
+    }
+    .chip-badge.pro { background: #14b8a6; color: #06251f; }
+    .chip-link {
+      background: none;
+      border: none;
+      color: #e87722;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    #account-row {
+      background: #152444;
+      border: 1px solid #2a3d63;
+      border-radius: 6px;
+      padding: 9px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    #account-row .who {
+      font-size: 11px;
+      line-height: 1.4;
+      color: #a9b4c9;
+      word-break: break-all;
+    }
+    #account-row .who strong { color: #f5ecd7; font-weight: 700; }
+    #account-row .who .tier-pro { color: #14b8a6; font-weight: 700; }
+    #account-row button {
+      width: 100%;
+      padding: 7px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #e87722;
+      color: white;
+    }
+    #account-row button:hover { background: #c8611a; }
   </style>
 </head>
 <body>
@@ -155,14 +216,23 @@
       </g>
     </svg>
     <span style="color:#f5ecd7;">Sports Explainer</span>
+    <span class="spacer"></span>
+    <!-- Account chip — filled by renderAccountChip() in popup.js -->
+    <div id="account-chip"></div>
   </div>
 
   <div class="body">
 
-    <!-- Sport Picker -->
+    <!-- Account row — sign-in nudge / Pro status / upgrade. Filled by renderAccountRow(). -->
+    <div id="account-row"></div>
+
+    <!-- Sport Picker. The first option is a real placeholder (value="") so NOTHING is
+         pre-selected — this is also what fixes the old bug where picking the already-
+         displayed NFL fired no 'change' event and silently loaded no games. -->
     <div>
       <label>Sport</label>
       <select id="sport-select">
+        <option value="" selected>Choose a sport…</option>
         <option value="nfl">🏈 NFL</option>
         <option value="mlb">⚾ MLB</option>
         <option value="nba">🏀 NBA</option>
@@ -198,7 +268,7 @@
     <hr class="divider">
 
     <!-- Status + Button -->
-    <div id="status">Select a sport to load today's games</div>
+    <div id="status">Start by selecting your sport</div>
     <button id="toggle-btn" disabled>Show Overlay</button>
 
   </div>
