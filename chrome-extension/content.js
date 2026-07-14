@@ -1681,6 +1681,31 @@
   const CAP_HIDDEN_IDS = ['se-h-what', 'se-explanation', 'se-glossary-box', 'se-h-why', 'se-why',
                           'se-h-rule', 'se-rule', 'se-source-container', 'se-cap-pill'];
 
+  // The server said "capped" but the local counter may still think credits remain (a cleared or
+  // tampered seDailyCap/seGameQA, or the server's UTC day vs the client's local day). Fast-forward
+  // the local counter to spent so the UI stops contradicting the server.
+  //
+  // This is NOT cosmetic: renderCapIndicators() — which runs in handleAskQuestion's `finally` —
+  // calls hideAskCapRow() whenever the local counter still shows credits left. Without this sync
+  // the upsell row would appear and then immediately vanish.
+  //
+  // The daily sync preserves `keys`, so plays already paid for stay free re-reads (matching the
+  // server, which also honours its per-play markers). Only NEW plays are blocked.
+  function syncCapFromServer(reason) {
+    const CAPS = window.SE_CAPS;
+    if (!CAPS) return;
+    if (reason === 'qa') {
+      if (!currentGameId) return;               // gameless asks are never capped server-side
+      seGameQA = { gameId: currentGameId, count: CAPS.QA_FREE_PER_GAME };
+      saveGameQA();
+    } else {
+      const today = CAPS.localDateStr(new Date());
+      const base = seDailyCap && seDailyCap.date === today ? seDailyCap : { date: today, count: 0, keys: [] };
+      seDailyCap = { date: today, count: CAPS.DAILY_FREE, keys: base.keys || [] };
+      saveDailyCap();
+    }
+  }
+
   function showDailyCapCard() {
     const card = document.getElementById('se-cap-card');
     if (!card) return;
@@ -1893,6 +1918,27 @@
       });
 
       if (response) {
+        // ── SERVER-ENFORCED CAP ──────────────────────────────────────────────────────────────
+        // The server is AUTHORITATIVE. It returns { capped:true, reason } with no `simple` /
+        // `gameContext`, so this must be intercepted FIRST: falling through would derive a game
+        // state from `undefined`, hash a phantom play key, and burn a client credit on a play
+        // that was never served.
+        //
+        // Normally unreachable — the client's own caps.js blocks first. It fires when the two
+        // DISAGREE: a tampered/cleared local counter, or the UTC-vs-local day-boundary desync.
+        // Either way the user sees the same upsell they'd have seen locally, never an error.
+        if (response.capped === true) {
+          syncCapFromServer(response.reason);
+          if (response.reason === 'qa') {
+            showAskCapRow();
+            setStatusReady(false, '🔒 Question limit reached');
+          } else {
+            showDailyCapCard();
+            setStatusReady(false, '🔒 Daily limit reached');
+          }
+          return;
+        }
+
         // Update game state for smart polling — derived from gameContext now
         // that response.state is gone (parse "... — Bot 1st" / "... — Final").
         const newState = deriveStateFromContext(response.gameContext);
@@ -2002,6 +2048,15 @@
         // "learn mode" ask, which stays UNGATED (same carve-out as iOS).
         gameId: currentGameId || undefined
       });
+      // Server-enforced per-game Q&A cap → the upsell row, NOT "⚠️ Could not get an answer."
+      // A capped response carries no `answer`, so without this it would read as a failure.
+      if (response && response.capped === true) {
+        syncCapFromServer(response.reason);   // must precede the finally → renderCapIndicators()
+        answerBox.style.display = 'none';     // no empty answer box above the upsell
+        showAskCapRow();
+        return;                               // `finally` still restores the button + chips
+      }
+
       answerBox.textContent = response?.answer || '⚠️ Could not get an answer.';
       answerGameId = currentGameId; // this answer belongs to the current game (survives poll refreshes)
       if (!preset && input) input.value = ''; // only clear the typed input, not on chip taps
