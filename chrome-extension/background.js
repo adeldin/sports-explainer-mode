@@ -276,13 +276,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // ─────────────────────────────────────────
 // FETCH PLAY EXPLANATION
 // ─────────────────────────────────────────
+// Attach the signed-in user's session token to an /api/explain body — and ONLY when one exists.
+// The backend's cap enforcement is PRESENCE-BASED: a body with no `session` is an anonymous
+// caller (the iOS app, and signed-out extension users) and is never enforced against. So an
+// empty/null session field must never be sent — it would be a different thing than "absent".
+// Same source the entitlement check reads: chrome.storage.local seAuth = { email, session }.
+async function withSession(body) {
+  const auth = await getAuth();
+  const session = auth && typeof auth.session === 'string' ? auth.session.trim() : '';
+  if (session) body.session = session;
+  return body;
+}
+
 async function handleFetchPlay(sport, level, gameId, language, playText) {
   const body = { sport, level, gameId, language };
   if (playText) body.playText = playText; // present → backend explains THAT play, not the latest
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(await withSession(body))
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();
@@ -330,7 +342,7 @@ async function handleRecap(sport, level, gameId, language, isPro = false) {
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'recap', sport, gameId, level, language, isPro })
+    body: JSON.stringify(await withSession({ action: 'recap', sport, gameId, level, language, isPro }))
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();
@@ -343,7 +355,7 @@ async function handleAskQuestion(sport, level, question, context, language = 'en
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'ask', sport, level, question, context, language })
+    body: JSON.stringify(await withSession({ action: 'ask', sport, level, question, context, language }))
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();
