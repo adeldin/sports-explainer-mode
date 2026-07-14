@@ -7,15 +7,22 @@ import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
 import { resolveCaller, type Caller } from '../_lib/entitlement';
-import { consumeGameQA, QA_FREE_PER_GAME } from '../_lib/caps';
+import {
+  consumeGameQA, QA_FREE_PER_GAME,
+  consumeDailyExplanation, DAILY_FREE, serverDateStr, playKeyFor,
+} from '../_lib/caps';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 // ── SERVER-SIDE CAP ENFORCEMENT ───────────────────────────────────────────────────────────────
-// STATUS:  ask (per-game Q&A cap)   → ENFORCED
-//          explain (daily play cap) → shadow-logged only, NOT enforced yet
+// STATUS:  ask (per-game Q&A cap)   → ENFORCED  (3/game)
+//          explain (daily play cap) → ENFORCED  (5/day, UTC day boundary, server-side play dedup)
+//
+// NOT capped: the tennis/golf learn-mode branch returns above the play path and is left ungated
+// — analogous to the gameless-ask carve-out. Moot for enforcement anyway: only signed-in
+// EXTENSION users are enforceable, and the extension doesn't support tennis/golf.
 //
 // The design is PRESENCE-BASED, and that is what makes it safe to ship:
 //   • No `session` in the body  → anonymous → NEVER enforced. The iOS app sends no identity of
@@ -1375,6 +1382,42 @@ export async function POST(req: NextRequest) {
       const fetched = await fetchGameData(sport, gameId, !!playText);
       play = playText || fetched.play;
       ({ gameContext, homeTeam, awayTeam } = fetched);
+    }
+
+    // ── FREE-TIER DAILY EXPLANATION CAP — ENFORCED ───────────────────────────────────────────
+    // Placed HERE, after the play is resolved but BEFORE the situation-cache check and before
+    // Groq. Two reasons that ordering is load-bearing:
+    //   1. The dedup key needs the RESOLVED play — that's what distinguishes a re-read (free)
+    //      from a genuinely new play (charged). The server hashes the play text IT fetched from
+    //      ESPN; it does NOT trust a client-sent key, and it IGNORES any client `isRefresh`
+    //      field entirely. Both are forgeable — a client could otherwise mark every request a
+    //      "refresh" and read forever for free.
+    //   2. The cache HIT below returns EARLY. If the cap sat under it, a cache hit would serve a
+    //      brand-new play without charging — a free user could read unlimited cached plays.
+    //      Gating above the cache means the cap counts EXPLANATIONS DELIVERED, not Groq calls.
+    //
+    // Exempt (served exactly as today): anonymous / no session (the iOS app), Pro + trial,
+    // invalid-session, and `degraded` (entitlement or Redis unreachable → FAIL OPEN).
+    if (enforceable(caller)) {
+      const dayStr = serverDateStr();
+      const pKey = playKeyFor(String(gameId ?? ''), play);
+      try {
+        const d = await consumeDailyExplanation(caller!.email as string, dayStr, pKey);
+        if (!d.allowed) {
+          console.log(`[caps] BLOCKED daily email=${caller!.email} day=${dayStr} used=${d.used} play=${pKey}`);
+          return NextResponse.json(
+            { capped: true, reason: 'daily', limit: DAILY_FREE, remaining: 0 },
+            { headers: corsHeaders },
+          );
+        }
+        console.log(
+          `[caps] daily ${d.outcome} email=${caller!.email} day=${dayStr} ` +
+          `used=${d.used} remaining=${d.remaining} play=${pKey}`,
+        );
+      } catch (e) {
+        // Counter unavailable → serve. Under-enforcing beats blocking a paying user.
+        console.error('[caps] daily counter failed (failing open — request served):', e);
+      }
     }
 
     // Situation-cache HIT: replay the cached TEACHING CORE merged with LIVE values (playType/teams/
