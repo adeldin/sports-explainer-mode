@@ -44,6 +44,21 @@ function enforceable(caller: Caller | undefined): boolean {
     && !!caller.email;        // no identity → nothing to count against
 }
 
+// Do we have a TRUSTWORTHY entitlement for this caller? If so, `caller.isPro` is authoritative
+// (RevenueCat, via a session we validated) and any client-sent `isPro` must be ignored.
+//
+// False → we have no verified view, so we fall back to the client's claim and behave EXACTLY as
+// today. That covers three cases, all deliberate:
+//   • no session      → the iOS app. Unchanged, by design (it has no identity to send yet).
+//   • invalid session → treated the same as anonymous everywhere else in this file. Being
+//     STRICTER here would withhold fields from a genuine Pro whose token merely expired, and it
+//     buys nothing: an attacker who wants the lenient path can simply omit the session entirely.
+//   • degraded        → Upstash/RevenueCat unreachable. FAIL OPEN, same discipline as the caps:
+//     briefly honoring a client's isPro beats withholding a paying customer's recap in an outage.
+function hasVerifiedEntitlement(caller: Caller | undefined): boolean {
+  return !!caller && caller.hasSession && caller.signedIn && !caller.degraded;
+}
+
 function shadowLog(caller: Caller, action: string, sport: string, gameId: string | undefined) {
   if (!CAPPED_ACTIONS.has(action)) return;
 
@@ -1153,7 +1168,29 @@ export async function POST(req: NextRequest) {
     // the model) so it can't be hallucinated. Free (isPro !== true) → only score + story
     // generated; Pro → all four narrative fields. Empty string = the data didn't support it.
     if (action === 'recap') {
-      const isProReq = body.isPro === true;
+      // ── RECAP Pro-GATE: VERIFIED, not claimed ────────────────────────────────────────────
+      // `body.isPro` is a naked boolean any caller can set. When we have a verified entitlement
+      // (a session we resolved through RevenueCat), it WINS and the client's claim is ignored —
+      // so a signed-in Free user sending isPro:true gets the free recap (score + story) and
+      // nothing more. Without a verified entitlement we fall back to the claim, which keeps the
+      // iOS app byte-identical (see hasVerifiedEntitlement for why that's the right call).
+      const claimedPro = body.isPro === true;
+      const verified = hasVerifiedEntitlement(caller);
+      const isProReq = verified ? caller!.isPro : claimedPro;
+
+      if (verified && claimedPro !== isProReq) {
+        console.log(
+          `[caps:shadow] recap OVERRIDE email=${caller!.email} ` +
+          `claimed=${claimedPro} verified=${isProReq} → ${isProReq ? 'granted' : 'WITHHELD'}`,
+        );
+      } else {
+        console.log(
+          `[caps:shadow] recap session=${caller?.hasSession ? 'yes' : 'no'} ` +
+          `verified=${verified} isPro=${isProReq}${verified ? ` email=${caller!.email}` : ' (client-claimed)'}` +
+          `${caller?.degraded ? ' DEGRADED→fail-open' : ''}`,
+        );
+      }
+
       const data = await fetchRecapData(sport, gameId);
       const score = (data.homeTeam || data.awayTeam)
         ? `${data.awayTeam} ${data.awayScore} — ${data.homeTeam} ${data.homeScore}`.trim()
