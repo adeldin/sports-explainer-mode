@@ -10,12 +10,13 @@ const AUTH_BASE = 'https://sports-explainer-mode.vercel.app/api/auth';
 // API root (Phase 2 4b — entitlement lives beside /auth, not under it).
 const API_BASE = 'https://sports-explainer-mode.vercel.app/api';
 
-// SINGLE SOURCE OF TRUTH for the web purchase link (SANDBOX). Lives here — not in content.js or
-// popup.js — because BOTH surfaces need it and a second copy would drift at the sandbox →
-// production swap. app_user_id = the signed-in email (URL-encoded) as the FINAL PATH SEGMENT, so
-// the purchase attaches to the same customer /api/entitlement reads.
-// SWAP THIS ONE LINE for the production link at launch.
-const PURCHASE_LINK_BASE = 'https://pay.rev.cat/sandbox/waracylgcjcmokss/';
+// SINGLE SOURCE OF TRUTH for the web purchase link — PRODUCTION. Lives here (not in content.js
+// or popup.js) because BOTH surfaces need it and a second copy would drift.
+// app_user_id = the signed-in email (URL-encoded) as the FINAL PATH SEGMENT, so the purchase
+// attaches to the same customer /api/entitlement reads. Note: the production link has NO
+// /sandbox/ path segment — the sandbox equivalent was https://pay.rev.cat/sandbox/<id>/.
+// THIS IS LIVE — a purchase here charges a real card.
+const PURCHASE_LINK_BASE = 'https://pay.rev.cat/ngnjkdtzqevjpwck/';
 
 // ─────────────────────────────────────────
 // CHROME.STORAGE STATE HELPERS (Fix #11)
