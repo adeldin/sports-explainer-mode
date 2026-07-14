@@ -242,7 +242,7 @@ const STAT_DEFS: Record<StandingsSport, StatDef[]> = {
       ),
     },
     {
-      key: 'pointsFor', tier: 'intermediate', label: 'Points scored', prompt: 'Which team has scored more points in this table?', pick: 'higher',
+      key: 'pointsFor', tier: 'intermediate', label: 'Points scored', prompt: 'Which team has scored more points?', pick: 'higher',
       teach: c => t4(
         `The ${c.w.shortName} have scored ${c.wd} points in this table — more than the ${c.l.shortName}'s ${c.ld}!`,
         `PF (points for) totals every point a team has scored. ${c.w.shortName} ${c.wd}, ${c.l.shortName} ${c.ld}. Around 23 points a game is a typical NFL offense; 28+ is elite.`,
@@ -401,7 +401,7 @@ const STAT_DEFS: Record<StandingsSport, StatDef[]> = {
       ),
     },
     {
-      key: 'pointsFor', tier: 'intermediate', label: 'Goals scored', prompt: 'Which team has scored more goals in this table?', pick: 'higher',
+      key: 'pointsFor', tier: 'intermediate', label: 'Goals scored', prompt: 'Which team has scored more goals?', pick: 'higher',
       teach: c => t4(
         `The ${c.w.shortName} have scored ${c.wd} goals — more than the ${c.l.shortName}'s ${c.ld}!`,
         `GF (goals for) totals a team's scoring: ${c.w.shortName} ${c.wd} vs ${c.l.shortName} ${c.ld}. Hockey is low-scoring — roughly 3 goals a game per team — so these totals build slowly.`,
@@ -653,11 +653,15 @@ function parseTeams(data: any): StandingTeam[] {
   return out;
 }
 
+// ESPN is inconsistent about displayName: the NBA gives a clean "2026-27", MLB gives
+// "2027", but the soccer feeds give "2026-27 English Premier League". Take the LEADING
+// SEASON TOKEN in every case. (The old length<=8 guard dropped the soccer name wholesale
+// and fell back to `year`, which reads as "the 2025 Premier League season" — wrong, since
+// a soccer year spans two: it's the 2025-26 season.) Also note `year` disagrees with the
+// token for split seasons, so never reconstruct the label from `year` when we have one.
 function seasonLabel(season: RawSeason | undefined): string {
-  const dn = season?.displayName;
-  // NBA-style "2026-27" is perfect; EPL-style "2026-27 English Premier League"
-  // is too long for a chip — fall back to the year.
-  if (dn && dn.length <= 8) return dn;
+  const m = season?.displayName?.trim().match(/^\d{4}(?:[-–]\d{2,4})?/);
+  if (m) return m[0];
   if (season?.year) return String(season.year);
   return '';
 }
@@ -828,6 +832,24 @@ function bandFor(level: Level, n: number): [number, number] {
   }
 }
 
+// Every question must name its OWN season. A bare "Which team has scored more
+// points?" reads as all-time — but these numbers are one season's standings table,
+// and (thanks to the prior-season fallback) sometimes LAST season's. A context chip
+// under the question wasn't enough: you read the question first and answer it before
+// your eye ever reaches the chip. So the season goes INSIDE the sentence.
+//   in-progress → "So far in the 2025-26 NBA season, which team has more wins?"
+//   completed   → "In the 2025-26 NBA season (final table), which team had more wins?"
+// StatDef.prompt stays a bare "Which team …?" clause; this is the only place it's
+// dressed for display.
+function qualifyPrompt(prompt: string, league: StandingsLeague): string {
+  const name = league.label.replace(/^the\s+/i, '');           // "the NBA" → "NBA"
+  const clause = prompt.charAt(0).toLowerCase() + prompt.slice(1); // "Which…" → "which…"
+  const season = league.season ? `${league.season} ${name}` : name;
+  return league.priorSeason
+    ? `In the ${season} season (final table), ${clause}`
+    : `So far in the ${season} season, ${clause}`;
+}
+
 function buildFromStat(
   league: StandingsLeague,
   def: StatDef,
@@ -842,6 +864,7 @@ function buildFromStat(
   if (!band.length) band = pairs;
   // Prefer a pair the player hasn't just seen; if the whole band is recent,
   // play on anyway (never blank beats never repeating).
+  // (see qualifyPrompt below — every question names its own season)
   const fresh = avoid
     ? band.filter(p => !avoid.has(pairKey(league.teams[p.i], league.teams[p.j], def.key)))
     : band;
@@ -866,7 +889,7 @@ function buildFromStat(
     priorSeason: league.priorSeason,
     statKey: def.key,
     statLabel: def.label,
-    prompt: def.prompt,
+    prompt: qualifyPrompt(def.prompt, league),
     pick: def.pick,
     a, b, answer,
     aDisplay: av.display,

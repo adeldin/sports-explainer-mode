@@ -349,15 +349,12 @@ export default function HigherOrLowerGame({ sportKeys, categoryEmoji }: AcademyG
           </View>
         ) : (
           <>
+            {/* The prompt now names its own league AND season (lib/standings
+                qualifyPrompt) — "So far in the 2025-26 NBA season, which team…".
+                A separate context chip underneath would just say it twice, and
+                it sat BELOW the question anyway, which is why the season never
+                registered: you answer before your eye gets there. */}
             <Text style={styles.prompt}>{round.prompt}</Text>
-
-            {/* Context chip: which table these two teams share — and, when the
-                prior-season fallback served it, an honest "last season" tag. */}
-            <Text style={styles.leagueChip} numberOfLines={1}>
-              {round.league}
-              {round.season ? ` · ${round.season}` : ''}
-              {round.priorSeason ? ' (last season)' : ''}
-            </Text>
 
             {/* Countdown bar — the timed-streak pressure. Frozen once judged. */}
             <View style={styles.timerTrack}>
@@ -445,7 +442,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rankUpName: { color: t.onAccent, fontSize: 22, fontWeight: '900', marginTop: 4 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   prompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 4, lineHeight: 22 },
-  leagueChip: { color: t.textMuted, fontSize: 12, fontWeight: '700', marginBottom: 10 },
   timerTrack: {
     height: 6, borderRadius: 3, backgroundColor: t.surfaceAlt, overflow: 'hidden', marginBottom: 12,
   },
