@@ -1,43 +1,50 @@
-// Signal Decoder — MLB bank. Umpire signals only (evergreen, rule-based; verified
-// against standard umpire mechanics manuals). 6 scenarios per tier × 4 tiers. Pure data.
+// Signal Decoder — MLB bank (v2 rework). Umpire signals only (evergreen, rule-based;
+// verified against standard umpire mechanics manuals). 6 scenarios per tier × 4 tiers.
+//
+// v2 CONTRACT: the prompt is a CONSTANT ("What is the umpire signaling?") — the
+// animated pictogram is the only clue. Options are always other MLB signal meanings.
+// Difficulty = how visually close the distractor signals are; the rules depth lives
+// in the exp teaching beat. Pure data, zero RN imports.
 import type { SignalScenario } from '../signalDecoder';
 
+const P = 'What is the umpire signaling?';
+
 export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
-  // ── kid ────────────────────────────────────────────────────────────────────
+  // ── kid: unmistakable signals, wildly different distractors ────────────────
   {
     id: 'mlb-sig-kid-1', level: 'kid', signal: 'mlb-out',
-    prompt: 'The umpire punches a clenched fist — the "hammer." What is he calling?',
-    options: ['Out!', 'Home run', 'Time for snacks'],
+    prompt: P,
+    options: ['Out!', 'Safe', 'Time out'],
     answer: 0,
     title: 'The hammer: out',
     exp: {
-      kid: 'The fist punch means OUT — the batter or runner is done for this inning. Three outs and the whole team switches to the field!',
-      beginner: 'Outs come many ways: caught fly ball, tag, force at a base, strikeout. However it happens, the fist is the confirmation — and three of them end the half-inning.',
+      kid: 'The punching fist means OUT — the batter or runner is done for this inning. Three outs and the whole team switches to the field!',
+      beginner: 'Outs come many ways: caught fly ball, tag, force at a base, strikeout. However it happens, the fist punch — the "hammer" — is the confirmation, and three of them end the half-inning.',
       intermediate: 'On close plays, watch the TIMING of the hammer: umpires deliberately pause a beat ("see it, then call it") to ensure the ball was held securely through the tag before committing.',
       expert: 'Mechanics detail: the out is a right-hand signal — the "action hand" umpires reserve for strikes, outs, and fair calls. A strong sell (a bigger, faster hammer) on bang-bang plays isn\'t theater only; it communicates certainty to dugouts weighing a replay challenge.',
     },
   },
   {
     id: 'mlb-sig-kid-2', level: 'kid', signal: 'mlb-safe',
-    prompt: 'The runner slides into the base and the umpire sweeps both arms out flat. The call is…',
-    options: ['Safe — the runner stays', 'Out', 'Rain delay'],
+    prompt: P,
+    options: ['Safe — the runner stays', 'Out', 'Strike'],
     answer: 0,
     title: 'Arms swept wide: safe',
     exp: {
-      kid: 'Wide-open arms mean SAFE! The runner beat the ball to the base and gets to stay there.',
+      kid: 'Wide-open arms sweeping apart mean SAFE! The runner beat the ball to the base and gets to stay there.',
       beginner: 'A runner is safe when he touches the base before being tagged (or before the base is touched on a force). The flat outward sweep says: no out, play on.',
       intermediate: 'Safe/out at a base is a race you can watch in the umpire\'s eyes: they take an angle to see BOTH the fielder\'s glove and the runner\'s foot — the sweep comes only after both are resolved.',
-      expert: 'A precise variant to know: safe sweep followed by pointing at the ball on the ground = "safe — the fielder DROPPED it." The add-on gesture pre-answers the dugout\'s protest before it starts. Umpire mechanics are built to justify, not just declare.',
+      expert: 'A precise variant to know: the safe sweep followed by pointing at the ball on the ground = "safe — the fielder DROPPED it." The add-on gesture pre-answers the dugout\'s protest before it starts. Umpire mechanics are built to justify, not just declare.',
     },
   },
   {
     id: 'mlb-sig-kid-3', level: 'kid', signal: 'mlb-strike',
-    prompt: 'The pitch zips past the batter and the umpire points sharply to the side. What was the pitch?',
-    options: ['A strike', 'A ball', 'A home run'],
+    prompt: P,
+    options: ['Strike!', 'Home run', 'Safe'],
     answer: 0,
-    title: 'The point: strike',
+    title: 'The sharp point: strike',
     exp: {
-      kid: 'The sideways point means STRIKE — the pitch was good and the batter should have swung (or swung and missed). Three strikes and you\'re out!',
+      kid: 'The arm firing out to the side means STRIKE — the pitch was good and the batter should have swung (or swung and missed). Three strikes and you\'re out!',
       beginner: 'A strike is a pitch in the strike zone taken, any swing-and-miss, or a foul with fewer than two strikes. Umpires signal strikes with the right hand — a point or a hammer, their style.',
       intermediate: 'Notice: called BALLS get no signal at all — the umpire just stays set. Only strikes are physically signaled. Silence + no motion is itself information: ball.',
       expert: 'Umpires personalize the strike mechanic (point, hammer, chainsaw) but the grammar is fixed: verbal "strike" + right-hand signal, and on strike three a more emphatic sell. A called third strike often gets a signature punch-out distinct from the swinging version — decoding a punch-out from center field is pure signal literacy.',
@@ -45,8 +52,8 @@ export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'mlb-sig-kid-4', level: 'kid', signal: 'mlb-time',
-    prompt: 'Both of the umpire\'s arms go straight up in the air. What does it mean?',
-    options: ['Time! The ball is dead — everything stops', 'Touchdown', 'The batter is out'],
+    prompt: P,
+    options: ['Time — dead ball', 'Home run', 'Out'],
     answer: 0,
     title: 'Both arms up: time / dead ball',
     exp: {
@@ -58,21 +65,21 @@ export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'mlb-sig-kid-5', level: 'kid', signal: 'mlb-homerun',
-    prompt: 'The ball sails over the wall and the umpire circles a raised finger overhead. That circle means…',
-    options: ['Home run — run all the bases!', 'Foul ball', 'The game is tied'],
+    prompt: P,
+    options: ['Home run — run all the bases!', 'Foul ball', 'Out'],
     answer: 0,
     title: 'The finger twirl: home run',
     exp: {
       kid: 'The circling finger means HOME RUN! The batter gets to jog around all four bases and score. The circle copies the trip around the bases!',
       beginner: 'A ball over the outfield fence in fair territory is a home run — the batter and every runner on base score. The circular signal mimics the base tour.',
-      intermediate: 'The umpire\'s judgment moment is the fence: over in FAIR territory = home run; bouncing over = a "ground-rule" style double (two bases). Watch which signal follows a wall-scraper — twirl vs two fingers tells the story instantly.',
+      intermediate: 'The umpire\'s judgment moment is the fence: over in FAIR territory = home run; bouncing over = a book-rule double (two bases). Watch which signal follows a wall-scraper — the twirl or two fingers tells the story instantly.',
       expert: 'Boundary calls are the classic replay case: fan interference, ball hitting the top of the wall, fair/foul at the pole. The pole itself is IN fair territory — hit it and the twirl comes out. When umpires huddle before twirling, they\'re reconstructing exactly which side of these lines the ball crossed.',
     },
   },
   {
     id: 'mlb-sig-kid-6', level: 'kid', signal: 'mlb-fair',
-    prompt: 'A ball lands near the line and the umpire silently points toward the field. What is the call?',
-    options: ['Fair ball — keep playing!', 'Foul ball', 'Time out'],
+    prompt: P,
+    options: ['Fair ball — keep playing!', 'Foul ball', 'Out'],
     answer: 0,
     title: 'The silent point: fair ball',
     exp: {
@@ -83,11 +90,11 @@ export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
     },
   },
 
-  // ── beginner ──────────────────────────────────────────────────────────────
+  // ── beginner: common signals, clearly distinct distractors ─────────────────
   {
     id: 'mlb-sig-beg-1', level: 'beginner', signal: 'mlb-count',
-    prompt: 'The umpire holds up fingers on both hands — three on the left, two on the right. What is being shown?',
-    options: ['The count: 3 balls, 2 strikes', 'The score: 3–2', 'Three outs coming'],
+    prompt: P,
+    options: ['The count: 3 balls, 2 strikes', 'Infield fly', 'Time — dead ball'],
     answer: 0,
     title: 'Fingers up: the count',
     exp: {
@@ -98,89 +105,89 @@ export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
     },
   },
   {
-    id: 'mlb-sig-beg-2', level: 'beginner', signal: 'mlb-strike',
-    prompt: 'The umpire points to the side but the batter never swung. What kind of strike is this?',
-    options: ['A called strike — the pitch caught the zone', 'A foul ball', 'A balk'],
-    answer: 0,
-    title: 'The called strike',
-    exp: {
-      kid: 'The batter let a good pitch go by, so the umpire calls the strike FOR him. Watching a perfect pitch counts the same as missing it!',
-      beginner: 'The strike zone is roughly over the plate, from the knees to the mid-torso. Take a pitch inside it and the umpire\'s point says: that one counted.',
-      intermediate: 'The zone is defined by the BATTER\'S stance, so it moves player to player — one reason framing (catchers subtly holding borderline pitches) is a real skill aimed directly at this signal.',
-      expert: 'The called strike is the most-judged event in sports — roughly 150 taken pitches a game, each a zone decision. Umpire "consistency" matters more to players than exact geometry: a zone that\'s identical for both teams all night is considered well-umpired even if slightly wide.',
-    },
-  },
-  {
-    id: 'mlb-sig-beg-3', level: 'beginner', signal: 'mlb-time',
-    prompt: 'A batted ball lands outside the line. The umpire throws both arms up and shouts. What\'s the ruling?',
-    options: ['Foul ball — dead, runners return', 'Home run', 'The batter walks'],
-    answer: 0,
-    title: 'Arms up + a shout: foul ball',
-    exp: {
-      kid: 'That\'s a FOUL BALL — it landed outside the lines. Everybody stops, runners go back, and the batter tries again.',
-      beginner: 'Foul balls kill the play: runners return, and the batter gets a strike (unless he already has two — a foul can\'t be strike three, except a bunt or caught foul tip).',
-      intermediate: 'Same arms as "Time" — the shared mechanic is DEAD BALL. The verbal ("Foul!") plus a point to foul territory is what specifies the cause. Loud voice on fouls, silence on fairs: mishearing must always fail safe.',
-      expert: 'The two-strike foul rule creates baseball\'s war of attrition: a batter can foul off pitch after pitch to survive, driving up pitch counts. Exception worth knowing: a two-strike BUNT fouled = strikeout, and a caught foul TIP (sharp, direct to the glove) is a live strike three — different signal entirely.',
-    },
-  },
-  {
-    id: 'mlb-sig-beg-4', level: 'beginner', signal: 'mlb-infield-fly',
-    prompt: 'With runners on first and second, a high pop-up goes to the shortstop — and the umpire points straight up. What did he just declare?',
-    options: ['Infield fly — the batter is automatically out', 'Home run', 'Time out'],
+    id: 'mlb-sig-beg-2', level: 'beginner', signal: 'mlb-infield-fly',
+    prompt: P,
+    options: ['Infield fly — batter out', 'Home run', 'Strike'],
     answer: 0,
     title: 'The skyward point: infield fly',
     exp: {
-      kid: 'Pointing straight up means the batter is OUT automatically on this easy pop-up — even before it\'s caught! It\'s a special rule that protects the runners.',
+      kid: 'Pointing straight up means the batter is OUT automatically on an easy pop-up — even before it\'s caught! It\'s a special rule that protects the runners.',
       beginner: 'Infield fly rule: with runners on 1st+2nd (or bases loaded) and fewer than two outs, an easy infield pop makes the batter out immediately, catch or no catch.',
       intermediate: 'The rule exists to kill a cheat: without it, an infielder could drop the pop ON PURPOSE and turn an easy double play on the frozen runners. Declaring the batter out removes the force and the trick.',
       expert: 'Fine print: the umpire calls it at the ball\'s apex ("Infield fly, batter\'s out — if fair"), it never applies to line drives or bunts, and the ball stays LIVE — runners may advance at their own risk after a catch. It\'s a judgment of ordinary effort, not a location: an outfielder camped under it can still trigger the call.',
     },
   },
   {
-    id: 'mlb-sig-beg-5', level: 'beginner', signal: 'mlb-safe',
-    prompt: 'A pickoff throw to first. The runner dives back, and the umpire gives this flat outward sweep. What happens next?',
-    options: ['Nothing — the runner stays and play continues', 'The runner must leave the field', 'The batter gets a strike'],
+    id: 'mlb-sig-beg-3', level: 'beginner', signal: 'mlb-fair',
+    prompt: P,
+    options: ['Fair ball — the ball is live', 'Foul ball', 'Safe at the base'],
     answer: 0,
-    title: 'Safe on the pickoff',
+    title: 'Fair/foul is about the ball, not the fielder',
     exp: {
-      kid: 'The runner got back to the base before the tag — SAFE! He stays right there, and the pitcher tries again.',
-      beginner: 'Pickoffs test the runner\'s lead. Beat the tag back to the bag and the sweep says: no out, ball still live, same situation.',
-      intermediate: 'Watch the first-base umpire\'s positioning: he squares to the tag attempt, reads glove-versus-hand, and sells the call. A pickoff safe/out is the classic replay-review play — the sweep can be challenged.',
-      expert: 'Signal-reading nuance: SAFE is signaled; a no-tag ("he never touched him") gets safe PLUS a separate wiping gesture umpires add to explain why. As with fair balls, the mechanics are engineered to answer the manager\'s argument in advance.',
+      kid: 'The umpire watches the BALL, not the players. If it\'s on or inside the line when someone touches it (or when it stops), the point says FAIR — keep playing!',
+      beginner: 'Before the base, fair/foul is judged where the ball is when touched or when it settles — a ball can wobble in foul ground and roll back fair. Fielders often let rollers drift, hoping they cross foul.',
+      intermediate: 'That\'s why third basemen theatrically crouch over a crawling ball doing nothing: touching it in fair territory MAKES it fair. Position of the fielder\'s feet is irrelevant — only the ball versus the line matters.',
+      expert: 'Beyond first/third base the test changes: it\'s where the ball lands or passes the BAG (the bag itself is fair — a ball nicking the corner is fair). The umpire\'s silent hover, then a sudden point or arms-up, is a two-zone geometry decision most spectators never realize is being computed.',
     },
   },
   {
-    id: 'mlb-sig-beg-6', level: 'beginner', signal: 'mlb-homerun',
-    prompt: 'A fly ball bounces on the warning track and hops over the fence. Does the umpire give the circling-finger signal?',
-    options: ['No — that\'s two bases, not a home run', 'Yes — anything over the fence is a homer', 'Only if the outfielder touched it'],
-    answer: 0,
-    title: 'Over on a bounce ≠ home run',
-    exp: {
-      kid: 'If the ball BOUNCES before hopping the fence, it\'s not a home run. The batter only gets to second base. The finger circle stays in the pocket!',
-      beginner: 'A ball must clear the fence on the fly, in fair territory, for the home-run twirl. On a bounce it\'s a book-rule double: batter to second, runners two bases.',
-      intermediate: 'You\'ll see the umpire signal TWO (fingers) or point to second instead — the anti-home-run. Runners already past their two-base award must return, which can wipe an apparent run off the board.',
-      expert: 'Common confusion: people call this a "ground-rule double," but it\'s a universal RULE-book double — ground rules are park-specific quirks (catwalks, ivy). Either way, the umpire\'s job is placement: kill the ball, award exactly two bases from the time of pitch, and the twirl never appears.',
-    },
-  },
-
-  // ── intermediate ──────────────────────────────────────────────────────────
-  {
-    id: 'mlb-sig-int-1', level: 'intermediate', signal: 'mlb-foul-tip',
-    prompt: 'The umpire brushes one hand over the other at shoulder height, then signals a strike. What just happened?',
-    options: ['A foul tip — caught, so it\'s a live strike', 'A foul ball into the stands', 'A checked swing'],
+    id: 'mlb-sig-beg-4', level: 'beginner', signal: 'mlb-foul-tip',
+    prompt: P,
+    options: ['Foul tip', 'Safe', 'Time — dead ball'],
     answer: 0,
     title: 'The brush: foul tip',
     exp: {
       kid: 'The batter barely nicked the ball and the catcher caught it anyway. That tiny touch is a FOUL TIP — it counts as a strike, and the game keeps going!',
       beginner: 'A foul tip is a ball that grazes the bat and goes SHARP and DIRECT into the catcher\'s glove. Unlike a foul ball, it\'s a live strike — and with two strikes it\'s a strikeout.',
-      intermediate: 'That live/dead difference is everything: runners can steal on a foul tip (the ball never went dead), while a foul ball sends them back. The brush signal exists precisely to announce "this stays live."',
-      expert: 'Definition matters: if the nicked ball pops UP even slightly before the catcher gloves it, it\'s a foul BALL, not a tip — dead, and can\'t be strike three. That arc-vs-direct judgment, signaled by brush versus raised arms, decides strikeouts and stolen bases in the same instant.',
+      intermediate: 'That live/dead difference is everything: runners can steal on a foul tip (the ball never went dead), while a foul ball sends them back. The brushing signal exists precisely to announce "this stays live."',
+      expert: 'Definition matters: if the nicked ball pops UP even slightly before the catcher gloves it, it\'s a foul BALL, not a tip — dead, and can\'t be strike three. That arc-vs-direct judgment, signaled by the brush versus raised arms, decides strikeouts and stolen bases in the same instant.',
+    },
+  },
+  {
+    id: 'mlb-sig-beg-5', level: 'beginner', signal: 'mlb-out',
+    prompt: P,
+    options: ['Out', 'Strike', 'Safe'],
+    answer: 0,
+    title: 'Timing: see it, then call it',
+    exp: {
+      kid: 'The fist punch means OUT. On catches, the umpire waits to make sure the fielder REALLY held the ball and didn\'t drop it — then, hammer!',
+      beginner: 'A catch requires secure possession and a voluntary release. Umpires are trained to let the play finish before the hammer — a ball popping loose on a wall collision means no catch at all.',
+      intermediate: 'The pause is a core mechanic ("proper timing"): call the play\'s END, not its middle. Fast calls get overturned; a beat of patience produces the right hammer or the right safe sweep.',
+      expert: 'Transfer rule nuance: dropping the ball while REACHING to throw is still a catch; dropping during the catching act is not. The umpire\'s eyes track glove-to-hand transfer before the fist moves. A delayed hammer at the wall means you just watched that entire legal analysis happen in silence.',
+    },
+  },
+  {
+    id: 'mlb-sig-beg-6', level: 'beginner', signal: 'mlb-homerun',
+    prompt: P,
+    options: ['Home run', 'Infield fly', 'Time — dead ball'],
+    answer: 0,
+    title: 'The twirl — and when it stays holstered',
+    exp: {
+      kid: 'The circling finger means HOME RUN — the ball cleared the fence without bouncing! If it BOUNCES over, it\'s only a two-base hit and the twirl stays in the pocket.',
+      beginner: 'A ball must clear the fence on the fly, in fair territory, for the home-run twirl. On a bounce it\'s a book-rule double: batter to second, runners two bases.',
+      intermediate: 'On a bounce-over you\'ll see the umpire signal TWO (fingers) or point to second instead — the anti-home-run. Runners already past their two-base award must return, which can wipe an apparent run off the board.',
+      expert: 'Common confusion: people call the bounce-over a "ground-rule double," but it\'s a universal RULE-book double — ground rules are park-specific quirks (catwalks, ivy). Either way, the umpire\'s job is placement: kill the ball, award exactly two bases from the time of pitch, and the twirl never appears.',
+    },
+  },
+
+  // ── intermediate: distractors from the same visual family ──────────────────
+  {
+    id: 'mlb-sig-int-1', level: 'intermediate', signal: 'mlb-strike',
+    prompt: P,
+    options: ['Strike', 'Fair ball', 'Infield fly', 'Out'],
+    answer: 0,
+    title: 'The called strike',
+    exp: {
+      kid: 'The sharp sideways point means STRIKE. Even if the batter never swings, a pitch through the zone counts against him!',
+      beginner: 'The strike zone is roughly over the plate, from the knees to the mid-torso. Take a pitch inside it and the umpire\'s point says: that one counted.',
+      intermediate: 'The zone is defined by the BATTER\'S stance, so it moves player to player — one reason framing (catchers subtly holding borderline pitches) is a real skill aimed directly at this signal.',
+      expert: 'The called strike is the most-judged event in sports — roughly 150 taken pitches a game, each a zone decision. Umpire "consistency" matters more to players than exact geometry: a zone that\'s identical for both teams all night is considered well-umpired even if slightly wide.',
     },
   },
   {
     id: 'mlb-sig-int-2', level: 'intermediate', signal: 'mlb-delayed-dead',
-    prompt: 'The umpire silently extends his LEFT arm straight out, fist clenched, while play continues. What is he holding?',
-    options: ['A delayed dead ball — e.g. catcher\'s interference, sorted after the play', 'A strike call', 'An immediate ejection'],
+    prompt: P,
+    options: ['Delayed dead ball', 'Strike', 'Out', 'Safe'],
     answer: 0,
     title: 'The left-arm fist: delayed dead ball',
     exp: {
@@ -191,135 +198,141 @@ export const MLB_SIGNAL_SCENARIOS: SignalScenario[] = [
     },
   },
   {
-    id: 'mlb-sig-int-3', level: 'intermediate', signal: 'mlb-infield-fly',
-    prompt: 'Infield fly is declared… and the shortstop drops the ball. A runner takes off for third. What\'s the ruling on that runner?',
-    options: ['Legal — the ball is live; he advances at his own risk', 'Automatically out', 'He must return to second'],
+    id: 'mlb-sig-int-3', level: 'intermediate', signal: 'mlb-count',
+    prompt: P,
+    options: ['The count — balls and strikes', 'Time — dead ball', 'Safe', 'Home run'],
+    answer: 0,
+    title: 'The two-strike foul freeze',
+    exp: {
+      kid: 'Fingers on both hands show the COUNT — balls on one hand, strikes on the other. With two strikes, foul balls don\'t add a third — the batter survives to try again!',
+      beginner: 'Fouls are strikes only up to strike two. After that, a foul changes nothing (except a bunt — a two-strike foul bunt IS strike three). The count freezes at x–2 through any number of fouls.',
+      intermediate: 'This creates the "spoiling" battle: two-strike hitters shorten their swing purely to foul off tough pitches, waiting for a mistake. Ten-pitch at-bats are won by this rule — and the umpire re-shows the count after every foul.',
+      expert: 'Strategic economics: every spoiled pitch raises the starter\'s pitch count (~100 is a typical leash), so spoiling has value even when the at-bat ends in an out. The re-shown count after each foul is the scoreboard of a war of attrition the casual eye reads as "nothing happening."',
+    },
+  },
+  {
+    id: 'mlb-sig-int-4', level: 'intermediate', signal: 'mlb-infield-fly',
+    prompt: P,
+    options: ['Infield fly — batter out', 'Time — dead ball', 'Home run', 'Strike'],
     answer: 0,
     title: 'Infield fly ≠ dead ball',
     exp: {
-      kid: 'Even though the batter is out, the ball is still IN PLAY! The runner is allowed to run — it\'s just risky.',
+      kid: 'The batter is out automatically — but the ball is still IN PLAY! Runners are allowed to run, it\'s just risky.',
       beginner: 'Infield fly makes the BATTER out; nothing else stops. Dropped ball: runners may advance (no force — they can\'t be forced because the batter is already out). Caught: normal tag-up rules.',
       intermediate: 'This is the most misunderstood signal in baseball: fans think "automatic out = play over." Smart runners exploit the fielder\'s confusion on a drop; smart fielders remember the force is OFF, so they must tag, not step.',
       expert: 'Chess depth: with the force removed, a dropped infield fly creates a tag-only situation the defense rarely rehearses. Meanwhile the runner reads the umpire\'s raised arm as the signal that changed the rules mid-play. One skyward point rewrites the entire baserunning logic for everyone on the field.',
     },
   },
   {
-    id: 'mlb-sig-int-4', level: 'intermediate', signal: 'mlb-out',
-    prompt: 'Fly ball to the wall, the umpire watches the catch, pauses… then hammers the fist. Why the deliberate delay before this signal?',
-    options: ['He must see the ball held securely through the play first', 'He forgot the signal', 'TV asked for suspense'],
-    answer: 0,
-    title: 'Timing: see it, then call it',
-    exp: {
-      kid: 'The umpire waits to make sure the fielder REALLY caught it and didn\'t drop it while falling. Then — hammer! Out.',
-      beginner: 'A catch requires secure possession and a voluntary release. Umpires are trained to let the play finish — a ball popping loose on the wall collision means no catch at all.',
-      intermediate: 'The pause is a core mechanic ("proper timing"): call the play\'s END, not its middle. Fast calls get overturned; a beat of patience produces the right hammer or the right safe sweep.',
-      expert: 'Transfer rule nuance: dropping the ball while REACHING to throw is still a catch; dropping during the catching act is not. The umpire\'s eyes track glove-to-hand transfer before the fist moves. When you see a delayed hammer at the wall, you watched that entire legal analysis happen in silence.',
-    },
-  },
-  {
-    id: 'mlb-sig-int-5', level: 'intermediate', signal: 'mlb-fair',
-    prompt: 'A slow roller dribbles up the third-base line. The umpire hovers, watching it, hands quiet. What is he waiting for?',
-    options: ['Where the ball is when touched or stops — that decides fair/foul', 'The crowd\'s opinion', 'The batter to reach first'],
-    answer: 0,
-    title: 'The hover: fair/foul is about the ball, not the fielder',
-    exp: {
-      kid: 'The umpire watches the BALL, not the players. If it\'s on or inside the line when someone touches it (or when it stops), the point says FAIR.',
-      beginner: 'Before the base, fair/foul is judged where the ball is when touched or when it settles — a ball can wobble in foul ground and roll back fair. Fielders often let rollers drift, hoping they cross foul.',
-      intermediate: 'That\'s why third basemen theatrically crouch over a crawling ball doing nothing: touching it in fair territory MAKES it fair. Position of the fielder\'s feet is irrelevant — only the ball versus the line matters.',
-      expert: 'Beyond first/third base the test changes: it\'s where the ball lands or passes the BAG (the bag itself is fair — a ball nicking the corner is fair). The umpire\'s silent hover, then a sudden point or arms-up, is a two-zone geometry decision most spectators never realize is being computed.',
-    },
-  },
-  {
-    id: 'mlb-sig-int-6', level: 'intermediate', signal: 'mlb-count',
-    prompt: 'After a long foul-ball battle, the umpire re-shows fingers: left hand 1, right hand 2. The NEXT pitch is fouled into the stands. What\'s the new count?',
-    options: ['Still 1–2 — fouls don\'t add a third strike', '1–3 — strikeout', '2–2'],
-    answer: 0,
-    title: 'The two-strike foul freeze',
-    exp: {
-      kid: 'With two strikes, foul balls don\'t count against you! The count stays 1 ball, 2 strikes — the batter survives to try again.',
-      beginner: 'Fouls are strikes only up to strike two. After that, a foul changes nothing (except a bunt — a two-strike foul bunt IS strike three). The count freezes at x–2 through any number of fouls.',
-      intermediate: 'This creates the "spoiling" battle: two-strike hitters shorten their swing purely to foul off tough pitches, waiting for a mistake. Ten-pitch at-bats are won by this rule.',
-      expert: 'Strategic economics: every spoiled pitch raises the starter\'s pitch count (~100 is a typical leash), so spoiling has value even when the at-bat ends in an out. The umpire\'s re-shown 1–2 after each foul is the scoreboard of a war of attrition the casual eye reads as "nothing happening."',
-    },
-  },
-
-  // ── expert ────────────────────────────────────────────────────────────────
-  {
-    id: 'mlb-sig-exp-1', level: 'expert', signal: 'mlb-time',
-    prompt: 'Arms up — dead ball — while a runner is halfway between second and third. Where does he end up?',
-    options: ['Depends on the cause: he returns or is placed by rule, not by his position', 'Always back to second', 'Always awarded third'],
+    id: 'mlb-sig-int-5', level: 'intermediate', signal: 'mlb-time',
+    prompt: P,
+    options: ['Time — dead ball', 'Safe', 'Infield fly', 'The count'],
     answer: 0,
     title: 'Dead-ball placement is by rule, not by feet',
     exp: {
-      kid: 'When everything stops, the umpire decides where runners belong using the rules — not where they happened to be standing when he yelled stop.',
+      kid: 'Both arms up means everything stops. The umpire then decides where runners belong using the rules — not where they happened to be standing when he yelled stop.',
       beginner: 'Each dead-ball cause carries its own award: foul ball = return to the time-of-pitch base; ball thrown into the stands = two bases; hit-by-pitch = batter to first, runners move only if forced.',
       intermediate: 'The key concept is the award BASELINE: awards count "from the time of pitch" or "time of throw" depending on the violation. Overthrow into the dugout from an infielder\'s first play = two bases from time of PITCH — even if the runner had already rounded second.',
       expert: 'This is where arguments actually live: nobody disputes the arms-up, they dispute the placement math after it. Master the awards table (foul: return; overthrow: 2 from the relevant baseline; balk: 1; HBP: force only) and you can predict every runner\'s final base before the umpire points them there.',
     },
   },
   {
-    id: 'mlb-sig-exp-2', level: 'expert', signal: 'mlb-delayed-dead',
-    prompt: 'Left-arm fist out. The batter grounds into a double play anyway. The offense\'s manager comes out. What is he asking for?',
-    options: ['To take the catcher\'s-interference award instead of the play', 'A replay of the pitch', 'An ejection'],
+    id: 'mlb-sig-int-6', level: 'intermediate', signal: 'mlb-safe',
+    prompt: P,
+    options: ['Safe', 'Time — dead ball', 'Foul tip', 'Out'],
     answer: 0,
-    title: 'The interference option',
+    title: 'Safe on the pickoff',
     exp: {
-      kid: 'Because the catcher bumped the bat, the hitting team gets a CHOICE: keep what happened, or take the free base. A double play is bad — so they\'ll take the free base!',
-      beginner: 'Catcher\'s interference: batter awarded first base, runners advance if forced. But if the play\'s outcome was BETTER for the offense, the manager can elect to keep it instead.',
+      kid: 'The flat outward sweep means SAFE — like a runner diving back to the base before the tag. He stays right there, and the pitcher tries again.',
+      beginner: 'Pickoffs test the runner\'s lead. Beat the tag back to the bag and the sweep says: no out, ball still live, same situation.',
+      intermediate: 'Watch the first-base umpire\'s positioning on pickoffs: he squares to the tag attempt, reads glove-versus-hand, and sells the call. A pickoff safe/out is the classic replay-review play — the sweep can be challenged.',
+      expert: 'Signal-reading nuance: SAFE is signaled; a no-tag ("he never touched him") gets safe PLUS a separate wiping gesture umpires add to explain why. As with fair balls, the mechanics are engineered to answer the manager\'s argument in advance.',
+    },
+  },
+
+  // ── expert: confusable pairs — read one limb/hand/motion difference ────────
+  // Pair A: strike (RIGHT arm fires out to a point) vs delayed dead ball (LEFT arm
+  // held out with a FIST) — side of body + hand shape + motion.
+  {
+    id: 'mlb-sig-exp-1', level: 'expert', signal: 'mlb-strike',
+    prompt: P,
+    options: ['Strike', 'Delayed dead ball', 'Fair ball', 'Infield fly'],
+    answer: 0,
+    title: 'Right hand, moving: strike',
+    exp: {
+      kid: 'It\'s the STRIKE point! The umpire\'s RIGHT arm fires out with a pointing finger. If the LEFT arm just hangs out still with a fist, that\'s a different call entirely.',
+      beginner: 'The umpire\'s two arms carry two channels: the right hand is the action hand (strikes, outs), fired with energy; a motionless LEFT fist held out means a delayed dead ball. Side + motion = meaning.',
+      intermediate: 'This pair also decides checked swings: on appeal, the base umpire\'s fist/point = swing (strike); a safe-style sweep = no swing. There\'s no rulebook definition of a swing — it\'s pure judgment, which is why the side angle matters and why the appeal exists.',
+      expert: 'Procedural teeth on the appeal version: if the plate umpire called a BALL, the defense can force the ask — a check-swing appeal can\'t be refused. The reversal is common on strike three with a runner stealing: a whole cascade (strikeout + throw-down) hangs on that little punch from 90 feet away.',
+    },
+  },
+  {
+    id: 'mlb-sig-exp-2', level: 'expert', signal: 'mlb-delayed-dead',
+    prompt: P,
+    options: ['Strike', 'Delayed dead ball', 'Fair ball', 'Infield fly'],
+    answer: 1,
+    title: 'Left fist, frozen: the interference option',
+    exp: {
+      kid: 'The LEFT arm held perfectly still with a fist means the umpire saw a rule broken — like the catcher bumping the bat — and the hitting team will get a CHOICE after the play!',
+      beginner: 'Catcher\'s interference: batter awarded first base, runners advance if forced. But if the play\'s outcome was BETTER for the offense, the manager can elect to keep it instead. The still left fist holds that door open.',
       intermediate: 'The election rule turns the left-arm fist into a free insurance policy for the offense: bad result → take the award; great result (say, a two-run double) → wave the award off and keep the hit.',
       expert: 'Precise mechanics: interference is enforced automatically UNLESS the manager elects the play — and if the batter reaches first AND all runners advance a base, the play stands with no option. Also scoring nuance: catcher\'s interference doesn\'t count as an at-bat and the catcher is charged an error. One quiet fist, an entire decision tree.',
     },
   },
+  // Pair B: home run (finger CIRCLING overhead) vs infield fly (arm up, point held
+  // STILL) — same raised arm, motion is the only difference.
   {
-    id: 'mlb-sig-exp-3', level: 'expert', signal: 'mlb-foul-tip',
-    prompt: 'Runner stealing on the pitch; batter nicks it sharp into the mitt (this brush signal follows); the catcher throws to second anyway — late. Result?',
-    options: ['Strike on the batter AND a stolen base — everything stays live', 'Foul, runner returns', 'Batter out for interference'],
+    id: 'mlb-sig-exp-3', level: 'expert', signal: 'mlb-homerun',
+    prompt: P,
+    options: ['Home run', 'Infield fly', 'Time — dead ball', 'Strike'],
     answer: 0,
-    title: 'Foul tip: the play within the play',
+    title: 'The arm that spins: home run',
     exp: {
-      kid: 'A foul tip doesn\'t stop anything! The batter gets a strike, and because the runner kept going, he steals the base fair and square.',
-      beginner: 'Foul tip = live ball. The steal attempt proceeds exactly as if the batter had missed cleanly: safe at second means a stolen base plus a strike on the batter.',
+      kid: 'Watch the hand — it\'s going in CIRCLES! That\'s the HOME RUN twirl. If the finger just pointed straight up and froze, it would mean an automatic out instead. Same arm, opposite news!',
+      beginner: 'Home run and infield fly are both one-arm-up calls. The decoder is pure MOTION: rotation = round the bases; a frozen skyward point = infield fly, batter out. Umpires exaggerate the twirl precisely so no runner ever confuses the two.',
+      intermediate: 'Both signals also announce awards, not suggestions: the twirl kills any defensive appeal about the fence, and the frozen point rewrites baserunning rules mid-play. Two of baseball\'s most game-changing rulings share one silhouette — motion is the entire information channel.',
+      expert: 'Design lesson: signal systems reserve STILLNESS for declarations that persist (infield fly stays in force while the ball hangs) and MOTION for one-time events (the ball is gone). You\'ll find the same still/moving split in cricket\'s penalty-runs pair. Once you see the pattern, you can decode signals you\'ve never been taught.',
+    },
+  },
+  {
+    id: 'mlb-sig-exp-4', level: 'expert', signal: 'mlb-infield-fly',
+    prompt: P,
+    options: ['Home run', 'Infield fly', 'Time — dead ball', 'Strike'],
+    answer: 1,
+    title: '"If fair" — the conditional out',
+    exp: {
+      kid: 'The finger points straight up and HOLDS — no circles! That\'s INFIELD FLY: the batter is out automatically on the pop-up. And the call has a secret word: "IF FAIR."',
+      beginner: 'Near the lines, the declaration is conditional: fair = batter out (infield fly); foul = ordinary foul ball, call canceled. The verbal "if fair" is a built-in escape hatch.',
+      intermediate: 'Everything from the base rule still applies on the fair branch (live ball, force removed) — but the foul branch rewinds completely: strike on the batter (if fewer than two), runners back, nothing happened.',
+      expert: 'This is the most conditional call in baseball: an out that exists in superposition until the ball resolves fair or foul, with fair/foul itself judged by the touched-or-settles rules. The held skyward point plus three spoken words encode a full branching ruling — signal literacy at its densest.',
+    },
+  },
+  // Pair C: foul tip (one hand BRUSHES up off the back of the other) vs safe (both
+  // flat hands SWEEP wide apart) — both two-handed motions at the chest.
+  {
+    id: 'mlb-sig-exp-5', level: 'expert', signal: 'mlb-foul-tip',
+    prompt: P,
+    options: ['Foul tip — live strike', 'Safe', 'Time — dead ball', 'Delayed dead ball'],
+    answer: 0,
+    title: 'The brush-off that keeps everything alive',
+    exp: {
+      kid: 'One hand brushing up off the other means FOUL TIP — the ball nicked the bat into the catcher\'s glove. A strike, and nobody stops playing!',
+      beginner: 'Foul tip = live ball. A steal attempt proceeds exactly as if the batter had missed cleanly: safe at second means a stolen base plus a strike on the batter.',
       intermediate: 'Compare the near-miss: if that nick had popped up before hitting leather, it\'s a foul BALL — dead, runner marched back. Millimeters of ball flight, opposite baserunning universes, and the umpire\'s brush-vs-arms-up broadcasts which one occurred.',
       expert: 'Catchers know this rule better than anyone: with two strikes and a runner going, a caught tip is simultaneously a strikeout AND still a live steal — the rare "strike \'em out, throw \'em out" where the strikeout came off the BAT. Decode the brush signal and you\'re never confused about why nobody stopped playing.',
     },
   },
   {
-    id: 'mlb-sig-exp-4', level: 'expert', signal: 'mlb-strike',
-    prompt: 'A checked-swing appeal: the plate umpire asks the base umpire, who gives THIS signal. What was decided?',
-    options: ['The batter DID swing — strike', 'The batter held up — ball', 'The pitch was a balk'],
-    answer: 0,
-    title: 'The appealed check swing',
-    exp: {
-      kid: 'The far-away umpire had the best side view. His strike signal means the bat DID come around — so the swing counts as a strike.',
-      beginner: 'On a checked swing, the catcher or plate umpire may appeal to the first- or third-base umpire, who saw the bat edge-on. Fist/point = swing (strike); a safe-style sweep = no swing.',
-      intermediate: 'There\'s no precise rulebook definition of a swing ("did he offer at the pitch?") — it\'s pure judgment, which is why the side angle matters and why the appeal exists at all.',
-      expert: 'Procedural teeth: if the plate umpire called it a BALL, the defense can force the appeal; a check-swing appeal can\'t be refused. The reversed call is common on strike three with a runner stealing — a whole cascade (strikeout + throw-down) hangs on a base umpire\'s little punch from 90 feet away.',
-    },
-  },
-  {
-    id: 'mlb-sig-exp-5', level: 'expert', signal: 'mlb-safe',
-    prompt: 'The sweep is given at the plate, then the defense\'s catcher steps on home and appeals — and the SAME umpire hammers an out. What kind of play allows this reversal?',
-    options: ['A missed-plate appeal: the runner never touched home', 'Umpires may flip any call once', 'A replay from the dugout'],
-    answer: 0,
+    id: 'mlb-sig-exp-6', level: 'expert', signal: 'mlb-safe',
+    prompt: P,
+    options: ['Foul tip — live strike', 'Safe', 'Time — dead ball', 'Delayed dead ball'],
+    answer: 1,
     title: 'Safe… until the appeal',
     exp: {
-      kid: 'The runner slid past the plate without touching it! He looked safe, but when the catcher tagged the plate and asked, the umpire changed to OUT — you must touch every base.',
-      beginner: 'Missing a base isn\'t called automatically. The umpire signals the apparent result (safe on the tag attempt) and waits: only if the defense APPEALS the missed touch does the out appear.',
+      kid: 'Both flat hands sweeping WIDE apart means SAFE. (The foul-tip brush is one small hand grazing the other — watch how far the arms travel!)',
+      beginner: 'A safe call answers one question only: did the tag beat him? Missing a base is a SEPARATE question — it isn\'t called automatically. The umpire signals the apparent result and waits for a defensive appeal.',
       intermediate: 'That\'s why you\'ll see catchers casually tag the plate after a wild slide — it\'s a formal appeal. If the runner scrambles back and touches home before the appeal tag, the run counts after all.',
-      expert: 'The two signals aren\'t contradictory: the sweep answered "did the tag beat him?" (no); the hammer answered a NEW question, "did he touch the plate?" (also no). Appeals are separate plays with separate calls. Umpiring is question-answering, and knowing WHICH question a signal answers is expert-level decoding.',
-    },
-  },
-  {
-    id: 'mlb-sig-exp-6', level: 'expert', signal: 'mlb-infield-fly',
-    prompt: 'Umpire points skyward on a pop-up drifting near the line, calling "Infield fly IF FAIR." It lands untouched in foul ground and spins foul. Final ruling?',
-    options: ['Just a foul ball — the infield-fly call evaporates', 'Batter out anyway', 'Batter out AND a dead ball'],
-    answer: 0,
-    title: '"If fair" — the conditional out',
-    exp: {
-      kid: 'The umpire\'s call had a secret word: IF FAIR. The ball landed foul, so there\'s no automatic out — it\'s just a normal foul ball and the batter bats again.',
-      beginner: 'Near the lines, the declaration is conditional: fair = batter out (infield fly); foul = ordinary foul ball, call canceled. The verbal "if fair" is a built-in escape hatch.',
-      intermediate: 'Everything from the earlier rule still applies on the fair branch (live ball, force removed) — but the foul branch rewinds completely: strike on the batter (if fewer than two), runners back, nothing happened.',
-      expert: 'This is the most conditional call in baseball: an out that exists in superposition until the ball resolves fair or foul, with fair/foul itself judged by the touched-or-settles rules. The pointing arm plus three spoken words encode a full branching ruling — signal literacy at its densest.',
+      expert: 'A safe sweep followed by an out hammer on the same runner isn\'t a contradiction: the sweep answered "did the tag beat him?" (no); the hammer answered a NEW question, "did he touch the plate?" (also no). Appeals are separate plays with separate calls. Umpiring is question-answering — knowing WHICH question a signal answers is expert-level decoding.',
     },
   },
 ];

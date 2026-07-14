@@ -35,11 +35,13 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
-// Signal Decoder — officials'-signal literacy game. Renders a referee/umpire
-// pictogram (art module: lib/signalArt) and asks the user what the signal means;
-// after every answer the VerdictCard re-explains the signal — and what happened
-// in the game to cause it — at all four depths (the teaching beat). The scenario
-// banks live in lib/signalDecoder + lib/signalDecoderBank/* (pure data).
+// Signal Decoder — officials'-signal literacy game (v2 rework). Renders an ANIMATED
+// referee/umpire pictogram (art module: lib/signalArt — keyframed limb motion driven
+// by a rAF loop, the house pattern) and asks the constant question "What is the
+// official signaling?" — the moving picture is the only clue; prompts never describe
+// the pose. After every answer the animation freezes at the signal's peak pose and
+// the VerdictCard re-explains the signal at all four depths (the teaching beat).
+// Scenario banks live in lib/signalDecoder + lib/signalDecoderBank/* (pure data).
 export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyGameProps) {
   const { level, notificationsEnabled, dailyStreak, recordQuizActivity, points, rank, awardPoints } = useAppState();
   const { theme } = useTheme();
@@ -69,6 +71,25 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
   }, [pool]);
 
   const scenario: SignalScenario | undefined = pool.length ? pool[order[idx % order.length] ?? 0] : undefined;
+
+  // Shuffle each scenario's OPTIONS at display time. The banks author the correct
+  // answer at index 0 far more often than not (147/168), so without this a player
+  // could score ~90% by always tapping the top button WITHOUT LOOKING AT THE SIGNAL
+  // — which defeats the entire game. Deck shuffling (above) reorders scenarios, not
+  // the options within one. Re-shuffled only when the displayed scenario changes
+  // (keyed on the deck slot), so options never reorder mid-answer. `view.answer` is
+  // the correct DISPLAY index; every option render + answer check uses it, not
+  // scenario.answer.
+  const slot = order[idx % order.length] ?? 0;
+  const view = useMemo(() => {
+    if (!scenario) return { options: [] as string[], answer: 0 };
+    const perm = shuffle(scenario.options.map((_, i) => i)); // display pos -> original idx
+    return {
+      options: perm.map(o => scenario.options[o]),
+      answer: perm.indexOf(scenario.answer),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot, pool]);
 
   // Answer state + the local explanation depth (VerdictCard tabs re-explain the
   // SAME signal at any depth without touching the global app level).
@@ -187,7 +208,7 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
   const choose = async (i: number) => {
     if (!scenario || chosen !== null) return;
     setChosen(i);
-    const correct = i === scenario.answer;
+    const correct = i === view.answer;
     if (correct) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Canonical award block (QuizGame, verbatim): base by the SCENARIO's tier
@@ -265,11 +286,15 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
           <>
             <Text style={styles.prompt}>{scenario.prompt}</Text>
 
-            <SignalArt signal={scenario.signal} />
+            {/* The animated pictogram IS the question (v2 contract: the prompt never
+                describes the pose). The loop plays while deciding and FREEZES at the
+                signal's peak pose the moment an answer is chosen — the rAF loop inside
+                SignalArt is cancelled on judge/unmount (house cleanup idiom). */}
+            <SignalArt signal={scenario.signal} playing={chosen === null} />
 
             <View style={styles.options}>
-              {scenario.options.map((opt, i) => {
-                const isAnswer = i === scenario.answer;
+              {view.options.map((opt, i) => {
+                const isAnswer = i === view.answer;
                 const isChosen = chosen === i;
                 const judged = chosen !== null;
                 return (
@@ -301,8 +326,8 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
                 via the difficulty tabs. */}
             <VerdictCard
               visible={chosen !== null}
-              correct={chosen === scenario.answer}
-              tagText={chosen === scenario.answer ? '✓ CORRECT' : '✗ NOT QUITE'}
+              correct={chosen === view.answer}
+              tagText={chosen === view.answer ? '✓ CORRECT' : '✗ NOT QUITE'}
               modeText={TIER_LABEL[scenario.level]}
               title={scenario.title}
               level={explainLevel}
@@ -337,7 +362,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rankUpKicker: { color: t.onAccent, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
   rankUpName: { color: t.onAccent, fontSize: 22, fontWeight: '900', marginTop: 4 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
-  prompt: { color: t.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 12, lineHeight: 22 },
+  // v2: the prompt is a constant one-liner ("What is the umpire signaling?") —
+  // centered above the pictogram, which carries all the information.
+  prompt: { color: t.textPrimary, fontSize: 17, fontWeight: '800', marginBottom: 12, lineHeight: 22, textAlign: 'center' },
   options: { marginTop: 14, gap: 10 },
   option: {
     borderRadius: 14, borderWidth: 1.5, borderColor: t.border, backgroundColor: t.surfaceAlt,

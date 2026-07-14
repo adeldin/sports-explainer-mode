@@ -1,67 +1,98 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import type { SignalKey } from './signalDecoder';
 
 // ============================================================================
-// Signal Decoder — ART MODULE. Every official-signal pictogram lives HERE and
-// only here (build doc §0.4: art is a placeholder, swappable in ONE file). The
-// game component renders <SignalArt signal={...} /> and knows nothing about
-// pixels; designers can replace this whole file without touching data or game.
+// Signal Decoder — ART MODULE (v2: ANIMATED). Every official-signal pictogram
+// lives HERE and only here (build doc §0.4: art is swappable in ONE file).
 //
-// Conventions (matching FieldEngine / readTheScoreArt):
-// - One fixed viewBox for every pictogram: 400×440 (SIGNAL_RATIO sizes the <Svg>).
-// - A referee looks the same in every app theme (like a field is green in every
-//   theme), so the palette below is FIXED — chalk-white figure on brand navy,
-//   amber for motion/objects — not theme tokens.
-// - Simple geometric stick figures: torso/limbs as <Line>, head as <Circle>.
-//   THE POSE IS THE INFORMATION — the distinguishing feature of a signal is arm
-//   position, so every figure shares one body and only the limbs (plus hand
-//   glyphs: fist / open palm / pointing finger / flat hand) and motion arcs vary.
+// v2 rework notes:
+// - Signals are MOTIONS, not poses. Each signal is a short looping animation
+//   described as KEYFRAMES of limb positions, interpolated per-frame. A signal
+//   that is genuinely static (a held card, a pointing arm) is one keyframe.
+// - The figure is a filled SILHOUETTE (solid head/torso, thick rounded limbs)
+//   — filled shapes read far better at phone size than hairline stick figures.
+// - Overlap legibility: every limb is drawn twice — a wider background-colored
+//   "outline" pass, then the fill pass — so arms crossing the head, torso, or
+//   each other stay cleanly separated (this fixes v1's mangled-head bug).
+//   Draw order: legs → torso → head → arms (arms LAST: the pose is the info).
+// - The core below the QA-PURE markers is 100% pure TypeScript (no React), so
+//   the render-QA pipeline can rasterize the exact same output outside RN.
+// - Animation driver: raw requestAnimationFrame + setState — the house pattern
+//   (WheresThePlayGame / FindTheOpenMan). No Lottie, no Reanimated for figures.
 // ============================================================================
+
+// ─── QA-PURE-START ──────────────────────────────────────────────────────────
 
 export const SIGNAL_VB = { w: 400, h: 440 };
 export const SIGNAL_RATIO = SIGNAL_VB.w / SIGNAL_VB.h;
 
-// Fixed pictogram palette (referee-on-navy; brand family from lib/theme).
+// Fixed pictogram palette (a referee looks the same in every app theme).
 const SG = {
   bg: '#0a1733',
   panel: '#0f2044',
   line: '#2a3a5e',
-  body: '#F4F4EE',    // chalk-white figure
-  accent: '#F5A623',  // amber: motion arcs, held objects, emphasis
+  body: '#F4F4EE',    // chalk-white silhouette
+  accent: '#F5A623',  // amber: meaning-bearing props only
   cardY: '#FFD60A',
   cardR: '#FF3B30',
-  muted: '#9ab4e0',
+  muted: '#8fa9d6',
 };
 
-const LIMB_W = 11;   // arm/leg/torso stroke width
-const S = { x: 200, y: 122 };   // shoulder joint
-const HIP = { x: 200, y: 246 }; // hip joint
+// ── primitive descriptors (what a frame renders down to) ────────────────────
+export type Prim =
+  | { k: 'line'; x1: number; y1: number; x2: number; y2: number; w: number; c: string; dash?: string }
+  | { k: 'circle'; cx: number; cy: number; r: number; f?: string; s?: string; sw?: number }
+  | { k: 'rect'; x: number; y: number; w: number; h: number; rx?: number; f?: string; s?: string; sw?: number; dash?: string }
+  | { k: 'poly'; pts: string; f: string }
+  | { k: 'path'; d: string; f?: string; s?: string; sw?: number; dash?: string };
 
+// ── skeleton geometry ────────────────────────────────────────────────────────
 type Pt = { x: number; y: number };
 type Grip =
-  | 'none'    // clean limb end (round cap)
-  | 'fist'    // filled knuckle circle
-  | 'palm'    // open hand: 5 splayed finger rays
-  | 'point'   // single extended index finger
+  | 'none'    // clean rounded limb end
+  | 'fist'    // solid knuckle ball
+  | 'palm'    // open hand: hub + 5 splayed finger rays
+  | 'point'   // hub + one long index finger
   | 'flat'    // flat hand: bar perpendicular to the forearm
-  | 'three'   // three raised fingers
-  | 'two'     // two raised fingers
-  | 'thumb'   // fist + thumb up
-  | 'ball'    // holding a ball
-  | 'cardY' | 'cardR'  // holding a card
+  | 'two' | 'three'  // hub + N finger rays
+  | 'thumb'   // fist + thumb ray
+  | 'cardY' | 'cardR' // holding a card
   | 'flag';   // holding an assistant referee's flag
 
-interface ArmPose { e: Pt; h: Pt; grip: Grip }
-interface FigureSpec {
-  l: ArmPose;               // viewer-left arm
-  r: ArmPose;               // viewer-right arm
-  legs?: { l: [Pt, Pt]; r: [Pt, Pt] };  // [knee, foot] per leg; default standing
-  extras?: React.ReactNode; // motion arcs, arrows, props (net, spot, TV box…)
+interface Arm { e: Pt; h: Pt; grip: Grip }           // elbow, hand
+interface Legs { l: [Pt, Pt]; r: [Pt, Pt] }          // [knee, foot] per leg
+interface Frame { l: Arm; r: Arm; legs?: Legs }
+
+interface SignalAnim {
+  frames: Frame[];              // 1 frame = a genuinely static signal
+  loopMs?: number;              // full loop duration (default 1500)
+  mode?: 'pingpong' | 'cycle';  // pingpong: A→B→A sweep; cycle: wrap (rotations)
+  ease?: 'sine' | 'linear';     // per-segment easing (default sine; linear for circles)
+  holdT?: number;               // progress to freeze at once answered (default: peak)
+  back?: Prim[];                // static props drawn BEHIND the figure (net, spot…)
+  front?: Prim[];               // static props drawn IN FRONT (TV box, held ball…)
+  linkHands?: boolean;          // draw an amber "stick shaft" between the two hands
 }
 
-// ── geometry helpers ─────────────────────────────────────────────────────────
+const HEAD = { cx: 200, cy: 64, r: 30 };
+const SHOULDER_L: Pt = { x: 166, y: 118 };
+const SHOULDER_R: Pt = { x: 234, y: 118 };
+const HIP_L: Pt = { x: 182, y: 248 };
+const HIP_R: Pt = { x: 218, y: 248 };
+const ARM_W = 15;
+const LEG_W = 16;
+const OUTLINE = 7; // extra width of the separation pass
+
+const DEFAULT_LEGS: Legs = {
+  l: [{ x: 174, y: 330 }, { x: 164, y: 406 }],
+  r: [{ x: 226, y: 330 }, { x: 236, y: 406 }],
+};
+
+// ── math ─────────────────────────────────────────────────────────────────────
+const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
+const lerpPt = (a: Pt, b: Pt, u: number): Pt => ({ x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) });
 const unit = (a: Pt, b: Pt): Pt => {
   const dx = b.x - a.x, dy = b.y - a.y;
   const m = Math.hypot(dx, dy) || 1;
@@ -72,596 +103,990 @@ const rot = (v: Pt, deg: number): Pt => {
   return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
 };
 const add = (p: Pt, v: Pt, k: number): Pt => ({ x: p.x + v.x * k, y: p.y + v.y * k });
+const easeSine = (u: number) => 0.5 - 0.5 * Math.cos(Math.PI * u);
 
-// ── reusable strokes ─────────────────────────────────────────────────────────
-function L({ a, b, w = LIMB_W, color = SG.body }: { a: Pt; b: Pt; w?: number; color?: string }) {
-  return <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={w} strokeLinecap="round" />;
-}
+// ── limb rendering (outline pass + fill pass) ────────────────────────────────
+const seg = (a: Pt, b: Pt, w: number, c: string): Prim =>
+  ({ k: 'line', x1: a.x, y1: a.y, x2: b.x, y2: b.y, w, c });
 
-// Dashed amber motion arc (waves, taps, circles, sweeps).
-function Arc({ d }: { d: string }) {
-  return <Path d={d} fill="none" stroke={SG.accent} strokeWidth={4.5} strokeDasharray="8 8" strokeLinecap="round" opacity={0.95} />;
-}
-
-// Solid amber arrow (directional motion: punch, pull, push, chop).
-function Arrow({ a, b }: { a: Pt; b: Pt }) {
-  const u = unit(a, b);
-  const tip = b;
-  const base = add(tip, u, -14);
-  const p1 = add(base, rot(u, 90), 8);
-  const p2 = add(base, rot(u, -90), 8);
-  return (
-    <>
-      <Line x1={a.x} y1={a.y} x2={base.x} y2={base.y} stroke={SG.accent} strokeWidth={5} strokeLinecap="round" />
-      <Polygon points={`${tip.x},${tip.y} ${p1.x},${p1.y} ${p2.x},${p2.y}`} fill={SG.accent} />
-    </>
-  );
-}
-
-// Dashed "TV screen" box (VAR / TMO / cricket TV referral).
-function TvBox({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
-  return <Rect x={x} y={y} width={w} height={h} rx={8} fill="none" stroke={SG.accent} strokeWidth={4.5} strokeDasharray="10 8" />;
-}
-
-// ── hand glyphs (drawn at the hand point, oriented along the forearm) ────────
-function Hand({ e, h, grip }: ArmPose) {
+// A hand glyph as [outlinePrims, fillPrims] so the whole arm can be layered.
+function handPrims(arm: Arm): { out: Prim[]; fill: Prim[] } {
+  const { e, h, grip } = arm;
   const u = unit(e, h);
+  const out: Prim[] = [];
+  const fill: Prim[] = [];
+  const dot = (c: Pt, r: number) => {
+    out.push({ k: 'circle', cx: c.x, cy: c.y, r: r + OUTLINE / 2, f: SG.panel });
+    fill.push({ k: 'circle', cx: c.x, cy: c.y, r, f: SG.body });
+  };
+  const ray = (a: Pt, b: Pt, w: number) => {
+    out.push(seg(a, b, w + OUTLINE, SG.panel));
+    fill.push(seg(a, b, w, SG.body));
+  };
   switch (grip) {
-    case 'none':
-      return null;
-    case 'fist':
-      return <Circle cx={h.x} cy={h.y} r={11} fill={SG.body} />;
+    case 'none': break;
+    case 'fist': dot(h, 12); break;
     case 'palm': {
-      const rays = [-40, -20, 0, 20, 40];
-      return (
-        <>
-          {rays.map(a => {
-            const t = add(h, rot(u, a), 19);
-            return <Line key={a} x1={h.x} y1={h.y} x2={t.x} y2={t.y} stroke={SG.body} strokeWidth={4.5} strokeLinecap="round" />;
-          })}
-        </>
-      );
+      dot(h, 8);
+      [-40, -20, 0, 20, 40].forEach(a => ray(h, add(h, rot(u, a), 20), 5));
+      break;
     }
-    case 'three': case 'two': {
-      const rays = grip === 'three' ? [-26, 0, 26] : [-15, 15];
-      return (
-        <>
-          <Circle cx={h.x} cy={h.y} r={8} fill={SG.body} />
-          {rays.map(a => {
-            const t = add(h, rot(u, a), 21);
-            return <Line key={a} x1={h.x} y1={h.y} x2={t.x} y2={t.y} stroke={SG.body} strokeWidth={5} strokeLinecap="round" />;
-          })}
-        </>
-      );
-    }
-    case 'point': {
-      const t = add(h, u, 23);
-      return (
-        <>
-          <Circle cx={h.x} cy={h.y} r={8} fill={SG.body} />
-          <Line x1={h.x} y1={h.y} x2={t.x} y2={t.y} stroke={SG.body} strokeWidth={5.5} strokeLinecap="round" />
-        </>
-      );
-    }
+    case 'point': dot(h, 8); ray(h, add(h, u, 25), 7); break;
     case 'flat': {
       const p = rot(u, 90);
-      const a = add(h, p, 14), b = add(h, p, -14);
-      return <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={SG.body} strokeWidth={8} strokeLinecap="round" />;
+      ray(add(h, p, 16), add(h, p, -16), 9);
+      break;
+    }
+    case 'two': case 'three': {
+      dot(h, 8);
+      (grip === 'two' ? [-13, 13] : [-22, 0, 22]).forEach(a => ray(h, add(h, rot(u, a), 20), 5));
+      break;
     }
     case 'thumb': {
-      const p = rot(u, u.x >= 0 ? -90 : 90); // thumb sticks up-ish
-      const t = add(h, p.y > 0 ? rot(u, u.x >= 0 ? 90 : -90) : p, 18);
-      return (
-        <>
-          <Circle cx={h.x} cy={h.y} r={10} fill={SG.body} />
-          <Line x1={h.x} y1={h.y} x2={t.x} y2={t.y} stroke={SG.body} strokeWidth={6} strokeLinecap="round" />
-        </>
-      );
-    }
-    case 'ball': {
-      const c = add(h, u, 16);
-      return <Circle cx={c.x} cy={c.y} r={13} fill="none" stroke={SG.accent} strokeWidth={5} />;
+      dot(h, 11);
+      const p1 = rot(u, 90), p2 = rot(u, -90);
+      ray(h, add(h, p1.y < p2.y ? p1 : p2, 17), 6); // thumb points up
+      break;
     }
     case 'cardY': case 'cardR': {
-      const c = add(h, u, 16);
-      return <Rect x={c.x - 13} y={c.y - 19} width={26} height={38} rx={4} fill={grip === 'cardY' ? SG.cardY : SG.cardR} />;
+      const c = add(h, u, 18);
+      out.push({ k: 'rect', x: c.x - 16, y: c.y - 22, w: 32, h: 44, rx: 5, f: SG.panel });
+      fill.push({ k: 'rect', x: c.x - 14, y: c.y - 20, w: 28, h: 40, rx: 4, f: grip === 'cardY' ? SG.cardY : SG.cardR });
+      fill.push({ k: 'circle', cx: h.x, cy: h.y, r: 10, f: SG.body });
+      break;
     }
     case 'flag': {
-      const tip = add(h, u, 54);
+      const tip = add(h, u, 56);
       const mid = add(h, u, 30);
       const p = rot(u, 90);
-      const f = add(mid, p, 20);
-      return (
-        <>
-          <Line x1={h.x} y1={h.y} x2={tip.x} y2={tip.y} stroke={SG.body} strokeWidth={5} strokeLinecap="round" />
-          <Polygon points={`${tip.x},${tip.y} ${mid.x},${mid.y} ${f.x},${f.y}`} fill={SG.accent} />
-        </>
-      );
+      const f1 = add(mid, p.y < 0 ? p : rot(u, -90), 22);
+      out.push(seg(h, tip, 5 + OUTLINE, SG.panel));
+      fill.push(seg(h, tip, 5, SG.body));
+      fill.push({ k: 'poly', pts: `${tip.x},${tip.y} ${mid.x},${mid.y} ${f1.x},${f1.y}`, f: SG.accent });
+      fill.push({ k: 'circle', cx: h.x, cy: h.y, r: 10, f: SG.body });
+      break;
     }
   }
+  return { out, fill };
 }
 
-// ── the shared figure ────────────────────────────────────────────────────────
-const REST_L: ArmPose = { e: { x: 172, y: 170 }, h: { x: 162, y: 220 }, grip: 'none' };
-const REST_R: ArmPose = { e: { x: 228, y: 170 }, h: { x: 238, y: 220 }, grip: 'none' };
-const DEFAULT_LEGS = {
-  l: [{ x: 168, y: 324 }, { x: 158, y: 402 }] as [Pt, Pt],
-  r: [{ x: 232, y: 324 }, { x: 242, y: 402 }] as [Pt, Pt],
-};
-
-function Figure({ spec }: { spec: FigureSpec }) {
-  const legs = spec.legs ?? DEFAULT_LEGS;
-  return (
-    <>
-      {/* legs first, then torso/arms so upper body reads on top */}
-      <L a={HIP} b={legs.l[0]} /><L a={legs.l[0]} b={legs.l[1]} />
-      <L a={HIP} b={legs.r[0]} /><L a={legs.r[0]} b={legs.r[1]} />
-      <L a={{ x: 200, y: 104 }} b={HIP} />
-      <Circle cx={200} cy={74} r={26} fill={SG.body} />
-      <L a={S} b={spec.l.e} /><L a={spec.l.e} b={spec.l.h} />
-      <L a={S} b={spec.r.e} /><L a={spec.r.e} b={spec.r.h} />
-      <Hand {...spec.l} />
-      <Hand {...spec.r} />
-      {spec.extras}
-    </>
-  );
+function armPrims(shoulder: Pt, arm: Arm): Prim[] {
+  const hand = handPrims(arm);
+  return [
+    // outline pass (separates this arm from whatever is behind it)
+    seg(shoulder, arm.e, ARM_W + OUTLINE, SG.panel),
+    seg(arm.e, arm.h, ARM_W + OUTLINE, SG.panel),
+    ...hand.out,
+    // fill pass
+    seg(shoulder, arm.e, ARM_W, SG.body),
+    seg(arm.e, arm.h, ARM_W, SG.body),
+    ...hand.fill,
+  ];
 }
 
-// ── shared arm positions ─────────────────────────────────────────────────────
-const UP_L: ArmPose = { e: { x: 180, y: 68 }, h: { x: 176, y: 14 }, grip: 'palm' };
-const UP_R: ArmPose = { e: { x: 220, y: 68 }, h: { x: 224, y: 14 }, grip: 'palm' };
-const OUT_L: ArmPose = { e: { x: 142, y: 122 }, h: { x: 84, y: 122 }, grip: 'none' };
-const OUT_R: ArmPose = { e: { x: 258, y: 122 }, h: { x: 316, y: 122 }, grip: 'none' };
-const HIPS_L: ArmPose = { e: { x: 148, y: 168 }, h: { x: 184, y: 214 }, grip: 'fist' };
-const HIPS_R: ArmPose = { e: { x: 252, y: 168 }, h: { x: 216, y: 214 }, grip: 'fist' };
+function legPrims(hip: Pt, knee: Pt, foot: Pt): Prim[] {
+  return [
+    seg(hip, knee, LEG_W + OUTLINE, SG.panel),
+    seg(knee, foot, LEG_W + OUTLINE, SG.panel),
+    seg(hip, knee, LEG_W, SG.body),
+    seg(knee, foot, LEG_W, SG.body),
+  ];
+}
+
+function figurePrims(f: Frame): Prim[] {
+  const legs = f.legs ?? DEFAULT_LEGS;
+  return [
+    // legs
+    ...legPrims(HIP_L, legs.l[0], legs.l[1]),
+    ...legPrims(HIP_R, legs.r[0], legs.r[1]),
+    // torso: filled tapered slab, rounded by its own stroke
+    {
+      k: 'path',
+      d: `M ${SHOULDER_L.x + 4} 112 L ${SHOULDER_R.x - 4} 112 L 222 250 L 178 250 Z`,
+      f: SG.body, s: SG.body, sw: 18,
+    },
+    // head (before arms; its outline ring separates it from the torso)
+    { k: 'circle', cx: HEAD.cx, cy: HEAD.cy, r: HEAD.r, f: SG.body, s: SG.panel, sw: 5 },
+    // arms LAST — arm/hand position is the entire information channel
+    ...armPrims(SHOULDER_L, f.l),
+    ...armPrims(SHOULDER_R, f.r),
+  ];
+}
+
+// ── shared poses ─────────────────────────────────────────────────────────────
+const REST_L: Arm = { e: { x: 154, y: 180 }, h: { x: 160, y: 236 }, grip: 'none' };
+const REST_R: Arm = { e: { x: 246, y: 180 }, h: { x: 240, y: 236 }, grip: 'none' };
+const UP_L = (grip: Grip = 'none'): Arm => ({ e: { x: 160, y: 62 }, h: { x: 156, y: 8 }, grip });
+const UP_R = (grip: Grip = 'none'): Arm => ({ e: { x: 240, y: 62 }, h: { x: 244, y: 8 }, grip });
+// "Up with a hand glyph": slightly lower so the palm/fist/finger glyph is never
+// clipped by the panel's top edge (QA finding — the NBA fist/palm pair depends on it).
+const UPG_L = (grip: Grip): Arm => ({ e: { x: 162, y: 76 }, h: { x: 157, y: 26 }, grip });
+const UPG_R = (grip: Grip): Arm => ({ e: { x: 238, y: 76 }, h: { x: 243, y: 26 }, grip });
+const OUT_L = (grip: Grip = 'none'): Arm => ({ e: { x: 120, y: 118 }, h: { x: 64, y: 118 }, grip });
+const OUT_R = (grip: Grip = 'none'): Arm => ({ e: { x: 280, y: 118 }, h: { x: 336, y: 118 }, grip });
+const HIPS_L: Arm = { e: { x: 138, y: 170 }, h: { x: 172, y: 216 }, grip: 'fist' };
+const HIPS_R: Arm = { e: { x: 262, y: 170 }, h: { x: 228, y: 216 }, grip: 'fist' };
+
+// Generated keyframes: two fists orbiting a common center (rolling / rotating fists).
+function rollingFists(): Frame[] {
+  const C = { x: 200, y: 184 }, R = 26, N = 8;
+  return Array.from({ length: N }, (_, i) => {
+    const a = (i / N) * Math.PI * 2;
+    const lh = { x: C.x + R * Math.cos(a + Math.PI), y: C.y + R * Math.sin(a + Math.PI) };
+    const rh = { x: C.x + R * Math.cos(a), y: C.y + R * Math.sin(a) };
+    return {
+      l: { e: { x: 148, y: 184 }, h: lh, grip: 'fist' as Grip },
+      r: { e: { x: 252, y: 184 }, h: rh, grip: 'fist' as Grip },
+    };
+  });
+}
+
+// Generated keyframes: one hand tracing a circle overhead (home run / free hit).
+function overheadCircle(grip: Grip): Frame[] {
+  const C = { x: 238, y: 30 }, R = 26, N = 8;
+  return Array.from({ length: N }, (_, i) => {
+    const a = (i / N) * Math.PI * 2;
+    return {
+      l: REST_L,
+      r: { e: { x: 246, y: 80 }, h: { x: C.x + R * Math.cos(a), y: C.y + R * Math.sin(a) }, grip },
+    };
+  });
+}
+
+// Dashed "TV screen" box (VAR / TMO / cricket referral).
+const tvBox = (x: number, y: number, w: number, h: number): Prim =>
+  ({ k: 'rect', x, y, w, h, rx: 8, f: undefined, s: SG.accent, sw: 5, dash: '11 9' });
 
 // ============================================================================
-// THE POSES — one entry per SignalKey (compiler-enforced exhaustive).
-// Signals were verified against: the NFL signal chart, umpire mechanics manuals
-// (UmpireBible / NFHS), NBA-FIBA-NFHS basketball mechanics, USA Hockey Appendix 3,
-// IFAB Laws of the Game + assistant-referee guides, World Rugby match-official
-// signals (passport.world.rugby), and MCC Laws of Cricket Law 2.13.
+// THE SIGNALS — one animation per SignalKey (compiler-enforced exhaustive).
+// Verified against: the NFL signal chart, umpire mechanics manuals (UmpireBible
+// / NFHS), NBA-FIBA-NFHS basketball mechanics, USA Hockey Appendix 3, IFAB Laws
+// + assistant-referee guides, World Rugby match-official signals, and MCC Laws
+// of Cricket Law 2.13.
 // ============================================================================
-const POSES: Record<SignalKey, FigureSpec> = {
+export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
 
   // ── MLB (umpire) ───────────────────────────────────────────────────────────
-  // Strike: emphatic point out to the side with the right hand.
-  'mlb-strike': { l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 312, y: 122 }, grip: 'point' } },
-  // Out: the "hammer" — bent arm, clenched fist punched up/forward.
+  // Strike: the arm fires out to the side — an emphatic point. (Balls get NO signal.)
+  'mlb-strike': {
+    frames: [
+      { l: REST_L, r: { e: { x: 244, y: 156 }, h: { x: 206, y: 150 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+    ],
+    loopMs: 1400,
+  },
+  // Out: the "hammer" — cocked fist punched forward.
   'mlb-out': {
-    l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 262, y: 64 }, grip: 'fist' },
-    extras: <Arc d="M 292 74 A 30 30 0 0 1 280 102" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 248, y: 120 }, h: { x: 244, y: 62 }, grip: 'fist' } },
+      { l: REST_L, r: { e: { x: 276, y: 132 }, h: { x: 322, y: 152 }, grip: 'fist' } },
+      { l: REST_L, r: { e: { x: 276, y: 132 }, h: { x: 322, y: 152 }, grip: 'fist' } },
+    ],
+    loopMs: 1300,
   },
-  // Safe: both arms extended out flat, palms down, swept apart.
+  // Safe: flat hands cross low, then SWEEP wide apart.
   'mlb-safe': {
-    l: { ...OUT_L, grip: 'flat' }, r: { ...OUT_R, grip: 'flat' },
-    extras: (<>
-      <Arc d="M 120 94 A 44 30 0 0 0 78 106" />
-      <Arc d="M 280 94 A 44 30 0 0 1 322 106" />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 166, y: 190 }, h: { x: 212, y: 206 }, grip: 'flat' },
+        r: { e: { x: 234, y: 190 }, h: { x: 188, y: 206 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 118, y: 142 }, h: { x: 62, y: 148 }, grip: 'flat' },
+        r: { e: { x: 282, y: 142 }, h: { x: 338, y: 148 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 118, y: 142 }, h: { x: 62, y: 148 }, grip: 'flat' },
+        r: { e: { x: 282, y: 142 }, h: { x: 338, y: 148 }, grip: 'flat' },
+      },
+    ],
+    loopMs: 1700,
   },
-  // Time / dead ball (same mechanic covers foul ball): both hands straight up.
-  'mlb-time': { l: UP_L, r: UP_R },
-  // Fair ball: point into fair territory (no verbal call).
-  'mlb-fair': { l: REST_L, r: { e: { x: 250, y: 158 }, h: { x: 300, y: 192 }, grip: 'point' } },
-  // Home run: arm up, index finger circling overhead.
-  'mlb-homerun': {
-    l: REST_L, r: { e: { x: 220, y: 70 }, h: { x: 232, y: 20 }, grip: 'point' },
-    extras: <Arc d="M 148 36 A 62 34 0 1 1 252 34" />,
-  },
-  // Infield fly: right arm straight up, index finger pointing skyward.
-  'mlb-infield-fly': { l: REST_L, r: { e: { x: 220, y: 68 }, h: { x: 224, y: 16 }, grip: 'point' } },
-  // The count: balls on the left hand, strikes on the right (3–2 shown).
+  // Time / dead ball (same mechanic covers foul ball): both hands straight up, HELD.
+  'mlb-time': { frames: [{ l: UPG_L('palm'), r: UPG_R('palm') }] },
+  // Fair ball: silent point down into fair territory, held.
+  'mlb-fair': { frames: [{ l: REST_L, r: { e: { x: 258, y: 162 }, h: { x: 310, y: 198 }, grip: 'point' } }] },
+  // Home run: index finger circling overhead.
+  'mlb-homerun': { frames: overheadCircle('point'), mode: 'cycle', ease: 'linear', loopMs: 1500 },
+  // Infield fly: arm straight up, finger pointing skyward, held.
+  'mlb-infield-fly': { frames: [{ l: REST_L, r: { e: { x: 238, y: 82 }, h: { x: 243, y: 34 }, grip: 'point' } }] },
+  // The count: balls on the left hand, strikes on the right (3–2 shown), held.
   'mlb-count': {
-    l: { e: { x: 150, y: 150 }, h: { x: 146, y: 96 }, grip: 'three' },
-    r: { e: { x: 250, y: 150 }, h: { x: 254, y: 96 }, grip: 'two' },
+    frames: [{
+      l: { e: { x: 146, y: 160 }, h: { x: 140, y: 104 }, grip: 'three' },
+      r: { e: { x: 254, y: 160 }, h: { x: 260, y: 104 }, grip: 'two' },
+    }],
   },
-  // Foul tip: one hand brushes over the other at shoulder height (then strike).
+  // Foul tip: one hand brushes up and off the back of the other.
   'mlb-foul-tip': {
-    l: { e: { x: 160, y: 170 }, h: { x: 192, y: 148 }, grip: 'flat' },
-    r: { e: { x: 246, y: 150 }, h: { x: 208, y: 136 }, grip: 'palm' },
-    extras: <Arc d="M 232 116 A 28 28 0 0 0 196 126" />,
+    frames: [
+      {
+        l: { e: { x: 158, y: 182 }, h: { x: 196, y: 170 }, grip: 'flat' },
+        r: { e: { x: 250, y: 152 }, h: { x: 212, y: 152 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 158, y: 182 }, h: { x: 196, y: 170 }, grip: 'flat' },
+        r: { e: { x: 242, y: 120 }, h: { x: 272, y: 96 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1100,
   },
-  // Delayed dead ball: LEFT arm extended horizontally, fist (e.g. catcher's interference).
-  'mlb-delayed-dead': { l: { ...OUT_L, grip: 'fist' }, r: REST_R },
+  // Delayed dead ball: LEFT arm extended horizontally, fist, HELD while play runs.
+  'mlb-delayed-dead': { frames: [{ l: OUT_L('fist'), r: REST_R }] },
 
   // ── NFL (referee) ──────────────────────────────────────────────────────────
-  // Touchdown (also field goal / extra point good): both arms straight up.
-  'nfl-touchdown': { l: UP_L, r: UP_R },
-  // Incomplete pass (also penalty declined / no score): arms crossed-and-swept at shoulder level.
+  // Touchdown (also FG/XP good): both arms straight up, held still.
+  'nfl-touchdown': { frames: [{ l: UP_L(), r: UP_R() }] },
+  // Incomplete pass (also no good / declined): flat hands cross and SWEEP apart, repeating.
   'nfl-incomplete': {
-    l: { ...OUT_L, grip: 'flat' }, r: { ...OUT_R, grip: 'flat' },
-    extras: (<>
-      <Arc d="M 100 148 A 64 22 0 0 0 176 148" />
-      <Arc d="M 224 148 A 64 22 0 0 0 300 148" />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 162, y: 172 }, h: { x: 240, y: 172 }, grip: 'flat' },
+        r: { e: { x: 238, y: 172 }, h: { x: 160, y: 172 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 118, y: 140 }, h: { x: 62, y: 140 }, grip: 'flat' },
+        r: { e: { x: 282, y: 140 }, h: { x: 338, y: 140 }, grip: 'flat' },
+      },
+    ],
+    loopMs: 1250,
   },
-  // First down: arm extended, pointing toward the defense's goal.
-  'nfl-first-down': { l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 312, y: 122 }, grip: 'point' } },
-  // Holding: one hand grasping the opposite wrist in front of the chest.
+  // First down: the arm swings up to point downfield and holds.
+  'nfl-first-down': {
+    frames: [
+      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 212, y: 146 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+    ],
+    loopMs: 1800,
+  },
+  // Holding: one hand GRASPS the opposite wrist (fists) and tugs DOWNWARD.
   'nfl-holding': {
-    l: { e: { x: 166, y: 176 }, h: { x: 204, y: 196 }, grip: 'fist' },
-    r: { e: { x: 252, y: 168 }, h: { x: 216, y: 190 }, grip: 'fist' },
-    extras: <Circle cx={210} cy={193} r={20} fill="none" stroke={SG.accent} strokeWidth={4} strokeDasharray="7 7" />,
+    frames: [
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 216, y: 184 }, grip: 'fist' },
+        r: { e: { x: 250, y: 178 }, h: { x: 202, y: 186 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 156, y: 192 }, h: { x: 218, y: 212 }, grip: 'fist' },
+        r: { e: { x: 252, y: 192 }, h: { x: 204, y: 214 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1200,
   },
-  // False start: forearms rotating over each other at chest height.
-  'nfl-false-start': {
-    l: { e: { x: 152, y: 176 }, h: { x: 186, y: 156 }, grip: 'fist' },
-    r: { e: { x: 248, y: 190 }, h: { x: 214, y: 180 }, grip: 'fist' },
-    extras: <Circle cx={200} cy={168} r={32} fill="none" stroke={SG.accent} strokeWidth={4.5} strokeDasharray="8 8" />,
+  // Illegal use of hands: grasps the wrist, but the free hand is an OPEN PALM that
+  // rises toward the face (vs holding: fist tugged DOWNWARD — the expert pair).
+  'nfl-illegal-hands': {
+    frames: [
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 212, y: 184 }, grip: 'fist' },
+        r: { e: { x: 248, y: 168 }, h: { x: 202, y: 172 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 152, y: 164 }, h: { x: 208, y: 150 }, grip: 'fist' },
+        r: { e: { x: 242, y: 146 }, h: { x: 200, y: 128 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1200,
   },
-  // Offside / encroachment / neutral-zone infraction: hands on hips.
-  'nfl-offside': { l: HIPS_L, r: HIPS_R },
-  // Pass interference: open hands pushed forward from the shoulders.
+  // False start: forearms ROLLING over each other (full rotation).
+  'nfl-false-start': { frames: rollingFists(), mode: 'cycle', ease: 'linear', loopMs: 1100 },
+  // Offside / encroachment: hands on hips, held.
+  'nfl-offside': { frames: [{ l: HIPS_L, r: HIPS_R }] },
+  // Pass interference: open hands PUSHED forward from the shoulders.
   'nfl-pass-interference': {
-    l: { e: { x: 156, y: 166 }, h: { x: 118, y: 202 }, grip: 'palm' },
-    r: { e: { x: 244, y: 166 }, h: { x: 282, y: 202 }, grip: 'palm' },
-    extras: (<>
-      <Arrow a={{ x: 118, y: 226 }} b={{ x: 94, y: 250 }} />
-      <Arrow a={{ x: 282, y: 226 }} b={{ x: 306, y: 250 }} />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 152, y: 160 }, h: { x: 174, y: 178 }, grip: 'palm' },
+        r: { e: { x: 248, y: 160 }, h: { x: 226, y: 178 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 140, y: 172 }, h: { x: 96, y: 208 }, grip: 'palm' },
+        r: { e: { x: 260, y: 172 }, h: { x: 304, y: 208 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 140, y: 172 }, h: { x: 96, y: 208 }, grip: 'palm' },
+        r: { e: { x: 260, y: 172 }, h: { x: 304, y: 208 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1300,
   },
-  // Personal foul: one wrist striking the other above the head.
+  // Personal foul: one wrist STRIKES down on the other, clear ABOVE the head
+  // (QA fix: the whole action lives above the head so nothing crosses the face).
   'nfl-personal-foul': {
-    l: { e: { x: 160, y: 84 }, h: { x: 204, y: 46 }, grip: 'fist' },
-    r: { e: { x: 232, y: 70 }, h: { x: 222, y: 22 }, grip: 'fist' },
-    extras: <Arc d="M 162 28 A 32 32 0 0 1 192 38" />,
+    frames: [
+      {
+        l: { e: { x: 146, y: 60 }, h: { x: 208, y: 24 }, grip: 'fist' },
+        r: { e: { x: 256, y: 62 }, h: { x: 266, y: 20 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 146, y: 60 }, h: { x: 208, y: 24 }, grip: 'fist' },
+        r: { e: { x: 252, y: 58 }, h: { x: 224, y: 28 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1000,
   },
-  // Safety: palms pressed together above the head.
+  // Safety: palms pressed together straight above the head, held.
   'nfl-safety': {
-    l: { e: { x: 176, y: 68 }, h: { x: 195, y: 18 }, grip: 'none' },
-    r: { e: { x: 224, y: 68 }, h: { x: 205, y: 18 }, grip: 'none' },
-    extras: <Line x1={200} y1={38} x2={200} y2={6} stroke={SG.body} strokeWidth={9} strokeLinecap="round" />,
+    frames: [{
+      l: { e: { x: 168, y: 64 }, h: { x: 196, y: 10 }, grip: 'none' },
+      r: { e: { x: 232, y: 64 }, h: { x: 204, y: 10 }, grip: 'none' },
+    }],
   },
-  // Delay of game: arms folded across the chest.
+  // Delay of game: arms folded across the chest, held.
   'nfl-delay': {
-    l: { e: { x: 158, y: 178 }, h: { x: 236, y: 188 }, grip: 'fist' },
-    r: { e: { x: 242, y: 202 }, h: { x: 164, y: 210 }, grip: 'fist' },
+    frames: [{
+      l: { e: { x: 154, y: 184 }, h: { x: 240, y: 192 }, grip: 'none' },
+      r: { e: { x: 246, y: 200 }, h: { x: 160, y: 208 }, grip: 'none' },
+    }],
   },
-  // Timeout: arms crisscrossed above the head, waving.
+  // Timeout: arms crisscross and WAVE above the head.
   'nfl-timeout': {
-    l: { e: { x: 172, y: 74 }, h: { x: 236, y: 26 }, grip: 'palm' },
-    r: { e: { x: 228, y: 74 }, h: { x: 164, y: 26 }, grip: 'palm' },
-    extras: <Arc d="M 148 60 A 70 26 0 0 1 252 60" />,
+    frames: [
+      {
+        l: { e: { x: 166, y: 70 }, h: { x: 238, y: 18 }, grip: 'palm' },
+        r: { e: { x: 234, y: 70 }, h: { x: 162, y: 18 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 150, y: 74 }, h: { x: 118, y: 26 }, grip: 'palm' },
+        r: { e: { x: 250, y: 74 }, h: { x: 282, y: 26 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1000,
   },
-  // Facemask: fist gripping in front of the face, pulling down.
+  // Facemask: a fist grips just below the chin and YANKS down (QA fix: grip point
+  // sits clear below the head so the fist never blobs into the face).
   'nfl-facemask': {
-    l: REST_L, r: { e: { x: 252, y: 122 }, h: { x: 218, y: 88 }, grip: 'fist' },
-    extras: <Arrow a={{ x: 240, y: 96 }} b={{ x: 244, y: 132 }} />,
+    frames: [
+      { l: REST_L, r: { e: { x: 256, y: 138 }, h: { x: 218, y: 104 }, grip: 'fist' } },
+      { l: REST_L, r: { e: { x: 252, y: 152 }, h: { x: 226, y: 160 }, grip: 'fist' } },
+    ],
+    loopMs: 1150,
   },
-  // Unsportsmanlike conduct: arms outstretched, flat palms down (static).
-  'nfl-unsportsmanlike': { l: { ...OUT_L, grip: 'flat' }, r: { ...OUT_R, grip: 'flat' } },
+  // Unsportsmanlike conduct: arms outstretched, flat palms down — held STATIC
+  // (its lookalike, incomplete, is the same span in MOTION).
+  'nfl-unsportsmanlike': { frames: [{ l: OUT_L('flat'), r: OUT_R('flat') }] },
 
   // ── NBA (referee) ──────────────────────────────────────────────────────────
-  // Foul (stop clock for foul): one arm straight up, CLENCHED FIST.
-  'nba-foul': { l: REST_L, r: { ...UP_R, grip: 'fist' } },
-  // Violation (stop clock): one arm straight up, OPEN HAND.
-  'nba-violation': { l: REST_L, r: UP_R },
-  // Traveling: fists rolling around each other in front of the chest.
-  'nba-travel': {
-    l: { e: { x: 152, y: 176 }, h: { x: 186, y: 156 }, grip: 'fist' },
-    r: { e: { x: 248, y: 190 }, h: { x: 214, y: 180 }, grip: 'fist' },
-    extras: <Circle cx={200} cy={168} r={32} fill="none" stroke={SG.accent} strokeWidth={4.5} strokeDasharray="8 8" />,
-  },
-  // Technical foul: hands form a "T".
+  // Foul: one arm straight up, CLENCHED FIST, held.
+  'nba-foul': { frames: [{ l: REST_L, r: UPG_R('fist') }] },
+  // Violation: one arm straight up, OPEN HAND, held.
+  'nba-violation': { frames: [{ l: REST_L, r: UPG_R('palm') }] },
+  // Traveling: fists ROLLING around each other.
+  'nba-travel': { frames: rollingFists(), mode: 'cycle', ease: 'linear', loopMs: 1150 },
+  // Technical foul: hands form a "T", held (drawn proud of the chest so it reads).
   'nba-technical': {
-    l: { e: { x: 148, y: 158 }, h: { x: 176, y: 130 }, grip: 'none' },
-    r: { e: { x: 252, y: 160 }, h: { x: 212, y: 146 }, grip: 'none' },
-    extras: (<>
-      <Line x1={206} y1={122} x2={206} y2={170} stroke={SG.body} strokeWidth={10} strokeLinecap="round" />
-      <Line x1={172} y1={118} x2={240} y2={118} stroke={SG.body} strokeWidth={10} strokeLinecap="round" />
-    </>),
+    frames: [{
+      l: { e: { x: 150, y: 174 }, h: { x: 188, y: 170 }, grip: 'none' },
+      r: { e: { x: 252, y: 172 }, h: { x: 224, y: 150 }, grip: 'none' },
+    }],
+    front: [
+      { k: 'line', x1: 206, y1: 122, x2: 206, y2: 184, w: 11 + OUTLINE, c: SG.panel },
+      { k: 'line', x1: 164, y1: 118, x2: 248, y2: 118, w: 11 + OUTLINE, c: SG.panel },
+      { k: 'line', x1: 206, y1: 122, x2: 206, y2: 184, w: 11, c: SG.body },
+      { k: 'line', x1: 164, y1: 118, x2: 248, y2: 118, w: 11, c: SG.body },
+    ],
   },
-  // Jump ball / held ball: both thumbs up.
+  // Jump ball / held ball: both thumbs up, held.
   'nba-jump-ball': {
-    l: { e: { x: 158, y: 82 }, h: { x: 128, y: 40 }, grip: 'thumb' },
-    r: { e: { x: 242, y: 82 }, h: { x: 272, y: 40 }, grip: 'thumb' },
+    frames: [{
+      l: { e: { x: 150, y: 96 }, h: { x: 126, y: 48 }, grip: 'thumb' },
+      r: { e: { x: 250, y: 96 }, h: { x: 274, y: 48 }, grip: 'thumb' },
+    }],
   },
-  // Blocking foul: both hands on hips.
-  'nba-blocking': { l: HIPS_L, r: HIPS_R },
-  // Charging (player control): fist punched into the open palm.
+  // Blocking foul: both hands on hips, held STATIC (its confusable twin, the
+  // charge, is a STRIKE in motion).
+  'nba-blocking': { frames: [{ l: HIPS_L, r: HIPS_R }] },
+  // Charging: a fist STRIKES down into the open opposite palm.
   'nba-charge': {
-    l: { e: { x: 154, y: 168 }, h: { x: 180, y: 178 }, grip: 'flat' },
-    r: { e: { x: 254, y: 178 }, h: { x: 208, y: 180 }, grip: 'fist' },
-    extras: <Arrow a={{ x: 246, y: 154 }} b={{ x: 218, y: 168 }} />,
+    frames: [
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 262, y: 148 }, h: { x: 278, y: 108 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 250, y: 168 }, h: { x: 206, y: 180 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 250, y: 168 }, h: { x: 206, y: 180 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1200,
   },
-  // Shot-clock violation: fingertips tap the top of the (same-side) shoulder.
+  // Shot-clock violation: fingertips TAP the top of the same-side shoulder.
   'nba-shot-clock': {
-    l: REST_L, r: { e: { x: 258, y: 150 }, h: { x: 232, y: 112 }, grip: 'two' },
-    extras: <Arc d="M 250 92 A 20 20 0 0 0 228 96" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 266, y: 148 }, h: { x: 246, y: 94 }, grip: 'two' } },
+      { l: REST_L, r: { e: { x: 264, y: 152 }, h: { x: 240, y: 110 }, grip: 'two' } },
+    ],
+    loopMs: 800,
   },
-  // Three-point ATTEMPT: one arm up, three fingers.
-  'nba-three-attempt': { l: REST_L, r: { ...UP_R, grip: 'three' } },
-  // Three-point GOOD: both arms extended overhead.
-  'nba-three-good': { l: { ...UP_L, grip: 'three' }, r: { ...UP_R, grip: 'three' } },
-  // Count the basket ("and one"): arm punched down toward the floor.
+  // Three-point ATTEMPT: one arm up, THREE fingers, held.
+  'nba-three-attempt': { frames: [{ l: REST_L, r: UPG_R('three') }] },
+  // Three-point GOOD: BOTH arms extended overhead, three fingers, held.
+  'nba-three-good': { frames: [{ l: UPG_L('three'), r: UPG_R('three') }] },
+  // Count the basket ("and one"): the fist cocks high beside the head, then
+  // PUNCHES down and out toward the floor.
   'nba-count-basket': {
-    l: REST_L, r: { e: { x: 240, y: 172 }, h: { x: 266, y: 222 }, grip: 'fist' },
-    extras: <Arrow a={{ x: 272, y: 238 }} b={{ x: 278, y: 272 }} />,
+    frames: [
+      { l: REST_L, r: { e: { x: 252, y: 146 }, h: { x: 264, y: 96 }, grip: 'fist' } },
+      { l: REST_L, r: { e: { x: 252, y: 192 }, h: { x: 296, y: 236 }, grip: 'fist' } },
+      { l: REST_L, r: { e: { x: 252, y: 192 }, h: { x: 296, y: 236 }, grip: 'fist' } },
+    ],
+    loopMs: 1150,
   },
-  // Direction / possession: arm pointed along the sideline.
-  'nba-direction': { l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 312, y: 122 }, grip: 'point' } },
+  // Direction / possession: the arm snaps out to point along the sideline, held.
+  'nba-direction': {
+    frames: [
+      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 212, y: 146 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 280, y: 118 }, h: { x: 338, y: 118 }, grip: 'point' } },
+    ],
+    loopMs: 1700,
+  },
 
   // ── NHL (referee / linesman) ───────────────────────────────────────────────
-  // Goal: referee points into the net.
+  // Goal: an emphatic point into the net.
   'nhl-goal': {
-    l: REST_L, r: { e: { x: 250, y: 158 }, h: { x: 296, y: 192 }, grip: 'point' },
-    extras: (<>
-      <Rect x={300} y={222} width={62} height={40} fill="none" stroke={SG.muted} strokeWidth={4} />
-      <Line x1={321} y1={222} x2={321} y2={262} stroke={SG.muted} strokeWidth={2.5} />
-      <Line x1={341} y1={222} x2={341} y2={262} stroke={SG.muted} strokeWidth={2.5} />
-      <Line x1={300} y1={242} x2={362} y2={242} stroke={SG.muted} strokeWidth={2.5} />
-    </>),
+    frames: [{ l: REST_L, r: { e: { x: 258, y: 162 }, h: { x: 308, y: 200 }, grip: 'point' } }],
+    back: [
+      { k: 'rect', x: 300, y: 334, w: 64, h: 44, f: undefined, s: SG.muted, sw: 4 },
+      { k: 'line', x1: 321, y1: 334, x2: 321, y2: 378, w: 2.5, c: SG.muted },
+      { k: 'line', x1: 342, y1: 334, x2: 342, y2: 378, w: 2.5, c: SG.muted },
+      { k: 'line', x1: 300, y1: 356, x2: 364, y2: 356, w: 2.5, c: SG.muted },
+    ],
   },
-  // Tripping: hand sweeps below the knee.
+  // Tripping: the flat hand SWEEPS across in front of the raised shin, below the knee.
   'nhl-trip': {
-    l: REST_L, r: { e: { x: 246, y: 198 }, h: { x: 240, y: 300 }, grip: 'flat' },
-    extras: <Arc d="M 266 318 A 36 24 0 0 0 216 328" />,
+    frames: [
+      {
+        l: REST_L,
+        r: { e: { x: 254, y: 198 }, h: { x: 292, y: 258 }, grip: 'flat' },
+        legs: { l: DEFAULT_LEGS.l, r: [{ x: 256, y: 288 }, { x: 276, y: 356 }] },
+      },
+      {
+        l: REST_L,
+        r: { e: { x: 244, y: 204 }, h: { x: 210, y: 272 }, grip: 'flat' },
+        legs: { l: DEFAULT_LEGS.l, r: [{ x: 256, y: 288 }, { x: 276, y: 356 }] },
+      },
+    ],
+    loopMs: 1100,
   },
-  // Hooking: tugging motion — both fists pulling back toward the body.
+  // Hooking: both fists grip an unseen stick out to the side and YANK it back in
+  // toward the hip — a tugging motion (its twin, holding, is a static clasp).
   'nhl-hook': {
-    l: { e: { x: 160, y: 182 }, h: { x: 186, y: 210 }, grip: 'fist' },
-    r: { e: { x: 248, y: 166 }, h: { x: 204, y: 182 }, grip: 'fist' },
-    extras: <Arrow a={{ x: 254, y: 210 }} b={{ x: 226, y: 226 }} />,
+    frames: [
+      {
+        l: { e: { x: 196, y: 174 }, h: { x: 254, y: 192 }, grip: 'fist' },
+        r: { e: { x: 260, y: 168 }, h: { x: 300, y: 210 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 158, y: 192 }, h: { x: 186, y: 222 }, grip: 'fist' },
+        r: { e: { x: 244, y: 196 }, h: { x: 224, y: 240 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1250,
+    linkHands: true,
   },
-  // Holding: clasping the opposite wrist in front of the chest.
+  // Holding: one hand clasps the opposite wrist, held STATIC in front of the chest
+  // (its confusable twin, hooking, is the same fists in a PULLING motion).
   'nhl-hold': {
-    l: { e: { x: 166, y: 176 }, h: { x: 204, y: 196 }, grip: 'fist' },
-    r: { e: { x: 252, y: 168 }, h: { x: 216, y: 190 }, grip: 'fist' },
-    extras: <Circle cx={210} cy={193} r={20} fill="none" stroke={SG.accent} strokeWidth={4} strokeDasharray="7 7" />,
+    frames: [{
+      l: { e: { x: 152, y: 178 }, h: { x: 216, y: 186 }, grip: 'fist' },
+      r: { e: { x: 250, y: 178 }, h: { x: 202, y: 188 }, grip: 'fist' },
+    }],
   },
-  // Slashing: chopping the edge of one hand down onto the opposite forearm.
+  // Slashing: the edge of one hand CHOPS down onto the opposite forearm.
   'nhl-slash': {
-    l: { e: { x: 150, y: 180 }, h: { x: 228, y: 186 }, grip: 'none' },
-    r: { e: { x: 254, y: 132 }, h: { x: 206, y: 160 }, grip: 'flat' },
-    extras: <Arrow a={{ x: 218, y: 128 }} b={{ x: 208, y: 168 }} />,
+    frames: [
+      {
+        l: { e: { x: 150, y: 180 }, h: { x: 226, y: 172 }, grip: 'none' },
+        r: { e: { x: 256, y: 120 }, h: { x: 248, y: 74 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 150, y: 180 }, h: { x: 226, y: 172 }, grip: 'none' },
+        r: { e: { x: 252, y: 140 }, h: { x: 200, y: 160 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 150, y: 180 }, h: { x: 226, y: 172 }, grip: 'none' },
+        r: { e: { x: 252, y: 140 }, h: { x: 200, y: 160 }, grip: 'flat' },
+      },
+    ],
+    loopMs: 1100,
   },
-  // High-sticking: two clenched fists stacked, held at forehead height.
+  // High-sticking: two fists stacked one above the other beside the head, held.
   'nhl-highstick': {
-    l: { e: { x: 172, y: 162 }, h: { x: 232, y: 128 }, grip: 'fist' },
-    r: { e: { x: 254, y: 120 }, h: { x: 234, y: 94 }, grip: 'fist' },
+    frames: [{
+      l: { e: { x: 168, y: 156 }, h: { x: 244, y: 124 }, grip: 'fist' },
+      r: { e: { x: 258, y: 130 }, h: { x: 246, y: 92 }, grip: 'fist' },
+    }],
   },
-  // Interference: arms crossed in front of the chest, fists closed.
+  // Interference: arms crossed static in front of the chest, fists closed.
   'nhl-interference': {
-    l: { e: { x: 162, y: 180 }, h: { x: 236, y: 188 }, grip: 'fist' },
-    r: { e: { x: 238, y: 180 }, h: { x: 164, y: 188 }, grip: 'fist' },
+    frames: [{
+      l: { e: { x: 158, y: 182 }, h: { x: 240, y: 192 }, grip: 'fist' },
+      r: { e: { x: 242, y: 182 }, h: { x: 160, y: 192 }, grip: 'fist' },
+    }],
   },
-  // Boarding: fist pounded into the open palm.
+  // Boarding: a fist STRIKES the open palm in front of the chest.
   'nhl-board': {
-    l: { e: { x: 154, y: 168 }, h: { x: 180, y: 178 }, grip: 'flat' },
-    r: { e: { x: 254, y: 178 }, h: { x: 208, y: 180 }, grip: 'fist' },
-    extras: <Arrow a={{ x: 246, y: 154 }} b={{ x: 218, y: 168 }} />,
+    frames: [
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 262, y: 148 }, h: { x: 278, y: 108 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 250, y: 168 }, h: { x: 206, y: 180 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 152, y: 178 }, h: { x: 188, y: 188 }, grip: 'flat' },
+        r: { e: { x: 250, y: 168 }, h: { x: 206, y: 180 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1200,
   },
-  // Charging: fists rotating around each other in front of the chest.
-  'nhl-charge': {
-    l: { e: { x: 152, y: 176 }, h: { x: 186, y: 156 }, grip: 'fist' },
-    r: { e: { x: 248, y: 190 }, h: { x: 214, y: 180 }, grip: 'fist' },
-    extras: <Circle cx={200} cy={168} r={32} fill="none" stroke={SG.accent} strokeWidth={4.5} strokeDasharray="8 8" />,
-  },
-  // Cross-checking: both fists thrust forward and back at chest height.
+  // Charging: fists ROTATING around each other (vs boarding's single strike).
+  'nhl-charge': { frames: rollingFists(), mode: 'cycle', ease: 'linear', loopMs: 1150 },
+  // Cross-checking: both fists grip a level stick shaft at the chest and THRUST
+  // it forward/out together (vs hooking's one-sided yank inward).
   'nhl-crosscheck': {
-    l: { e: { x: 152, y: 178 }, h: { x: 114, y: 196 }, grip: 'fist' },
-    r: { e: { x: 248, y: 178 }, h: { x: 286, y: 196 }, grip: 'fist' },
-    extras: (<>
-      <Arrow a={{ x: 106, y: 214 }} b={{ x: 82, y: 228 }} />
-      <Arrow a={{ x: 294, y: 214 }} b={{ x: 318, y: 228 }} />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 154, y: 178 }, h: { x: 158, y: 206 }, grip: 'fist' },
+        r: { e: { x: 246, y: 178 }, h: { x: 242, y: 206 }, grip: 'fist' },
+      },
+      {
+        l: { e: { x: 140, y: 192 }, h: { x: 122, y: 240 }, grip: 'fist' },
+        r: { e: { x: 260, y: 192 }, h: { x: 278, y: 240 }, grip: 'fist' },
+      },
+    ],
+    loopMs: 1050,
+    linkHands: true,
   },
-  // Delayed penalty: arm fully extended straight up (play continues until the whistle).
-  'nhl-delayed-penalty': { l: REST_L, r: { ...UP_R, grip: 'none' } },
-  // Washout: both arms swept out flat — no goal / icing waved off.
+  // Delayed penalty: one arm fully extended straight up, HELD (play continues).
+  'nhl-delayed-penalty': { frames: [{ l: REST_L, r: UP_R() }] },
+  // Washout: flat arms SWEEP out level at the shoulders (no goal / wave-off).
   'nhl-washout': {
-    l: { ...OUT_L, grip: 'flat' }, r: { ...OUT_R, grip: 'flat' },
-    extras: (<>
-      <Arc d="M 120 94 A 44 30 0 0 0 78 106" />
-      <Arc d="M 280 94 A 44 30 0 0 1 322 106" />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 162, y: 172 }, h: { x: 240, y: 172 }, grip: 'flat' },
+        r: { e: { x: 238, y: 172 }, h: { x: 160, y: 172 }, grip: 'flat' },
+      },
+      { l: OUT_L('flat'), r: OUT_R('flat') },
+    ],
+    loopMs: 1250,
   },
-  // Misconduct: both hands on hips.
-  'nhl-misconduct': { l: HIPS_L, r: HIPS_R },
-  // Penalty shot: arms crossed above the head (static X).
+  // Misconduct: both hands on hips, held.
+  'nhl-misconduct': { frames: [{ l: HIPS_L, r: HIPS_R }] },
+  // Penalty shot: arms crossed in a STATIC X above the head.
   'nhl-penalty-shot': {
-    l: { e: { x: 172, y: 74 }, h: { x: 236, y: 26 }, grip: 'fist' },
-    r: { e: { x: 228, y: 74 }, h: { x: 164, y: 26 }, grip: 'fist' },
+    frames: [{
+      l: { e: { x: 168, y: 72 }, h: { x: 244, y: 20 }, grip: 'fist' },
+      r: { e: { x: 232, y: 72 }, h: { x: 156, y: 20 }, grip: 'fist' },
+    }],
   },
 
   // ── Soccer (referee + assistant referee) ───────────────────────────────────
-  // Yellow card: card raised high.
-  'soc-yellow': { l: REST_L, r: { e: { x: 238, y: 76 }, h: { x: 262, y: 32 }, grip: 'cardY' } },
-  // Red card: card raised high.
-  'soc-red': { l: REST_L, r: { e: { x: 238, y: 76 }, h: { x: 262, y: 32 }, grip: 'cardR' } },
-  // INDIRECT free kick: arm raised straight up and HELD there.
-  'soc-indirect': { l: REST_L, r: UP_R },
-  // DIRECT free kick: arm pointed toward the attacking direction (no raised arm).
-  'soc-direct': { l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 312, y: 122 }, grip: 'point' } },
-  // Advantage: arms extended forward, sweeping on — "play on".
+  // Yellow card: raised from the chest high into the air, held up.
+  'soc-yellow': {
+    frames: [
+      { l: REST_L, r: { e: { x: 248, y: 158 }, h: { x: 222, y: 124 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
+    ],
+    loopMs: 2200,
+  },
+  // Red card: same mechanic, red.
+  'soc-red': {
+    frames: [
+      { l: REST_L, r: { e: { x: 248, y: 158 }, h: { x: 222, y: 124 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
+    ],
+    loopMs: 2200,
+  },
+  // INDIRECT free kick: arm raised straight up and HELD there (static by law).
+  'soc-indirect': { frames: [{ l: REST_L, r: UP_R() }] },
+  // DIRECT free kick: the arm swings up to POINT the attacking direction, then drops
+  // (shown as point-and-hold; contrast the indirect's vertical hold).
+  'soc-direct': {
+    frames: [
+      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 214, y: 144 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 282, y: 128 }, h: { x: 338, y: 140 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 282, y: 128 }, h: { x: 338, y: 140 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 282, y: 128 }, h: { x: 338, y: 140 }, grip: 'point' } },
+    ],
+    loopMs: 1800,
+  },
+  // Advantage: both open hands SWEEP from the sides toward the attacking
+  // direction — "play on!"
   'soc-advantage': {
-    l: { e: { x: 156, y: 180 }, h: { x: 118, y: 212 }, grip: 'palm' },
-    r: { e: { x: 244, y: 180 }, h: { x: 282, y: 212 }, grip: 'palm' },
-    extras: (<>
-      <Arc d="M 96 232 A 40 26 0 0 1 140 244" />
-      <Arc d="M 304 232 A 40 26 0 0 0 260 244" />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 148, y: 194 }, h: { x: 144, y: 232 }, grip: 'palm' },
+        r: { e: { x: 252, y: 194 }, h: { x: 256, y: 232 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 178, y: 194 }, h: { x: 244, y: 210 }, grip: 'palm' },
+        r: { e: { x: 260, y: 174 }, h: { x: 322, y: 188 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1300,
   },
-  // Penalty kick: referee points at the penalty spot.
+  // Penalty kick: emphatic point DOWN at the spot, held (spot drawn on the ground).
   'soc-penalty': {
-    l: REST_L, r: { e: { x: 250, y: 158 }, h: { x: 296, y: 194 }, grip: 'point' },
-    extras: (<>
-      <Line x1={292} y1={248} x2={352} y2={248} stroke={SG.muted} strokeWidth={4} strokeLinecap="round" />
-      <Circle cx={322} cy={234} r={8} fill={SG.accent} />
-    </>),
+    frames: [{ l: REST_L, r: { e: { x: 256, y: 166 }, h: { x: 304, y: 214 }, grip: 'point' } }],
+    back: [
+      { k: 'line', x1: 292, y1: 252, x2: 352, y2: 252, w: 4, c: SG.muted },
+      { k: 'circle', cx: 322, cy: 238, r: 8, f: SG.accent },
+    ],
   },
-  // Corner kick: arm raised diagonally, pointing at the corner arc.
+  // Corner kick: point up at the corner flag, held.
   'soc-corner': {
-    l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 288, y: 44 }, grip: 'point' },
-    extras: (<>
-      <Line x1={330} y1={10} x2={330} y2={46} stroke={SG.muted} strokeWidth={4} strokeLinecap="round" />
-      <Polygon points="330,10 330,28 352,19" fill={SG.accent} />
-    </>),
+    frames: [{ l: REST_L, r: { e: { x: 248, y: 86 }, h: { x: 294, y: 44 }, grip: 'point' } }],
+    back: [
+      { k: 'line', x1: 344, y1: 14, x2: 344, y2: 72, w: 4, c: SG.muted },
+      { k: 'poly', pts: '344,14 344,34 370,24', f: SG.accent },
+    ],
   },
-  // Offside (assistant): flag raised straight up.
-  'soc-offside-flag': { l: REST_L, r: { e: { x: 222, y: 70 }, h: { x: 228, y: 20 }, grip: 'flag' } },
-  // Throw-in (assistant): flag angled up in the throwing team's direction.
-  'soc-throwin-flag': { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 286, y: 46 }, grip: 'flag' } },
-  // Substitution (assistant): flag held horizontally overhead with both hands.
+  // Offside (assistant): flag raised STRAIGHT UP, held (hand kept low enough that
+  // the pennant at the pole tip stays on-panel — QA fix).
+  'soc-offside-flag': { frames: [{ l: REST_L, r: { e: { x: 242, y: 108 }, h: { x: 246, y: 74 }, grip: 'flag' } }] },
+  // Throw-in (assistant): flag ANGLED at 45°, held.
+  'soc-throwin-flag': { frames: [{ l: REST_L, r: { e: { x: 248, y: 94 }, h: { x: 288, y: 56 }, grip: 'flag' } }] },
+  // Substitution (assistant): the flag held HORIZONTALLY overhead with both hands.
   'soc-sub-flag': {
-    l: { e: { x: 172, y: 72 }, h: { x: 162, y: 26 }, grip: 'none' },
-    r: { e: { x: 228, y: 72 }, h: { x: 238, y: 26 }, grip: 'none' },
-    extras: (<>
-      <Line x1={140} y1={18} x2={266} y2={18} stroke={SG.body} strokeWidth={5} strokeLinecap="round" />
-      <Polygon points="266,18 240,18 258,36" fill={SG.accent} />
-    </>),
+    frames: [{
+      l: { e: { x: 162, y: 70 }, h: { x: 150, y: 24 }, grip: 'none' },
+      r: { e: { x: 238, y: 70 }, h: { x: 250, y: 24 }, grip: 'none' },
+    }],
+    front: [
+      { k: 'line', x1: 128, y1: 16, x2: 268, y2: 16, w: 6 + OUTLINE, c: SG.panel },
+      { k: 'line', x1: 128, y1: 16, x2: 268, y2: 16, w: 6, c: SG.body },
+      { k: 'poly', pts: '268,16 240,16 262,36', f: SG.accent },
+    ],
   },
   // VAR review: the "TV screen" rectangle drawn in the air.
   'soc-var': {
-    l: { e: { x: 150, y: 172 }, h: { x: 148, y: 150 }, grip: 'point' },
-    r: { e: { x: 250, y: 172 }, h: { x: 252, y: 150 }, grip: 'point' },
-    extras: <TvBox x={140} y={94} w={120} h={72} />,
+    frames: [{
+      l: { e: { x: 150, y: 172 }, h: { x: 146, y: 146 }, grip: 'point' },
+      r: { e: { x: 250, y: 172 }, h: { x: 254, y: 146 }, grip: 'point' },
+    }],
+    front: [tvBox(142, 96, 116, 68)],
   },
 
-  // ── Rugby union (referee) ──────────────────────────────────────────────────
-  // Try: arm raised straight up (back to the dead-ball line), whistle blown.
-  'rug-try': { l: REST_L, r: { e: { x: 220, y: 68 }, h: { x: 224, y: 14 }, grip: 'none' } },
-  // Penalty: arm angled UP (~45°) toward the non-offending team.
-  'rug-penalty': { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 292, y: 44 }, grip: 'none' } },
-  // Free kick: arm bent square at the elbow (upper arm horizontal, forearm up).
-  'rug-free-kick': { l: REST_L, r: { e: { x: 258, y: 122 }, h: { x: 258, y: 64 }, grip: 'none' } },
-  // Scrum awarded: arm horizontal (shoulder height) toward the team throwing in.
-  'rug-scrum': { l: REST_L, r: OUT_R },
-  // Advantage: arm outstretched at WAIST height toward the non-offending team (~5s, no whistle).
-  'rug-advantage': { l: REST_L, r: { e: { x: 252, y: 150 }, h: { x: 304, y: 182 }, grip: 'none' } },
-  // Knock-on: arm raised, open hand waving back and forth above the head.
+  // ── Rugby union (referee) — the one-arm "angle ladder" ────────────────────
+  // Try: arm raised dead VERTICAL, held still.
+  'rug-try': { frames: [{ l: REST_L, r: UP_R() }] },
+  // Penalty: arm angled UP at ~45°, held.
+  'rug-penalty': { frames: [{ l: REST_L, r: { e: { x: 254, y: 86 }, h: { x: 296, y: 44 }, grip: 'none' } }] },
+  // Free kick: arm BENT square at the elbow (upper arm level, forearm up), held.
+  'rug-free-kick': { frames: [{ l: REST_L, r: { e: { x: 282, y: 118 }, h: { x: 284, y: 60 }, grip: 'none' } }] },
+  // Scrum: arm dead HORIZONTAL at the shoulder, held.
+  'rug-scrum': { frames: [{ l: REST_L, r: OUT_R() }] },
+  // Advantage: arm outstretched LOW at waist height, held while play continues.
+  'rug-advantage': { frames: [{ l: REST_L, r: { e: { x: 268, y: 152 }, h: { x: 318, y: 182 }, grip: 'none' } }] },
+  // Knock-on: open hand WAVING back and forth above the head.
   'rug-knock-on': {
-    l: REST_L, r: { e: { x: 234, y: 74 }, h: { x: 260, y: 28 }, grip: 'palm' },
-    extras: <Arc d="M 222 16 A 46 22 0 0 1 300 24" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 240, y: 70 }, h: { x: 200, y: 20 }, grip: 'palm' } },
+      { l: REST_L, r: { e: { x: 248, y: 72 }, h: { x: 286, y: 28 }, grip: 'palm' } },
+    ],
+    loopMs: 950,
   },
-  // Forward pass: hands mime a pass travelling forward.
+  // Forward pass: both hands MIME a pass travelling across/ahead of the body.
   'rug-forward-pass': {
-    l: { e: { x: 164, y: 190 }, h: { x: 158, y: 232 }, grip: 'palm' },
-    r: { e: { x: 238, y: 196 }, h: { x: 178, y: 236 }, grip: 'palm' },
-    extras: (<>
-      <Arc d="M 176 254 A 100 60 0 0 0 296 216" />
-      <Arrow a={{ x: 290, y: 220 }} b={{ x: 314, y: 206 }} />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 152, y: 196 }, h: { x: 148, y: 244 }, grip: 'palm' },
+        r: { e: { x: 244, y: 206 }, h: { x: 180, y: 250 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 180, y: 182 }, h: { x: 252, y: 196 }, grip: 'palm' },
+        r: { e: { x: 258, y: 168 }, h: { x: 314, y: 184 }, grip: 'palm' },
+      },
+      {
+        l: { e: { x: 180, y: 182 }, h: { x: 252, y: 196 }, grip: 'palm' },
+        r: { e: { x: 258, y: 168 }, h: { x: 314, y: 184 }, grip: 'palm' },
+      },
+    ],
+    loopMs: 1400,
   },
-  // High tackle: flat hand drawn across the throat/neck line.
+  // High tackle: a flat hand SWEEPS across the neck line.
   'rug-high-tackle': {
-    l: REST_L, r: { e: { x: 254, y: 142 }, h: { x: 218, y: 106 }, grip: 'flat' },
-    extras: <Arc d="M 238 100 A 40 14 0 0 0 166 104" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 258, y: 142 }, h: { x: 240, y: 102 }, grip: 'flat' } },
+      { l: REST_L, r: { e: { x: 246, y: 148 }, h: { x: 172, y: 102 }, grip: 'flat' } },
+    ],
+    loopMs: 1150,
   },
-  // Not releasing: both hands clutched to the chest as if refusing to let the ball go.
+  // Not releasing: both hands clutch a ball tight to the chest, held.
   'rug-not-release': {
-    l: { e: { x: 158, y: 180 }, h: { x: 184, y: 184 }, grip: 'fist' },
-    r: { e: { x: 242, y: 180 }, h: { x: 216, y: 184 }, grip: 'fist' },
-    extras: (
-      // a rugby ball (ellipse via two arcs) pinned at the chest
-      <Path d="M 178 184 A 26 15 0 0 1 222 184 A 26 15 0 0 1 178 184"
-        fill="none" stroke={SG.accent} strokeWidth={5} />
-    ),
+    frames: [{
+      l: { e: { x: 154, y: 180 }, h: { x: 184, y: 198 }, grip: 'none' },
+      r: { e: { x: 246, y: 180 }, h: { x: 216, y: 198 }, grip: 'none' },
+    }],
+    front: [
+      { k: 'path', d: 'M 176 198 A 28 16 0 0 1 224 198 A 28 16 0 0 1 176 198', f: undefined, s: SG.accent, sw: 6 },
+    ],
   },
   // TMO referral: the big "TV box" drawn in the air.
   'rug-tmo': {
-    l: { e: { x: 150, y: 172 }, h: { x: 148, y: 150 }, grip: 'point' },
-    r: { e: { x: 250, y: 172 }, h: { x: 252, y: 150 }, grip: 'point' },
-    extras: <TvBox x={132} y={88} w={136} h={80} />,
+    frames: [{
+      l: { e: { x: 150, y: 172 }, h: { x: 146, y: 146 }, grip: 'point' },
+      r: { e: { x: 250, y: 172 }, h: { x: 254, y: 146 }, grip: 'point' },
+    }],
+    front: [tvBox(134, 90, 132, 76)],
   },
-  // Obstruction: arms crossed in front of the chest, scissor motion.
+  // Obstruction: crossed arms SCISSOR open and shut in front of the chest.
   'rug-obstruction': {
-    l: { e: { x: 162, y: 180 }, h: { x: 238, y: 186 }, grip: 'flat' },
-    r: { e: { x: 238, y: 180 }, h: { x: 162, y: 186 }, grip: 'flat' },
-    extras: (<>
-      <Arc d="M 246 168 A 22 18 0 0 1 258 196" />
-      <Arc d="M 154 168 A 22 18 0 0 0 142 196" />
-    </>),
+    frames: [
+      {
+        l: { e: { x: 158, y: 180 }, h: { x: 244, y: 190 }, grip: 'flat' },
+        r: { e: { x: 242, y: 180 }, h: { x: 156, y: 190 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 148, y: 182 }, h: { x: 174, y: 190 }, grip: 'flat' },
+        r: { e: { x: 252, y: 182 }, h: { x: 226, y: 190 }, grip: 'flat' },
+      },
+    ],
+    loopMs: 950,
   },
 
   // ── Cricket (umpire — MCC Law 2.13) ────────────────────────────────────────
-  // Out: index finger raised above head height.
-  'crk-out': { l: REST_L, r: { e: { x: 230, y: 72 }, h: { x: 246, y: 22 }, grip: 'point' } },
-  // Boundary four: arm waved side to side, finishing across the chest.
+  // Out: the index finger raised, slow and solemn, then held high.
+  'crk-out': {
+    frames: [
+      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 228, y: 120 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
+    ],
+    loopMs: 2200,
+  },
+  // Boundary four: the arm WAVES across the chest and back.
   'crk-four': {
-    l: REST_L, r: { e: { x: 252, y: 162 }, h: { x: 172, y: 170 }, grip: 'flat' },
-    extras: <Arc d="M 148 146 A 74 24 0 0 1 268 144" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 276, y: 140 }, h: { x: 328, y: 156 }, grip: 'flat' } },
+      { l: REST_L, r: { e: { x: 240, y: 178 }, h: { x: 164, y: 182 }, grip: 'flat' } },
+    ],
+    loopMs: 1250,
   },
-  // Boundary six: both arms raised above the head.
-  'crk-six': { l: UP_L, r: UP_R },
-  // Wide: BOTH arms extended horizontally.
-  'crk-wide': { l: OUT_L, r: OUT_R },
-  // No-ball: ONE arm extended horizontally.
-  'crk-noball': { l: REST_L, r: OUT_R },
-  // Bye: open hand raised above the head.
-  'crk-bye': { l: REST_L, r: UP_R },
-  // Leg bye: hand touching a raised knee.
+  // Boundary six: both arms raised above the head, held.
+  'crk-six': { frames: [{ l: UP_L(), r: UP_R() }] },
+  // Wide: BOTH arms extended dead horizontal, held.
+  'crk-wide': { frames: [{ l: OUT_L(), r: OUT_R() }] },
+  // No-ball: ONE arm extended horizontal, held.
+  'crk-noball': { frames: [{ l: REST_L, r: OUT_R() }] },
+  // Bye: an OPEN HAND raised above the head, held (vs out's single finger).
+  'crk-bye': { frames: [{ l: REST_L, r: UPG_R('palm') }] },
+  // Leg bye: the hand TAPS the raised knee.
   'crk-legbye': {
-    l: REST_L, r: { e: { x: 248, y: 196 }, h: { x: 240, y: 250 }, grip: 'palm' },
-    legs: { l: DEFAULT_LEGS.l, r: [{ x: 238, y: 262 }, { x: 222, y: 334 }] },
+    frames: [
+      {
+        l: REST_L,
+        r: { e: { x: 258, y: 172 }, h: { x: 268, y: 208 }, grip: 'palm' },
+        legs: { l: DEFAULT_LEGS.l, r: [{ x: 264, y: 240 }, { x: 258, y: 330 }] },
+      },
+      {
+        l: REST_L,
+        r: { e: { x: 260, y: 178 }, h: { x: 266, y: 228 }, grip: 'palm' },
+        legs: { l: DEFAULT_LEGS.l, r: [{ x: 264, y: 240 }, { x: 258, y: 330 }] },
+      },
+    ],
+    loopMs: 850,
   },
-  // Dead ball: wrists crossed and re-crossed below the waist.
+  // Dead ball: wrists CROSS and re-cross below the waist.
   'crk-dead': {
-    l: { e: { x: 168, y: 188 }, h: { x: 214, y: 258 }, grip: 'flat' },
-    r: { e: { x: 232, y: 188 }, h: { x: 186, y: 258 }, grip: 'flat' },
-    extras: <Arc d="M 158 278 A 54 18 0 0 0 242 278" />,
+    frames: [
+      {
+        l: { e: { x: 160, y: 208 }, h: { x: 230, y: 258 }, grip: 'flat' },
+        r: { e: { x: 240, y: 208 }, h: { x: 170, y: 258 }, grip: 'flat' },
+      },
+      {
+        l: { e: { x: 152, y: 212 }, h: { x: 142, y: 264 }, grip: 'flat' },
+        r: { e: { x: 248, y: 212 }, h: { x: 258, y: 264 }, grip: 'flat' },
+      },
+    ],
+    loopMs: 1150,
   },
-  // Short run: bent arm, fingertips tapping the NEAR (same-side) shoulder.
+  // Short run: fingertips TAP the NEAR (same-side) shoulder — the arm does NOT cross.
   'crk-short-run': {
-    l: REST_L, r: { e: { x: 258, y: 150 }, h: { x: 232, y: 112 }, grip: 'two' },
-    extras: <Arc d="M 250 92 A 20 20 0 0 0 228 96" />,
+    frames: [
+      { l: REST_L, r: { e: { x: 268, y: 148 }, h: { x: 248, y: 94 }, grip: 'two' } },
+      { l: REST_L, r: { e: { x: 266, y: 152 }, h: { x: 242, y: 110 }, grip: 'two' } },
+    ],
+    loopMs: 800,
   },
-  // Free hit: arm circling above the head (follows a no-ball in white-ball cricket).
-  'crk-free-hit': {
-    l: REST_L, r: { e: { x: 220, y: 70 }, h: { x: 232, y: 20 }, grip: 'palm' },
-    extras: <Arc d="M 148 36 A 62 34 0 1 1 252 34" />,
-  },
-  // New ball: ball held above the head.
-  'crk-new-ball': { l: REST_L, r: { e: { x: 220, y: 70 }, h: { x: 226, y: 26 }, grip: 'ball' } },
-  // 5 penalty runs to the BATTING side: repeatedly TAPPING the opposite shoulder.
+  // Free hit: the arm circling overhead (follows a no-ball in white-ball cricket).
+  'crk-free-hit': { frames: overheadCircle('point'), mode: 'cycle', ease: 'linear', loopMs: 1500 },
+  // 5 penalty runs to the BATTING side: repeatedly TAPPING the OPPOSITE shoulder
+  // (the arm crosses the chest — and it MOVES).
   'crk-penalty-bat': {
-    l: { e: { x: 156, y: 152 }, h: { x: 220, y: 116 }, grip: 'palm' },
-    r: REST_R,
-    extras: (<>
-      <Arc d="M 240 94 A 18 18 0 0 0 222 100" />
-      <Arc d="M 254 106 A 18 18 0 0 0 238 114" />
-    </>),
+    frames: [
+      { l: REST_L, r: { e: { x: 232, y: 162 }, h: { x: 184, y: 96 }, grip: 'palm' } },
+      { l: REST_L, r: { e: { x: 230, y: 166 }, h: { x: 176, y: 112 }, grip: 'palm' } },
+    ],
+    loopMs: 750,
   },
-  // 5 penalty runs to the FIELDING side: hand PLACED on the opposite shoulder (static).
+  // 5 penalty runs to the FIELDING side: the hand PLACED still on the opposite shoulder.
   'crk-penalty-field': {
-    l: { e: { x: 156, y: 152 }, h: { x: 220, y: 116 }, grip: 'flat' },
-    r: REST_R,
+    frames: [{ l: REST_L, r: { e: { x: 230, y: 166 }, h: { x: 174, y: 110 }, grip: 'flat' } }],
   },
-  // Revoke last signal: touching both shoulders, each with the opposite hand.
+  // Revoke last signal: BOTH hands crossed to touch the opposite shoulders, held.
   'crk-revoke': {
-    l: { e: { x: 168, y: 164 }, h: { x: 226, y: 118 }, grip: 'palm' },
-    r: { e: { x: 232, y: 164 }, h: { x: 174, y: 118 }, grip: 'palm' },
+    frames: [{
+      l: { e: { x: 176, y: 170 }, h: { x: 228, y: 110 }, grip: 'palm' },
+      r: { e: { x: 224, y: 170 }, h: { x: 172, y: 110 }, grip: 'palm' },
+    }],
   },
-  // TV referral: mimes a TV screen — decision sent upstairs.
+  // TV referral: mimes a TV screen — the decision goes upstairs.
   'crk-tv': {
-    l: { e: { x: 150, y: 172 }, h: { x: 148, y: 150 }, grip: 'point' },
-    r: { e: { x: 250, y: 172 }, h: { x: 252, y: 150 }, grip: 'point' },
-    extras: <TvBox x={140} y={94} w={120} h={72} />,
-  },
-  // Last hour (Tests): pointing at a raised wrist — tapping the "watch".
-  'crk-last-hour': {
-    l: { e: { x: 152, y: 168 }, h: { x: 194, y: 138 }, grip: 'fist' },
-    r: { e: { x: 252, y: 162 }, h: { x: 216, y: 146 }, grip: 'point' },
-    extras: <Circle cx={196} cy={138} r={9} fill="none" stroke={SG.accent} strokeWidth={4} />,
+    frames: [{
+      l: { e: { x: 150, y: 172 }, h: { x: 146, y: 146 }, grip: 'point' },
+      r: { e: { x: 250, y: 172 }, h: { x: 254, y: 146 }, grip: 'point' },
+    }],
+    front: [tvBox(142, 96, 116, 68)],
   },
 };
 
-// ── the public renderer ──────────────────────────────────────────────────────
-// Width-capped, centered SVG wrapper (portrait pictogram — a standing figure is
-// taller than wide, so it doesn't take the full screen width like a scoreboard).
-export function SignalArt({ signal }: { signal: SignalKey }) {
+// ── frame resolution (interpolation) ─────────────────────────────────────────
+function blendArm(a: Arm, b: Arm, u: number): Arm {
+  return { e: lerpPt(a.e, b.e, u), h: lerpPt(a.h, b.h, u), grip: u < 0.5 ? a.grip : b.grip };
+}
+function blendLegs(a?: Legs, b?: Legs, u = 0): Legs | undefined {
+  if (!a && !b) return undefined;
+  const A = a ?? DEFAULT_LEGS, B = b ?? DEFAULT_LEGS;
+  return {
+    l: [lerpPt(A.l[0], B.l[0], u), lerpPt(A.l[1], B.l[1], u)],
+    r: [lerpPt(A.r[0], B.r[0], u), lerpPt(A.r[1], B.r[1], u)],
+  };
+}
+
+// Resolve the pose at loop progress t ∈ [0,1).
+function poseAt(anim: SignalAnim, t: number): Frame {
+  const n = anim.frames.length;
+  if (n === 1) return anim.frames[0];
+  const mode = anim.mode ?? 'pingpong';
+  let i: number, j: number, u: number;
+  if (mode === 'cycle') {
+    const f = (t % 1) * n;
+    i = Math.floor(f) % n;
+    j = (i + 1) % n;
+    u = f - Math.floor(f);
+  } else {
+    const p = 1 - Math.abs(1 - 2 * (t % 1)); // triangle wave 0→1→0
+    const f = p * (n - 1);
+    i = Math.min(Math.floor(f), n - 2);
+    j = i + 1;
+    u = f - i;
+  }
+  if ((anim.ease ?? 'sine') === 'sine') u = easeSine(u);
+  const A = anim.frames[i], B = anim.frames[j];
+  return { l: blendArm(A.l, B.l, u), r: blendArm(A.r, B.r, u), legs: blendLegs(A.legs, B.legs, u) };
+}
+
+// ── the public pure API ──────────────────────────────────────────────────────
+export function isSignalAnimated(signal: SignalKey): boolean {
+  return SIGNAL_ANIMS[signal].frames.length > 1;
+}
+export function signalLoopMs(signal: SignalKey): number {
+  return SIGNAL_ANIMS[signal].loopMs ?? 1500;
+}
+// Where to freeze once the player has answered (the signal's "peak" pose).
+export function signalFreezeT(signal: SignalKey): number {
+  const anim = SIGNAL_ANIMS[signal];
+  return anim.holdT ?? (anim.frames.length > 1 ? 0.5 : 0);
+}
+
+// The COMPLETE primitive list for one rendered frame (backdrop included), so the
+// RN renderer and the QA rasterizer draw pixel-identical scenes.
+export function signalFrame(signal: SignalKey, t: number): Prim[] {
+  const anim = SIGNAL_ANIMS[signal];
+  const pose = poseAt(anim, t);
+  // Optional "stick shaft" between the two hands (hooking / cross-checking):
+  // extended beyond each fist so it reads as a gripped stick, and it moves with
+  // the interpolated hands every frame.
+  const link: Prim[] = [];
+  if (anim.linkHands) {
+    const u = unit(pose.l.h, pose.r.h);
+    const a = add(pose.l.h, u, -24), b = add(pose.r.h, u, 24);
+    link.push({ k: 'line', x1: a.x, y1: a.y, x2: b.x, y2: b.y, w: 8, c: SG.accent });
+  }
+  return [
+    { k: 'rect', x: 0, y: 0, w: SIGNAL_VB.w, h: SIGNAL_VB.h, f: SG.bg },
+    { k: 'rect', x: 8, y: 8, w: SIGNAL_VB.w - 16, h: SIGNAL_VB.h - 16, rx: 14, f: SG.panel, s: SG.line, sw: 2 },
+    { k: 'line', x1: 60, y1: 412, x2: 340, y2: 412, w: 3, c: SG.line },
+    ...(anim.back ?? []),
+    ...figurePrims(pose),
+    ...link,
+    ...(anim.front ?? []),
+  ];
+}
+
+// ─── QA-PURE-END ────────────────────────────────────────────────────────────
+
+// ── the RN renderer ──────────────────────────────────────────────────────────
+// One rAF owner, house cleanup idiom (WheresThePlayGame / FindTheOpenMan):
+// the loop runs only while `playing` and the signal is actually animated; it is
+// cancelled on answer (playing=false), on signal change, and on unmount.
+function PrimEl({ p }: { p: Prim }) {
+  switch (p.k) {
+    case 'line':
+      return <Line x1={p.x1} y1={p.y1} x2={p.x2} y2={p.y2} stroke={p.c} strokeWidth={p.w}
+        strokeLinecap="round" strokeDasharray={p.dash} />;
+    case 'circle':
+      return <Circle cx={p.cx} cy={p.cy} r={p.r} fill={p.f ?? 'none'} stroke={p.s} strokeWidth={p.sw} />;
+    case 'rect':
+      return <Rect x={p.x} y={p.y} width={p.w} height={p.h} rx={p.rx} fill={p.f ?? 'none'}
+        stroke={p.s} strokeWidth={p.sw} strokeDasharray={p.dash} />;
+    case 'poly':
+      return <Polygon points={p.pts} fill={p.f} />;
+    case 'path':
+      return <Path d={p.d} fill={p.f ?? 'none'} stroke={p.s} strokeWidth={p.sw}
+        strokeDasharray={p.dash} strokeLinecap="round" strokeLinejoin="round" />;
+  }
+}
+
+export function SignalArt({ signal, playing = true }: { signal: SignalKey; playing?: boolean }) {
+  const animated = isSignalAnimated(signal);
+  const [t, setT] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setT(0);
+    if (!playing || !animated) return;
+    let start: number | null = null;
+    const ms = signalLoopMs(signal);
+    const tick = (now: number) => {
+      if (start == null) start = now;
+      setT(((now - start) % ms) / ms);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    };
+  }, [signal, playing, animated]);
+
+  // While deciding: the live loop. Once answered: freeze at the signal's peak pose.
+  const shownT = playing ? t : signalFreezeT(signal);
+  const prims = signalFrame(signal, shownT);
+
   return (
     <View style={{ alignItems: 'center' }}>
-      <View style={{ width: '62%', maxWidth: 250, borderRadius: 16, overflow: 'hidden' }}>
+      <View style={{ width: '84%', maxWidth: 330, borderRadius: 16, overflow: 'hidden' }}>
         <Svg viewBox={`0 0 ${SIGNAL_VB.w} ${SIGNAL_VB.h}`}
           style={{ width: '100%', aspectRatio: SIGNAL_RATIO, backgroundColor: SG.bg }}>
-          <Rect x={0} y={0} width={SIGNAL_VB.w} height={SIGNAL_VB.h} fill={SG.bg} />
-          <Rect x={8} y={8} width={SIGNAL_VB.w - 16} height={SIGNAL_VB.h - 16} rx={14}
-            fill={SG.panel} stroke={SG.line} strokeWidth={2} />
-          {/* ground line the figure stands on */}
-          <Line x1={60} y1={408} x2={340} y2={408} stroke={SG.line} strokeWidth={3} strokeLinecap="round" />
-          <Figure spec={POSES[signal]} />
+          {prims.map((p, i) => <PrimEl key={i} p={p} />)}
         </Svg>
       </View>
     </View>

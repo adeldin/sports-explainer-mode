@@ -1,14 +1,21 @@
-// Signal Decoder — Soccer bank. Referee + assistant-referee signals only (evergreen,
-// rule-based; verified against the IFAB Laws of the Game and standard AR signal guides).
-// 6 scenarios per tier × 4 tiers. Pure data, zero RN imports.
+// Signal Decoder — Soccer bank (v2 rework). Referee + assistant-referee signals only
+// (evergreen, rule-based; verified against the IFAB Laws of the Game and standard AR
+// signal guides). 6 scenarios per tier × 4 tiers.
+//
+// v2 CONTRACT: constant prompt (varied only by WHICH official is shown — referee vs
+// flag-carrying assistant), options are always other soccer signal meanings,
+// difficulty = visual closeness of the distractor signals. Pure data.
 import type { SignalScenario } from '../signalDecoder';
+
+const P = 'What is the referee signaling?';
+const PA = 'What is the assistant referee signaling?';
 
 export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   // ── kid ────────────────────────────────────────────────────────────────────
   {
     id: 'soc-sig-kid-1', level: 'kid', signal: 'soc-yellow',
-    prompt: 'The referee holds a YELLOW card high in the air toward a player. What does it mean?',
-    options: ['A warning — behave, or you\'re off!', 'That player scored', 'Time for a substitution'],
+    prompt: P,
+    options: ['A warning — behave, or you\'re off!', 'A goal', 'A substitution'],
     answer: 0,
     title: 'Yellow card: the official warning',
     exp: {
@@ -20,8 +27,8 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-kid-2', level: 'kid', signal: 'soc-red',
-    prompt: 'Now the referee raises a RED card. What happens to the player?',
-    options: ['Sent off — out of the game, no replacement', 'He takes a penalty', 'A short break'],
+    prompt: P,
+    options: ['Sent off for the match', 'A penalty kick', 'A corner kick'],
     answer: 0,
     title: 'Red card: sent off',
     exp: {
@@ -33,8 +40,8 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-kid-3', level: 'kid', signal: 'soc-penalty',
-    prompt: 'A defender fouls inside his own big box, and the referee points firmly at a spot on the ground near the goal. The call is…',
-    options: ['Penalty kick!', 'A goal kick', 'Halftime'],
+    prompt: P,
+    options: ['Penalty kick!', 'A goal', 'Offside'],
     answer: 0,
     title: 'Pointing at the spot: penalty!',
     exp: {
@@ -46,7 +53,7 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-kid-4', level: 'kid', signal: 'soc-offside-flag',
-    prompt: 'The assistant on the sideline stops running and raises the flag straight up. What is being flagged?',
+    prompt: PA,
     options: ['Offside', 'A goal', 'The end of the match'],
     answer: 0,
     title: 'Flag up: offside',
@@ -59,21 +66,21 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-kid-5', level: 'kid', signal: 'soc-corner',
-    prompt: 'The ball rolls over the goal line, last touched by a defender. The referee points up toward the flag in the field\'s corner. What\'s awarded?',
-    options: ['A corner kick for the attackers', 'A penalty', 'A throw-in'],
+    prompt: P,
+    options: ['A corner kick', 'A penalty', 'A substitution'],
     answer: 0,
     title: 'Pointing at the corner: corner kick',
     exp: {
-      kid: 'That point means CORNER KICK — the defending team knocked the ball over their own goal line, so the attackers get to cross it in from the corner. Great chance to score!',
+      kid: 'That upward point at the little flag means CORNER KICK — the defending team knocked the ball over their own goal line, so the attackers get to cross it in from the corner. Great chance to score!',
       beginner: 'Ball out over the goal line, last touched by the defense (and no goal) = corner. Last touched by the attack = goal kick instead. The angled point to the arc settles which.',
       intermediate: 'Corners are set-piece currency: teams score a meaningful share of goals from them, which is why you\'ll see goalkeepers sprint forward for last-minute corners — the award converts a dead ball into a scoring lottery.',
-      expert: 'Reading the paired signals: referee points to the corner arc = corner; horizontal arm toward the goal area = goal kick. On deflections neither team agrees who touched last — watch the ASSISTANT\'s flag (pointed at the arc vs extended toward the goal area); the referee usually mirrors the AR\'s read on these.',
+      expert: 'Reading the paired signals: referee points up to the corner arc = corner; a horizontal arm toward the goal area = goal kick. On deflections neither team agrees who touched last — watch the ASSISTANT\'s flag (pointed at the arc vs extended toward the goal area); the referee usually mirrors the AR\'s read on these.',
     },
   },
   {
     id: 'soc-sig-kid-6', level: 'kid', signal: 'soc-sub-flag',
-    prompt: 'The assistant holds the flag horizontally above his head with BOTH hands. What is he telling the referee?',
-    options: ['A substitution is ready', 'Offside', 'A goal was scored'],
+    prompt: PA,
+    options: ['A substitution is ready', 'Offside', 'A goal'],
     answer: 0,
     title: 'Flag overhead in both hands: substitution',
     exp: {
@@ -87,12 +94,12 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   // ── beginner ──────────────────────────────────────────────────────────────
   {
     id: 'soc-sig-beg-1', level: 'beginner', signal: 'soc-indirect',
-    prompt: 'The referee awards a free kick and keeps one arm raised straight up — holding it there as play restarts. What kind of free kick is this?',
-    options: ['Indirect — someone else must touch it before a goal counts', 'Direct — shoot away', 'A penalty'],
+    prompt: P,
+    options: ['An indirect free kick', 'A direct free kick', 'A penalty'],
     answer: 0,
     title: 'The held-up arm: indirect free kick',
     exp: {
-      kid: 'The raised arm means INDIRECT — you can\'t score straight from this kick! The ball must touch another player first. That\'s why the arm stays up: it\'s a reminder.',
+      kid: 'The arm raised straight up and HELD there means INDIRECT — you can\'t score straight from this kick! The ball must touch another player first. That\'s why the arm stays up: it\'s a reminder.',
       beginner: 'Indirect free kicks follow non-physical offences (offside, dangerous play, keeper handling a back-pass). The referee\'s arm stays raised until the ball touches a second player or goes out.',
       intermediate: 'Shoot an indirect kick straight in and the "goal" becomes a goal kick for the defense. Teams therefore build two-touch routines — one tap, then the strike — to legalize the shot.',
       expert: 'This is soccer\'s classic paired-signal exam: raised-and-HELD arm = indirect; a mere directional point (arm then lowered) = direct. The most theatrical version is the indirect kick INSIDE the box (back-pass offence): the defending wall lines up on the goal line, and the two-touch choreography plays out at point-blank range.',
@@ -100,12 +107,12 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-beg-2', level: 'beginner', signal: 'soc-direct',
-    prompt: 'After a crunching tackle, the referee blows the whistle and simply points one arm toward the attacking direction — then lowers it. What was given?',
-    options: ['A direct free kick — a goal can be scored straight from it', 'An indirect free kick', 'A drop ball'],
+    prompt: P,
+    options: ['A direct free kick', 'An indirect free kick', 'A corner kick'],
     answer: 0,
     title: 'Point and lower: direct free kick',
     exp: {
-      kid: 'The quick point means DIRECT free kick — the fouled team can shoot straight at goal from the spot of the foul. No raised arm = shoot away!',
+      kid: 'The quick point toward goal means DIRECT free kick — the fouled team can shoot straight at goal from the spot of the foul. No held-up arm = shoot away!',
       beginner: 'Direct free kicks follow physical/handball offences: kicks, trips, pushes, holds, handballs. The signal is just a directional point; the arm doesn\'t stay up.',
       intermediate: 'The direct/indirect split is about offence TYPE, not location: contact and handball offences = direct (and become penalties in the box); technical offences = indirect (never a penalty, even in the box).',
       expert: 'Free-kick geometry is a science: within ~25 yards of goal, a direct award spawns the wall ritual (10 yards, vanishing spray, jostling for rebounds). Decode the absence: fans often can\'t tell why a dangerous kick wasn\'t shot at goal — the answer is usually an arm you didn\'t notice staying up.',
@@ -113,8 +120,8 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-beg-3', level: 'beginner', signal: 'soc-throwin-flag',
-    prompt: 'The ball crosses the sideline and the assistant angles the flag up at 45°, pointing along the touchline. What is signaled?',
-    options: ['A throw-in — for the team attacking in the pointed direction', 'Offside', 'A corner kick'],
+    prompt: PA,
+    options: ['A throw-in', 'Offside', 'A corner kick'],
     answer: 0,
     title: 'The angled flag: throw-in',
     exp: {
@@ -126,12 +133,12 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-beg-4', level: 'beginner', signal: 'soc-advantage',
-    prompt: 'A player is fouled but keeps the ball; the referee, without whistling, sweeps both arms forward and shouts "Play on!" What did he decide?',
-    options: ['Advantage — the foul is noted, but stopping play would help the fouling team', 'No foul occurred', 'A penalty'],
+    prompt: P,
+    options: ['Advantage — play on, the foul is noted', 'A direct free kick', 'A substitution'],
     answer: 0,
     title: 'Arms sweeping on: advantage',
     exp: {
-      kid: 'The referee saw the foul but the fouled team STILL has the ball and a good attack — so he lets them keep going. Stopping would only help the team that fouled!',
+      kid: 'The referee saw a foul but the fouled team STILL has the ball and a good attack — so the sweeping arms say keep going! Stopping would only help the team that fouled.',
       beginner: 'Advantage: play continues if the offended team benefits more from possession than from a free kick. If the promised advantage dies within seconds, the referee whistles the original foul after all.',
       intermediate: 'The referee runs a value calculation in real time: position on pitch, attack\'s momentum, chance of the free kick being better. Near the box the free kick is often WORTH more — advantage is rarer there.',
       expert: 'Cards survive advantage: a caution-worthy foul played through gets the yellow at the next stoppage; a red-card offence too (with the nuance that the offender\'s further involvement can be curtailed). One more decode: modern law allows the signal with one OR both arms — but the both-arm sweep remains the canonical classroom image.',
@@ -139,8 +146,8 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-beg-5', level: 'beginner', signal: 'soc-var',
-    prompt: 'The referee stops, presses a finger to his earpiece, then draws a big RECTANGLE in the air. What is happening?',
-    options: ['A VAR review — the video referees are checking a decision', 'A tactics board is requested', 'The match is abandoned'],
+    prompt: P,
+    options: ['A VAR review', 'A substitution', 'An indirect free kick'],
     answer: 0,
     title: 'The TV-screen rectangle: VAR',
     exp: {
@@ -151,41 +158,41 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
     },
   },
   {
-    id: 'soc-sig-beg-6', level: 'beginner', signal: 'soc-offside-flag',
-    prompt: 'After the whistle, the assistant lowers the raised flag and holds it out horizontally, parallel to the ground, at mid height. What is this second position saying?',
-    options: ['Where the offside happened — middle of the pitch', 'The offside is cancelled', 'A substitution'],
+    id: 'soc-sig-beg-6', level: 'beginner', signal: 'soc-corner',
+    prompt: P,
+    options: ['A corner kick', 'A goal kick', 'A penalty'],
     answer: 0,
-    title: 'The flag\'s second act: location',
+    title: 'The save that concedes a corner',
     exp: {
-      kid: 'After showing offside, the flag becomes a pointer! Held level in the middle means the offside player was in the MIDDLE of the field. It shows where the free kick goes.',
-      beginner: 'The AR signals offside in two beats: straight up (offence), then — after the whistle — angled down / level / angled up to mark near side, middle, or far side. The kick is taken from that zone.',
-      intermediate: 'This is the fastest way to read tight calls from your seat: the flag\'s final angle tells you WHICH attacker was caught, resolving those "surely the winger was on!" arguments — the flag may be for the striker in the middle.',
-      expert: 'Complete AR semaphore: up = offside; angled 45° = throw-in direction; both hands overhead = sub; flag toward the goal area vs corner arc = goal kick vs corner; and a quick flag-wag then stillness = "ball out and back in, play on." Assistants speak a full flag language — the offside two-parter is just its most famous sentence.',
+      kid: 'The point at the corner flag means CORNER — and any defender\'s touch counts, even the goalie\'s great save! Touch it last before it crosses your goal line and the attackers get the corner.',
+      beginner: 'The rule is purely about last touch and which line: over the goal line, last touched by defense (keeper included) = corner. The quality or intent of the touch is irrelevant.',
+      intermediate: 'This creates the goalkeeper\'s dilemma on shots drifting near the frame: tip it over (concede a dangerous corner) or trust it\'s going wide (risk a goal). Elite keepers make that read in a tenth of a second.',
+      expert: 'Deflection chains complicate the read: shot → defender\'s shin → keeper\'s glove → over. Still a corner (all defensive touches). Attacker\'s toe last = goal kick. The referee is doing touch-forensics at full speed, often deferring to the AR\'s flag or, in elite matches, goal-line-adjacent camera checks for the near-impossible calls.',
     },
   },
 
-  // ── intermediate ──────────────────────────────────────────────────────────
+  // ── intermediate: same-family distractors ──────────────────────────────────
   {
-    id: 'soc-sig-int-1', level: 'intermediate', signal: 'soc-indirect',
-    prompt: 'Indirect free kick — and the taker blasts it straight into the net, untouched by anyone. The referee\'s arm was up the whole time. What\'s the restart?',
-    options: ['Goal kick to the defending team — the "goal" doesn\'t count', 'The goal stands', 'Retake the free kick'],
+    id: 'soc-sig-int-1', level: 'intermediate', signal: 'soc-offside-flag',
+    prompt: PA,
+    options: ['Offside', 'A throw-in', 'A substitution', 'A corner kick'],
     answer: 0,
-    title: 'The un-goal',
+    title: 'Offside without touching the ball',
     exp: {
-      kid: 'No goal! Remember the raised arm: someone ELSE had to touch the ball first. Since nobody did, the other team gets a goal kick instead. The rule really matters!',
-      beginner: 'Straight in from an indirect kick = no goal, goal kick to the defense. Had it deflected off ANY player (either team) on the way, it would count.',
-      intermediate: 'The arm coming DOWN is your live indicator: watch the referee during the kick — the moment a second player touches the ball, the arm drops and a subsequent goal is good.',
-      expert: 'Mirror case for completeness: an indirect kick straight into your OWN goal = corner to the opponents (the ball technically can\'t score unassisted in either direction). These restart tables — who touched, which line, which restart — are the deep grammar the raised arm compresses into one held pose.',
+      kid: 'The straight-up flag means OFFSIDE — and you can be offside without even touching the ball! Standing where the goalie can\'t see past you counts as joining the play.',
+      beginner: 'Offside needs position AND involvement. Involvement includes: playing the ball, blocking an opponent\'s line of vision, challenging for the ball, or gaining advantage from a rebound.',
+      intermediate: 'This is the "phantom offside" that confuses stadiums: the goal-scorer was onside, but a teammate lurking offside in the keeper\'s eyeline poisons the goal. The flag is for the lurker, not the scorer.',
+      expert: 'The line-of-vision test is deliberately narrow: the attacker must be in the keeper\'s sightline to the BALL and clearly impact his ability to play it — merely standing offside in the box is legal. VAR reviews of disallowed goals now hinge on frame-by-frame sightline reconstruction. When a whole crowd asks "offside on WHO?", you now know the answer.',
     },
   },
   {
     id: 'soc-sig-int-2', level: 'intermediate', signal: 'soc-advantage',
-    prompt: 'Advantage is signaled after a nasty, yellow-worthy foul. The attack fizzles three seconds later with a harmless backpass. What does the referee do now?',
-    options: ['Whistle, give the original free kick, and book the fouler', 'Nothing — advantage waived everything', 'Award a penalty'],
+    prompt: P,
+    options: ['Advantage — play on', 'A direct free kick', 'A VAR review', 'A penalty'],
     answer: 0,
     title: 'Advantage has a return policy',
     exp: {
-      kid: 'The referee gave the attackers a chance, but it went nowhere — so he rewinds! Free kick where the foul happened, AND the fouler still gets his yellow card.',
+      kid: 'The sweeping arms give the attackers a chance — but if their attack fizzles right away, the referee rewinds! Free kick where the foul happened, AND the fouler still gets his card.',
       beginner: 'If the anticipated advantage doesn\'t develop within a few seconds, the referee brings play back for the original offence. The card, when deserved, is shown either now or at the next stoppage.',
       intermediate: 'The "few seconds" window is real refereeing craft: too quick a whistle wastes real advantages; too slow and the foul becomes unenforceable (you can\'t rewind after a full new phase of play). Watch top referees hold the sweep with the whistle already at their lips.',
       expert: 'One critical asymmetry: if the advantage DOES develop, the free kick is gone forever, but misconduct is not — the yellow comes at the stoppage, and a DOGSO red played under advantage that ends in a goal downgrades to yellow (the denial evaporated). Advantage trades the restart, never the discipline.',
@@ -193,12 +200,12 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-int-3', level: 'intermediate', signal: 'soc-penalty',
-    prompt: 'The point-to-the-spot is given for a handball — but the defender\'s arm was tight against his chest when the ball struck it. Modern law says the referee judged what?',
-    options: ['This shouldn\'t be a penalty — handball needs an arm making the body bigger or deliberate movement', 'Any ball-to-arm contact is a penalty', 'Handballs are judged by pain'],
+    prompt: P,
+    options: ['A penalty kick', 'A direct free kick', 'A corner kick', 'An indirect free kick'],
     answer: 0,
     title: 'Handball: position, not just contact',
     exp: {
-      kid: 'Ball touching an arm isn\'t automatically a foul! It matters WHERE the arm was — stuck out wide (unfair blocking) or held in close to the body (just part of standing).',
+      kid: 'The firm point DOWN at the spot means PENALTY. But remember — a ball touching an arm isn\'t automatically a foul! It matters where the arm WAS: stuck out wide, or held in close.',
       beginner: 'Handball requires the arm to make the body "unnaturally bigger," to move toward the ball, or a deliberate play. An arm pinned to the chest is a natural position — normally no offence.',
       intermediate: 'The judgment axis is silhouette: outstretched or raised arms extend your blocking area and get punished regardless of intent; arms in a natural running/falling shape don\'t. That\'s why box defenders adopt the "arms behind back" insurance posture.',
       expert: 'The law has oscillated for years (accidental handball before a goal, arm-above-shoulder presumptions), which is exactly why VAR reviews cluster on this call. Decode the sequence: point-to-spot → rectangle → monitor jog = the referee is re-checking silhouette, proximity (no time to react?), and whether the arm moved to ball or ball to arm.',
@@ -206,121 +213,126 @@ export const SOCCER_SIGNAL_SCENARIOS: SignalScenario[] = [
   },
   {
     id: 'soc-sig-int-4', level: 'intermediate', signal: 'soc-red',
-    prompt: 'A midfielder already on a yellow dives to win a free kick. The referee shows yellow… then immediately red. Explain the two-card sequence.',
-    options: ['Second caution = automatic red; the sequence shows the red is for accumulation, not one act', 'The referee changed his mind', 'Diving is always a straight red'],
+    prompt: P,
+    options: ['A sending-off', 'A caution', 'A substitution', 'A penalty'],
     answer: 0,
     title: 'Yellow + yellow = red, shown in order',
     exp: {
-      kid: 'Two warnings in one game means you\'re off! The referee shows the second yellow first, THEN the red, so everyone knows the sending-off is because of TWO yellows.',
-      beginner: 'Simulation (diving) is a caution. A player\'s second caution triggers a mandatory sending-off, always displayed as yellow-then-red so the record shows accumulation, not violent conduct.',
+      kid: 'The red card means OFF — and when it comes right after a second yellow, the referee shows the yellow first, THEN the red, so everyone knows it\'s two warnings adding up.',
+      beginner: 'A player\'s second caution triggers a mandatory sending-off, always displayed as yellow-then-red so the record shows accumulation, not violent conduct.',
       intermediate: 'The distinction matters beyond the day: a two-yellow red usually carries a lighter suspension than a straight red for serious foul play. The card choreography IS the paper trail.',
       expert: 'Referee craft: managing a match means knowing who\'s "on a yellow" — players bait booked opponents into second-yellow situations, and referees consciously raise the bar for a second caution to avoid deciding matches on trifles. The two-card flourish looks bureaucratic; it\'s actually the visible tip of game-management strategy on both sides.',
     },
   },
   {
-    id: 'soc-sig-int-5', level: 'intermediate', signal: 'soc-corner',
-    prompt: 'Attacker shoots, the keeper tips it over the bar brilliantly. The referee points to the corner arc. Why a corner when the DEFENSE saved it?',
-    options: ['The keeper\'s touch counts as the defense playing it out over the goal line', 'Saves are penalized', 'It should be a goal kick'],
-    answer: 0,
-    title: 'The save that concedes a corner',
-    exp: {
-      kid: 'The goalie touched the ball last before it flew over the goal! Any defender\'s touch — even a great save — means corner kick for the attackers.',
-      beginner: 'The rule is purely about last touch and which line: over the goal line, last touched by defense (keeper included) = corner. The quality or intent of the touch is irrelevant.',
-      intermediate: 'This creates the goalkeeper\'s dilemma on shots drifting near the frame: tip it over (concede a dangerous corner) or trust it\'s going wide (risk a goal). Elite keepers make that read in a tenth of a second.',
-      expert: 'Deflection chains complicate the read: shot → defender\'s shin → keeper\'s glove → over. Still a corner (all defensive touches). Attacker\'s toe last = goal kick. The referee is doing touch-forensics at full speed, often deferring to the AR\'s flag or, in elite matches, goal-line-adjacent camera checks for the near-impossible calls.',
-    },
-  },
-  {
-    id: 'soc-sig-int-6', level: 'intermediate', signal: 'soc-offside-flag',
-    prompt: 'A striker in an offside position doesn\'t touch the through-ball — but stands in front of the keeper\'s face as it rolls in. Flag goes up. What made him "involved"?',
-    options: ['Obstructing the keeper\'s line of vision — interference without touching', 'Being in the box at all', 'His teammate\'s intent'],
-    answer: 0,
-    title: 'Offside without touching the ball',
-    exp: {
-      kid: 'You can be offside without even touching the ball! Standing where the goalie can\'t see past you counts as joining the play — and he was standing in the wrong place.',
-      beginner: 'Offside needs position AND involvement. Involvement includes: playing the ball, blocking an opponent\'s line of vision, challenging for the ball, or gaining advantage from a rebound.',
-      intermediate: 'This is the "phantom offside" that confuses stadiums: the goal-scorer was onside, but a teammate lurking offside in the keeper\'s eyeline poisons the goal. The flag is for the lurker, not the scorer.',
-      expert: 'The line-of-vision test is deliberately narrow: the attacker must be in the keeper\'s sightline to the BALL and clearly impact his ability to play it — merely standing offside in the box is legal. VAR reviews of disallowed goals now hinge on frame-by-frame sightline reconstruction. When a whole crowd asks "offside on WHO?", you now know the answer.',
-    },
-  },
-
-  // ── expert ────────────────────────────────────────────────────────────────
-  {
-    id: 'soc-sig-exp-1', level: 'expert', signal: 'soc-direct',
-    prompt: 'Direct vs indirect is the classic signal pair. A keeper picks up a deliberate back-pass from his defender\'s FOOT. Which free kick — and thus which signal — follows?',
-    options: ['Indirect (arm held up), inside the box, where he handled it', 'Direct — penalty kick', 'No offence at all'],
-    answer: 0,
-    title: 'The back-pass: technical, therefore indirect',
-    exp: {
-      kid: 'Goalies can\'t pick up a pass a teammate kicked to them on purpose! But it\'s the "polite" kind of foul — an indirect free kick, so the arm goes up and two touches are needed.',
-      beginner: 'Keeper handling a deliberate foot-pass from a teammate is a TECHNICAL offence: always an indirect free kick (never a penalty), taken where the handling happened — even deep inside the six-yard box.',
-      intermediate: 'This is why the direct/indirect distinction exists: physical offences threaten opponents (direct/penalty); technical ones only break procedure (indirect). Header or chest back to the keeper: perfectly legal to catch.',
-      expert: 'The full test: deliberate KICK (not a miskick or deflection), by a TEAMMATE, handled by the keeper in his own area. Circumventions count too — the flick-up-and-head trick is booked as unsporting. And the resulting box-indirect produces soccer\'s strangest set piece: eleven defenders lawfully packed on their own goal line against a two-touch missile.',
-    },
-  },
-  {
-    id: 'soc-sig-exp-2', level: 'expert', signal: 'soc-var',
-    prompt: 'The rectangle is drawn, the referee jogs to the monitor, watches, returns — and reverses his penalty call to a corner. What standard did the video evidence have to meet?',
-    options: ['Clear and obvious error in the on-field decision', 'Any doubt at all', 'A 50/50 balance of probability'],
+    id: 'soc-sig-int-5', level: 'intermediate', signal: 'soc-var',
+    prompt: P,
+    options: ['A VAR review', 'A substitution', 'An indirect free kick', 'Advantage'],
     answer: 0,
     title: 'The bar for the overturn',
     exp: {
-      kid: 'The TV check doesn\'t redo every decision — it only fixes CLEAR mistakes. The replay must basically shout "that was wrong!" before the referee changes his call.',
+      kid: 'The rectangle means the TV check is on. It doesn\'t redo every decision — it only fixes CLEAR mistakes. The replay must basically shout "that was wrong!" before the call changes.',
       beginner: 'VAR\'s threshold is "clear and obvious error" (or a serious missed incident). Marginal, debatable calls stay with the on-field decision — the referee\'s original ruling has weight.',
       intermediate: 'That\'s why identical-looking penalties get opposite outcomes: one was CALLED on-field and survives review (not clearly wrong); the other wasn\'t called and isn\'t clearly right either. The initial signal sets the default.',
       expert: 'Structural insight: the monitor visit is reserved for SUBJECTIVE reversals (the referee must own the new judgment); factual matters — offside geometry, ball out of play, wrong player identified — are corrected without a review, no rectangle jog needed. Decode the two workflows and every VAR delay becomes legible: monitor = judgment; no monitor = math.',
     },
   },
   {
-    id: 'soc-sig-exp-3', level: 'expert', signal: 'soc-advantage',
-    prompt: 'DOGSO scenario: last defender trips a striker who somehow stays up — advantage sweep — and the striker SCORES three seconds later. What card does the defender get now?',
-    options: ['Yellow — the goal repaired the denied opportunity', 'Red — DOGSO is always red', 'No card'],
+    id: 'soc-sig-int-6', level: 'intermediate', signal: 'soc-yellow',
+    prompt: P,
+    options: ['A caution', 'A sending-off', 'A substitution', 'An indirect free kick'],
     answer: 0,
-    title: 'The goal that saves the defender',
+    title: 'The captain-accountability yellow',
     exp: {
-      kid: 'The trip tried to steal a goal chance — but the striker scored anyway! Since nothing was actually stolen, the defender gets a warning instead of being sent off.',
-      beginner: 'Denying an obvious goal-scoring opportunity is a red — but if advantage is played and the goal is scored, the "denial" no longer exists: law downgrades it to a caution for unsporting behaviour.',
-      intermediate: 'The logic is restorative: cards protect opportunities. Opportunity restored (goal!) → punish the attempt (yellow), not the outcome. If the advantage had fizzled, back comes the free kick AND the full red.',
-      expert: 'This is the most elegant interaction in the Laws: advantage, DOGSO, and misconduct downgrade all triggered by one sweep of the arms. Note the same downgrade logic in the box: genuine ball-playing attempt + penalty awarded = yellow not red (the penalty restores the chance). The Laws consistently price sanctions against what was actually lost.',
+      kid: 'The yellow card is a warning — and when lots of players surround the referee shouting, the CAPTAIN can get the warning for the whole group. He\'s the boss, so he answers for his teammates\' manners!',
+      beginner: 'Modern protocols route dissent through captains: only the captain may approach the referee on major decisions, and mobbing officials draws cautions — with the captain as the accountable card-bearer.',
+      intermediate: 'The design goal is de-escalation economics: one predictable yellow beats five heat-of-the-moment ones. Captains now physically herd teammates away — an on-pitch compliance role created by a card policy.',
+      expert: 'Signal-reading level: a yellow shown AWAY from any tackle, with the referee\'s other arm sweeping the crowd of players back, is a conduct-management card — it will appear in the book as dissent, and it resets the tolerance threshold for the rest of the match. Referees spend cards to buy control; that\'s match management, visible in card choreography.',
+    },
+  },
+
+  // ── expert: confusable pairs ────────────────────────────────────────────────
+  // Pair A: indirect (arm raised VERTICAL and held) vs direct (arm swings out to a
+  // LEVEL point, then holds) — arm angle + the hold.
+  {
+    id: 'soc-sig-exp-1', level: 'expert', signal: 'soc-indirect',
+    prompt: P,
+    options: ['An indirect free kick', 'A direct free kick', 'Advantage', 'A penalty'],
+    answer: 0,
+    title: 'Vertical and held: the un-goal warning',
+    exp: {
+      kid: 'The arm points straight at the SKY and stays there — INDIRECT free kick. Score straight from it without another touch and the goal doesn\'t count!',
+      beginner: 'Straight in from an indirect kick = no goal, goal kick to the defense. Had it deflected off ANY player (either team) on the way, it would count.',
+      intermediate: 'The arm coming DOWN is your live indicator: watch the referee during the kick — the moment a second player touches the ball, the arm drops and a subsequent goal is good.',
+      expert: 'Mirror case for completeness: an indirect kick straight into your OWN goal = corner to the opponents (the ball technically can\'t score unassisted in either direction). These restart tables — who touched, which line, which restart — are the deep grammar the raised arm compresses into one held pose.',
     },
   },
   {
-    id: 'soc-sig-exp-4', level: 'expert', signal: 'soc-offside-flag',
-    prompt: 'The flag stays DOWN as a striker races through and finishes; only after the ball hits the net does it rise. Furious defenders surround the assistant. Explain the delayed flag.',
-    options: ['VAR-era protocol: on tight scoring chances, let play finish so the review can rescue a wrong flag', 'The assistant fell asleep', 'Flags may only rise after goals'],
+    id: 'soc-sig-exp-2', level: 'expert', signal: 'soc-direct',
+    prompt: P,
+    options: ['An indirect free kick', 'A direct free kick', 'Advantage', 'A penalty'],
+    answer: 1,
+    title: 'The level point: shoot away',
+    exp: {
+      kid: 'The arm swings out LEVEL, pointing the attacking way, then drops — DIRECT free kick. The fouled team may blast it straight at goal, no extra touch needed!',
+      beginner: 'Angle is the entire decode: vertical-and-held = indirect (two touches to score); a level directional point = direct (shoot freely). A keeper picking up a deliberate back-pass earns the vertical arm — even deep inside his own box.',
+      intermediate: 'The distinction is offence type: physical/handball offences threaten opponents (direct, penalties in the box); technical offences only break procedure (indirect, never a penalty). Header or chest back to the keeper: perfectly legal to catch — no arm at all.',
+      expert: 'The box-indirect is the collector\'s item this pair produces: eleven defenders lawfully packed on their own goal line against a two-touch missile from eight yards. The full back-pass test: deliberate KICK (not a miskick), by a TEAMMATE, handled by the keeper in his own area — and circumventions (the flick-up-and-head trick) are booked as unsporting. One elbow angle, two universes of restart law.',
+    },
+  },
+  // Pair B: offside flag (pole VERTICAL) vs throw-in flag (pole at 45°) — one angle.
+  {
+    id: 'soc-sig-exp-3', level: 'expert', signal: 'soc-offside-flag',
+    prompt: PA,
+    options: ['Offside', 'A throw-in', 'A substitution', 'A corner kick'],
     answer: 0,
     title: 'The deliberate late flag',
     exp: {
-      kid: 'The assistant waited ON PURPOSE! If he flags too early and he\'s wrong, the goal is lost forever. By waiting, the TV check can still fix everything either way.',
+      kid: 'The flag pole is perfectly VERTICAL — OFFSIDE. And sometimes the assistant raises it late ON PURPOSE: if he flagged too early and was wrong, a real goal would be lost forever!',
       beginner: 'Instruction to ARs: on close offsides leading directly to a scoring chance, keep the flag down, let the attack conclude, THEN flag. VAR can cancel a wrong goal — but can\'t resurrect an attack killed by a wrong early flag.',
       intermediate: 'The asymmetry drives the protocol: a wrong "onside" is fully correctable (disallow the goal); a wrong "offside" whistle is irreversible. So doubt = delay. Defenders must play to the whistle even when certain.',
       expert: 'Consequences ripple: defenders can no longer stop on a raised arm (there isn\'t one), collision risk shifts, and semi-automated offside tech now often replaces the judgment entirely at top level. The late flag is the perfect case study of how review systems reshape live signals — the gesture\'s TIMING became part of its meaning.',
     },
   },
   {
-    id: 'soc-sig-exp-5', level: 'expert', signal: 'soc-yellow',
-    prompt: 'The referee shows yellow to the TEAM CAPTAIN while pointing at the whole protesting group. Under modern dissent protocols, what is this booking managing?',
-    options: ['Mass confrontation — the captain answers for collective dissent', 'The captain\'s tackle', 'The crowd\'s behavior'],
-    answer: 0,
-    title: 'The captain-accountability yellow',
+    id: 'soc-sig-exp-4', level: 'expert', signal: 'soc-throwin-flag',
+    prompt: PA,
+    options: ['Offside', 'A throw-in', 'A substitution', 'A corner kick'],
+    answer: 1,
+    title: 'Forty-five degrees: the ball just changed hands',
     exp: {
-      kid: 'When lots of players surround the referee shouting, the CAPTAIN can get the warning card for the whole group. He\'s the boss — so he\'s responsible for his teammates\' manners!',
-      beginner: 'Modern protocols route dissent through captains: only the captain may approach the referee on major decisions, and mobbing officials draws cautions — with the captain as the accountable card-bearer.',
-      intermediate: 'The design goal is de-escalation economics: one predictable yellow beats five heat-of-the-moment ones. Captains now physically herd teammates away — an on-pitch compliance role created by a card policy.',
-      expert: 'Signal-reading level: a yellow shown AWAY from any tackle, with the referee\'s other arm sweeping the crowd of players back, is a conduct-management card — it will appear in the book as dissent, and it resets the tolerance threshold for the rest of the match. Referees spend cards to buy control; that\'s match management, visible in card choreography.',
+      kid: 'The flag is TILTED at a slant, not straight up — THROW-IN, pointing the way the throwing team attacks. Straight up would mean offside. One angle, totally different call!',
+      beginner: 'The AR\'s flag is a one-pole semaphore: vertical = offside (stop play); 45° up = throw-in direction (routine restart); held horizontally overhead with both hands = substitution. Angle carries the entire message.',
+      intermediate: 'Direction disputes are the daily grind of this signal: on deflected balls the AR and referee sometimes disagree, and you\'ll see the flag angle flip after eye contact — the referee\'s view overrides, and the crowd howls either way.',
+      expert: 'Complete AR semaphore for the collector: up = offside; angled = throw-in; both hands overhead = sub; flag pointed at the corner arc vs extended toward the goal area = corner vs goal kick; a quick wag then stillness = "ball out and back in, play on." Assistants speak a full flag language — learn the angles and you can officiate from behind the goal.',
+    },
+  },
+  // Pair C: corner (point angled UP at the corner flag) vs penalty (point angled
+  // DOWN at the spot) — the same arm, opposite angles, different props.
+  {
+    id: 'soc-sig-exp-5', level: 'expert', signal: 'soc-corner',
+    prompt: P,
+    options: ['A corner kick', 'A penalty kick', 'A direct free kick', 'An indirect free kick'],
+    answer: 0,
+    title: 'Pointing up: to the arc',
+    exp: {
+      kid: 'The arm points UP toward the little flag in the field\'s corner — CORNER KICK. Pointing DOWN at a spot on the grass would be a penalty. Up or down changes everything!',
+      beginner: 'Both calls are emphatic points; the target separates them. Corner: ball over the goal line off a defender — attackers cross from the arc. Penalty: a foul inside the box — a free shot from the spot.',
+      intermediate: 'Confusing the two on a scramble near the byline is a real broadcast moment: a shot deflected wide (corner) versus a clipped attacker (penalty) can look identical live. Watch the referee\'s ARM ANGLE before believing the crowd\'s roar.',
+      expert: 'Officiating mechanics resolve the ambiguity deliberately: the penalty point is made while RUNNING toward the spot (unmistakable commitment amid protest), while the corner point is made standing, angled to the arc. Posture + angle + target — three redundant channels, because these two rulings differ by roughly 0.7 expected goals.',
     },
   },
   {
     id: 'soc-sig-exp-6', level: 'expert', signal: 'soc-penalty',
-    prompt: 'Penalty pointed. The kicker stutter-steps, stops completely at the end of his run, then scores. The referee orders a RETAKE and books him. Which law bit?',
-    options: ['Feinting after completing the run-up is illegal — stopping at the end to fool the keeper', 'Stuttering is always illegal', 'He kicked too hard'],
-    answer: 0,
-    title: 'Feinting: allowed in the run, not at the end',
+    prompt: P,
+    options: ['A corner kick', 'A penalty kick', 'A direct free kick', 'An indirect free kick'],
+    answer: 1,
+    title: 'Pointing down: to the spot',
     exp: {
-      kid: 'Trick steps DURING the run-up are okay — but you can\'t fully stop right at the end to trick the goalie into diving first. That\'s too sneaky! Kick again (and a warning).',
-      beginner: 'Law: feinting in the run-up is permitted; feinting to kick once the run-up is COMPLETED is an offence — caution, and the kick is retaken only per the outcome table (scored = retake; missed = indirect FK out).',
+      kid: 'The arm drives DOWN at the little white dot — PENALTY! And penalties have their own rules of politeness: the kicker can do trick steps during the run-up, but can\'t fully stop at the end to fool the goalie.',
+      beginner: 'Law: feinting in the run-up is permitted; feinting to kick once the run-up is COMPLETED is an offence — caution, and the kick is retaken or reversed per the outcome table.',
       intermediate: 'The line is the final planting step: hesitation rhythm upstream = art; a full stop at the ball = illegal. Keepers, meanwhile, must keep part of one foot on/level with the line — both sides have choreography laws.',
-      expert: 'The outcome matrix is the expert layer: illegal feint + goal = retake + yellow; illegal feint + miss = indirect free kick to defense + yellow; keeper off the line early + save = retake (+ warning/caution regime); both offend = context decides. Every penalty is a tiny procedural courtroom, and the point-to-the-spot is just its opening gavel.',
+      expert: 'The outcome matrix is the expert layer: illegal feint + goal = retake + yellow; illegal feint + miss = indirect free kick to the defense + yellow; keeper off the line early + save = retake; both offend = context decides. Every penalty is a tiny procedural courtroom, and the point-to-the-spot is just its opening gavel.',
     },
   },
 ];

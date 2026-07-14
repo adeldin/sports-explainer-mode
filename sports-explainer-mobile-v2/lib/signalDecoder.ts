@@ -39,7 +39,7 @@ export type SignalKey =
   // NFL — referee signals (NFL signal chart)
   | 'nfl-touchdown' | 'nfl-incomplete' | 'nfl-first-down' | 'nfl-holding' | 'nfl-false-start'
   | 'nfl-offside' | 'nfl-pass-interference' | 'nfl-personal-foul' | 'nfl-safety'
-  | 'nfl-delay' | 'nfl-timeout' | 'nfl-facemask' | 'nfl-unsportsmanlike'
+  | 'nfl-delay' | 'nfl-timeout' | 'nfl-facemask' | 'nfl-unsportsmanlike' | 'nfl-illegal-hands'
   // NBA — referee mechanics (NBA/FIBA/NFHS shared grammar)
   | 'nba-foul' | 'nba-violation' | 'nba-travel' | 'nba-technical' | 'nba-jump-ball'
   | 'nba-blocking' | 'nba-charge' | 'nba-shot-clock' | 'nba-three-attempt'
@@ -56,18 +56,28 @@ export type SignalKey =
   | 'rug-try' | 'rug-penalty' | 'rug-free-kick' | 'rug-scrum' | 'rug-advantage'
   | 'rug-knock-on' | 'rug-forward-pass' | 'rug-high-tackle' | 'rug-not-release'
   | 'rug-tmo' | 'rug-obstruction'
-  // Cricket — umpire signals (MCC Law 2.13)
+  // Cricket — umpire signals (MCC Law 2.13). CUT (v2 rework): 'crk-new-ball' (a held-up
+  // ball doesn't read as a signal at phone size) and 'crk-last-hour' (the wrist-watch
+  // tap is too small a glyph to read) — a smaller legible vocabulary beats a mushy one.
   | 'crk-out' | 'crk-four' | 'crk-six' | 'crk-wide' | 'crk-noball' | 'crk-bye'
-  | 'crk-legbye' | 'crk-dead' | 'crk-short-run' | 'crk-free-hit' | 'crk-new-ball'
-  | 'crk-penalty-bat' | 'crk-penalty-field' | 'crk-revoke' | 'crk-tv' | 'crk-last-hour';
+  | 'crk-legbye' | 'crk-dead' | 'crk-short-run' | 'crk-free-hit'
+  | 'crk-penalty-bat' | 'crk-penalty-field' | 'crk-revoke' | 'crk-tv';
 
 // ── The scenario ────────────────────────────────────────────────────────────
+// CONTRACT (v2 rework — the reason this game was rebuilt):
+// 1. `prompt` is a CONSTANT one-liner ("What is the umpire signaling?"). It must NEVER
+//    describe the pose or motion — the animated pictogram is the only clue. Acceptance
+//    test: if a scenario could be answered with eyes closed, it is wrong.
+// 2. `options` are always OTHER SIGNAL MEANINGS from the same sport — never abstract
+//    rules statements. Difficulty comes from how visually close the distractor signals
+//    are to the one shown (kid = wildly different … expert = confusable pairs).
+// 3. The rules depth lives in `exp` (the post-answer teaching beat), not in the prompt.
 export interface SignalScenario {
   id: string;            // unique within the bank, e.g. 'nfl-sig-kid-1'
   level: Level;          // the tier this scenario BELONGS to (content is tiered, not just points)
-  signal: SignalKey;     // which pictogram the art module renders
-  prompt: string;        // the question asked about the pictogram
-  options: string[];     // 2–4 tappable answers
+  signal: SignalKey;     // which pictogram the art module renders (animated in signalArt)
+  prompt: string;        // constant per sport — see contract above
+  options: string[];     // 3–4 tappable answers, all same-sport signal meanings
   answer: number;        // index into options
   title: string;         // verdict headline shown after answering
   // The teaching beat — the same signal re-explained at all four depths (the
