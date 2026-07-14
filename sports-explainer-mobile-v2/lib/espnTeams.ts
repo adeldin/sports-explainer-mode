@@ -148,16 +148,38 @@ function normHex(v: unknown): string | undefined {
   return undefined;
 }
 
-async function fetchLeague(path: string, label: string): Promise<TeamInfo[]> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+// Time out WITHOUT an AbortController. Passing `signal` to fetch on RN's New
+// Architecture (newArchEnabled) fails the FIRST request of a session while every
+// identical retry succeeds — which shipped as "every live game opens on its error
+// card until you tap Try again." Race a timer instead: the request isn't cancelled,
+// it's abandoned, which costs us nothing here (small GET, no side effects).
+function timeoutAfter(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), ms),
+  );
+}
+
+async function getJson(url: string): Promise<any> {
+  const res = await Promise.race([fetch(url), timeoutAfter(FETCH_TIMEOUT_MS)]);
+  if (!res.ok) throw new Error(`teams ${res.status}`);
+  return res.json();
+}
+
+// One retry before we give up. A cold first call must never cost the user the game.
+async function getJsonRetrying(url: string): Promise<any> {
   try {
-    const res = await fetch(
+    return await getJson(url);
+  } catch {
+    await new Promise(r => setTimeout(r, 400));
+    return getJson(url);
+  }
+}
+
+async function fetchLeague(path: string, label: string): Promise<TeamInfo[]> {
+  {
+    const data = await getJsonRetrying(
       `https://site.api.espn.com/apis/site/v2/sports/${path}/teams`,
-      { signal: ctrl.signal },
     );
-    if (!res.ok) throw new Error(`teams ${res.status}`);
-    const data = await res.json();
     const raw: any[] = data?.sports?.[0]?.leagues?.[0]?.teams || [];
     const out: TeamInfo[] = [];
     for (const entry of raw) {
@@ -178,8 +200,6 @@ async function fetchLeague(path: string, label: string): Promise<TeamInfo[]> {
       });
     }
     return out;
-  } finally {
-    clearTimeout(t);
   }
 }
 

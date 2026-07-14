@@ -61,8 +61,14 @@ export default function TeamPickGame({ sportKeys, categoryEmoji, variant }: Acad
   // ── Live pool: load → ready | friendly error (never a crash, never blank) ──
   const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading');
   const [pool, setPool] = useState<TeamInfo[]>([]);
+  // Re-arm on mount, not just disarm on unmount: a bare `() => { mounted.current = false }`
+  // cleanup latches false forever across a remount, so the load's success path would
+  // early-return and the game would hang on its spinner.
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   const load = useCallback(async () => {
     if (!sport) { setStatus('error'); return; }

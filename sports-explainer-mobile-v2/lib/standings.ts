@@ -587,18 +587,31 @@ const FETCH_TIMEOUT_MS = 8000;
 
 interface RawSeason { year?: number; displayName?: string }
 
+// Time out WITHOUT an AbortController — see the matching note in lib/espnTeams.ts.
+// Passing `signal` to fetch on RN's New Architecture fails the FIRST request of a
+// session while identical retries succeed, which shipped as "every live game opens
+// on its error card until you tap Try again." Race a timer, and retry once.
+function timeoutAfter(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), ms),
+  );
+}
+
+async function getStandings(url: string): Promise<any> {
+  const res = await Promise.race([fetch(url), timeoutAfter(FETCH_TIMEOUT_MS)]);
+  if (!res.ok) throw new Error(`standings ${res.status}`);
+  return res.json();
+}
+
 async function fetchStandingsJson(path: string, season?: number): Promise<any> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const url =
+    `https://site.api.espn.com/apis/v2/sports/${path}/standings` +
+    (season ? `?season=${season}` : '');
   try {
-    const url =
-      `https://site.api.espn.com/apis/v2/sports/${path}/standings` +
-      (season ? `?season=${season}` : '');
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error(`standings ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(t);
+    return await getStandings(url);
+  } catch {
+    await new Promise(r => setTimeout(r, 400));
+    return getStandings(url); // one retry — a cold first call must not cost the game
   }
 }
 
