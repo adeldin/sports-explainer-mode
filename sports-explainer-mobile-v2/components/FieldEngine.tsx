@@ -2,7 +2,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect, Line, Circle, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Rect, Line, Circle, Ellipse, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import { useTheme, Theme } from '../lib/theme';
 import type { Level } from '../lib/api';
 
@@ -217,6 +217,224 @@ export function BaseballDiamond({ fill = 'width', children }: { fill?: 'width' |
       {BB_BASES.map(([bx, by], i) => (
         <Rect key={`base${i}`} x={bx - 6.5} y={by - 6.5} width={13} height={13} fill="#fff" stroke={FE.navy} strokeWidth={1.5} rotation={45} originX={bx} originY={by} />
       ))}
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Basketball court (FULL court, hoops LEFT and RIGHT; NBA + WNBA share it) ──
+// viewBox 680×360. Paint only (wood, halfcourt, keys, FT circles, 3-pt lines, rims/backboards);
+// the module supplies the DYNAMIC layer as `children` — same topic-agnostic contract as SoccerPitch.
+// Geometry at ~7 px/ft: rims at x=47/633 · keys x=10..143 / 537..670, y=124..236 · FT circles r=42 ·
+// 3-pt arc r=167 about the rim, corner lines at y=26/334 meeting the arc at x=110/570.
+export const COURT = { vbW: 680, vbH: 360 };
+export const BASKETBALL_COURT_RATIO = COURT.vbW / COURT.vbH;
+const HOOPS = { wood: '#C98A4B', woodD: '#BD7E42', paint: '#A34A2A', rim: '#E0704A', chalk: '#F4F4EE' };
+
+export function BasketballCourt({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={COURT.vbW} viewH={COURT.vbH} fill={fill} bg={HOOPS.woodD}>
+      <Rect x={10} y={10} width={660} height={340} fill={HOOPS.wood} stroke={HOOPS.chalk} strokeWidth={2.5} />
+      {/* halfcourt line + center circle */}
+      <Line x1={340} y1={10} x2={340} y2={350} stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Circle cx={340} cy={180} r={42} fill="none" stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      {/* keys (painted lanes) + free-throw circles */}
+      <Rect x={10} y={124} width={133} height={112} fill={HOOPS.paint} stroke={HOOPS.chalk} strokeWidth={2} />
+      <Rect x={537} y={124} width={133} height={112} fill={HOOPS.paint} stroke={HOOPS.chalk} strokeWidth={2} />
+      <Circle cx={143} cy={180} r={42} fill="none" stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Circle cx={537} cy={180} r={42} fill="none" stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      {/* three-point lines: corner lines + arc about each rim */}
+      <Line x1={10} y1={26} x2={110} y2={26} stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Line x1={10} y1={334} x2={110} y2={334} stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Path d="M110 26 A167 167 0 0 1 110 334" fill="none" stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Line x1={570} y1={26} x2={670} y2={26} stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Line x1={570} y1={334} x2={670} y2={334} stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      <Path d="M570 26 A167 167 0 0 0 570 334" fill="none" stroke={HOOPS.chalk} strokeWidth={2} opacity={0.85} />
+      {/* backboards + rims */}
+      <Line x1={38} y1={159} x2={38} y2={201} stroke={HOOPS.chalk} strokeWidth={3} />
+      <Line x1={642} y1={159} x2={642} y2={201} stroke={HOOPS.chalk} strokeWidth={3} />
+      <Circle cx={47} cy={180} r={6} fill="none" stroke={HOOPS.rim} strokeWidth={2.5} />
+      <Circle cx={633} cy={180} r={6} fill="none" stroke={HOOPS.rim} strokeWidth={2.5} />
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Hockey rink (nets LEFT and RIGHT; center ice at 340,150) ──
+// viewBox 680×300, ~3.3 px/ft. Rounded ice sheet on a navy surround; goal lines x=46/634, blue lines
+// x=258/422, red line x=340, end-zone faceoff circles r=50, creases bulge INTO the play (in FRONT of
+// each net), trapezoids behind the goal lines. Module supplies the dynamic layer as `children`.
+export const RINK = { vbW: 680, vbH: 300 };
+export const HOCKEY_RINK_RATIO = RINK.vbW / RINK.vbH;
+const ICE = { sheet: '#E9F2F7', board: '#9FB6C9', red: '#D64545', blue: '#2E6FBF', creaseFill: '#9CC9EA' };
+
+export function HockeyRink({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={RINK.vbW} viewH={RINK.vbH} fill={fill} bg={FE.navy}>
+      <Rect x={10} y={10} width={660} height={280} rx={70} fill={ICE.sheet} stroke={ICE.board} strokeWidth={3} />
+      {/* goal lines (red) + trapezoids behind them */}
+      <Line x1={46} y1={20} x2={46} y2={280} stroke={ICE.red} strokeWidth={2} />
+      <Line x1={634} y1={20} x2={634} y2={280} stroke={ICE.red} strokeWidth={2} />
+      <Line x1={46} y1={114} x2={14} y2={102} stroke={ICE.red} strokeWidth={1.5} opacity={0.8} />
+      <Line x1={46} y1={186} x2={14} y2={198} stroke={ICE.red} strokeWidth={1.5} opacity={0.8} />
+      <Line x1={634} y1={114} x2={666} y2={102} stroke={ICE.red} strokeWidth={1.5} opacity={0.8} />
+      <Line x1={634} y1={186} x2={666} y2={198} stroke={ICE.red} strokeWidth={1.5} opacity={0.8} />
+      {/* blue lines + center red line + center circle */}
+      <Line x1={258} y1={11} x2={258} y2={289} stroke={ICE.blue} strokeWidth={5} opacity={0.9} />
+      <Line x1={422} y1={11} x2={422} y2={289} stroke={ICE.blue} strokeWidth={5} opacity={0.9} />
+      <Line x1={340} y1={11} x2={340} y2={289} stroke={ICE.red} strokeWidth={4} opacity={0.9} />
+      <Circle cx={340} cy={150} r={50} fill="none" stroke={ICE.blue} strokeWidth={2} />
+      <Circle cx={340} cy={150} r={4} fill={ICE.blue} />
+      {/* end-zone faceoff circles + dots */}
+      {([[112, 78], [112, 222], [568, 78], [568, 222]] as [number, number][]).map(([x, y], i) => (
+        <Circle key={`fo${i}`} cx={x} cy={y} r={50} fill="none" stroke={ICE.red} strokeWidth={2} opacity={0.9} />
+      ))}
+      {([[112, 78], [112, 222], [568, 78], [568, 222]] as [number, number][]).map(([x, y], i) => (
+        <Circle key={`fd${i}`} cx={x} cy={y} r={4} fill={ICE.red} />
+      ))}
+      {/* creases (blue paint bulging away from each net, toward center ice) + nets */}
+      <Path d="M46 128 A22 22 0 0 1 46 172 Z" fill={ICE.creaseFill} opacity={0.85} stroke={ICE.blue} strokeWidth={1.5} />
+      <Path d="M634 128 A22 22 0 0 0 634 172 Z" fill={ICE.creaseFill} opacity={0.85} stroke={ICE.blue} strokeWidth={1.5} />
+      <Rect x={34} y={136} width={12} height={28} fill="none" stroke={ICE.red} strokeWidth={2} />
+      <Rect x={634} y={136} width={12} height={28} fill="none" stroke={ICE.red} strokeWidth={2} />
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Tennis court (net VERTICAL at x=340; baselines LEFT and RIGHT) ──
+// viewBox 680×340. Hard court on a green surround. Court x=67..613, y=44..296; singles sidelines
+// y=76/264; service lines x=193/487; center service line y=170; center marks on both baselines.
+// Module supplies the dynamic layer as `children`.
+export const TENNIS_C = { vbW: 680, vbH: 340 };
+export const TENNIS_COURT_RATIO = TENNIS_C.vbW / TENNIS_C.vbH;
+const TEN = { surround: '#2E5D4E', court: '#3170B7', chalk: '#F4F4EE', net: '#E5ECF2', post: '#26323B' };
+
+export function TennisCourt({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={TENNIS_C.vbW} viewH={TENNIS_C.vbH} fill={fill} bg={TEN.surround}>
+      <Rect x={67} y={44} width={546} height={252} fill={TEN.court} stroke={TEN.chalk} strokeWidth={2.5} />
+      {/* singles sidelines (doubles alleys outside them) */}
+      <Line x1={67} y1={76} x2={613} y2={76} stroke={TEN.chalk} strokeWidth={2} opacity={0.9} />
+      <Line x1={67} y1={264} x2={613} y2={264} stroke={TEN.chalk} strokeWidth={2} opacity={0.9} />
+      {/* service lines + center service line */}
+      <Line x1={193} y1={76} x2={193} y2={264} stroke={TEN.chalk} strokeWidth={2} opacity={0.9} />
+      <Line x1={487} y1={76} x2={487} y2={264} stroke={TEN.chalk} strokeWidth={2} opacity={0.9} />
+      <Line x1={193} y1={170} x2={487} y2={170} stroke={TEN.chalk} strokeWidth={2} opacity={0.9} />
+      {/* center marks on the baselines */}
+      <Line x1={67} y1={170} x2={76} y2={170} stroke={TEN.chalk} strokeWidth={2.5} />
+      <Line x1={604} y1={170} x2={613} y2={170} stroke={TEN.chalk} strokeWidth={2.5} />
+      {/* the net (posts outside the doubles lines) */}
+      <Line x1={340} y1={30} x2={340} y2={310} stroke={TEN.net} strokeWidth={4} />
+      <Circle cx={340} cy={30} r={4} fill={TEN.post} />
+      <Circle cx={340} cy={310} r={4} fill={TEN.post} />
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Cricket ground (OVAL; pitch VERTICAL in the middle — bowler's end TOP, striker BOTTOM) ──
+// viewBox 680×460. Boundary ellipse (340,230) rx=320 ry=215 with the rope just inside; dashed
+// 30-yard fielding circle rx=190 ry=130; pitch rect x=325..355, y=160..300 with creases + stumps
+// at each end. Fielding positions are MODULE data (children) — the ground stays position-agnostic.
+export const GROUND = { vbW: 680, vbH: 460 };
+export const CRICKET_GROUND_RATIO = GROUND.vbW / GROUND.vbH;
+const CRK = { out: '#1C3B27', turfD: '#2f7a44', turfL: '#3A8A50', chalk: '#F4F4EE', pitch: '#C9A66B', stump: '#3A2C18' };
+
+export function CricketGround({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={GROUND.vbW} viewH={GROUND.vbH} fill={fill} bg={CRK.out}>
+      <Ellipse cx={340} cy={230} rx={320} ry={215} fill={CRK.turfD} />
+      <Ellipse cx={340} cy={230} rx={316} ry={211} fill="none" stroke={CRK.chalk} strokeWidth={3} opacity={0.85} />
+      {/* 30-yard fielding circle (powerplay ring) */}
+      <Ellipse cx={340} cy={230} rx={190} ry={130} fill={CRK.turfL} opacity={0.45} />
+      <Ellipse cx={340} cy={230} rx={190} ry={130} fill="none" stroke={CRK.chalk} strokeWidth={2} strokeDasharray="6 6" opacity={0.7} />
+      {/* the pitch: bowler's end TOP (y=160), striker's end BOTTOM (y=300) */}
+      <Rect x={325} y={160} width={30} height={140} rx={3} fill={CRK.pitch} />
+      <Line x1={327} y1={176} x2={353} y2={176} stroke={CRK.chalk} strokeWidth={1.5} />
+      <Line x1={327} y1={284} x2={353} y2={284} stroke={CRK.chalk} strokeWidth={1.5} />
+      <Rect x={335} y={163} width={10} height={5} rx={1} fill={CRK.stump} />
+      <Rect x={335} y={292} width={10} height={5} rx={1} fill={CRK.stump} />
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Golf hole (tee LEFT → green RIGHT; hole anatomy: tee/fairway/rough/bunkers/water/green/pin) ──
+// viewBox 680×340. Deep rough base; fairway = overlapping light ellipses (organic shape, cheap);
+// OB stakes along the TOP edge; 150-yard marker mid-fairway; greenside + fairway bunkers; water
+// guarding the front-right of the green. Module supplies the dynamic layer as `children`.
+export const HOLE = { vbW: 680, vbH: 340 };
+export const GOLF_HOLE_RATIO = HOLE.vbW / HOLE.vbH;
+const GLF = {
+  rough: '#255C33', roughL: '#2C6A3C', fairway: '#4B9A56', fringe: '#57B267', green: '#6FCF7F',
+  sand: '#E7D7A3', water: '#3A7FC1', waterEdge: '#A8D0EE', stake: '#F4F4EE', flag: '#D64545', stick: '#E8E8E8', cup: '#1E2A24',
+};
+
+export function GolfHole({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={HOLE.vbW} viewH={HOLE.vbH} fill={fill} bg={GLF.rough}>
+      <Ellipse cx={340} cy={175} rx={310} ry={135} fill={GLF.roughL} opacity={0.55} />
+      {/* fairway (three overlapping lobes, tee side → green side) */}
+      <Ellipse cx={180} cy={170} rx={100} ry={42} fill={GLF.fairway} />
+      <Ellipse cx={330} cy={165} rx={120} ry={48} fill={GLF.fairway} />
+      <Ellipse cx={470} cy={168} rx={90} ry={40} fill={GLF.fairway} />
+      {/* tee box + tee markers */}
+      <Rect x={30} y={150} width={40} height={40} rx={6} fill={GLF.fairway} stroke={GLF.stake} strokeWidth={1.5} />
+      <Circle cx={62} cy={157} r={3} fill={GLF.stake} />
+      <Circle cx={62} cy={183} r={3} fill={GLF.stake} />
+      {/* hazards: water + fairway bunker + two greenside bunkers */}
+      <Ellipse cx={450} cy={245} rx={55} ry={26} fill={GLF.water} stroke={GLF.waterEdge} strokeWidth={1.5} />
+      <Ellipse cx={300} cy={110} rx={24} ry={13} fill={GLF.sand} />
+      <Ellipse cx={540} cy={215} rx={20} ry={12} fill={GLF.sand} />
+      <Ellipse cx={655} cy={125} rx={16} ry={10} fill={GLF.sand} />
+      {/* fringe + green + cup + pin */}
+      <Ellipse cx={595} cy={170} rx={66} ry={58} fill={GLF.fringe} />
+      <Ellipse cx={595} cy={170} rx={48} ry={42} fill={GLF.green} />
+      <Circle cx={605} cy={168} r={3} fill={GLF.cup} />
+      <Line x1={605} y1={168} x2={605} y2={128} stroke={GLF.stick} strokeWidth={2} />
+      <Polygon points="605,128 605,141 626,134.5" fill={GLF.flag} />
+      {/* 150-yard marker + out-of-bounds stakes along the top */}
+      <Circle cx={390} cy={200} r={4} fill={GLF.stake} stroke="#888" strokeWidth={1} />
+      {[90, 190, 290, 390, 490, 590].map(x => <Circle key={`ob${x}`} cx={x} cy={10} r={3} fill={GLF.stake} />)}
+      {children}
+    </FieldCanvas>
+  );
+}
+
+// ── Rugby pitch (attack LEFT→RIGHT; in-goal areas at BOTH ends; halfway/22s/10m/5m lines) ──
+// viewBox 680×420 (same footprint as the soccer PITCH). Try lines x=66/614 (in-goals shaded
+// beyond), 22-metre lines x=187/493, dashed 10-metre lines x=285/395, dashed 5-metre-from-try
+// lines x=93/587, halfway x=340 with the kickoff center spot, posts ON each try line.
+export const RUGBY_P = { vbW: 680, vbH: 420 };
+export const RUGBY_PITCH_RATIO = RUGBY_P.vbW / RUGBY_P.vbH;
+const RUG = { turfD: '#2f7a44', turfL: '#358a4c', chalk: '#F4F4EE', shade: 'rgba(13,27,62,0.18)' };
+const RUG_STRIPES = Array.from({ length: 10 }, (_, i) => ({ x: i * 68, fill: i % 2 ? RUG.turfD : RUG.turfL }));
+
+export function RugbyPitch({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+  return (
+    <FieldCanvas viewW={RUGBY_P.vbW} viewH={RUGBY_P.vbH} fill={fill} bg={RUG.turfD}>
+      {RUG_STRIPES.map((s, i) => (
+        <Rect key={`rs${i}`} x={s.x} y={0} width={68} height={RUGBY_P.vbH} fill={s.fill} />
+      ))}
+      {/* in-goal areas (shaded) + boundary */}
+      <Rect x={6} y={6} width={60} height={408} fill={RUG.shade} />
+      <Rect x={614} y={6} width={60} height={408} fill={RUG.shade} />
+      <Rect x={6} y={6} width={668} height={408} fill="none" stroke={RUG.chalk} strokeWidth={2} opacity={0.7} />
+      {/* try lines + posts on them */}
+      <Line x1={66} y1={6} x2={66} y2={414} stroke={RUG.chalk} strokeWidth={3} opacity={0.9} />
+      <Line x1={614} y1={6} x2={614} y2={414} stroke={RUG.chalk} strokeWidth={3} opacity={0.9} />
+      <Line x1={66} y1={196} x2={66} y2={224} stroke={RUG.chalk} strokeWidth={5} />
+      <Line x1={614} y1={196} x2={614} y2={224} stroke={RUG.chalk} strokeWidth={5} />
+      {/* 5m-from-try (dashed) · 22m · 10m (dashed) · halfway + center spot */}
+      <Line x1={93} y1={6} x2={93} y2={414} stroke={RUG.chalk} strokeWidth={1.5} strokeDasharray="6 8" opacity={0.5} />
+      <Line x1={587} y1={6} x2={587} y2={414} stroke={RUG.chalk} strokeWidth={1.5} strokeDasharray="6 8" opacity={0.5} />
+      <Line x1={187} y1={6} x2={187} y2={414} stroke={RUG.chalk} strokeWidth={2} opacity={0.7} />
+      <Line x1={493} y1={6} x2={493} y2={414} stroke={RUG.chalk} strokeWidth={2} opacity={0.7} />
+      <Line x1={285} y1={6} x2={285} y2={414} stroke={RUG.chalk} strokeWidth={2} strokeDasharray="8 7" opacity={0.6} />
+      <Line x1={395} y1={6} x2={395} y2={414} stroke={RUG.chalk} strokeWidth={2} strokeDasharray="8 7" opacity={0.6} />
+      <Line x1={340} y1={6} x2={340} y2={414} stroke={RUG.chalk} strokeWidth={2.5} opacity={0.8} />
+      <Circle cx={340} cy={210} r={3.5} fill={RUG.chalk} opacity={0.9} />
       {children}
     </FieldCanvas>
   );
