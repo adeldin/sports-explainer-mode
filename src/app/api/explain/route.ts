@@ -6,10 +6,56 @@ import { getNationsCupMatch } from './zylaProvider';
 import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
+import { resolveCaller, type Caller } from '../_lib/entitlement';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
+// ── SERVER-SIDE CAP ENFORCEMENT — STEP 2: SHADOW MODE ────────────────────────────────────────
+// Identity resolution is LIVE; enforcement is NOT. Every request is served exactly as before —
+// this block only resolves who the caller is and logs what a future cap WOULD have done.
+//
+// The design is PRESENCE-BASED, and that is what makes it safe to ship:
+//   • No `session` in the body  → anonymous → NEVER enforced. The iOS app sends no identity of
+//     any kind, so it is structurally exempt and cannot be broken by this work.
+//   • `session` present         → the Chrome extension → resolvable → enforceable (later).
+//
+// Only the two COST-BEARING, capped actions are shadowed: the play explanation (no `action`)
+// and `ask`. recap/vision/coach/translate are not capped on iOS either, so they're not shadowed.
+const CAPPED_ACTIONS = new Set(['explain', 'ask']);
+
+function shadowLog(caller: Caller, action: string, sport: string, gameId: string | undefined) {
+  if (!CAPPED_ACTIONS.has(action)) return;
+
+  // Anonymous = the iOS app / web. Nothing to enforce, ever. Logged at a low volume so the
+  // ratio of anonymous:identified traffic is visible before enforcement flips on.
+  if (!caller.hasSession) {
+    console.log(`[caps:shadow] anonymous (exempt) action=${action} sport=${sport}`);
+    return;
+  }
+  if (caller.degraded) {
+    console.log(`[caps:shadow] degraded (would FAIL OPEN → serve) action=${action} sport=${sport}`);
+    return;
+  }
+  if (!caller.signedIn) {
+    console.log(`[caps:shadow] session present but INVALID/EXPIRED action=${action} sport=${sport}`);
+    return;
+  }
+  if (caller.isPro) {
+    console.log(
+      `[caps:shadow] PRO${caller.isTrial ? ' (trial)' : ''} → uncapped ` +
+      `email=${caller.email} action=${action} sport=${sport} game=${gameId ?? '-'}`,
+    );
+    return;
+  }
+  // The one that matters: a Free, identified caller. Today it is SERVED. Once Step 3 lands, this
+  // is the request that would consume a credit — and be blocked once the allowance is spent.
+  console.log(
+    `[caps:shadow] FREE → WOULD BE CAPPED (still served) ` +
+    `email=${caller.email} action=${action} sport=${sport} game=${gameId ?? '-'}`,
+  );
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -972,6 +1018,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText } = body;
+
+    // STEP 2 — SHADOW MODE. Resolve the caller, log what a cap would have done, then fall
+    // through UNCHANGED. No branch below reads `caller`, so no response can differ from before.
+    // Wrapped so that an entitlement failure can never take down an explanation.
+    let caller: Caller;
+    try {
+      caller = await resolveCaller(body?.session);
+      shadowLog(caller, action || 'explain', sport, gameId);
+    } catch (e) {
+      console.error('[caps:shadow] resolve threw (ignored — request served):', e);
+    }
 
     // Batch-translate a list of raw ESPN play descriptions (the play-by-play
     // list). Deterministic, one call for the whole list. Returns the input
