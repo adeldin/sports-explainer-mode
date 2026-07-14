@@ -122,8 +122,12 @@ function validateAskQuestionMsg(msg) {
     ? msg.context.trim().slice(0, 1000)
     : '';
 
+  // Optional: which game this question is about. Drives the server's per-game Q&A cap. Absent
+  // (gameless "learn mode" ask) → the server leaves it ungated.
+  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+
   if (!sport || !question) return null; // both required
-  return { sport, level, question, context, language };
+  return { sport, level, question, context, language, gameId };
 }
 
 function validateFetchGamesMsg(msg) {
@@ -193,7 +197,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ error: 'Invalid askQuestion message — sport and question are required.' });
       return true;
     }
-    handleAskQuestion(validated.sport, validated.level, validated.question, validated.context, validated.language)
+    handleAskQuestion(validated.sport, validated.level, validated.question, validated.context, validated.language, validated.gameId)
       .then(sendResponse)
       .catch(err => sendResponse({ error: err.message }));
     return true;
@@ -351,11 +355,15 @@ async function handleRecap(sport, level, gameId, language, isPro = false) {
 // ─────────────────────────────────────────
 // ASK ANYTHING Q&A
 // ─────────────────────────────────────────
-async function handleAskQuestion(sport, level, question, context, language = 'en') {
+async function handleAskQuestion(sport, level, question, context, language = 'en', gameId = null) {
+  const askBody = { action: 'ask', sport, level, question, context, language };
+  // Only when a game is selected. Omitted → the server treats it as a gameless "learn mode"
+  // ask and leaves it ungated, matching the iOS carve-out.
+  if (gameId) askBody.gameId = gameId;
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(await withSession({ action: 'ask', sport, level, question, context, language }))
+    body: JSON.stringify(await withSession(askBody))
   });
   if (!res.ok) throw new Error(`API returned ${res.status}`);
   return await res.json();

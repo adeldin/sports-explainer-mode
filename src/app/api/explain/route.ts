@@ -7,23 +7,35 @@ import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
 import { resolveCaller, type Caller } from '../_lib/entitlement';
+import { consumeGameQA, QA_FREE_PER_GAME } from '../_lib/caps';
 
 // Model is configurable so we can swap/upgrade tiers without code changes.
 // Defaults to the current free-tier model.
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-// ── SERVER-SIDE CAP ENFORCEMENT — STEP 2: SHADOW MODE ────────────────────────────────────────
-// Identity resolution is LIVE; enforcement is NOT. Every request is served exactly as before —
-// this block only resolves who the caller is and logs what a future cap WOULD have done.
+// ── SERVER-SIDE CAP ENFORCEMENT ───────────────────────────────────────────────────────────────
+// STATUS:  ask (per-game Q&A cap)   → ENFORCED
+//          explain (daily play cap) → shadow-logged only, NOT enforced yet
 //
 // The design is PRESENCE-BASED, and that is what makes it safe to ship:
 //   • No `session` in the body  → anonymous → NEVER enforced. The iOS app sends no identity of
 //     any kind, so it is structurally exempt and cannot be broken by this work.
-//   • `session` present         → the Chrome extension → resolvable → enforceable (later).
+//   • `session` present         → the Chrome extension → resolvable → enforceable.
 //
-// Only the two COST-BEARING, capped actions are shadowed: the play explanation (no `action`)
-// and `ask`. recap/vision/coach/translate are not capped on iOS either, so they're not shadowed.
+// Only the two COST-BEARING actions are capped: the play explanation (no `action`) and `ask`.
+// recap/vision/coach/translate are not capped on iOS either, so they're untouched here.
 const CAPPED_ACTIONS = new Set(['explain', 'ask']);
+
+// Is this caller subject to caps at all? Every "no" here means SERVE AS TODAY.
+// Note `degraded` (Upstash/RevenueCat unreachable) returns false → we fail OPEN by construction.
+function enforceable(caller: Caller | undefined): boolean {
+  return !!caller
+    && caller.hasSession      // anonymous (iOS app / signed-out) → exempt
+    && caller.signedIn        // invalid/expired token → treated as anonymous, not blocked
+    && !caller.isPro          // Pro + trial → uncapped
+    && !caller.degraded       // lookup failed → fail open
+    && !!caller.email;        // no identity → nothing to count against
+}
 
 function shadowLog(caller: Caller, action: string, sport: string, gameId: string | undefined) {
   if (!CAPPED_ACTIONS.has(action)) return;
@@ -1019,15 +1031,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText } = body;
 
-    // STEP 2 — SHADOW MODE. Resolve the caller, log what a cap would have done, then fall
-    // through UNCHANGED. No branch below reads `caller`, so no response can differ from before.
-    // Wrapped so that an entitlement failure can never take down an explanation.
-    let caller: Caller;
+    // Resolve WHO is calling. Left `undefined` if this throws — enforceable() then returns false
+    // and every cap below is skipped, so an entitlement outage can never take down an explanation.
+    let caller: Caller | undefined;
     try {
       caller = await resolveCaller(body?.session);
       shadowLog(caller, action || 'explain', sport, gameId);
     } catch (e) {
-      console.error('[caps:shadow] resolve threw (ignored — request served):', e);
+      console.error('[caps] resolve threw (ignored — request served):', e);
     }
 
     // Batch-translate a list of raw ESPN play descriptions (the play-by-play
@@ -1065,6 +1076,33 @@ export async function POST(req: NextRequest) {
 
     // Handle Follow-up Q&A
     if (action === 'ask' && question) {
+      // ── FREE-TIER PER-GAME Q&A CAP — ENFORCED ────────────────────────────────────────────
+      // Checked BEFORE the cache and BEFORE Groq, so a blocked ask costs nothing.
+      //
+      // Enforced ONLY for an identified, signed-in, non-Pro caller asking about a REAL game.
+      // Everything else falls through and is served exactly as before:
+      //   • no session (the iOS app, signed-out extension) → anonymous, exempt
+      //   • Pro / trial                                    → uncapped
+      //   • no gameId ("learn mode" / gameless ask)        → ungated, mirroring the iOS carve-out
+      //   • Redis or RevenueCat degraded                   → FAIL OPEN, serve
+      const askGameId = typeof gameId === 'string' && gameId.trim() ? gameId.trim() : '';
+      if (enforceable(caller) && askGameId) {
+        try {
+          const d = await consumeGameQA(caller!.email as string, askGameId);
+          if (!d.allowed) {
+            console.log(`[caps] BLOCKED qa email=${caller!.email} game=${askGameId} used=${d.used}`);
+            return NextResponse.json(
+              { capped: true, reason: 'qa', limit: QA_FREE_PER_GAME, remaining: 0 },
+              { headers: corsHeaders },
+            );
+          }
+          console.log(`[caps] qa allowed email=${caller!.email} game=${askGameId} used=${d.used} remaining=${d.remaining}`);
+        } catch (e) {
+          // Counter unavailable → serve. Under-enforcing beats blocking a paying user.
+          console.error('[caps] qa counter failed (failing open — request served):', e);
+        }
+      }
+
       const langName = languageNames[language] || 'English';
       const langLine = language && language !== 'en' ? ` Respond entirely in ${langName}.` : '';
 

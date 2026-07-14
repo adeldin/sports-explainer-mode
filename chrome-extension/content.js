@@ -1997,7 +1997,10 @@
 
     try {
       const response = await chrome.runtime.sendMessage({
-        action: 'askQuestion', sport: currentSport, level: settings.level, question, context: currentPlayText, language: settings.language
+        action: 'askQuestion', sport: currentSport, level: settings.level, question, context: currentPlayText, language: settings.language,
+        // The per-game Q&A cap is keyed on the game. Null when no game is selected — a gameless
+        // "learn mode" ask, which stays UNGATED (same carve-out as iOS).
+        gameId: currentGameId || undefined
       });
       answerBox.textContent = response?.answer || '⚠️ Could not get an answer.';
       answerGameId = currentGameId; // this answer belongs to the current game (survives poll refreshes)

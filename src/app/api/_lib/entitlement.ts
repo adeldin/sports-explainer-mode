@@ -9,6 +9,7 @@
 //
 // The security property both callers depend on: the email is DERIVED from a validated session,
 // never taken from the client. A caller can only ever resolve their own entitlement.
+import { redisCmd } from './redis';
 
 export interface Entitlement {
   isPro: boolean;
@@ -45,21 +46,6 @@ export const ANONYMOUS: Caller = {
 // from checkout, so the visible UI flips instantly; this only bounds the SERVER's view.
 const ENT_CACHE_TTL = 300; // seconds
 const entKey = (session: string) => `ent:session:${session}`;
-
-async function redisCmd(cmd: (string | number)[]): Promise<unknown> {
-  const REST_URL = process.env.UPSTASH_REDIS_REST_URL;
-  const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!REST_URL || !REST_TOKEN) return null;
-  const res = await fetch(REST_URL, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${REST_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`upstash ${res.status}`);
-  const json = (await res.json()) as { result?: unknown };
-  return json?.result ?? null;
-}
 
 // Resolve the caller behind a request. NEVER throws — on any failure it returns a `degraded`
 // caller so the hot path can fail OPEN (serve the request) rather than blocking a paying user
