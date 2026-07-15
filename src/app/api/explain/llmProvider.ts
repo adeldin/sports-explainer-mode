@@ -12,7 +12,17 @@
 //   LLM_FALLBACK_PROVIDER=gemini, GEMINI_MODEL=gemini-2.5-flash.
 import Groq from 'groq-sdk';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Instantiate the Groq client LAZILY, on first use — not at module load. The SDK
+// constructor throws when GROQ_API_KEY is empty, and Next collects page data at BUILD
+// time by evaluating every route module. Eager instantiation therefore failed the whole
+// build on any deploy whose BUILD env lacked the key (e.g. preview/branch deployments —
+// the key is only needed at RUNTIME). Deferring to first request keeps the build clean
+// and changes nothing at runtime.
+let _groq: Groq | null = null;
+function groq(): Groq {
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return _groq;
+}
 
 const FALLBACK = (process.env.LLM_FALLBACK_PROVIDER || 'none').toLowerCase();
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -28,7 +38,7 @@ export interface LLMCompletion {
 // Drop-in for groq.chat.completions.create(). Same params in, same shape out.
 export async function createChatCompletion(params: any): Promise<LLMCompletion> {
   try {
-    const c = await groq.chat.completions.create(params);
+    const c = await groq().chat.completions.create(params);
     console.log('[llm] provider=groq');
     return c as unknown as LLMCompletion;
   } catch (e) {
