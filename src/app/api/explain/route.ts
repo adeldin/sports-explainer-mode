@@ -3,6 +3,9 @@ import { analyzeImage } from './visionProvider';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
 import { getNationsCupMatch } from './zylaProvider';
+import { normalizeCricsheet } from './cricsheetProvider';
+import { reduceForExplain } from './cricketReducer';
+import { CRICKET_RAW } from '../cricket/matches.generated';
 import { createChatCompletion } from './llmProvider';
 import { cacheGet, cacheSet, normalizeQuestion, askKey, soccerSig, explainKey, cacheIsEnabled, cacheLog } from './explanationCache';
 import { getLiveTennisMatches, getTennisTimeline, type TennisGame, type TennisTimelineEntry } from './tennisProvider';
@@ -122,7 +125,7 @@ const sportContext: Record<string, string> = {
 // use the normal site API with their own league slugs.
 // `provider` selects the data source: absent/'espn' = ESPN base (default). `sport`/`league` are
 // optional so a 'zyla' entry needn't supply meaningless ESPN values (every ESPN entry still sets both).
-type EspnCfg = { sport?: string; league?: string; core?: boolean; learnMode?: boolean; provider?: 'espn' | 'zyla' };
+type EspnCfg = { sport?: string; league?: string; core?: boolean; learnMode?: boolean; provider?: 'espn' | 'zyla' | 'cricket' };
 const espnConfig: Record<string, EspnCfg> = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
@@ -151,9 +154,11 @@ const espnConfig: Record<string, EspnCfg> = {
   // The explain endpoint returns an educational "what to watch for" response.
   tennis: { sport: 'tennis', league: 'atp', learnMode: true },
   golf: { sport: 'golf', league: 'pga', learnMode: true },
-  // NOTE: cricket intentionally omitted from espnConfig — no usable ESPN data. — ESPN's public API has no usable cricket
-  // data (site API 404s; Core API lists the sport but exposes zero leagues/events).
-  // It needs a different source (e.g. ESPNcricinfo) before it can be added here.
+  // Cricket (provider:'cricket'): NOT ESPN — ESPN's public API has no usable cricket data (site API
+  // 404s; Core API lists the sport but exposes zero leagues/events). Source is the committed Cricsheet
+  // snapshot served by /api/cricket; fetchGameData/fetchRecapData divert to fetchCricketGameData /
+  // the cricket recap branch, both reducing the canonical CricketMatch via cricketReducer.
+  cricket: { provider: 'cricket' },
 };
 
 const languageNames: Record<string, string> = {
@@ -209,7 +214,28 @@ async function fetchZylaGameData(sport: string, gameId?: string) {
   return await getNationsCupMatch(gameId || '');
 }
 
-async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = false) {
+// Cricket base fetch: committed Cricsheet snapshot → canonical CricketMatch → the reducer's two
+// validated slots. `playKey` selects the delivery being explained (a tapped Play-by-Play row);
+// absent/unknown → the LAST delivery (the live/headline explain — same reduction, cursor at the end).
+// Best-effort: unknown match or an invariant throw degrades to the generic shape, NEVER to
+// silently-wrong data (the reducer only ever folds payloads the normalizer accepted).
+function fetchCricketGameData(gameId?: string, playKey?: string) {
+  const fallback = { play: 'A key play just happened', gameContext: 'Live cricket match in progress', homeTeam: '', awayTeam: '' };
+  const raw = gameId ? CRICKET_RAW[gameId] : undefined;
+  if (!raw) return fallback;
+  try {
+    const match = normalizeCricsheet(raw, gameId as string);
+    const all = match.innings.flatMap((i) => i.overs.flatMap((o) => o.deliveries));
+    if (!all.length) return fallback;
+    const key = playKey && all.some((d) => d.key === playKey) ? playKey : all[all.length - 1].key;
+    const { play, gameContext } = reduceForExplain(match, key);
+    return { play, gameContext, homeTeam: match.teams[0], awayTeam: match.teams[1] };
+  } catch {
+    return fallback;
+  }
+}
+
+async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = false, cricketPlayKey?: string) {
   let play = 'A key play just happened';
   let gameContext = 'Live game in progress';
   let homeTeam = '', awayTeam = '';
@@ -218,6 +244,8 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
   // Zyla-provider sports divert BEFORE the ESPN learnMode/core/site branches.
   if (cfg.provider === 'zyla') return await fetchZylaGameData(sport, gameId);
+  // Cricket diverts the same way — committed snapshot, no upstream call.
+  if (cfg.provider === 'cricket') return fetchCricketGameData(gameId, cricketPlayKey);
 
   // Learn Mode (tennis/golf): tournament-shaped, not head-to-head. Build a
   // context string from the current tournament rather than home/away teams.
@@ -421,6 +449,44 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
   // No gameId → nothing to summarize. Return empty (graceful no-data path) — we do NOT scan a
   // scoreboard, since that only ever holds today's slate (the very bug this rewrite fixes).
   if (!gameId) return out;
+  // Cricket: recap from the SAME committed snapshot + normalizer the explain path uses. Facts are
+  // computed from the deliveries (single source of truth) — innings score lines, result, toss, POTM.
+  // Article fields stay '' → Branch B (score + facts-grounded short recap), like the zyla path below.
+  if (cfg.provider === 'cricket') {
+    const raw = CRICKET_RAW[gameId];
+    if (!raw) return out;
+    try {
+      const m = normalizeCricsheet(raw, gameId);
+      out.homeTeam = m.teams[0];
+      out.awayTeam = m.teams[1];
+      out.statusDetail = 'Final';
+      const innLines: string[] = [];
+      const scoreByTeam: Record<string, string> = {};
+      for (const inn of m.innings) {
+        let runs = 0, wkts = 0, legal = 0;
+        for (const ov of inn.overs) for (const d of ov.deliveries) {
+          runs += d.runsTotal;
+          if (d.wicket) wkts += 1;
+          if (d.isLegal) legal += 1;
+        }
+        const score = `${runs}/${wkts} (${Math.floor(legal / 6)}.${legal % 6} overs)`;
+        scoreByTeam[inn.battingTeam] = `${runs}/${wkts}`;
+        innLines.push(`${inn.battingTeam} ${score}`);
+      }
+      out.homeScore = scoreByTeam[m.teams[0]] ?? '';
+      out.awayScore = scoreByTeam[m.teams[1]] ?? '';
+      out.winner = m.outcome?.winner ?? '';
+      out.summaryFacts = [
+        ...innLines,
+        m.outcome ? `Result: ${m.outcome.winner} won by ${m.outcome.by}` : 'Result: no result',
+        m.toss ? `Toss: ${m.toss.winner} won the toss and chose to ${m.toss.decision}` : '',
+        m.playerOfMatch ? `Player of the match: ${m.playerOfMatch}` : '',
+      ].filter(Boolean);
+    } catch {
+      return out; // invariant/parse failure → honest empty, never fabricated facts
+    }
+    return out;
+  }
   // Zyla-provider (nationscup): the ESPN summary endpoint below has no valid sport/league for it, so
   // divert to getNationsCupMatch — the SAME structured data the explain path uses — and map it into
   // RecapData. Article fields stay '' → Branch B (score + stats-grounded short recap), like ESPN rugby.
@@ -1059,7 +1125,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText } = body;
+    const { sport = 'nfl', level = 'beginner', action, question, context, gameId, language = 'en', playText, playKey } = body;
 
     // Resolve WHO is calling. Left `undefined` if this throws — enforceable() then returns false
     // and every cap below is skipped, so an entitlement outage can never take down an explanation.
@@ -1424,7 +1490,9 @@ export async function POST(req: NextRequest) {
       const sig = (cacheIsEnabled() && language === 'en') ? soccerSig(enriched) : null;
       eKey = sig ? explainKey({ sport, level, lang: language, sig }) : null;
     } else {
-      const fetched = await fetchGameData(sport, gameId, !!playText);
+      // playKey (cricket only): selects the tapped delivery — the reducer then produces BOTH the
+      // play line and the state snapshot for that exact ball. Other sports ignore it entirely.
+      const fetched = await fetchGameData(sport, gameId, !!playText, playKey);
       play = playText || fetched.play;
       ({ gameContext, homeTeam, awayTeam } = fetched);
     }
