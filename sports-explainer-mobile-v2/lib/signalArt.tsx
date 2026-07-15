@@ -156,9 +156,17 @@ function handPrims(arm: Arm): { out: Prim[]; fill: Prim[] } {
       (grip === 'two' ? [-14, 14] : [-20, 0, 20]).forEach(a => ray(h, add(h, rot(u, a), 27), 6));
       break;
     }
-    // Thumbs-up: ball + one SHORT screen-up stub (short + stubby so it can never
-    // be misread as a 1-finger point, which is long and along the forearm).
-    case 'thumb': dot(h, 11); ray(h, { x: h.x, y: h.y - 22 }, 10); break;
+    // Thumbs-up: fist ball + a short, thick thumb coming off the OUTER SIDE of the
+    // fist, angled up-and-out. A stub pointing straight up from the CENTRE of a fist
+    // reads as a raised middle finger (it did) — a thumb protrudes from the side. The
+    // outward direction is away from the body centreline (viewBox x=200), so the left
+    // hand's thumb points up-left and the right's up-right, like a real two-thumbs-up.
+    case 'thumb': {
+      const side = h.x < 200 ? -1 : 1;
+      dot(h, 12);
+      ray({ x: h.x + side * 7, y: h.y - 2 }, { x: h.x + side * 17, y: h.y - 17 }, 11);
+      break;
+    }
     case 'cardY': case 'cardR': {
       const c = add(h, u, 18);
       out.push({ k: 'rect', x: c.x - 16, y: c.y - 22, w: 32, h: 44, rx: 5, f: SG.panel });
