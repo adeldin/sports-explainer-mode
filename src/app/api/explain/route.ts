@@ -4,6 +4,8 @@ import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
 import { getNationsCupMatch } from './zylaProvider';
 import { normalizeCricsheet } from './cricsheetProvider';
+import { normalizeSportmonks } from './sportmonksProvider';
+import { getSmFixture, SM_ID_PREFIX } from './sportmonksLive';
 import { reduceForExplain } from './cricketReducer';
 import { CRICKET_RAW } from '../cricket/matches.generated';
 import { createChatCompletion } from './llmProvider';
@@ -214,17 +216,26 @@ async function fetchZylaGameData(sport: string, gameId?: string) {
   return await getNationsCupMatch(gameId || '');
 }
 
-// Cricket base fetch: committed Cricsheet snapshot → canonical CricketMatch → the reducer's two
-// validated slots. `playKey` selects the delivery being explained (a tapped Play-by-Play row);
-// absent/unknown → the LAST delivery (the live/headline explain — same reduction, cursor at the end).
-// Best-effort: unknown match or an invariant throw degrades to the generic shape, NEVER to
-// silently-wrong data (the reducer only ever folds payloads the normalizer accepted).
-function fetchCricketGameData(gameId?: string, playKey?: string) {
+// Cricket base fetch: archival (committed Cricsheet snapshot) OR live ('sm-'-prefixed Sportmonks
+// fixture; getSmFixture self-gates on CRICKET_SM_LIVE) → the SAME canonical CricketMatch → the
+// reducer's two validated slots. ONE fold, cursor-only: `playKey` selects a tapped Play-by-Play
+// row; absent/unknown → the LAST delivery — which for a LIVE match IS the latest ball, so the 60s
+// headline refresh needs no special path. Best-effort: unknown match, live feed off, or an
+// invariant throw degrades to the generic shape, NEVER to silently-wrong data.
+async function fetchCricketGameData(gameId?: string, playKey?: string) {
   const fallback = { play: 'A key play just happened', gameContext: 'Live cricket match in progress', homeTeam: '', awayTeam: '' };
-  const raw = gameId ? CRICKET_RAW[gameId] : undefined;
-  if (!raw) return fallback;
+  if (!gameId) return fallback;
   try {
-    const match = normalizeCricsheet(raw, gameId as string);
+    let match;
+    if (gameId.startsWith(SM_ID_PREFIX)) {
+      const raw = await getSmFixture(gameId.slice(SM_ID_PREFIX.length));
+      if (!raw) return fallback;
+      match = normalizeSportmonks(raw, gameId);
+    } else {
+      const raw = CRICKET_RAW[gameId];
+      if (!raw) return fallback;
+      match = normalizeCricsheet(raw, gameId);
+    }
     const all = match.innings.flatMap((i) => i.overs.flatMap((o) => o.deliveries));
     if (!all.length) return fallback;
     const key = playKey && all.some((d) => d.key === playKey) ? playKey : all[all.length - 1].key;
@@ -244,8 +255,8 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
   // Zyla-provider sports divert BEFORE the ESPN learnMode/core/site branches.
   if (cfg.provider === 'zyla') return await fetchZylaGameData(sport, gameId);
-  // Cricket diverts the same way — committed snapshot, no upstream call.
-  if (cfg.provider === 'cricket') return fetchCricketGameData(gameId, cricketPlayKey);
+  // Cricket diverts the same way — committed snapshot, or the live feed for 'sm-' ids.
+  if (cfg.provider === 'cricket') return await fetchCricketGameData(gameId, cricketPlayKey);
 
   // Learn Mode (tennis/golf): tournament-shaped, not head-to-head. Build a
   // context string from the current tournament rather than home/away teams.

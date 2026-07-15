@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Game } from '../explain/zylaProvider';
 import { normalizeCricsheet } from '../explain/cricsheetProvider';
+import { normalizeSportmonks } from '../explain/sportmonksProvider';
+import { getSmLiveBoard, getSmFixture, SM_ID_PREFIX } from '../explain/sportmonksLive';
 import type { CricketMatch } from '../explain/cricketTypes';
 import { CRICKET_INDEX, CRICKET_RAW, type CricketIndexEntry } from './matches.generated';
 
@@ -65,6 +67,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (matchId) {
+    // 'sm-' prefix routes to the LIVE (Sportmonks) source. The prefix is load-bearing: the two
+    // id spaces (7-digit Cricinfo vs 5-digit Sportmonks) not colliding today is luck, not
+    // contract. getSmFixture self-gates on CRICKET_SM_LIVE — off -> null, same as unknown id.
+    if (matchId.startsWith(SM_ID_PREFIX)) {
+      try {
+        const raw = await getSmFixture(matchId.slice(SM_ID_PREFIX.length));
+        if (!raw) return NextResponse.json({ match: null }, { headers: corsHeaders });
+        const match: CricketMatch = normalizeSportmonks(raw, matchId);
+        return NextResponse.json({ match }, { headers: corsHeaders });
+      } catch {
+        return NextResponse.json({ match: null }, { headers: corsHeaders });
+      }
+    }
     const raw = CRICKET_RAW[matchId];
     if (!raw) return NextResponse.json({ match: null }, { headers: corsHeaders });
     try {
@@ -78,5 +93,24 @@ export async function GET(request: NextRequest) {
 
   const date = params.get('date');
   const entries = date ? CRICKET_INDEX.filter((e) => e.date === date) : CRICKET_INDEX;
-  return NextResponse.json({ matches: entries.map(toGame) }, { headers: corsHeaders });
+  const archival = entries.map(toGame);
+
+  // Live merge (no-op when CRICKET_SM_LIVE is off: getSmLiveBoard returns []).
+  //
+  // ═══ ARCHIVAL WINS ═══ The one genuinely new invariant of the live path: when the SAME real
+  // match exists in both sources (Sportmonks 'Finished' + Cricsheet ingested 1-5 days later),
+  // the ARCHIVAL entry is served and the sm- twin is DROPPED — Cricsheet is free (no quota),
+  // richer (toss/officials/real powerplays), and keys the explain path we validated. Because the
+  // id spaces differ, the dedupe keys on TEAMS+DATE equality, order-insensitive.
+  const liveGames = await getSmLiveBoard(date ?? undefined);
+  const seen = new Set(archival.map((g) => dedupeKey(g)));
+  const merged = [...archival, ...liveGames.filter((g) => !seen.has(dedupeKey(g)))];
+  return NextResponse.json({ matches: merged }, { headers: corsHeaders });
+}
+
+// Order-insensitive teams+local-date key for ARCHIVAL-WINS dedupe (ids can't be compared —
+// different id spaces). Date from startTime's UTC day, matching Cricsheet's match-local date.
+function dedupeKey(g: Game): string {
+  const day = g.startTime ? new Date(g.startTime).toISOString().slice(0, 10) : '';
+  return [...[g.homeTeam, g.awayTeam].map((t) => t.toLowerCase().trim())].sort().join('|') + '|' + day;
 }
