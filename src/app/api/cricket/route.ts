@@ -3,6 +3,7 @@ import type { Game } from '../explain/zylaProvider';
 import { normalizeCricsheet } from '../explain/cricsheetProvider';
 import { normalizeSportmonks } from '../explain/sportmonksProvider';
 import { getSmLiveBoard, getSmFixture, SM_ID_PREFIX } from '../explain/sportmonksLive';
+import { cricketFlag } from '../explain/cricketFlags';
 import type { CricketMatch } from '../explain/cricketTypes';
 import { CRICKET_INDEX, CRICKET_RAW, type CricketIndexEntry } from './matches.generated';
 
@@ -40,20 +41,34 @@ export async function OPTIONS() {
 
 // Index entry -> canonical Game (the shape the mobile scoreboard consumes, zero re-normalize).
 // Cricsheet has no home/away concept; teams[0] renders as "home". Archival source -> always post.
+//
+// Board scores are SHORT ("257/3") — GameCard is a 150px tile whose name column gets whatever
+// width the score leaves behind, and the long "(20.0)" overs suffix crushes the team name out of
+// the row (Gate 12 Bug 1). Overs detail lives in the recap facts instead. A side with no innings
+// (rain-abandoned 1496574) emits "DNB" (did not bat) — never '' (which read as a missing row).
+function shortScore(e: CricketIndexEntry, team: string): string {
+  const s = e.scores[team];
+  return s ? s.replace(/\s*\(.*\)\s*$/, '') : 'DNB';
+}
+
 function toGame(e: CricketIndexEntry): Game {
   const ms = Date.parse(`${e.date}T00:00:00Z`);
+  const homeFlag = cricketFlag(e.teams[0]);
+  const awayFlag = cricketFlag(e.teams[1]);
   return {
     id: e.id,
     homeTeam: e.teams[0],
     awayTeam: e.teams[1],
-    homeScore: e.scores[e.teams[0]] ?? '',
-    awayScore: e.scores[e.teams[1]] ?? '',
+    homeScore: shortScore(e, e.teams[0]),
+    awayScore: shortScore(e, e.teams[1]),
     status: e.note || 'No result',
     isLive: false,
     sport: 'cricket',
     state: 'post',
     ...(Number.isFinite(ms) ? { startTime: ms } : {}),
     ...(e.venue ? { venue: e.venue } : {}),
+    ...(homeFlag ? { homeFlag } : {}),
+    ...(awayFlag ? { awayFlag } : {}),
   };
 }
 

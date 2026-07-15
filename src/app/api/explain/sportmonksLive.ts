@@ -14,6 +14,7 @@
 // to ≤2 upstream fixture calls/min (~≤360 per 3h T20I) against a 2,000/hr plan cap.
 
 import type { Game } from './zylaProvider';
+import { cricketFlag } from './cricketFlags';
 
 const SM_LIVE = () => process.env.CRICKET_SM_LIVE === '1'; // read per-call: honored at runtime
 const TOKEN = () => process.env.SPORTMONKS_TOKEN || '';
@@ -110,10 +111,14 @@ export async function getSmLiveBoard(date?: string): Promise<Game[]> {
       const state = smState(status);
       const [home, away] = await Promise.all([teamName(Number(f?.localteam_id)), teamName(Number(f?.visitorteam_id))]);
       const ms = Date.parse(str(f?.starting_at));
+      const homeFlag = cricketFlag(home);
+      const awayFlag = cricketFlag(away);
       games.push({
         id: `${SM_ID_PREFIX}${f?.id}`,
         homeTeam: home,
         awayTeam: away,
+        ...(homeFlag ? { homeFlag } : {}),
+        ...(awayFlag ? { awayFlag } : {}),
         // Board scores: the season fixture list carries no runs. v1 leaves them '' — the status/
         // note text carries the story. TODO(Gate 10b): the live-fire run will show whether
         // /livescores exposes a runs shape worth merging here.

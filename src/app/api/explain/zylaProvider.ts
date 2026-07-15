@@ -28,6 +28,11 @@ export interface Game {
   startTime?: number;
   venue?: string;   // canonical Game.venue — retained when present
   stage?: string;   // canonical Game.stage — e.g. "Pool A"; retained when present
+  // Team flag/crest presentation values (cricket national sides today). Emoji OR an https URL —
+  // the mobile renderer branches Text-vs-Image on the value. Optional + unset by every non-cricket
+  // builder, so existing sports' emitted JSON is byte-identical.
+  homeFlag?: string;
+  awayFlag?: string;
 }
 
 // --- Defensive parsing (the feed may mix string/number; never blanket-cast) ---

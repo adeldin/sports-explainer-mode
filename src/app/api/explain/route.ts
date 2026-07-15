@@ -484,8 +484,10 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
         scoreByTeam[inn.battingTeam] = `${runs}/${wkts}`;
         innLines.push(`${inn.battingTeam} ${score}`);
       }
-      out.homeScore = scoreByTeam[m.teams[0]] ?? '';
-      out.awayScore = scoreByTeam[m.teams[1]] ?? '';
+      // A side with no innings (rain-abandoned match) reads "DNB" (did not bat) — never '',
+      // which rendered the recap headline as "England  — India 189/7" (Gate 12 Bug 1e).
+      out.homeScore = scoreByTeam[m.teams[0]] ?? 'DNB';
+      out.awayScore = scoreByTeam[m.teams[1]] ?? 'DNB';
       out.winner = m.outcome?.winner ?? '';
       out.summaryFacts = [
         ...innLines,
