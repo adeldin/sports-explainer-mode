@@ -8,6 +8,7 @@ import KitClashGame from '../components/academy/KitClashGame';
 import HigherOrLowerGame from '../components/academy/HigherOrLowerGame';
 import SignalDecoderGame from '../components/academy/SignalDecoderGame';
 import ZoneTapGame from '../components/academy/ZoneTapGame';
+import JeopardyGame from '../components/academy/JeopardyGame';
 
 // The Academy game registry — the single source of truth for "what games exist."
 // The home shell renders the hero + grid by iterating ACADEMY_GAMES; it never names a
@@ -16,7 +17,7 @@ import ZoneTapGame from '../components/academy/ZoneTapGame';
 
 export type AcademyGameId =
   | 'quiz' | 'term-match' | 'read-the-score' | 'crest-rush' | 'kit-clash'
-  | 'higher-or-lower' | 'signal-decoder' | 'zone-tap'; // grows as games are added
+  | 'higher-or-lower' | 'signal-decoder' | 'zone-tap' | 'jeopardy'; // grows as games are added
 
 // Uniform prop contract every game receives from the GameHost. `sportKeys` is the
 // active Academy category's pooled league keys (scopes which sport's content plays).
@@ -141,6 +142,20 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     Component: ZoneTapGame,
     // Every sportKey that resolves to a Zone Tap bank (lib/zoneTap KEY_TO_ZONE_SPORT).
     // All 10 categories: each has a painted surface in FieldEngine.
+    supportedSports: [
+      'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
+      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+    ],
+  },
+  {
+    id: 'jeopardy',
+    title: 'Sportswise Jeopardy',
+    icon: '🎪',
+    blurb: 'The whole Academy on one board — clear it to win.',
+    Component: JeopardyGame,
+    // All 10 categories: lib/jeopardy builds each sport's columns dynamically
+    // (tennis/golf get a narrower Scores·Zones·Terms board; the live-data columns
+    // drop offline). It composes the other games, so it lists every category.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
       'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',

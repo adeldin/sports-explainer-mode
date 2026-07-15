@@ -67,7 +67,10 @@ const BALL_STYLE: Record<ZoneSurface, { oval?: boolean; fill: string; stroke: st
   golf:       { fill: '#ffffff', stroke: '#8a8f98', r: 4.5 },
 };
 
-function markNodes(marks: ZoneMark[], surface: ZoneSurface): ReactNode[] {
+// Exported for Sportswise Jeopardy's zone tile (components/academy/jeopardyTiles),
+// which renders the same orienting scene inside a board clue. Export only — no
+// behavior change to this game.
+export function markNodes(marks: ZoneMark[], surface: ZoneSurface): ReactNode[] {
   const nodes: ReactNode[] = [];
   marks.forEach((m, i) => {
     const k = `mk${i}`;
