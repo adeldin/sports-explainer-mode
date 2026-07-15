@@ -3,7 +3,13 @@
 // (30,150,40,40) with markers at x=62; fairway lobes centered (180,170)/(330,165)/(470,168);
 // water ellipse (450,245); bunkers (300,110)/(540,215)/(655,125); fringe (595,170) rx66;
 // green (595,170) rx48 ry42; cup+pin (605,168); 150-marker (390,200); OB stakes along y=10.
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, flag, guide } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): golf has no context players — the orienting
+// layer is YOUR BALL (where the prompt says you're playing from), a pennant where a
+// prompt describes a pin position (the component hides the painted pin when a flag
+// mark exists, so the scene shows ONE pin, where the words say), and guide arrows for
+// wind / a water-entry line. Pure-anatomy prompts (painted features) carry no marks.
 
 const TEE_BOX = rectSpot('teebox', 30, 150, 40, 40);
 const GREEN = circle('green', 595, 170, 38);
@@ -110,6 +116,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-beg-2', level: 'beginner',
     prompt: 'Driver in hand — tap where you WANT the tee shot to finish.',
     spots: [FAIRWAY, ROUGH, BUNKER_FAIR, WATER], answer: 'fairway',
+    marks: [ball(50, 168)],
     title: 'Position first: find the short grass',
     exp: {
       kid: 'The perfect drive lands on the smooth short grass, far enough to see the flag — not in sand, water, or the shaggy stuff!',
@@ -172,6 +179,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-1', level: 'intermediate',
     prompt: 'You can’t carry the water today. Tap the smart LAY-UP zone.',
     spots: [circle('layup', 378, 168, 18), GREEN, WATER, ROUGH], answer: 'layup',
+    marks: [ball(150, 170)],
     title: 'Lay up SHORT of the trouble — on purpose',
     exp: {
       kid: 'Instead of trying a superhero shot over the pond, smart golfers hit a shorter shot that stops safely BEFORE it. Next shot: easy!',
@@ -184,6 +192,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-2', level: 'intermediate',
     prompt: 'The pin is cut NEAR the bottom bunker. Tap the "SHORT SIDE" — the miss you must avoid.',
     spots: [circle('shortside', 552, 202, 12), circle('fatside', 648, 138, 13), circle('layzone', 380, 168, 15), PIN], answer: 'shortside',
+    marks: [flag(578, 199), ball(300, 165)],
     title: 'Short-siding yourself: the worst miss in golf',
     exp: {
       kid: 'Missing on the SAME side as the flag leaves you almost no green to work with — your chip has nowhere to land and stop!',
@@ -196,6 +205,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-3', level: 'intermediate',
     prompt: 'Trouble everywhere near this pin. Tap the BAIL-OUT area — the safe miss.',
     spots: [APRON, WATER, BUNKER_GREEN, OB_LINE], answer: 'apron',
+    marks: [ball(250, 168)],
     title: 'The bail-out: short and center, in front',
     exp: {
       kid: 'When sand and water surround the flag, the safest miss is the open grass just in FRONT of the green — no traps, easy chip.',
@@ -208,6 +218,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-4', level: 'intermediate',
     prompt: 'Your drive found the deep rough. Tap the smart PUNCH-OUT target.',
     spots: [circle('punchout', 292, 162, 17), GREEN, WATER, circle('deeper', 250, 62, 15)], answer: 'punchout',
+    marks: [ball(255, 70)],
     title: 'Take your medicine: back to the fairway',
     exp: {
       kid: 'Stuck in the junk? Don’t be a hero — hit a small sideways shot back to the nice grass, THEN attack the flag.',
@@ -220,6 +231,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-5', level: 'intermediate',
     prompt: 'Firm links-style day: tap where a RUN-UP shot should LAND to feed onto the green.',
     spots: [circle('runup', 528, 172, 12), PIN, WATER, BUNKER_GREEN], answer: 'runup',
+    marks: [ball(330, 168)],
     title: 'Land it short, let it release',
     exp: {
       kid: 'On hard ground, the ball bounces and rolls a LOT — so you land it on the grass before the green and let it roll the rest of the way like a putt.',
@@ -232,6 +244,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-int-6', level: 'intermediate',
     prompt: 'Lay-up wisdom: tap the spot that leaves your FULL wedge — not an awkward half-swing.',
     spots: [circle('fullwedge', 352, 160, 16), circle('tooclose', 474, 190, 14), ROUGH, GREEN], answer: 'fullwedge',
+    marks: [ball(140, 172)],
     title: 'Closer isn’t better — your NUMBER is better',
     exp: {
       kid: 'Weird but true: being a bit FARTHER away can be easier, if it lets you take your favorite full swing instead of a tricky little half-one!',
@@ -246,6 +259,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-exp-1', level: 'expert',
     prompt: 'Hard wind blowing DOWN from the top of the screen. Tap the tee-shot START line.',
     spots: [circle('windline', 300, 128, 15), circle('windwrong', 308, 206, 15), ROUGH, WATER], answer: 'windline',
+    marks: [ball(50, 168), guide(150, 18, 150, 50, true), guide(210, 18, 210, 50, true), guide(450, 18, 450, 50, true)],
     title: 'Start it INTO the wind side, let it ride back',
     exp: {
       kid: 'When wind pushes the ball sideways, aim toward the windy side — the wind will carry it back to the middle like a paper airplane!',
@@ -258,6 +272,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-exp-2', level: 'expert',
     prompt: 'Your ball found the WATER, crossing in on the tee side. Tap a LEGAL drop area.',
     spots: [circle('legaldrop', 388, 230, 14), circle('illegaldrop', 512, 244, 11), GREEN, TEE_BOX], answer: 'legaldrop',
+    marks: [ball(432, 238), guide(330, 180, 425, 232, true)],
     title: 'Drop on the entry side — never nearer the hole',
     exp: {
       kid: 'After a splash you drop a new ball near where it flew IN — on the side you came from. You can’t sneak it closer to the flag!',
@@ -270,6 +285,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-exp-3', level: 'expert',
     prompt: 'Course management: tap the WIDEST part of the fairway — the percentage target.',
     spots: [circle('widest', 330, 165, 17), circle('neck', 418, 167, 13), circle('teeSideShort', 150, 170, 14), ROUGH], answer: 'widest',
+    marks: [ball(50, 168)],
     title: 'Aim where the fairway is fattest',
     exp: {
       kid: 'Some parts of the fairway are wide, some skinny. Aim for the widest part — more room means fewer mistakes!',
@@ -282,6 +298,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-exp-4', level: 'expert',
     prompt: 'Pin tucked bottom-left behind the bunker. Tap PIN-HIGH on the FAT side.',
     spots: [circle('pinhighfat', 640, 134, 13), circle('shortsided', 552, 202, 12), FAIRWAY, WATER], answer: 'pinhighfat',
+    marks: [flag(572, 198), ball(250, 168)],
     title: 'Pin-high, away from the trouble',
     exp: {
       kid: 'Aim beside the flag, on the open side! You end up the same distance from the hole — without ever flying over the sand.',
@@ -294,6 +311,7 @@ export const GOLF_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'glf-exp-5', level: 'expert',
     prompt: 'OB stakes along the TOP, water low. Tap the tee-shot line that dodges the DOUBLE penalty.',
     spots: [circle('favorwater', 290, 192, 15), circle('favorob', 300, 126, 14), GREEN, ROUGH], answer: 'favorwater',
+    marks: [ball(50, 168)],
     title: 'Favor the water side — OB is the costlier miss',
     exp: {
       kid: 'Both sides are scary, but the white stakes are SCARIER: that mistake makes you go all the way back and hit again!',

@@ -125,6 +125,22 @@ function FieldCanvas({ viewW, viewH, fill = 'width', bg, children }: {
   );
 }
 
+// The line of scrimmage + its label, as ONE exported marker so every consumer stays aligned.
+// The label is anchored `middle` AT the LOS x (owner feedback: the old start-anchored label read
+// as floating off to the right of the line it names — it must sit ON the line). It renders in the
+// strip above the playable band (y<bandTop) so it never collides with on-field art, with a short
+// tick joining it to the line. Modules that draw the LOS inside their own overlay (the
+// showLos={false} pattern) should render <LosMarker /> rather than re-drawing line+label by hand.
+export function LosMarker() {
+  return (
+    <>
+      <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
+      <Line x1={FIELD.los} y1={24} x2={FIELD.los} y2={FIELD.bandTop} stroke={FE.losLine} strokeWidth={1.5} opacity={0.7} />
+      <SvgText x={FIELD.los} y={20} textAnchor="middle" fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
+    </>
+  );
+}
+
 // The gridiron: turf → stripes → yard lines → [overlay slot, UNDER players] → LOS → players.
 // `showLos` (default true) draws the engine's line-of-scrimmage on top of the overlay. A module that
 // puts tappable art (dots) in the overlay can pass showLos={false} and draw the LOS as its FIRST overlay
@@ -143,12 +159,7 @@ export function FootballField({ players, overlay, fill = 'width', showLos = true
         <Line key={`yd${i}`} x1={x} y1={FIELD.bandTop} x2={x} y2={FIELD.bandBot} stroke={FE.chalk} strokeWidth={1.2} opacity={0.8} />
       ))}
       {overlay}
-      {showLos && (
-        <>
-          <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
-          <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
-        </>
-      )}
+      {showLos && <LosMarker />}
       {players.map(p => <Dot key={p.id} p={p} />)}
     </FieldCanvas>
   );
@@ -371,7 +382,10 @@ const GLF = {
   sand: '#E7D7A3', water: '#3A7FC1', waterEdge: '#A8D0EE', stake: '#F4F4EE', flag: '#D64545', stick: '#E8E8E8', cup: '#1E2A24',
 };
 
-export function GolfHole({ fill = 'width', children }: { fill?: 'width' | 'height'; children?: ReactNode }) {
+// `showPin` (default true) draws the painted cup+flagstick. A module whose scenario
+// supplies its OWN pin position (e.g. a Zone Tap flag mark for "pin tucked behind the
+// bunker") passes showPin={false} so the scene shows exactly one pin — where the words say.
+export function GolfHole({ fill = 'width', showPin = true, children }: { fill?: 'width' | 'height'; showPin?: boolean; children?: ReactNode }) {
   return (
     <FieldCanvas viewW={HOLE.vbW} viewH={HOLE.vbH} fill={fill} bg={GLF.rough}>
       <Ellipse cx={340} cy={175} rx={310} ry={135} fill={GLF.roughL} opacity={0.55} />
@@ -388,12 +402,16 @@ export function GolfHole({ fill = 'width', children }: { fill?: 'width' | 'heigh
       <Ellipse cx={300} cy={110} rx={24} ry={13} fill={GLF.sand} />
       <Ellipse cx={540} cy={215} rx={20} ry={12} fill={GLF.sand} />
       <Ellipse cx={655} cy={125} rx={16} ry={10} fill={GLF.sand} />
-      {/* fringe + green + cup + pin */}
+      {/* fringe + green + cup + pin (pin optional — see showPin) */}
       <Ellipse cx={595} cy={170} rx={66} ry={58} fill={GLF.fringe} />
       <Ellipse cx={595} cy={170} rx={48} ry={42} fill={GLF.green} />
-      <Circle cx={605} cy={168} r={3} fill={GLF.cup} />
-      <Line x1={605} y1={168} x2={605} y2={128} stroke={GLF.stick} strokeWidth={2} />
-      <Polygon points="605,128 605,141 626,134.5" fill={GLF.flag} />
+      {showPin && (
+        <>
+          <Circle cx={605} cy={168} r={3} fill={GLF.cup} />
+          <Line x1={605} y1={168} x2={605} y2={128} stroke={GLF.stick} strokeWidth={2} />
+          <Polygon points="605,128 605,141 626,134.5" fill={GLF.flag} />
+        </>
+      )}
       {/* 150-yard marker + out-of-bounds stakes along the top */}
       <Circle cx={390} cy={200} r={4} fill={GLF.stake} stroke="#888" strokeWidth={1} />
       {[90, 190, 290, 390, 490, 590].map(x => <Circle key={`ob${x}`} cx={x} cy={10} r={3} fill={GLF.stake} />)}

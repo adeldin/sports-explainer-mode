@@ -6,7 +6,13 @@
 // ORIENTATION (stated in prompts where it matters): the striker is RIGHT-HANDED, batting
 // at the BOTTOM end, facing the bowler at the top. A right-hander's chest faces his
 // OFF SIDE — here the RIGHT half of the screen (x>340); the LEG (on) side is the LEFT.
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): the FIELDING side is 'def' (blue), the batting
+// pair 'att' (orange). The recurring anchors — bowler at the top end, right-handed
+// striker at the bottom crease, keeper behind the stumps — appear wherever they make
+// the question judgeable; a fielder whose position is a candidate ring is never drawn
+// (the ring must stay the question, not the answer).
 
 const PITCH = rectSpot('pitch', 325, 160, 30, 140);
 const STUMPS_STRIKER = circle('stumpsS', 340, 292, 14);
@@ -34,6 +40,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-1', level: 'kid',
     prompt: 'Tap the PITCH — the strip where all the bowling and batting happens.',
     spots: [PITCH, COVER, BOUNDARY_ROPE, LONG_OFF], answer: 'pitch',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'The pitch: cricket’s 22-yard heart',
     exp: {
       kid: 'The light-colored strip in the middle is the pitch. The bowler runs in and bowls down it, and the batter defends at the other end!',
@@ -46,6 +53,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-2', level: 'kid',
     prompt: 'Tap the STUMPS the batter is guarding (bottom end).',
     spots: [STUMPS_STRIKER, NON_STRIKER_END, COVER, BOUNDARY_ROPE], answer: 'stumpsS',
+    marks: [att(356, 282), def(340, 320), def(348, 150)],
     title: 'The striker’s stumps',
     exp: {
       kid: 'Three wooden sticks stand behind the batter — if the ball knocks them over, the batter is OUT, bowled!',
@@ -58,6 +66,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-3', level: 'kid',
     prompt: 'Tap the WICKETKEEPER — the catcher crouched behind the stumps.',
     spots: [KEEPER, NON_STRIKER_END, COVER, BOUNDARY_ROPE], answer: 'keeper',
+    marks: [att(356, 284), def(348, 150), def(378, 318)],
     title: 'The keeper: gloves behind the stumps',
     exp: {
       kid: 'The wicketkeeper squats behind the batter’s stumps wearing big gloves, catching everything the batter misses.',
@@ -70,6 +79,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-4', level: 'kid',
     prompt: 'Tap the BOUNDARY — hit the ball past this rope for 4 or 6!',
     spots: [BOUNDARY_ROPE, PITCH, COVER, KEEPER], answer: 'rope',
+    marks: [att(356, 284), ball(340, 380), def(348, 150), def(295, 398)],
     title: 'The rope: 4 along the ground, 6 in the air',
     exp: {
       kid: 'The rope around the edge is the boundary. Roll the ball past it: 4 runs! Fly it over without bouncing: 6 runs!',
@@ -82,6 +92,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-5', level: 'kid',
     prompt: 'TWO batters bat at once! Tap the NON-STRIKER’s end (top of the pitch).',
     spots: [NON_STRIKER_END, KEEPER, POINT, BOUNDARY_ROPE], answer: 'nonstriker',
+    marks: [att(356, 284), def(340, 322), def(352, 146)],
     title: 'The non-striker waits at the bowler’s end',
     exp: {
       kid: 'Cricket always has two batters — one faces the bowling, and his partner waits at the far end, ready to run!',
@@ -94,6 +105,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-kid-6', level: 'kid',
     prompt: 'Tap a fielder waiting DEEP, near the boundary (top of the ground).',
     spots: [LONG_OFF, SLIPS, POINT, MIDWICKET], answer: 'longoff',
+    marks: [att(356, 284), def(348, 150), def(340, 322), def(390, 135)],
     title: 'Deep fielders guard the boundary',
     exp: {
       kid: 'Some fielders stand way out near the rope to catch big hits or stop the ball rolling for four!',
@@ -108,6 +120,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-1', level: 'beginner',
     prompt: 'The batter is RIGHT-HANDED (facing the bowler at the top). Tap the OFF SIDE.',
     spots: [OFF_SIDE, LEG_SIDE], answer: 'offside',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Off side: the side the batter faces',
     exp: {
       kid: 'The field splits into two halves. The side the batter’s chest points at is the OFF side — for this right-hander, the right half!',
@@ -120,6 +133,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-2', level: 'beginner',
     prompt: 'Tap the SLIPS — the catchers waiting beside the keeper for an edge.',
     spots: [SLIPS, MIDWICKET, LONG_OFF, COVER], answer: 'slips',
+    marks: [def(340, 322), att(356, 284), def(348, 150), ball(360, 306)],
     title: 'The slip cordon: edge hunters',
     exp: {
       kid: 'A row of fielders stands right next to the keeper — when the ball nicks the edge of the bat, it flies straight to them!',
@@ -132,6 +146,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-3', level: 'beginner',
     prompt: 'Tap COVER — the classic off-side fielder who stops the cover drive.',
     spots: [COVER, MIDWICKET, MID_OFF, SLIPS], answer: 'cover',
+    marks: [att(356, 284), def(348, 150), def(340, 322), def(462, 278)],
     title: 'Cover: square-ish on the off side, saving one',
     exp: {
       kid: 'The prettiest shot in cricket — the cover drive — flies through this exact area. So a fielder stands right there to spoil it!',
@@ -144,6 +159,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-4', level: 'beginner',
     prompt: 'Tap MID-ON — the straight fielder on the LEG side.',
     spots: [MID_ON, MID_OFF, SQUARE_LEG, GULLY], answer: 'midon',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Mid-on: straight, near the bowler, leg side',
     exp: {
       kid: 'Up near the bowler, on the batter’s legs side, stands mid-on — catching straight hits that go slightly to that side.',
@@ -156,6 +172,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-5', level: 'beginner',
     prompt: 'Tap FINE LEG — behind square on the LEG side, down toward the boundary.',
     spots: [FINE_LEG, THIRD_MAN, SQUARE_LEG, LONG_ON], answer: 'fineleg',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Fine leg: behind the batter, leg side',
     exp: {
       kid: 'Way behind the batter on the legs side — this fielder chases the balls that glance off the bat or pads and sneak away backwards.',
@@ -168,6 +185,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-beg-6', level: 'beginner',
     prompt: 'Tap SQUARE LEG — level with the batter on the LEG side.',
     spots: [SQUARE_LEG, POINT, FINE_LEG, COVER], answer: 'squareleg',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Square leg: square of the wicket, leg side',
     exp: {
       kid: '"Square" means exactly level with the batter, out to the side. Square leg stands level with him on the legs side.',
@@ -182,6 +200,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-1', level: 'intermediate',
     prompt: 'Tap THIRD MAN — the runs-saver behind square on the OFF side.',
     spots: [THIRD_MAN, FINE_LEG, COVER, LONG_ON], answer: 'thirdman',
+    marks: [def(378, 318), def(340, 322), att(356, 284), def(348, 150)],
     title: 'Third man: behind the slips, toward the rope',
     exp: {
       kid: 'When the ball zips off the edge of the bat PAST the catchers, it runs away behind — third man waits back there to stop it.',
@@ -194,6 +213,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-2', level: 'intermediate',
     prompt: 'Tap GULLY — the cordon’s wide extension, between the slips and point.',
     spots: [GULLY, COVER, MIDWICKET, THIRD_MAN], answer: 'gully',
+    marks: [def(378, 318), def(462, 278), def(340, 322), att(356, 284), def(348, 150)],
     title: 'Gully: the wide slip',
     exp: {
       kid: 'One more catcher stands a little wider than the slips row — in the "gully," snapping up hard slashes and thick edges.',
@@ -206,6 +226,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-3', level: 'intermediate',
     prompt: 'POWERPLAY: only TWO fielders may be outside the inner ring. Tap the 30-yard circle.',
     spots: [circle('ring', 152, 230, 16), PITCH, circle('ropefar', 30, 230, 13), COVER], answer: 'ring',
+    marks: [def(230, 225), def(390, 135), def(115, 335), att(356, 284), def(348, 150)],
     title: 'The fielding ring: the powerplay’s fence',
     exp: {
       kid: 'See the dashed oval? During the powerplay overs, almost every fielder must stay INSIDE it — so big hits over their heads are extra rewarding!',
@@ -218,6 +239,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-4', level: 'intermediate',
     prompt: 'The batter keeps lofting straight drives. Tap LONG-OFF — the deep version of mid-off.',
     spots: [LONG_OFF, MID_OFF, COVER, BOUNDARY_ROPE], answer: 'longoff',
+    marks: [att(356, 284), ball(372, 110), def(348, 150), def(340, 322)],
     title: 'Same lane, boundary depth',
     exp: {
       kid: 'When the batter starts hitting long and straight, the close straight fielder walks aaaall the way back to the rope — now he’s called long-off!',
@@ -230,6 +252,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-5', level: 'intermediate',
     prompt: 'Tap COW CORNER — where slog sweeps land.',
     spots: [circle('cowcorner', 175, 120, 18), LONG_ON, FINE_LEG, THIRD_MAN], answer: 'cowcorner',
+    marks: [att(356, 284), ball(230, 165), def(140, 185), def(348, 150), def(340, 322)],
     title: 'Cow corner: between deep midwicket and long-on',
     exp: {
       kid: 'The funny-named corner of the field where big wild leg-side swings fly — "cow corner," where supposedly only cows used to graze!',
@@ -242,6 +265,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-int-6', level: 'intermediate',
     prompt: 'Short ball incoming — the batter will HOOK. Tap where the top edge or hook shot travels.',
     spots: [circle('hookzone', 165, 350, 17), circle('coverdeep', 520, 300, 15), LONG_OFF, THIRD_MAN], answer: 'hookzone',
+    marks: [att(358, 282), ball(352, 268), def(255, 375), def(348, 150), def(340, 322)],
     title: 'Hooks go BEHIND square on the leg side',
     exp: {
       kid: 'A ball at the chest gets swatted around the corner behind the batter’s legs — deep back there is where it flies!',
@@ -256,6 +280,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-1', level: 'expert',
     prompt: 'The bowler glances balls off the pads too well. Tap LEG SLIP — the trap behind square, leg side, CLOSE.',
     spots: [circle('legslip', 303, 318, 13), SLIPS, SQUARE_LEG, FINE_LEG], answer: 'legslip',
+    marks: [def(340, 322), att(356, 284), def(348, 150)],
     title: 'Leg slip: the mirror-image edge catcher',
     exp: {
       kid: 'A sneaky catcher stands just behind the batter on the LEGS side — waiting for a flick off the pads to pop straight to him!',
@@ -268,6 +293,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-2', level: 'expert',
     prompt: 'Tap the SWEEPER — deep cover, patrolling the off-side rope.',
     spots: [circle('sweeper', 518, 298, 16), COVER, THIRD_MAN, LONG_OFF], answer: 'sweeper',
+    marks: [att(356, 284), def(348, 150), def(340, 322), def(462, 278)],
     title: 'The sweeper: deep cover point, saving four',
     exp: {
       kid: 'One fielder cruises along the far-off-side rope, sweeping up every big off-side hit before it can reach the boundary.',
@@ -280,6 +306,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-3', level: 'expert',
     prompt: 'Tap SILLY MID-OFF — the helmet-wearing catcher crouched almost on the pitch.',
     spots: [circle('sillymidoff', 375, 255, 12), MID_OFF, COVER, SLIPS], answer: 'sillymidoff',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: '"Silly" = dangerously close',
     exp: {
       kid: 'Some brave fielders stand SO close to the batter they wear helmets! "Silly" is cricket’s real word for "very, very close."',
@@ -292,6 +319,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-4', level: 'expert',
     prompt: 'T20 death overs: the batter RAMPS the yorker. Tap where the ramp/scoop is aimed.',
     spots: [circle('rampzone', 368, 420, 17), COVER, LONG_ON, POINT], answer: 'rampzone',
+    marks: [def(340, 325), att(356, 284), def(348, 150)],
     title: 'Over the keeper — into the space behind',
     exp: {
       kid: 'The cheekiest shot in cricket: the batter scoops the ball right over the catcher’s head, backwards! Nobody fields back there!',
@@ -304,6 +332,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-5', level: 'expert',
     prompt: 'Off-spinner turning the ball INTO the right-hander. Tap SHORT LEG — the bat-pad trap.',
     spots: [circle('shortleg', 300, 268, 12), SLIPS, POINT, MIDWICKET], answer: 'shortleg',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Short leg: the bat-pad catcher',
     exp: {
       kid: 'When the spinning ball jumps off the bat’s edge onto the pad, it pops up — and a helmeted fielder crouched by the batter’s legs grabs it!',
@@ -316,6 +345,7 @@ export const CRICKET_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'crk-exp-6', level: 'expert',
     prompt: 'Death-overs plan: wide yorkers outside off. Tap DEEP POINT — the boundary rider that plan needs.',
     spots: [circle('deeppoint', 528, 258, 15), POINT, THIRD_MAN, COVER], answer: 'deeppoint',
+    marks: [att(356, 284), def(348, 150), def(340, 322)],
     title: 'Deep point: square off-side boundary cover',
     exp: {
       kid: 'If the bowler keeps aiming wide of the bat, the batter will slash it square — so a fielder waits deep out there on the rope.',

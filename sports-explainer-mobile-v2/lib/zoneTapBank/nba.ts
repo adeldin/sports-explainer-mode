@@ -3,7 +3,12 @@
 // data, zero RN imports. Coordinates: BasketballCourt viewBox 680×360 — rims (47,180)
 // and (633,180), keys x=10..143 / 537..670 (y=124..236), FT circles r=42, 3-pt arc
 // r=167 about each rim with corner lines at y=26/334. "Your team attacks the RIGHT."
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): 'att' = your team (attacking the RIGHT basket
+// unless the prompt flips it), 'def' = opposition. The player/spot the prompt asks the
+// user to LOCATE is never drawn; a dot inside a DECOY ring is allowed only when it is
+// truthfully that player's real spot (e.g. jump-ball centers inside the circle).
 
 const RIM_R = circle('rimR', 633, 180, 18);
 const RIM_L = circle('rimL', 47, 180, 18);
@@ -29,6 +34,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-kid-1', level: 'kid',
     prompt: 'Your team attacks the RIGHT. Tap the hoop you score in.',
     spots: [RIM_R, RIM_L, CENTER], answer: 'rimR',
+    marks: [att(450, 204), ball(462, 200), att(520, 120), att(520, 244), def(560, 180), def(590, 140)],
     title: 'You score in ONE basket — the one you attack',
     exp: {
       kid: 'Each team scores in one basket and defends the other. Your basket this half is on the right!',
@@ -41,6 +47,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-kid-2', level: 'kid',
     prompt: 'Tap the circle where the game STARTS with a jump ball.',
     spots: [CENTER, RIM_R, CORNER3_BOT, FT_R], answer: 'center',
+    marks: [att(324, 180), def(356, 180), att(300, 120), def(380, 240)],
     title: 'Tip-off at the center circle',
     exp: {
       kid: 'The referee tosses the ball up in the middle circle, and one tall player from each team jumps to tap it to a teammate.',
@@ -53,6 +60,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-kid-3', level: 'kid',
     prompt: 'Tap the FREE-THROW line — where you shoot after being fouled.',
     spots: [FT_R, RIM_R, CORNER3_TOP, CENTER], answer: 'ftR',
+    marks: [def(600, 132), att(618, 132), def(600, 228), att(618, 228)],
     title: 'The free-throw line',
     exp: {
       kid: 'When you get fouled while shooting, you stand at this line all alone and shoot free shots worth 1 point each.',
@@ -65,6 +73,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-kid-4', level: 'kid',
     prompt: 'Tap "the PAINT" — the colored box under the basket.',
     spots: [PAINT_R, CENTER, CORNER3_BOT, TOP_KEY_R], answer: 'paintR',
+    marks: [att(592, 200), def(606, 186), att(455, 150), ball(466, 146)],
     title: 'The paint (the lane, the key)',
     exp: {
       kid: 'The painted box under the hoop is where the tall players battle — most close shots and rebounds happen right here.',
@@ -77,6 +86,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-kid-5', level: 'kid',
     prompt: 'Tap a spot BEHIND the three-point line, in the corner.',
     spots: [CORNER3_TOP, RIM_R, FT_R, PAINT_R], answer: 'corner3t',
+    marks: [att(500, 180), ball(512, 176), def(520, 208)],
     title: 'Beyond the arc = 3 points',
     exp: {
       kid: 'Shots made from behind the big curved line count 3 points instead of 2. The corners are part of that line too!',
@@ -103,6 +113,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-1', level: 'beginner',
     prompt: 'Tap where the POINT GUARD usually starts the offense.',
     spots: [TOP_KEY_R, CORNER3_BOT, BLOCK_R, RIM_R], answer: 'topkeyR',
+    marks: [att(620, 32), att(560, 320), def(600, 200)],
     title: 'Top of the key: the offense’s steering wheel',
     exp: {
       kid: 'The point guard dribbles to the top, behind the arc, where he can see the whole team and start the play.',
@@ -115,6 +126,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-2', level: 'beginner',
     prompt: 'Tap the LOW BLOCK — where post players battle for position.',
     spots: [BLOCK_R, TOP_KEY_R, CORNER3_TOP, CENTER], answer: 'blockR',
+    marks: [att(509, 60), ball(520, 66), def(575, 210)],
     title: 'The block: low on the lane, next to the basket',
     exp: {
       kid: 'The little marks beside the paint near the hoop are "the blocks" — big players wrestle for that spot because it’s so close to the basket.',
@@ -127,6 +139,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-3', level: 'beginner',
     prompt: 'Tap the ELBOW.',
     spots: [ELBOW_R, BLOCK_R, CENTER, CORNER3_BOT], answer: 'elbowR',
+    marks: [att(470, 140), ball(482, 136), def(505, 160)],
     title: 'The elbow: corner of the free-throw line',
     exp: {
       kid: 'Where the free-throw line meets the side of the paint makes a corner shaped like an elbow — that’s its real name!',
@@ -139,6 +152,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-4', level: 'beginner',
     prompt: 'Tap the RESTRICTED area — right at the rim, where layups live.',
     spots: [RIM_R, FT_R, CORNER3_TOP, TOP_KEY_R], answer: 'rimR',
+    marks: [att(566, 148), ball(578, 156), def(600, 196)],
     title: 'At the rim: the best shot in basketball',
     exp: {
       kid: 'Layups and dunks happen right at the hoop — the closer you get, the easier the shot.',
@@ -151,6 +165,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-5', level: 'beginner',
     prompt: 'You attack the RIGHT basket. Tap the BACKCOURT — where you can’t dribble back to.',
     spots: [BACKCOURT, FRONTCOURT], answer: 'backcourt',
+    marks: [att(372, 180), ball(360, 176), def(396, 168)],
     title: 'Backcourt: behind the midline once you’ve crossed',
     exp: {
       kid: 'Once your team brings the ball past halfcourt, you’re not allowed to take it back — that half is off-limits!',
@@ -163,6 +178,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-beg-6', level: 'beginner',
     prompt: 'Tap the SHORTEST three-point shot on the floor.',
     spots: [CORNER3_BOT, WING3_R, TOP_KEY_R], answer: 'corner3b',
+    marks: [att(560, 200), ball(572, 206), def(590, 220)],
     title: 'The corner three',
     exp: {
       kid: 'The 3-point line isn’t the same distance everywhere — in the corners it comes closer to the hoop, so corner threes are the shortest!',
@@ -177,6 +193,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-1', level: 'intermediate',
     prompt: 'Pick-and-roll: after setting the screen, the big ROLLS. Tap where he’s heading.',
     spots: [circle('roll', 606, 180, 18), CORNER3_TOP, TOP_KEY_R, ELBOW_R], answer: 'roll',
+    marks: [att(490, 140), ball(500, 146), att(520, 160), def(505, 124), def(560, 170)],
     title: 'The roll: downhill to the rim',
     exp: {
       kid: 'After blocking the defender with his body, the big player turns and runs straight at the basket for a pass and an easy shot.',
@@ -189,6 +206,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-2', level: 'intermediate',
     prompt: 'Tap the DUNKER SPOT.',
     spots: [DUNKER, ELBOW_R, TOP_KEY_R, CORNER3_TOP], answer: 'dunker',
+    marks: [att(500, 225), ball(512, 230), def(530, 245), def(610, 215)],
     title: 'Along the baseline, just outside the paint',
     exp: {
       kid: 'A player hides low along the end line beside the paint — when a teammate drives, he’s right there for a quick dunk pass!',
@@ -201,6 +219,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-3', level: 'intermediate',
     prompt: 'Tap "no-man’s land" — the LEAST efficient shot zone in basketball.',
     spots: [LONG_TWO, CORNER3_BOT, RIM_R, FT_R], answer: 'longtwo',
+    marks: [att(440, 170), ball(452, 166), def(470, 150)],
     title: 'The long two: worst points-per-shot on the floor',
     exp: {
       kid: 'A shot from just INSIDE the big line is almost as hard as a 3-pointer — but it only counts 2. Tough deal!',
@@ -213,6 +232,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-4', level: 'intermediate',
     prompt: 'Ball in the BOTTOM corner. Tap where the weak-side HELP defender sinks to.',
     spots: [circle('help', 555, 135, 16), CORNER3_BOT, TOP_KEY_R, RIM_R], answer: 'help',
+    marks: [att(617, 332), ball(628, 336), def(600, 318), att(620, 26)],
     title: 'Help side: sink toward the paint, off your man',
     exp: {
       kid: 'When the ball is on one side, the defenders on the OTHER side sneak toward the middle to help stop drives.',
@@ -225,6 +245,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-5', level: 'intermediate',
     prompt: 'Fast break! Tap the lane the WINGS should sprint in.',
     spots: [rectSpot('widelane', 360, 14, 240, 50), rectSpot('midlane', 360, 155, 240, 50), BACKCOURT], answer: 'widelane',
+    marks: [att(420, 180), ball(432, 176), def(560, 180), def(590, 120), att(300, 240)],
     title: 'Run WIDE in transition',
     exp: {
       kid: 'On a fast break, the players without the ball run near the sidelines — spreading out makes the defense impossible to be everywhere.',
@@ -237,6 +258,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-int-6', level: 'intermediate',
     prompt: 'Tap "the NAIL" — the help spot defenses guard with their life.',
     spots: [FT_R, RIM_R, CORNER3_TOP, WING3_R], answer: 'ftR',
+    marks: [att(470, 180), ball(482, 176), att(622, 28)],
     title: 'The nail: middle of the free-throw line',
     exp: {
       kid: 'The exact middle of the free-throw line has a nickname — "the nail." A defender stands there to block the road to the middle.',
@@ -251,6 +273,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-1', level: 'expert',
     prompt: 'Attacking a 2-3 ZONE: tap its classic soft spot.',
     spots: [circle('highpost', 548, 180, 16), CORNER3_BOT, RIM_R, TOP_KEY_R], answer: 'highpost',
+    marks: [def(500, 150), def(500, 210), def(600, 120), def(612, 182), def(600, 240), att(450, 180), ball(462, 176)],
     title: 'Flash to the high post — the middle of the zone',
     exp: {
       kid: 'A zone defense guards AREAS, not people — and the middle, by the free-throw line, is the gap nobody quite owns.',
@@ -263,6 +286,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-2', level: 'expert',
     prompt: 'Screener’s defender plays DROP coverage. Tap where he sits.',
     spots: [circle('drop', 595, 180, 16), TOP_KEY_R, CORNER3_BOT, ELBOW_R], answer: 'drop',
+    marks: [att(490, 150), ball(500, 156), att(515, 162), def(498, 130)],
     title: 'Drop: between the screen and the rim',
     exp: {
       kid: 'Instead of chasing out to the screen, the big defender backs up toward his basket and guards the space in front of it.',
@@ -275,6 +299,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-3', level: 'expert',
     prompt: 'The low helper left the BOTTOM corner shooter to stop the drive. Tap where the kick-out pass goes.',
     spots: [CORNER3_BOT, TOP_KEY_R, RIM_R, ELBOW_R], answer: 'corner3b',
+    marks: [att(560, 225), ball(570, 232), def(598, 266), att(614, 334)],
     title: 'Drive, collapse, kick to the vacated corner',
     exp: {
       kid: 'The defender guarding the corner ran to stop the drive — so his player is standing all alone. Pass it there!',
@@ -287,6 +312,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-4', level: 'expert',
     prompt: 'Tap the SLOT — the lane-line-extended spot beyond the arc.',
     spots: [SLOT_R, CORNER3_TOP, TOP_KEY_R, ELBOW_R], answer: 'slotR',
+    marks: [att(478, 180), ball(466, 174), att(622, 24), att(620, 336), att(480, 272)],
     title: 'The slot: between the top and the wing',
     exp: {
       kid: 'Coaches have names for every spot behind the arc — the "slot" is the one between the very top and the wing.',
@@ -299,6 +325,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-5', level: 'expert',
     prompt: 'Tap the MID-POST — the in-between spot where fadeaway artists operate.',
     spots: [circle('midpost', 580, 244, 14), ELBOW_R, CORNER3_TOP, RIM_R], answer: 'midpost',
+    marks: [def(560, 222), att(470, 150), ball(482, 146)],
     title: 'Mid-post: halfway between block and elbow',
     exp: {
       kid: 'Halfway between the low block and the elbow is the "mid-post" — a favorite spot for tricky turnaround shots.',
@@ -311,6 +338,7 @@ export const NBA_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nba-exp-6', level: 'expert',
     prompt: 'Live-ball turnover while you attacked the RIGHT basket! Tap the FIRST spot your transition defense must protect.',
     spots: [RIM_L, RIM_R, HALF_LINE, circle('corner3lb', 60, 340, 14)], answer: 'rimL',
+    marks: [def(300, 180), ball(288, 184), att(560, 120), att(590, 240)],
     title: 'Protect YOUR rim first',
     exp: {
       kid: 'Uh oh — the other team has the ball and is racing the other way! Someone must sprint back to guard YOUR basket before anything else.',

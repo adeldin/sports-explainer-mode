@@ -1,7 +1,12 @@
 // Zone Tap — MLB bank. Positions/zones only (rule-based, evergreen). Pure data, zero RN
 // imports. Coordinates: BaseballDiamond viewBox 680×560 — home (340,490), 1B (490,340),
 // 2B (340,190), 3B (190,340), mound (340,355); same base geometry as lib/wheresThePlay.
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): fielding side = 'def' (blue), batter/runners =
+// 'att' (orange). Fielder context uses lib/wheresThePlay START coordinates. The player
+// the prompt asks the user to LOCATE is never drawn; the pitcher/catcher/batter appear
+// at their real spots even inside a DECOY ring when that is simply the true scene.
 
 // Canonical diamond spots (fielder positions match lib/wheresThePlay START).
 const HOME = circle('home', 340, 490, 24);
@@ -28,6 +33,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-1', level: 'kid',
     prompt: 'Tap home plate — where the batter stands to hit.',
     spots: [HOME, SECOND, MOUND, FIRST], answer: 'home',
+    marks: [def(340, 524, 'C'), def(340, 362), def(262, 235), def(418, 235), def(478, 300), def(202, 300)],
     title: 'Home plate is where it all starts (and ends)',
     exp: {
       kid: 'The batter stands at home plate — the bottom corner of the diamond. Score by running ALL the way around and back to it!',
@@ -40,6 +46,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-2', level: 'kid',
     prompt: 'Tap the pitcher’s mound.',
     spots: [MOUND, HOME, FIRST, OUTFIELD], answer: 'mound',
+    marks: [att(324, 498), def(340, 524, 'C'), def(262, 235), def(418, 235)],
     title: 'The mound: the little hill in the middle',
     exp: {
       kid: 'The pitcher throws from the small dirt hill in the middle of the infield, aiming at home plate.',
@@ -52,6 +59,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-3', level: 'kid',
     prompt: 'The batter just hit the ball. Tap the FIRST base they run to.',
     spots: [FIRST, THIRD, SECOND, HOME], answer: 'first',
+    marks: [att(395, 445), ball(280, 310), def(478, 300), def(262, 235), def(340, 362), def(340, 524)],
     title: 'Always run to first — up the right-side line',
     exp: {
       kid: 'After hitting, the batter always runs to the base up the RIGHT side line first. Bases go in a circle: 1st, 2nd, 3rd, then home!',
@@ -64,6 +72,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-4', level: 'kid',
     prompt: 'Tap the outfield — the big grass where the far catches happen.',
     spots: [OUTFIELD, MOUND, HOME, THIRD], answer: 'outfield',
+    marks: [def(180, 135), def(340, 120), def(500, 135), def(262, 235), def(418, 235), att(324, 498), def(340, 362)],
     title: 'The outfield: the deep grass',
     exp: {
       kid: 'The outfield is the huge grassy part far from the batter. Three players wait out there to chase long hits.',
@@ -76,6 +85,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-5', level: 'kid',
     prompt: 'Tap second base — the base at the TOP of the diamond.',
     spots: [SECOND, FIRST, THIRD, HOME], answer: 'second',
+    marks: [def(262, 235), def(418, 235), def(340, 362), def(340, 524), att(324, 498)],
     title: 'Second base: the halfway point',
     exp: {
       kid: 'Second base is at the very top of the diamond — exactly halfway around your trip back to home plate.',
@@ -88,6 +98,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-kid-6', level: 'kid',
     prompt: 'Tap where the catcher crouches.',
     spots: [CATCHER, MOUND, FIRST, OUTFIELD], answer: 'catcher',
+    marks: [att(322, 496), def(340, 362)],
     title: 'The catcher: right behind home plate',
     exp: {
       kid: 'The catcher squats right behind home plate and catches every pitch the batter doesn’t hit.',
@@ -102,6 +113,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-1', level: 'beginner',
     prompt: 'Tap where the SHORTSTOP stands.',
     spots: [SS, SECOND_BASEMAN, FIRST_BASEMAN, THIRD_BASEMAN], answer: 'ss',
+    marks: [def(340, 362), def(340, 524), att(324, 498), def(180, 135), def(340, 115), def(500, 135)],
     title: 'Shortstop: between second and third',
     exp: {
       kid: 'The shortstop stands in the gap between second base and third base — lots of ground balls go right there!',
@@ -114,6 +126,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-2', level: 'beginner',
     prompt: 'Tap where the SECOND BASEMAN plays. (Hint: it’s not on the bag!)',
     spots: [SECOND_BASEMAN, SS, SECOND, FIRST_BASEMAN], answer: '2b',
+    marks: [def(340, 362), def(340, 524), att(324, 498), def(180, 135), def(340, 115), def(500, 135)],
     title: 'The second baseman plays BESIDE the bag',
     exp: {
       kid: 'Tricky! The second baseman doesn’t stand on second base — he stands in the gap between FIRST and second.',
@@ -126,6 +139,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-3', level: 'beginner',
     prompt: 'Tap the CENTER fielder.',
     spots: [CF, LF, RF, SS], answer: 'cf',
+    marks: [def(418, 235), def(478, 300), def(202, 300), def(340, 362), def(340, 524), att(324, 498)],
     title: 'Center field: straightaway, deepest of all',
     exp: {
       kid: 'The center fielder plays in the middle of the outfield, straight out past second base — usually the fastest player.',
@@ -138,6 +152,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-4', level: 'beginner',
     prompt: 'A runner is sprinting from second. Tap the NEXT base he must touch.',
     spots: [THIRD, HOME, FIRST, SECOND], answer: 'third',
+    marks: [att(310, 220), def(340, 362), def(340, 524)],
     title: 'From second, the next stop is third',
     exp: {
       kid: 'Bases always go in order: after second comes third — the corner on the LEFT side.',
@@ -150,6 +165,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-5', level: 'beginner',
     prompt: 'Tap FOUL territory.',
     spots: [FOUL_LEFT, MOUND, OUTFIELD, SECOND], answer: 'foul',
+    marks: [att(322, 496), def(340, 524), def(340, 362)],
     title: 'Outside the lines = foul ground',
     exp: {
       kid: 'The two white lines from home plate make a giant V. Outside the V is foul ground — hits there don’t count as fair balls.',
@@ -162,6 +178,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-beg-6', level: 'beginner',
     prompt: 'Tap where the FIRST BASEMAN plays (before the pitch).',
     spots: [FIRST_BASEMAN, FIRST, SECOND_BASEMAN, THIRD_BASEMAN], answer: '1b',
+    marks: [def(340, 362), def(340, 524), att(324, 498), def(180, 135), def(340, 115), def(500, 135)],
     title: 'Near the bag — but off it',
     exp: {
       kid: 'The first baseman stands NEAR first base but a few steps off it, so he can catch ground balls too.',
@@ -176,6 +193,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-1', level: 'intermediate',
     prompt: 'Double play, runner on first: the second baseman flips the ball. Tap where the shortstop takes the feed.',
     spots: [SECOND, SS, FIRST, MOUND], answer: 'second',
+    marks: [def(420, 238), ball(432, 244), att(455, 308), def(478, 300), att(400, 430), def(340, 362), def(340, 524)],
     title: 'The pivot happens AT the bag',
     exp: {
       kid: 'For a double play, the shortstop runs TO second base, catches the flip there for one out, then throws to first for two!',
@@ -188,6 +206,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-2', level: 'intermediate',
     prompt: 'Tap "the 5.5 hole" — the gap a ground ball sneaks through between third and short.',
     spots: [circle('hole56', 230, 272, 13), SS, THIRD_BASEMAN, SECOND_BASEMAN], answer: 'hole56',
+    marks: [def(262, 235), def(202, 300), ball(262, 335), att(324, 498)],
     title: 'The hole between 3B (5) and SS (6)',
     exp: {
       kid: 'There’s a gap between the third baseman and the shortstop — ground balls that find it usually roll into left field for hits.',
@@ -200,6 +219,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-3', level: 'intermediate',
     prompt: 'Tap "up the middle" — the ground-ball lane behind the mound.',
     spots: [circle('middle', 340, 245, 20), FOUL_LEFT, FIRST_BASEMAN, LF], answer: 'middle',
+    marks: [def(262, 235), def(418, 235), def(340, 362), def(340, 524), att(324, 498)],
     title: 'Up the middle: behind the mound, in front of second',
     exp: {
       kid: 'A ball hit "up the middle" goes straight past the pitcher, over second base, and into center field.',
@@ -212,6 +232,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-4', level: 'intermediate',
     prompt: 'Late innings, protecting a lead: tap where the third baseman "guards the line."',
     spots: [circle('line3b', 168, 330, 18), circle('normal3b', 225, 285, 18), SS, FIRST_BASEMAN], answer: 'line3b',
+    marks: [def(340, 362), def(340, 524), att(324, 498), def(418, 235), def(180, 135), def(500, 135)],
     title: 'Guarding the line: pinch toward the foul line',
     exp: {
       kid: 'To stop a big hit down the line, the third baseman slides over and stands almost ON the foul line.',
@@ -224,6 +245,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-5', level: 'intermediate',
     prompt: 'Runner on third, infield IN: tap where the first baseman moves to.',
     spots: [circle('in1b', 420, 375, 18), FIRST_BASEMAN, FIRST, SECOND_BASEMAN], answer: 'in1b',
+    marks: [att(208, 322), def(245, 388), def(340, 524), def(340, 362), att(324, 498)],
     title: 'Infield in: corners charge toward the plate',
     exp: {
       kid: 'With a runner on third, the infielders sneak in close to home so they can grab a grounder and throw it home FAST.',
@@ -236,6 +258,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-int-6', level: 'intermediate',
     prompt: 'No-doubles defense: tap where the LEFT fielder repositions.',
     spots: [circle('lfdeep', 150, 70, 20), LF, SS, circle('lfshallow', 215, 185, 18)], answer: 'lfdeep',
+    marks: [def(340, 82), def(505, 88), att(324, 498), def(340, 362), def(340, 524)],
     title: 'No-doubles: outfielders back up and pinch the lines',
     exp: {
       kid: 'To stop long hits, the outfielders take big steps BACK toward the wall so nothing flies over their heads.',
@@ -250,6 +273,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-1', level: 'expert',
     prompt: 'Single to RIGHT with a runner trying to score. Tap where the CUTOFF man sets up.',
     spots: [circle('cut1b', 400, 415, 20), MOUND, SS, SECOND], answer: 'cut1b',
+    marks: [def(505, 155), ball(516, 162), att(220, 370), att(430, 398), def(340, 524, 'C'), def(340, 362)],
     title: 'The first baseman is the cutoff on throws home from right',
     exp: {
       kid: 'One infielder runs to a spot between right field and home plate, ready to catch the long throw if it needs help.',
@@ -262,6 +286,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-2', level: 'expert',
     prompt: 'Single to LEFT, play at the plate. Tap the cutoff man’s spot this time.',
     spots: [circle('cut3b', 285, 425, 20), FIRST_BASEMAN, SECOND_BASEMAN, MOUND], answer: 'cut3b',
+    marks: [def(178, 158), ball(190, 165), att(228, 378), att(400, 430), def(340, 524, 'C'), def(340, 362)],
     title: 'From left field, the THIRD baseman cuts',
     exp: {
       kid: 'When the throw home comes from the LEFT side, it’s the third baseman who runs to the helper spot in the middle.',
@@ -274,6 +299,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-3', level: 'expert',
     prompt: 'Bunt with runners on first and second — the "wheel play" spins. Tap the base the SHORTSTOP sprints to cover.',
     spots: [THIRD, SECOND, FIRST, HOME], answer: 'third',
+    marks: [att(470, 322), att(322, 208), att(322, 500), def(248, 392), def(262, 235), def(340, 362), def(340, 524)],
     title: 'Wheel play: SS covers third while 3B charges',
     exp: {
       kid: 'The third baseman runs IN to grab the bunt — so the shortstop races over to stand on third base for him.',
@@ -286,6 +312,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-4', level: 'expert',
     prompt: 'Runners on first and third, steal attempt coming. Tap where the middle infielder "cheats" before the pitch.',
     spots: [circle('cheat', 372, 206, 16), SECOND_BASEMAN, SS, FIRST_BASEMAN], answer: 'cheat',
+    marks: [att(465, 318), att(212, 325), att(324, 498), def(340, 362), def(340, 524)],
     title: 'Cheating toward the bag before the steal',
     exp: {
       kid: 'When a runner might steal, the fielder tiptoes a little closer to second base before the pitch, ready to race there for the throw.',
@@ -298,6 +325,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-5', level: 'expert',
     prompt: 'Sacrifice bunt, first baseman charging hard. Tap the base the SECOND baseman must run to cover.',
     spots: [FIRST, SECOND, THIRD, HOME], answer: 'first',
+    marks: [def(428, 428), def(418, 235), att(465, 318), att(322, 500), ball(398, 455), def(340, 362), def(340, 524)],
     title: 'When 1B charges, 2B owns first base',
     exp: {
       kid: 'The first baseman ran in to grab the bunt — so his friend the second baseman runs over to stand on first base for the throw.',
@@ -310,6 +338,7 @@ export const MLB_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'mlb-exp-6', level: 'expert',
     prompt: 'No-doubles, late and close: tap where the RIGHT fielder stands to take away the gap AND the line.',
     spots: [circle('rfdeep', 540, 65, 20), RF, CF, SECOND_BASEMAN], answer: 'rfdeep',
+    marks: [def(158, 80), att(324, 498), def(340, 362), def(340, 524)],
     title: 'Deep and toward the line',
     exp: {
       kid: 'The right fielder backs way up near the wall and slides toward the white line, so no ball can bounce past him.',

@@ -53,8 +53,8 @@ export const SURFACE_FOR_SPORT: Record<ZoneSport, ZoneSurface> = {
 // The region model + authoring helpers live in lib/zoneTapRegions.ts (the banks import
 // them from there — NOT from this file — to avoid a load-order cycle, since this file
 // imports the banks above). Re-exported here so the component has one import surface.
-export type { ZoneRegion, ZoneSpot, ZoneScenario } from './zoneTapRegions';
-export { circle, rectSpot, regionCenter } from './zoneTapRegions';
+export type { ZoneRegion, ZoneSpot, ZoneScenario, ZoneMark } from './zoneTapRegions';
+export { circle, rectSpot, regionCenter, ball, att, def, flag, guide } from './zoneTapRegions';
 import type { ZoneScenario } from './zoneTapRegions';
 
 // ── Registry + accessors ────────────────────────────────────────────────────

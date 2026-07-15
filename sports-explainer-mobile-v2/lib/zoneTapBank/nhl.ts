@@ -2,7 +2,12 @@
 // zero RN imports. Coordinates: HockeyRink viewBox 680×300 — goal lines x=46/634, blue
 // lines x=258/422, red line x=340, center ice (340,150), end faceoff dots (112|568, 78|222),
 // creases bulge toward center from each goal line, nets behind them. "You attack RIGHT."
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): 'att' = your team (attacking the RIGHT net
+// unless the prompt flips it), 'def' = opposition; the ball mark renders as a puck.
+// Goalies sit truthfully in their nets/creases even when that region is a candidate;
+// the player/spot the prompt asks the user to LOCATE is never drawn.
 
 const NET_R = rectSpot('netR', 630, 130, 22, 40);
 const NET_L = rectSpot('netL', 28, 130, 22, 40);
@@ -26,6 +31,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-kid-1', level: 'kid',
     prompt: 'Your team shoots at the RIGHT net. Tap it!',
     spots: [NET_R, NET_L, CENTER], answer: 'netR',
+    marks: [att(450, 152), ball(462, 148), att(500, 92), def(639, 150), att(41, 150)],
     title: 'Score in the net you attack',
     exp: {
       kid: 'Each team defends one net and attacks the other. Yours to score in is on the right — the goalie standing in it is NOT on your team!',
@@ -38,6 +44,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-kid-2', level: 'kid',
     prompt: 'Tap CENTER ICE — where every game begins.',
     spots: [CENTER, NET_R, DOT_TL, BLUE_R], answer: 'center',
+    marks: [att(326, 150), def(354, 150), att(300, 90), def(380, 210)],
     title: 'The opening faceoff',
     exp: {
       kid: 'The referee drops the puck in the exact middle circle, and one player from each team fights for it. Game on!',
@@ -50,6 +57,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-kid-3', level: 'kid',
     prompt: 'Tap the goalie’s CREASE — the blue paint in front of the net.',
     spots: [CREASE_R, DOT_BR, CENTER, BLUE_R], answer: 'creaseR',
+    marks: [att(552, 162), ball(564, 156), def(634, 150)],
     title: 'The crease: the goalie’s house',
     exp: {
       kid: 'The blue paint in FRONT of the net is the goalie’s special area. Crashing into the goalie there is not allowed!',
@@ -100,6 +108,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-beg-1', level: 'beginner',
     prompt: 'You attack the RIGHT net. Tap the line the PUCK must cross before your teammates — or it’s offside.',
     spots: [BLUE_R, BLUE_L, RED_LINE, GOAL_LINE_R], answer: 'blueR',
+    marks: [att(360, 210), ball(372, 206), att(398, 96), def(470, 150)],
     title: 'Offside lives at the attacking blue line',
     exp: {
       kid: 'The puck has to cross the blue line into the attacking end FIRST. If a teammate skates in before the puck — offside, whistle!',
@@ -112,6 +121,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-beg-2', level: 'beginner',
     prompt: 'Tap the SLOT — where the best scoring chances happen.',
     spots: [SLOT, POINT_T, DOT_TR, CENTER], answer: 'slot',
+    marks: [def(634, 150), def(585, 196), att(505, 92)],
     title: 'The slot: between the circles, in front of the net',
     exp: {
       kid: 'The open ice right in front of the goalie is called the slot — shots from there go in the most!',
@@ -124,6 +134,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-beg-3', level: 'beginner',
     prompt: 'Tap "the POINT" — where a defenseman keeps the puck in the zone.',
     spots: [POINT_T, SLOT, CREASE_R, DOT_BR], answer: 'pointT',
+    marks: [att(545, 238), ball(556, 244), def(634, 150), def(520, 190)],
     title: 'The point: just inside the blue line',
     exp: {
       kid: 'The defensemen stand way up by the blue line when their team attacks — that spot is called "the point."',
@@ -148,6 +159,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-beg-5', level: 'beginner',
     prompt: 'ICING check: the puck must be shot from BEHIND one line to be icing. Tap that line.',
     spots: [RED_LINE, BLUE_R, GOAL_LINE_R, DOT_TL], answer: 'redline',
+    marks: [att(150, 220), ball(163, 214)],
     title: 'Icing: shot from your side of the center red line',
     exp: {
       kid: 'If you shoot the puck from your OWN half all the way past the other team’s goal line, that’s icing — play comes ALL the way back.',
@@ -160,6 +172,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-beg-6', level: 'beginner',
     prompt: 'Tap "Gretzky’s office" — the famous spot BEHIND the net.',
     spots: [circle('behind', 660, 150, 11), SLOT, POINT_T, DOT_TR], answer: 'behind',
+    marks: [def(630, 150), att(560, 118), att(578, 190), def(600, 130)],
     title: 'Behind the net: the office',
     exp: {
       kid: 'The skinny ice BEHIND the goal is a sneaky place to hold the puck — the goalie can’t even see you back there!',
@@ -174,6 +187,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-1', level: 'intermediate',
     prompt: 'Power play, umbrella setup. Tap where the PP quarterback runs things from.',
     spots: [circle('ppqb', 445, 150, 16), SLOT, HALFWALL, CREASE_R], answer: 'ppqb',
+    marks: [att(520, 52), att(520, 268), att(596, 166), def(636, 150), def(500, 120), def(500, 180)],
     title: 'Top of the zone: the PP quarterback',
     exp: {
       kid: 'On a power play, one player stands up top in the middle, controlling the puck and choosing the play — like a quarterback.',
@@ -186,6 +200,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-2', level: 'intermediate',
     prompt: 'Tap the HALF-WALL — the power play’s playmaking hub on the boards.',
     spots: [HALFWALL, CREASE_R, CENTER, DOT_BR], answer: 'halfwall',
+    marks: [att(445, 150), ball(457, 146), att(548, 150), def(628, 150), def(505, 105)],
     title: 'The half-wall: halfway up the boards',
     exp: {
       kid: 'The spot along the side boards, halfway between the corner and the blue line, is where a clever passer likes to stand.',
@@ -198,6 +213,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-3', level: 'intermediate',
     prompt: 'You defend the LEFT net. Tap the dot where a DEFENSIVE-zone faceoff happens (top side).',
     spots: [DOT_TL, DOT_TR, CENTER, DOT_BR], answer: 'dotTL',
+    marks: [att(41, 150), def(150, 120)],
     title: 'D-zone draw: the dots in YOUR end',
     exp: {
       kid: 'When the whistle blows near your own net, the puck gets dropped on the dot in YOUR end — dangerous territory!',
@@ -210,6 +226,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-4', level: 'intermediate',
     prompt: 'Tap the TRAPEZOID behind the net — the only area back there where the goalie may play the puck.',
     spots: [rectSpot('trap', 648, 168, 20, 26), SLOT, POINT_T, CENTER], answer: 'trap',
+    marks: [def(630, 150), ball(640, 242)],
     title: 'The trapezoid: the goalie’s legal puck-playing zone',
     exp: {
       kid: 'Those slanted lines behind the net make a special zone — the goalie may only play the puck back there INSIDE it.',
@@ -222,6 +239,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-5', level: 'intermediate',
     prompt: 'Puck on the BOTTOM half-wall. Tap the "BACK DOOR" the defense must not forget.',
     spots: [circle('backdoor', 618, 124, 13), SLOT, DOT_BR, POINT_T], answer: 'backdoor',
+    marks: [att(540, 270), ball(552, 264), def(628, 162), def(566, 182)],
     title: 'Back door: the far side of the crease',
     exp: {
       kid: 'While everyone watches the puck on one side, a sneaky attacker tiptoes to the FAR side of the net for a tap-in!',
@@ -234,6 +252,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-int-6', level: 'intermediate',
     prompt: 'Breakout time (you defend the LEFT net). Tap where the WINGER posts up for the outlet pass.',
     spots: [circle('breakout', 105, 28, 14), SLOT, CENTER, POINT_T], answer: 'breakout',
+    marks: [att(32, 185), ball(24, 178), att(41, 150), att(150, 150), def(120, 215)],
     title: 'Wingers to the walls for the breakout',
     exp: {
       kid: 'To escape your own end, a teammate waits along the boards, ready to catch a pass and zoom up the ice.',
@@ -248,6 +267,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-1', level: 'expert',
     prompt: '1-3-1 power play: tap the BUMPER position.',
     spots: [circle('bumper', 548, 150, 15), POINT_T, HALFWALL, CREASE_R], answer: 'bumper',
+    marks: [att(445, 150), att(520, 52), ball(531, 60), att(520, 268), att(596, 166), def(634, 150), def(505, 112), def(505, 188)],
     title: 'The bumper: middle of the 1-3-1',
     exp: {
       kid: 'One power-play player stands right in the MIDDLE of everything, between the circles — quick touches, quick shots.',
@@ -260,6 +280,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-2', level: 'expert',
     prompt: 'Beating the trap: tap where the STRETCH forward camps for the long pass.',
     spots: [circle('stretch', 405, 75, 16), CENTER, DOT_TL, SLOT], answer: 'stretch',
+    marks: [att(120, 200), ball(132, 196), def(310, 150), def(310, 210), def(280, 100)],
     title: 'The stretch man: at the far blue line',
     exp: {
       kid: 'One fast player sneaks all the way up near the far blue line, waiting for a looong pass to race in alone.',
@@ -272,6 +293,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-3', level: 'expert',
     prompt: 'Tap the "ROYAL ROAD" — the invisible line passes must cross to break a goalie.',
     spots: [rectSpot('royal', 455, 140, 165, 20), POINT_T, HALFWALL, BLUE_R], answer: 'royal',
+    marks: [def(632, 150), att(528, 48), ball(539, 56), att(528, 252)],
     title: 'The royal road: net-to-net through the slot',
     exp: {
       kid: 'Imagine a line drawn through the middle of the ice straight at the net. Passes that cross it make the goalie scramble sideways!',
@@ -284,6 +306,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-4', level: 'expert',
     prompt: 'Hybrid icing: the linesman judges a RACE. Tap where that race is judged.',
     spots: [DOT_TR, GOAL_LINE_R, NET_R, BLUE_R], answer: 'dotTR',
+    marks: [ball(655, 262), def(495, 170), att(505, 188), def(639, 150)],
     title: 'The race is to the faceoff dots — not the puck',
     exp: {
       kid: 'On a long icing chase, the referee watches which player reaches the red DOT first — not who touches the puck!',
@@ -296,6 +319,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-5', level: 'expert',
     prompt: 'You defend the LEFT net. Tap where your defenseman "boxes out" at the NET-FRONT.',
     spots: [circle('netfront', 85, 150, 15), SLOT, POINT_T, circle('cornerL', 60, 262, 14)], answer: 'netfront',
+    marks: [att(41, 150), def(95, 142), def(200, 62), ball(212, 68), att(70, 250)],
     title: 'Net-front defense: body between man and net',
     exp: {
       kid: 'The defender plants himself right in front of his own net and uses his body to keep attackers away from the goalie.',
@@ -308,6 +332,7 @@ export const NHL_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'nhl-exp-6', level: 'expert',
     prompt: 'Puck on the TOP boards in the offensive zone. Tap the WEAK SIDE the defense will leave thin.',
     spots: [rectSpot('weakside', 450, 195, 190, 88), rectSpot('strongside', 450, 20, 190, 80), NEUTRAL], answer: 'weakside',
+    marks: [att(540, 32), ball(552, 38), def(520, 72), def(560, 92), def(632, 150)],
     title: 'Strong side / weak side: the puck defines them',
     exp: {
       kid: 'Defenders crowd the side where the puck is — so the OTHER side of the ice is where the open space hides.',

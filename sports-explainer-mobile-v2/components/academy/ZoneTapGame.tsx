@@ -4,7 +4,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, runOnJS, Easing,
 } from 'react-native-reanimated';
-import { Circle, Rect, Line, Text as SvgText } from 'react-native-svg';
+import { Circle, Rect, Line, Ellipse, Polygon, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
 import { Level } from '../../lib/api';
@@ -13,12 +13,13 @@ import { useTheme, Theme } from '../../lib/theme';
 import { scheduleQuizReminder } from '../../lib/notifications';
 import {
   FootballField, SoccerPitch, BaseballDiamond, BasketballCourt, HockeyRink,
-  TennisCourt, CricketGround, GolfHole, RugbyPitch, VerdictCard, NextButton, FIELD, FE,
+  TennisCourt, CricketGround, GolfHole, RugbyPitch, VerdictCard, NextButton, LosMarker, FE,
 } from '../FieldEngine';
 import {
   ZONE_TAP, SURFACE_FOR_SPORT, poolForLevel, zoneSportForKeys, regionCenter,
-  ZoneScenario, ZoneSpot, ZoneRegion,
+  ZoneScenario, ZoneSpot, ZoneRegion, ZoneSurface,
 } from '../../lib/zoneTap';
+import type { ZoneMark } from '../../lib/zoneTap';
 import type { AcademyGameProps } from '../../lib/academyGames';
 
 // Same scoring contract as QuizGame (the canonical award block, copied verbatim):
@@ -41,6 +42,86 @@ const BURST_MS = 600;
 const TIER_LABEL: Record<Level, string> = {
   kid: 'ROOKIE', beginner: 'BEGINNER', intermediate: 'INTERMEDIATE', expert: 'EXPERT',
 };
+
+// ── Context-mark art (the swappable design layer for ZoneMark) ──────────────
+// Renders a scenario's `marks` — the orienting scene: a sport-styled ball at the spot
+// the prompt references, context players that frame the question, flags and guide
+// lines. All of it is NON-interactive and drawn UNDER the hit/vis passes so the amber
+// rings stay unmistakably the tappable layer. Fixed FE palette (field-intrinsic art);
+// a designer can restyle everything here without touching any bank.
+const MARK = {
+  att: FE.orange, def: FE.blue, ring: FE.navy, chalk: '#F4F4EE',
+  labelOut: '#16331b', labelAtt: '#ffffff', labelDef: '#dbeaff',
+  flagRed: '#D64545', flagStick: '#E8E8E8',
+};
+// Per-surface ball styling: shape (round vs the two oval-ball codes) + colors.
+const BALL_STYLE: Record<ZoneSurface, { oval?: boolean; fill: string; stroke: string; detail?: string; r: number }> = {
+  football:   { oval: true, fill: '#7a4a21', stroke: MARK.chalk, detail: MARK.chalk, r: 8 },
+  rugby:      { oval: true, fill: '#8a5a28', stroke: MARK.chalk, detail: MARK.chalk, r: 8 },
+  soccer:     { fill: '#ffffff', stroke: MARK.ring, detail: MARK.ring, r: 6 },
+  baseball:   { fill: '#ffffff', stroke: '#c2453d', r: 5 },
+  basketball: { fill: '#D2691E', stroke: MARK.ring, detail: MARK.ring, r: 6 },
+  hockey:     { fill: '#15181d', stroke: '#4a5468', r: 5 },
+  tennis:     { fill: '#cbe54e', stroke: '#8aa32a', r: 5 },
+  cricket:    { fill: '#b33939', stroke: '#7a1f1f', detail: '#e9c9c9', r: 5 },
+  golf:       { fill: '#ffffff', stroke: '#8a8f98', r: 4.5 },
+};
+
+function markNodes(marks: ZoneMark[], surface: ZoneSurface): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  marks.forEach((m, i) => {
+    const k = `mk${i}`;
+    if (m.kind === 'ball') {
+      const b = BALL_STYLE[surface];
+      if (b.oval) {
+        nodes.push(
+          <Ellipse key={k} cx={m.x} cy={m.y} rx={b.r} ry={b.r * 0.62} fill={b.fill} stroke={b.stroke} strokeWidth={1.2} />,
+          <Line key={`${k}l`} x1={m.x - b.r * 0.45} y1={m.y} x2={m.x + b.r * 0.45} y2={m.y} stroke={b.detail} strokeWidth={1} />,
+        );
+      } else {
+        nodes.push(<Circle key={k} cx={m.x} cy={m.y} r={b.r} fill={b.fill} stroke={b.stroke} strokeWidth={1.4} />);
+        if (b.detail) nodes.push(<Circle key={`${k}d`} cx={m.x} cy={m.y} r={b.r * 0.4} fill="none" stroke={b.detail} strokeWidth={0.9} />);
+      }
+    } else if (m.kind === 'player') {
+      nodes.push(
+        <Circle key={k} cx={m.x} cy={m.y} r={7} fill={m.side === 'att' ? MARK.att : MARK.def} stroke={MARK.ring} strokeWidth={1.5} />,
+      );
+      if (m.label && m.label.length === 1) {
+        // Single letter fits INSIDE the dot — the only placement that survives tight
+        // formations (an OL column's below-dot labels get covered by the next dot).
+        nodes.push(
+          <SvgText key={`${k}t`} x={m.x} y={m.y + 3} textAnchor="middle" fontSize={8} fontFamily={F_BOLD} fill="#ffffff">{m.label}</SvgText>,
+        );
+      } else if (m.label) {
+        // Outline pass first, fill on top (react-native-svg has no paint-order — the DotLabel idiom).
+        const common = { x: m.x, y: m.y + 17, textAnchor: 'middle' as const, fontSize: 9, fontFamily: F_BOLD };
+        nodes.push(
+          <SvgText key={`${k}o`} {...common} fill="none" stroke={MARK.labelOut} strokeWidth={3} strokeLinejoin="round">{m.label}</SvgText>,
+          <SvgText key={`${k}t`} {...common} fill={m.side === 'att' ? MARK.labelAtt : MARK.labelDef}>{m.label}</SvgText>,
+        );
+      }
+    } else if (m.kind === 'flag') {
+      nodes.push(
+        <Line key={k} x1={m.x} y1={m.y} x2={m.x} y2={m.y - 20} stroke={MARK.flagStick} strokeWidth={1.8} />,
+        <Polygon key={`${k}f`} points={`${m.x},${m.y - 20} ${m.x},${m.y - 11} ${m.x + 11},${m.y - 15.5}`} fill={MARK.flagRed} />,
+      );
+    } else {
+      nodes.push(
+        <Line key={k} x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} stroke={MARK.chalk} strokeWidth={2} strokeDasharray="6 5" opacity={0.85} />,
+      );
+      if (m.arrow) {
+        // Small arrowhead at the (x2,y2) end, oriented along the guide.
+        const ang = Math.atan2(m.y2 - m.y1, m.x2 - m.x1);
+        const L = 9, W = 5.5;
+        const bx = m.x2 - L * Math.cos(ang), by = m.y2 - L * Math.sin(ang);
+        const p1 = `${bx - W * Math.sin(ang)},${by + W * Math.cos(ang)}`;
+        const p2 = `${bx + W * Math.sin(ang)},${by - W * Math.cos(ang)}`;
+        nodes.push(<Polygon key={`${k}a`} points={`${m.x2},${m.y2} ${p1} ${p2}`} fill={MARK.chalk} opacity={0.9} />);
+      }
+    }
+  });
+  return nodes;
+}
 
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -258,12 +339,16 @@ export default function ZoneTapGame({ sportKeys, categoryEmoji }: AcademyGamePro
   };
 
   // ── the tappable spot layer (SVG children of the surface) ─────────────────
-  // Two-PASS render: ALL oversized transparent hit targets first, then ALL visible
-  // markers on top (both pressable — the two-circle pattern from Where's the Play).
-  // The pass split matters: a neighbor's oversized hit disc must never sit ABOVE
-  // another spot's visible marker, or a precise tap could resolve to the wrong spot.
-  // Judged: the answer region turns teal (revealed even on a miss), the wrong tap
-  // turns red, other decoys dim. No SMIL pulse (doesn't port to react-native-svg).
+  // THREE passes, bottom to top: the scenario's context MARKS (ball/players — the
+  // orienting scene, never interactive), then ALL oversized transparent hit targets,
+  // then ALL visible markers (both pressable — the two-circle pattern from Where's
+  // the Play). The pass split matters: a neighbor's oversized hit disc must never sit
+  // ABOVE another spot's visible marker, or a precise tap could resolve to the wrong
+  // spot — and the context marks must sit UNDER both so the amber rings stay
+  // unmistakably the interactive layer. Judged: the answer region turns teal (revealed
+  // even on a miss), the wrong tap turns red, other decoys dim. No SMIL pulse (doesn't
+  // port to react-native-svg).
+  const surface: ZoneSurface | null = zoneSport ? SURFACE_FOR_SPORT[zoneSport] : null;
   const judged = chosen !== null;
   const hitNodes: ReactNode[] = [];
   const visNodes: ReactNode[] = [];
@@ -311,7 +396,9 @@ export default function ZoneTapGame({ sportKeys, categoryEmoji }: AcademyGamePro
       }
     });
   }
-  const spotNodes: ReactNode[] = [...hitNodes, ...visNodes];
+  const contextNodes: ReactNode[] =
+    scenario?.marks && surface ? markNodes(scenario.marks, surface) : [];
+  const spotNodes: ReactNode[] = [...contextNodes, ...hitNodes, ...visNodes];
   if (burst) {
     spotNodes.push(
       <Circle key="burst" cx={burst.x} cy={burst.y} r={burst.r} fill="none" stroke={burst.color} strokeWidth={3.5} opacity={burst.opacity} />,
@@ -319,20 +406,19 @@ export default function ZoneTapGame({ sportKeys, categoryEmoji }: AcademyGamePro
   }
 
   // ── the surface (one FieldEngine renderer per sport — the swappable art layer) ──
-  const surface = zoneSport ? SURFACE_FOR_SPORT[zoneSport] : null;
   let art: ReactNode = null;
   if (surface === 'football') {
     // Engine LOS is drawn ABOVE the overlay by default; spots must sit on top of it, so
     // draw the LOS ourselves as the FIRST overlay element (the documented showLos={false}
-    // pattern from FieldEngine).
+    // pattern from FieldEngine) — via the engine's shared LosMarker so the label stays
+    // aligned ON the line (one source of truth with Box Count's field).
     art = (
       <FootballField
         players={[]}
         showLos={false}
         overlay={
           <>
-            <Line x1={FIELD.los} y1={FIELD.bandTop} x2={FIELD.los} y2={FIELD.bandBot} stroke={FE.losLine} strokeWidth={2.5} opacity={0.9} />
-            <SvgText x={FIELD.los + 5} y={22} fill={FE.losLabel} fontSize={10.5} fontFamily={F_BOLD}>Line of scrimmage</SvgText>
+            <LosMarker />
             {spotNodes}
           </>
         }
@@ -351,7 +437,10 @@ export default function ZoneTapGame({ sportKeys, categoryEmoji }: AcademyGamePro
   } else if (surface === 'cricket') {
     art = <CricketGround>{spotNodes}</CricketGround>;
   } else if (surface === 'golf') {
-    art = <GolfHole>{spotNodes}</GolfHole>;
+    // A scenario that authors its own pin (a flag mark) suppresses the engine's painted
+    // pin, so the hole shows exactly one flag — at the position the prompt describes.
+    const ownPin = !!scenario?.marks?.some(m => m.kind === 'flag');
+    art = <GolfHole showPin={!ownPin}>{spotNodes}</GolfHole>;
   } else if (surface === 'rugby') {
     art = <RugbyPitch>{spotNodes}</RugbyPitch>;
   }

@@ -4,7 +4,13 @@
 // service line y=170. Perspective: the server/you play from the LEFT unless stated.
 // Facing-right geometry: the left player's DEUCE side is the BOTTOM half, so his deuce
 // serve lands in the TOP-RIGHT box (diagonal); his AD serve lands in the BOTTOM-RIGHT box.
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context marks (owner feedback pass): 'att' = the player the prompt frames as "you"
+// (or the server), 'def' = the opponent. The spot the prompt asks the user to LOCATE
+// is never drawn; the ball appears only where the prompt references it (a drop shot,
+// a rally ball at a racquet) — never on a serve-target question, where the ball's
+// landing IS the answer.
 
 const NET = rectSpot('net', 332, 44, 16, 252);
 const BOX_TR = rectSpot('boxTR', 344, 78, 141, 90);   // right side, top box (receiver's deuce court)
@@ -26,6 +32,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-kid-1', level: 'kid',
     prompt: 'Tap the NET.',
     spots: [NET, BASELINE_R, ALLEY_TOP], answer: 'net',
+    marks: [att(48, 170), def(634, 152)],
     title: 'The net: the wall in the middle',
     exp: {
       kid: 'The ball must fly OVER the net on every shot. Hit it into the net and the point is over — for the other player!',
@@ -38,6 +45,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-kid-2', level: 'kid',
     prompt: 'Tap the BASELINE — players serve from behind it.',
     spots: [BASELINE_R, NET, SVC_LINE_R, ALLEY_TOP], answer: 'baselineR',
+    marks: [def(636, 150), att(50, 190)],
     title: 'The baseline: the back boundary',
     exp: {
       kid: 'The line at the very back of the court — most of tennis happens near it, and serves must start behind it.',
@@ -50,6 +58,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-kid-3', level: 'kid',
     prompt: 'Tap a SERVICE BOX — where a serve must land.',
     spots: [BOX_TR, NOMANS, NET, ALLEY_TOP], answer: 'boxTR',
+    marks: [att(50, 240), ball(300, 140), def(640, 100)],
     title: 'Serves must land in the small box',
     exp: {
       kid: 'A serve only counts if it bounces inside the small box near the net on the other side — miss it twice and you lose the point!',
@@ -62,6 +71,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-kid-4', level: 'kid',
     prompt: 'Tap the DOUBLES ALLEY — the lane used only in doubles.',
     spots: [ALLEY_TOP, BOX_TR, NET, NOMANS], answer: 'alley',
+    marks: [att(48, 230), att(280, 105), def(640, 120), def(400, 245)],
     title: 'The alley: extra court for doubles',
     exp: {
       kid: 'The skinny lane along the side is a bonus strip — it counts in doubles (four players) but is OUT in singles!',
@@ -74,6 +84,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-kid-5', level: 'kid',
     prompt: 'Tap where a player stands to SERVE.',
     spots: [SERVE_STANCE, VOLLEY_POS, BOX_TR, T_RIGHT], answer: 'servestance',
+    marks: [def(55, 250)],
     title: 'Behind the baseline, next to the center mark',
     exp: {
       kid: 'The server stands BEHIND the back line, near the little middle notch — never inside the court until after the hit!',
@@ -100,6 +111,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-1', level: 'beginner',
     prompt: 'DEUCE point: the server (left side) must hit the receiver’s deuce court. Tap the target box.',
     spots: [BOX_TR, BOX_BR, NOMANS], answer: 'boxTR',
+    marks: [att(52, 238), def(648, 96)],
     title: 'Serves travel diagonally — deuce court to deuce court',
     exp: {
       kid: 'Serves always fly diagonally, corner to corner! The server stands on his right, and the ball must land in the box diagonally across.',
@@ -112,6 +124,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-2', level: 'beginner',
     prompt: 'Tap "down the T" — the ace target at the middle of the service line.',
     spots: [T_RIGHT, WIDE_DEUCE, NET, BASELINE_R], answer: 'tee',
+    marks: [att(52, 196), def(650, 110)],
     title: 'The T: where the center line meets the service line',
     exp: {
       kid: 'The two lines make a letter T in the middle. A serve fired right at the T is super hard to reach!',
@@ -124,6 +137,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-3', level: 'beginner',
     prompt: 'Deuce-court serve: tap the WIDE target that drags the returner off the court.',
     spots: [WIDE_DEUCE, T_RIGHT, BASELINE_R, NET], answer: 'widedeuce',
+    marks: [att(52, 196), def(645, 105)],
     title: 'The wide serve: near the sideline edge of the box',
     exp: {
       kid: 'A serve aimed at the box’s outside corner pulls the other player way off the court — leaving the rest empty!',
@@ -136,6 +150,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-4', level: 'beginner',
     prompt: 'Tap "NO-MAN’S LAND" — the zone coaches tell you never to camp in.',
     spots: [NOMANS, BOX_TR, NET, ALLEY_TOP], answer: 'nomans',
+    marks: [def(52, 170)],
     title: 'Between the service line and the baseline',
     exp: {
       kid: 'Standing in the middle zone is trouble: too far back to volley, too close to hit a normal bounce — the ball lands right at your feet!',
@@ -148,6 +163,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-5', level: 'beginner',
     prompt: 'Tap where a VOLLEYER stands at the net.',
     spots: [VOLLEY_POS, NOMANS, BASELINE_R, NET], answer: 'volleypos',
+    marks: [def(52, 200), ball(66, 196)],
     title: 'Volley position: halfway between net and service line',
     exp: {
       kid: 'A net player stands a few steps back from the net itself — close enough to smash volleys, far enough to react and cover lobs.',
@@ -160,6 +176,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-beg-6', level: 'beginner',
     prompt: 'You just served from the LEFT. Tap where you RECOVER to for the next shot.',
     spots: [circle('recover', 634, 172, 14), circle('cornercamp', 632, 274, 13), VOLLEY_POS, NOMANS], answer: 'recover',
+    marks: [att(652, 276), def(48, 110), ball(200, 140)],
     title: 'Recover to the middle, behind the baseline',
     exp: {
       kid: 'After every shot, hustle back toward the middle — so no corner is too far away when the ball comes back!',
@@ -174,6 +191,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-1', level: 'intermediate',
     prompt: 'ADVANTAGE point: server (left) now serves from his AD side. Tap the box this serve must land in.',
     spots: [BOX_BR, BOX_TR, NOMANS], answer: 'boxBR',
+    marks: [att(52, 150), def(648, 240)],
     title: 'Ad-court serves land in the other diagonal',
     exp: {
       kid: 'For this point the server moves to the other side of his little center mark — so the diagonal flips, and the serve lands in the OTHER box!',
@@ -186,6 +204,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-2', level: 'intermediate',
     prompt: 'DOUBLES: the server plays from the bottom-left. Tap where the server’s PARTNER stands.',
     spots: [circle('netpartner', 268, 108, 17), circle('backtogether', 268, 232, 17), NOMANS, ALLEY_TOP], answer: 'netpartner',
+    marks: [att(48, 240), def(648, 100), def(420, 250)],
     title: 'Server’s partner: at the net, on the other half',
     exp: {
       kid: 'While one player serves from the back, the partner stands close to the net on the other side of their court, ready to pounce!',
@@ -198,6 +217,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-3', level: 'intermediate',
     prompt: 'Tap the SHORT-ANGLE target — the shot that drags your opponent OFF the court sideways.',
     spots: [circle('shortangle', 368, 92, 14), circle('deepcorner', 592, 88, 14), CENTER_MARK, NET], answer: 'shortangle',
+    marks: [att(630, 200), ball(616, 196), def(52, 170)],
     title: 'Short and wide: near the net, near the sideline',
     exp: {
       kid: 'A softly angled shot that lands short and wide makes your opponent sprint OFF the court sideways to reach it — then the whole court is empty!',
@@ -210,6 +230,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-4', level: 'intermediate',
     prompt: 'Your opponent is at the NET. Tap where your LOB should land.',
     spots: [circle('lobtarget', 578, 170, 17), BOX_TR, NET, ALLEY_TOP], answer: 'lobtarget',
+    marks: [def(398, 155), att(60, 220), ball(74, 214)],
     title: 'Deep — near the baseline, over their head',
     exp: {
       kid: 'When the other player rushes the net, hit the ball high over their head so it lands way back near their baseline — they have to turn and chase!',
@@ -222,6 +243,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-5', level: 'intermediate',
     prompt: 'Facing a HUGE first serve. Tap where returners stand to buy time.',
     spots: [circle('deepreturn', 658, 172, 14), NOMANS, VOLLEY_POS, BOX_TR], answer: 'deepreturn',
+    marks: [att(52, 196), ball(300, 160)],
     title: 'Way behind the baseline',
     exp: {
       kid: 'Against a rocket serve, smart players back way up — the extra steps give the ball time to slow down and give you time to swing!',
@@ -234,6 +256,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-int-6', level: 'intermediate',
     prompt: 'SERVE-AND-VOLLEY: after serving, you sprint in. Tap where your SPLIT-STEP happens for the first volley.',
     spots: [circle('firstvolley', 470, 150, 15), NET, BASELINE_R, BOX_BR], answer: 'firstvolley',
+    marks: [att(588, 178), def(52, 140), ball(66, 146)],
     title: 'First volley: around the service line',
     exp: {
       kid: 'A serve-and-volley player can’t reach the net in one sprint — the first stop is around the service line, hitting the volley there before moving closer.',
@@ -248,6 +271,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-1', level: 'expert',
     prompt: 'BREAK POINT, serving to the ad court: the classic play is the BODY serve. Tap the target.',
     spots: [BODY_AD, circle('wideadex', 465, 250, 13), T_RIGHT, NET], answer: 'bodyad',
+    marks: [att(50, 150), def(645, 235)],
     title: 'The body serve: right at the returner',
     exp: {
       kid: 'Instead of aiming at a corner, the serve flies straight AT the other player — it’s surprisingly hard to hit a ball coming right at you!',
@@ -260,6 +284,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-2', level: 'expert',
     prompt: 'The player on the RIGHT is right-handed. Tap where they camp to hit the INSIDE-OUT forehand.',
     spots: [circle('bhcorner', 638, 242, 16), circle('fhcorner', 638, 98, 16), NOMANS, VOLLEY_POS], answer: 'bhcorner',
+    marks: [def(52, 180), ball(66, 176)],
     title: 'Run around the backhand — camp in the backhand corner',
     exp: {
       kid: 'The player sneaks around so a ball coming to their weaker side can be hit with their FAVORITE swing instead — sneaky footwork!',
@@ -272,6 +297,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-3', level: 'expert',
     prompt: 'DOUBLES: the net player POACHES. Tap where they cut to.',
     spots: [circle('poach', 308, 166, 14), circle('alleyguard', 150, 58, 14), rectSpot('baselineL', 61, 68, 12, 204), NOMANS], answer: 'poach',
+    marks: [att(268, 108), att(48, 244), def(648, 102), def(420, 246), ball(460, 190)],
     title: 'The poach: across the middle, at the net',
     exp: {
       kid: 'The net player suddenly dashes ACROSS the middle to steal a crosscourt shot meant for their partner — an ambush!',
@@ -284,6 +310,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-4', level: 'expert',
     prompt: 'Your opponent drops it SHORT. Tap where you must sprint to.',
     spots: [circle('dropspot', 372, 196, 15), circle('staybase', 636, 200, 14), NOMANS, NET], answer: 'dropspot',
+    marks: [att(642, 212), def(52, 190), ball(366, 188)],
     title: 'Chase the drop shot — get in before the second bounce',
     exp: {
       kid: 'A drop shot barely tips over the net and dies — you must SPRINT forward and reach it before it bounces twice!',
@@ -296,6 +323,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-5', level: 'expert',
     prompt: 'SERVE +1: your wide deuce serve dragged the returner off the TOP side. Tap the classic +1 target.',
     spots: [circle('opencourt', 585, 246, 16), circle('behindem', 585, 96, 15), T_RIGHT, NET], answer: 'opencourt',
+    marks: [def(640, 55), att(52, 196), ball(300, 150)],
     title: 'Into the open court — the opposite corner',
     exp: {
       kid: 'The serve pulled the other player way off one side — so the next shot goes to the far EMPTY corner. One-two punch!',
@@ -308,6 +336,7 @@ export const TENNIS_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'ten-exp-6', level: 'expert',
     prompt: 'You hit a sharp angle pulling your opponent wide TOP. Tap your correct RECOVERY spot (right side).',
     spots: [circle('bisector', 642, 138, 15), circle('deadcenter', 640, 268, 14), T_RIGHT, NET], answer: 'bisector',
+    marks: [att(600, 90), def(60, 70), ball(170, 80)],
     title: 'Recover to the bisector — not the center',
     exp: {
       kid: 'You don’t always run back to the exact middle! Stand a bit toward the side the ball can most easily come back to.',

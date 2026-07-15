@@ -2,7 +2,12 @@
 // only (rule-based, evergreen). Pure data, zero RN imports. Coordinates: SoccerPitch
 // viewBox 680×420 — attack LEFT→RIGHT: right penalty box x=578..674 (y=110..310), right
 // 6-yard box x=634..674 (y=160..260), goal at x=674 (y=180..240), center (340,210) r=44.
-import { ZoneScenario, circle, rectSpot } from '../zoneTapRegions';
+import { ZoneScenario, circle, rectSpot, ball, att, def } from '../zoneTapRegions';
+
+// Context-mark shorthands (owner feedback pass): 'att' = your team (attacking L→R
+// unless the prompt flips it), 'def' = opposition. The keeper is drawn wherever the
+// scene needs a goal defended — truthfully inside a candidate region when that IS the
+// scene (keeper on his line). The player the prompt asks the user to LOCATE is never drawn.
 
 const GOAL_MOUTH = rectSpot('goal', 655, 172, 24, 76);
 const CENTER_SPOT = circle('centerspot', 340, 210, 20);
@@ -25,6 +30,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-1', level: 'kid',
     prompt: 'You attack left → right. Tap the GOAL you score in.',
     spots: [GOAL_MOUTH, CENTER_CIRCLE, CORNER_BOT], answer: 'goal',
+    marks: [att(270, 200), ball(283, 205), def(500, 210), def(560, 160), def(662, 210, 'GK')],
     title: 'The goal: the whole point',
     exp: {
       kid: 'Get the ball into the net at the end you’re attacking — that’s a goal, worth exactly one, and it’s the only way to score!',
@@ -37,6 +43,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-2', level: 'kid',
     prompt: 'Tap the CENTER SPOT — where kickoff happens.',
     spots: [CENTER_SPOT, GOAL_MOUTH, CORNER_TOP, SIX_YARD], answer: 'centerspot',
+    marks: [att(300, 140), att(295, 210), att(300, 280), def(385, 140), def(380, 210), def(385, 280)],
     title: 'Kickoff from the middle',
     exp: {
       kid: 'Every game (and every restart after a goal) begins with the ball sitting on the little dot in the exact middle.',
@@ -49,6 +56,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-3', level: 'kid',
     prompt: 'Tap the PENALTY SPOT.',
     spots: [PEN_SPOT, CENTER_SPOT, CORNER_TOP, GOAL_MOUTH], answer: 'penspot',
+    marks: [att(585, 222), att(560, 150), att(558, 272), def(666, 210, 'GK')],
     title: 'The penalty spot: 12 yards from goal',
     exp: {
       kid: 'When a team breaks the rules inside the big box, the other team gets a free shot from this dot — just the shooter versus the goalie!',
@@ -61,6 +69,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-4', level: 'kid',
     prompt: 'Tap a CORNER arc — where corner kicks are taken.',
     spots: [CORNER_BOT, CENTER_SPOT, PEN_SPOT, GOAL_MOUTH], answer: 'cornerbot',
+    marks: [def(660, 210, 'GK'), def(640, 190), def(636, 232), att(596, 196), att(605, 242)],
     title: 'The corner arc',
     exp: {
       kid: 'If the defending team knocks the ball over their own goal line, the attackers get to kick it from the little corner curve!',
@@ -73,6 +82,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-5', level: 'kid',
     prompt: 'Tap the BIG BOX — the only place the goalkeeper may use hands.',
     spots: [PEN_AREA, CENTER_CIRCLE, WING_TOP], answer: 'penarea',
+    marks: [def(650, 212, 'GK'), ball(641, 204)],
     title: 'The penalty area: the keeper’s hand zone',
     exp: {
       kid: 'The goalie may grab the ball with hands ONLY inside this big box. Outside it, even the goalie must use feet like everyone else!',
@@ -85,6 +95,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-kid-6', level: 'kid',
     prompt: 'Tap where the GOALKEEPER stands.',
     spots: [GK, CENTER_SPOT, CORNER_TOP, WING_TOP], answer: 'gk',
+    marks: [att(560, 208), ball(573, 212), def(600, 165), def(598, 258)],
     title: 'Keeper on the goal line',
     exp: {
       kid: 'The goalkeeper guards the goal mouth — the last line of defense, and the only player who can use hands (inside the box).',
@@ -99,6 +110,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-beg-1', level: 'beginner',
     prompt: 'Tap the SIX-YARD box.',
     spots: [SIX_YARD, PEN_SPOT, CENTER_CIRCLE, CORNER_TOP], answer: 'sixyard',
+    marks: [def(654, 196, 'GK')],
     title: 'The goal area: goal kicks start here',
     exp: {
       kid: 'The small box inside the big box is the six-yard box — goal kicks get placed anywhere inside it.',
@@ -111,6 +123,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-beg-2', level: 'beginner',
     prompt: 'OFFSIDE can only happen in part of the pitch. You attack right — tap that part.',
     spots: [ATT_HALF, OWN_HALF], answer: 'atthalf',
+    marks: [att(300, 206), ball(313, 210), def(430, 120), def(430, 210), def(430, 300)],
     title: 'No offside in your own half',
     exp: {
       kid: 'The offside trap only works in the half you’re ATTACKING. In your own half you can stand anywhere you like!',
@@ -123,6 +136,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-beg-3', level: 'beginner',
     prompt: 'Tap the WING — where wide players hug the touchline.',
     spots: [WING_TOP, CENTER_CIRCLE, PEN_SPOT, SIX_YARD], answer: 'wingtop',
+    marks: [att(390, 175), ball(402, 180), att(400, 250), def(440, 180)],
     title: 'The flanks: width stretches defenses',
     exp: {
       kid: 'Wingers stay way out by the sideline — stretching the defense wide so gaps open in the middle.',
@@ -135,6 +149,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-beg-4', level: 'beginner',
     prompt: 'Your team defends the LEFT goal. Tap where your CENTER-BACKS set up.',
     spots: [circle('cbs', 120, 210, 26), circle('striker9', 560, 210, 20), WING_TOP, CENTER_CIRCLE], answer: 'cbs',
+    marks: [att(16, 210, 'GK'), def(250, 204), ball(238, 208)],
     title: 'Center-backs: central, in front of their own goal',
     exp: {
       kid: 'The two big defenders stand in the middle, right in front of THEIR OWN goal — the last wall before the goalkeeper.',
@@ -147,6 +162,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-beg-5', level: 'beginner',
     prompt: 'Tap where a NUMBER 9 (striker) hunts for goals.',
     spots: [circle('nine', 560, 210, 20), WING_TOP, OWN_HALF, CENTER_CIRCLE], answer: 'nine',
+    marks: [def(588, 140), def(588, 210), def(588, 280), def(662, 210, 'GK'), att(318, 192), ball(330, 196)],
     title: 'The striker: central, on the last defender’s shoulder',
     exp: {
       kid: 'The striker stays up front in the middle, as close to the other team’s goal as the rules allow, ready to pounce.',
@@ -173,6 +189,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-1', level: 'intermediate',
     prompt: 'Tap the "TOP OF THE BOX" — where cutback passes aim.',
     spots: [TOP_OF_BOX, SIX_YARD, CORNER_TOP, PEN_SPOT], answer: 'topofbox',
+    marks: [att(648, 140), ball(656, 148), def(628, 188), def(618, 230), def(666, 206, 'GK'), att(520, 204)],
     title: 'The edge of the area: the cutback zone',
     exp: {
       kid: 'Just outside the big box, in the middle — a favorite spot for a pass pulled BACK from the goal line for a big shot.',
@@ -185,6 +202,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-2', level: 'intermediate',
     prompt: 'Corner from the TOP corner. Tap the NEAR post.',
     spots: [circle('nearpost', 666, 184, 13), circle('farpost', 666, 236, 13), PEN_SPOT], answer: 'nearpost',
+    marks: [ball(669, 11), def(656, 212, 'GK'), def(640, 196), def(638, 234), att(596, 188), att(594, 240)],
     title: 'Near post = the post closest to the kicker',
     exp: {
       kid: 'The goal has two posts — the one NEARER the corner kicker is the "near post." The other one is the "far post."',
@@ -197,6 +215,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-3', level: 'intermediate',
     prompt: 'Your team attacks RIGHT. Tap the zone your DEFENSIVE midfielder (the "6") screens.',
     spots: [circle('six', 140, 210, 26), CENTER_CIRCLE, TOP_OF_BOX, WING_TOP], answer: 'six',
+    marks: [att(16, 210, 'GK'), att(85, 168), att(85, 252), def(255, 206), ball(242, 210)],
     title: 'The 6: in front of his OWN box',
     exp: {
       kid: 'One midfielder stays back near his own defenders, guarding the space in front of them like a bodyguard.',
@@ -209,6 +228,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-4', level: 'intermediate',
     prompt: 'Tap the "CORRIDOR OF UNCERTAINTY" — where a driven cross causes chaos.',
     spots: [rectSpot('corridor', 616, 165, 18, 90), TOP_OF_BOX, WING_TOP, CENTER_CIRCLE], answer: 'corridor',
+    marks: [att(656, 78), ball(662, 88), def(667, 208, 'GK'), def(600, 182), def(602, 240), att(545, 192), att(548, 246)],
     title: 'Between the six-yard box and the penalty spot',
     exp: {
       kid: 'A hard, low cross into the skinny strip in front of the goalie is scary for defenders — do they touch it or leave it?',
@@ -221,6 +241,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-5', level: 'intermediate',
     prompt: 'Tap where an OVERLAPPING fullback ends his run.',
     spots: [circle('overlap', 630, 55, 22), circle('wingmid', 470, 45, 18), CENTER_CIRCLE, PEN_SPOT], answer: 'overlap',
+    marks: [att(468, 48), ball(480, 54), def(520, 68)],
     title: 'The overlap: outside and BEYOND the winger',
     exp: {
       kid: 'The defender from the back sprints all the way up the sideline, PAST his own winger, into the deep corner!',
@@ -233,6 +254,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-int-6', level: 'intermediate',
     prompt: 'Tap "ZONE 14" — the pocket in front of the penalty area.',
     spots: [rectSpot('zone14', 520, 160, 55, 100), WING_TOP, CENTER_CIRCLE, SIX_YARD], answer: 'zone14',
+    marks: [def(596, 150), def(596, 196), def(596, 242), def(660, 210, 'GK'), att(500, 206), ball(512, 210)],
     title: 'Zone 14: the playmaker’s pocket',
     exp: {
       kid: 'The space just outside the big box, in the middle, is where the most dangerous passes in soccer are born.',
@@ -247,6 +269,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-1', level: 'expert',
     prompt: 'Shot coming from a TIGHT ANGLE up top. Tap the post the keeper must seal.',
     spots: [circle('sealnear', 664, 188, 12), circle('sealfar', 664, 232, 12), PEN_SPOT], answer: 'sealnear',
+    marks: [att(626, 102), ball(634, 112), def(612, 152), def(658, 206, 'GK')],
     title: 'Never beaten at the near post',
     exp: {
       kid: 'From a tight angle, the goalie hugs the closest post — getting beaten on that side is the one unforgivable goal!',
@@ -259,6 +282,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-2', level: 'expert',
     prompt: 'The team defending the RIGHT goal drops into a LOW BLOCK. Tap where their defensive line sets up.',
     spots: [rectSpot('lowblock', 592, 135, 26, 150), HALFWAY, CENTER_CIRCLE, rectSpot('highline', 355, 135, 26, 150)], answer: 'lowblock',
+    marks: [att(540, 206), ball(552, 210), att(480, 150), att(482, 266), def(664, 210, 'GK')],
     title: 'A low block defends the edge of its own box',
     exp: {
       kid: 'Sometimes a team pulls EVERYONE back near their own goal and forms a wall. That wall stands just outside their own box.',
@@ -271,6 +295,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-3', level: 'expert',
     prompt: 'PRESSING TRIGGER: a slow back-pass rolls toward the keeper. Tap the zone your striker sprints to.',
     spots: [circle('presszone', 640, 210, 22), CENTER_CIRCLE, OWN_HALF, WING_TOP], answer: 'presszone',
+    marks: [def(668, 210, 'GK'), ball(600, 206), def(556, 240), att(536, 178)],
     title: 'Press the keeper on the trigger',
     exp: {
       kid: 'A slow pass back to the goalie is the signal — CHARGE! The goalie has to kick it away in a panic.',
@@ -283,6 +308,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-4', level: 'expert',
     prompt: 'Tap a HALF-SPACE — the channel between the center and the wing.',
     spots: [rectSpot('halfspace', 420, 88, 180, 62), rectSpot('centrallane', 420, 180, 180, 60), rectSpot('flanklane', 420, 12, 180, 58)], answer: 'halfspace',
+    marks: [def(520, 44), def(520, 118), def(520, 208), att(390, 120), ball(402, 124)],
     title: 'The half-space: the in-between lane',
     exp: {
       kid: 'Slice the pitch into five long lanes. The two lanes BETWEEN the middle and the sidelines are secret passageways coaches love.',
@@ -295,6 +321,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-5', level: 'expert',
     prompt: 'You win the ball at YOUR box (left). Counter-attack: tap the FIRST outlet zone.',
     spots: [rectSpot('outlet', 150, 12, 170, 70), rectSpot('centerown', 130, 170, 150, 80), CORNER_TOP, CENTER_CIRCLE], answer: 'outlet',
+    marks: [ball(85, 222), att(74, 228), def(108, 206), def(122, 248), def(96, 186), att(235, 44)],
     title: 'Play away from the pressure — to the flank outlet',
     exp: {
       kid: 'Right after you steal the ball, everyone’s crowded around you — so the first pass goes to a friend waiting out wide, away from the crowd.',
@@ -307,6 +334,7 @@ export const SOCCER_ZONE_SCENARIOS: ZoneScenario[] = [
     id: 'soc-exp-6', level: 'expert',
     prompt: 'Tap where the CUTBACK is played FROM.',
     spots: [circle('byline', 656, 138, 16), TOP_OF_BOX, PEN_SPOT, circle('wingdeep', 480, 45, 18)], answer: 'byline',
+    marks: [att(560, 214), att(586, 240), def(640, 180), def(630, 232), def(664, 206, 'GK')],
     title: 'The byline, inside the box',
     exp: {
       kid: 'The passer dribbles all the way to the goal line first — THEN rolls the ball backward to a friend running in. Backwards pass, easy goal!',
