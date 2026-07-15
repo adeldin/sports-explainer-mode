@@ -32,6 +32,17 @@ export function reduceForExplain(match: CricketMatch, cursorKey: string): Reduce
   // --- play: the cursor delivery ---
   const play = cur.wicket ? playWicket(cur, f) : playRuns(cur);
 
+  // Wicket suffix, FUSED into the score fragment so the dismissal and the wicket count read as
+  // one fact. The ordinal (`the Nth wicket to fall`) pins playerOut to the `/N` in the score, so
+  // the model can't double-count it to `/N+1` (Gate 2 bug). Replaces the old separate
+  // "Batter dismissed:" fragment, which cued the model to add the wicket a second time.
+  let wSuffix = '';
+  if (cur.wicket) {
+    const o = cur.wicket.playerOut;
+    const wf = f.batters.get(o.name) ?? [0, 0];
+    wSuffix = ` — ${o.name} the ${ord(f.wkts)} wicket to fall, out for ${wf[0]} off ${wf[1]}`;
+  }
+
   // --- gameContext: sentence fragments joined by a space (each ends with its own period) ---
   const frags: string[] = [];
   frags.push(`Format ${match.format} (${match.oversPerInnings} overs).`);
@@ -39,7 +50,9 @@ export function reduceForExplain(match: CricketMatch, cursorKey: string): Reduce
   if (innings.index >= 2) {
     const target = firstInningsTotal(match) + 1;
     frags.push(`${innings.battingTeam} ${ord(innings.index)} innings chasing ${target}.`);
-    frags.push(`${f.score}/${f.wkts} after ${oversDisp} overs.`);
+    // "Now" marks the score as the AFTER-this-ball state — inclusive fold already counts the
+    // cursor delivery, so this stops the model re-applying the outcome (e.g. "27/1 → 33/1").
+    frags.push(`Now ${f.score}/${f.wkts} after ${oversDisp} overs${wSuffix}.`);
     // required rate — 2nd innings only; NO current run rate (cut at Gate 0.5)
     const need = target - f.score;
     const ballsLeft = match.oversPerInnings * 6 - f.legalBalls;
@@ -51,19 +64,15 @@ export function reduceForExplain(match: CricketMatch, cursorKey: string): Reduce
       frags.push(`Phase: ${phaseClause(cur.over, innings, match.oversPerInnings)}`);
     }
   } else {
-    frags.push(`${innings.battingTeam} ${ord(innings.index)} innings v ${oppTeam}, ${f.score}/${f.wkts} after ${oversDisp} overs.`);
+    frags.push(`${innings.battingTeam} ${ord(innings.index)} innings v ${oppTeam}, now ${f.score}/${f.wkts} after ${oversDisp} overs${wSuffix}.`);
     frags.push(`Phase: ${phaseClause(cur.over, innings, match.oversPerInnings)}`);
   }
 
-  // The batter clause. On a wicket, the dismissed batter's figures; otherwise the striker's.
-  // The bowler's NAME rides in the play line; bowler FIGURES are intentionally omitted —
-  // Gate 1.5 found them unused across all real-data outputs (their apparent value at Gate 0.5
-  // was an artifact of a fabricated figure).
-  if (cur.wicket) {
-    const out = cur.wicket.playerOut;
-    const fig = f.batters.get(out.name) ?? [0, 0];
-    frags.push(`Batter dismissed: ${out.name}, ${fig[0]} off ${fig[1]}.`);
-  } else {
+  // Non-wicket: the striker's form (Gate 1.5 validated it — the model reads "41 off 20" as a
+  // set batsman). A wicket needs no fragment here: the dismissed batter is fused into the score
+  // above, where the ordinal pins the wicket count. The bowler's NAME rides in the play line;
+  // bowler FIGURES are omitted (Gate 1.5: unused across all real-data outputs).
+  if (!cur.wicket) {
     const fig = f.batters.get(cur.striker.name) ?? [0, 0];
     frags.push(`Striker ${cur.striker.name} ${fig[0]} off ${fig[1]}.`);
   }
