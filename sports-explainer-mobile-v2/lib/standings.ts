@@ -67,7 +67,33 @@ export interface StandingsLeague {
   label: string;        // authored evergreen label ("the Premier League")
   season: string;       // from the payload ("2025-26" / "2026") — shown as context
   priorSeason: boolean; // true when the ?season=prev fallback served this table
+  // True when this is a FINISHED regular season (a final table), false when it's
+  // still in progress. Drives "So far in the … season" vs "In the … (final table)".
+  // Clock-free: a season is complete when every team has played the SAME, non-trivial
+  // number of games (mid-season the slate is staggered — game 94 vs 98; at the end
+  // it's level — all 17 / all 82). Padded ESPN endDates can't tell us this; the games
+  // column can. `priorSeason` (the zeroed-fallback table) is always complete.
+  seasonComplete: boolean;
   teams: StandingTeam[];
+}
+
+// Games a team has played: ESPN's `gamesPlayed` when present, else W+L+T+OTL.
+function gamesPlayedOf(t: StandingTeam): number {
+  const gp = t.stats['gamesPlayed']?.value;
+  if (typeof gp === 'number' && isFinite(gp)) return gp;
+  const s = (k: string) => t.stats[k]?.value ?? 0;
+  return s('wins') + s('losses') + s('ties') + s('otlosses');
+}
+
+// A regular season is complete when every team has played an identical, non-trivial
+// slate. The floor (12) rejects the trivially-early all-equal windows (opening day,
+// all teams at 0–1) — no major league finishes anywhere near that low, and NFL's
+// full 17 clears it. Mid-season the counts differ, so this reads false until the end.
+function seasonCompleteFrom(teams: StandingTeam[]): boolean {
+  if (teams.length < 2) return false;
+  const gps = teams.map(gamesPlayedOf);
+  const max = Math.max(...gps);
+  return max >= 12 && gps.every(g => g === max);
 }
 
 export interface StandingsPool {
@@ -693,6 +719,7 @@ async function fetchLeague(
       label: source.label,
       season: seasonLabel(data?.season),
       priorSeason: false,
+      seasonComplete: seasonCompleteFrom(teams),
       teams,
     };
   }
@@ -705,6 +732,7 @@ async function fetchLeague(
       label: source.label,
       season: seasonLabel(prev?.season),
       priorSeason: true,
+      seasonComplete: true, // a prior-season fallback table is by definition final
       teams,
     };
   }
@@ -845,7 +873,11 @@ function qualifyPrompt(prompt: string, league: StandingsLeague): string {
   const name = league.label.replace(/^the\s+/i, '');           // "the NBA" → "NBA"
   const clause = prompt.charAt(0).toLowerCase() + prompt.slice(1); // "Which…" → "which…"
   const season = league.season ? `${league.season} ${name}` : name;
-  return league.priorSeason
+  // "So far" only when the season is genuinely in progress. A finished regular season
+  // (all games played — an NFL offseason table, last year's fallback) reads "final",
+  // never "so far in the … season" for a season that's already over.
+  const done = league.priorSeason || league.seasonComplete;
+  return done
     ? `In the ${season} season (final table), ${clause}`
     : `So far in the ${season} season, ${clause}`;
 }
