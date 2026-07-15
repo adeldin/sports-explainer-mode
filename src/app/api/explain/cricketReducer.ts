@@ -59,7 +59,9 @@ export function reduceForExplain(match: CricketMatch, cursorKey: string): Reduce
     if (ballsLeft > 0) {
       const rrr = ((need / ballsLeft) * 6).toFixed(1);
       frags.push(`Phase: ${phaseClause(cur.over, innings, match.oversPerInnings)}`);
-      frags.push(`Need ${need} off ${ballsLeft} — required run rate ${rrr}.`);
+      // "Still" anchors the need as the AFTER-this-ball figure (same inclusive-fold cue as the
+      // score's "now") — Gate 3 found 2/4 death-over outputs narrating "84 -> 83" without it.
+      frags.push(`Still need ${need} off ${ballsLeft} — required run rate ${rrr}.`);
     } else {
       frags.push(`Phase: ${phaseClause(cur.over, innings, match.oversPerInnings)}`);
     }
