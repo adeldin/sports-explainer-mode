@@ -60,7 +60,7 @@ export interface Game {
 // likewise keeps learnMode:true AND gains liveFormat:'tennis' (its live matches come from the
 // /api/tennis-live endpoint, not ESPN — fetchScoreboard still returns [] for it).
 // `provider` selects the data source: absent/'espn' = ESPN base (default). Future: 'sportradar'.
-export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' | 'tennis'; provider?: 'espn' | 'zyla' };
+export type SportCfg = { espnSport?: string; league?: string; core?: boolean; learnMode?: boolean; liveFormat?: 'leaderboard' | 'tennis'; provider?: 'espn' | 'zyla' | 'cricket' };
 export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   mlb: { espnSport: 'baseball', league: 'mlb' },
   nhl: { espnSport: 'hockey', league: 'nhl' },
@@ -80,10 +80,14 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   // filter in a later gate. Same Core-API two-step fetch as URC/MLR (espnSport 'rugby').
   sixnations: { espnSport: 'rugby', league: '180659', core: true },
   nationschamp: { espnSport: 'rugby', league: '17567', core: true },
-  // Learn Mode sports — tennis/golf fetch tournament context; cricket has no data source.
+  // Learn Mode sports — tennis/golf fetch tournament context.
   tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
   golf: { espnSport: 'golf', league: 'pga', learnMode: true, liveFormat: 'leaderboard' },
-  cricket: { learnMode: true },
+  // Cricket — OUR backend's /api/cricket (committed Cricsheet snapshot), NOT ESPN. The
+  // provider:'cricket' branch in fetchScoreboard diverts to fetchCricketBoard before the ESPN
+  // path. When the backend kill-switch (CRICKET_LIVE) is off the board is [] → LiveScreen's
+  // empty-board clause re-enters learn mode, so the teaching surface is preserved.
+  cricket: { provider: 'cricket' },
 };
 
 // Fetch a single sport's scoreboard and return normalized Game[] (post-dedup,
@@ -112,6 +116,25 @@ async function fetchZylaBoard(
   }
 }
 
+// Cricket board — same posture as fetchZylaBoard (backend-normalized Game[], no key, no
+// re-normalize, best-effort []). Date-aware: with a date the backend filters to that local day
+// (?date=YYYY-MM-DD, matching Cricsheet's match-local date); without one it returns the full
+// board — the nationscup pattern — so the board-derived date-strip effect can find game days.
+const CRICKET_URL = API_URL.replace('/api/explain', '/api/cricket');
+async function fetchCricketBoard(date?: Date): Promise<Game[]> {
+  try {
+    const day = date
+      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      : null;
+    const response = await fetch(day ? `${CRICKET_URL}?date=${day}` : CRICKET_URL, { method: 'GET' });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.matches) ? data.matches : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchScoreboard(
   sport: Sport,
   isCancelled: () => boolean = () => false,
@@ -122,6 +145,8 @@ export async function fetchScoreboard(
   // Zyla-provider sports bypass the entire ESPN path — placed BEFORE the off-season guard on purpose
   // (isOffSeason reads ESPN-shaped SEASON_WINDOWS, which would wrongly short-circuit a Zyla sport).
   if (cfg.provider === 'zyla') return fetchZylaBoard(sport, isCancelled, date);
+  // Cricket bypasses the ESPN path the same way (no SEASON_WINDOWS entry either — kept symmetric).
+  if (cfg.provider === 'cricket') return fetchCricketBoard(date);
   // Off-season → [] for the DEFAULT (today) fetch; an explicit date bypasses this, since the date
   // strip only asks for days discoverGameDays already found to have games (incl. across an
   // offseason gap — e.g. tapping a preseason day for a currently-out-of-season league).

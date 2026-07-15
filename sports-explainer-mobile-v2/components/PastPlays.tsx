@@ -71,7 +71,11 @@ export default function PastPlays({ sport, gameId, level, language }: Props) {
     if (explanations[p.id]) return; // cached
     setExplLoadingId(p.id);
     try {
-      const data = await fetchExplanation(sport, level, gameId, language, p.text);
+      // Cricket: send the delivery KEY, not the row label — the backend reducer rebuilds both the
+      // play line and the state-as-of-that-ball from the key. Other sports send the play text.
+      const data = sport === 'cricket'
+        ? await fetchExplanation(sport, level, gameId, language, undefined, { playKey: p.id })
+        : await fetchExplanation(sport, level, gameId, language, p.text);
       setExplanations(prev => ({ ...prev, [p.id]: data }));
     } catch {
       // leave uncached → next expand retries

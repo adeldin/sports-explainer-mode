@@ -583,11 +583,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [sport]);
 
-  // Merged Rugby tile: derive the date strip's game-days from the board's OWN startTimes (discoverGameDays
-  // can't serve core/Zyla leagues). Recomputes as the merged board changes; always includes today so
-  // there's a "TODAY" cell to return to. Non-rugby sports are unaffected (guarded above + here).
+  // Merged Rugby tile + Cricket: derive the date strip's game-days from the board's OWN startTimes
+  // (discoverGameDays can't serve core/Zyla/cricket leagues — it needs ESPN espnSport/league).
+  // Recomputes as the board changes; always includes today so there's a "TODAY" cell to return to.
+  // Other sports are unaffected (guarded above + here).
   useEffect(() => {
-    if (sport !== 'nationscup') return;
+    if (sport !== 'nationscup' && sport !== 'cricket') return;
     const days = Array.from(new Set(
       games.filter(g => g.startTime).map(g => toLocalDayString(new Date(g.startTime!)))
     ));
@@ -1032,17 +1033,31 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             // FINAL game → Post-Game Recap (premium #1) replaces the PlayCard. Skeleton while
             // fetching, the card when it has content, a graceful "not available" when ESPN had
             // no usable data for this final game.
-            recapLoading && !recap ? (
-              <View style={styles.skeleton}>
-                <View style={[styles.skeletonLine, { width: '50%', height: 24 }]} />
-                <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 14 }]} />
-                <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
-              </View>
-            ) : recap && hasRecapContent(recap) ? (
-              <RecapCard recap={recap} isPro={caps.isPro} sport={selectedSport} language={language} onUnlock={presentPaywall} />
-            ) : !recapLoading ? (
-              <View style={styles.capCard}><Text style={styles.capBody}>{S.recapNoData}</Text></View>
-            ) : null
+            <>
+              {recapLoading && !recap ? (
+                <View style={styles.skeleton}>
+                  <View style={[styles.skeletonLine, { width: '50%', height: 24 }]} />
+                  <View style={[styles.skeletonLine, { width: '90%', height: 14, marginTop: 14 }]} />
+                  <View style={[styles.skeletonLine, { width: '80%', height: 14, marginTop: 8 }]} />
+                </View>
+              ) : recap && hasRecapContent(recap) ? (
+                <RecapCard recap={recap} isPro={caps.isPro} sport={selectedSport} language={language} onUnlock={presentPaywall} />
+              ) : !recapLoading ? (
+                <View style={styles.capCard}><Text style={styles.capBody}>{S.recapNoData}</Text></View>
+              ) : null}
+              {/* Cricket replay: a finished match is the PRODUCT surface for delivery-by-delivery
+                  teaching (Cricsheet is post-match), so the tappable Play-by-Play list renders
+                  under the recap for cricket finals only. Other sports' finals are unchanged. */}
+              {sport === 'cricket' && selectedGameId && (
+                <PastPlays
+                  key={`replay-${sport}-${selectedGameId}-${language}-${level}`}
+                  sport={sport}
+                  gameId={selectedGameId}
+                  level={level}
+                  language={language}
+                />
+              )}
+            </>
           ) : loading && !result ? (
             <View style={styles.skeleton}>
               <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
@@ -1118,7 +1133,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 />
               )}
 
-              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba') && selectedGameId && (
+              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba' || sport === 'cricket') && selectedGameId && (
                 <PastPlays
                   key={`${sport}-${selectedGameId}-${language}-${level}`}
                   sport={sport}

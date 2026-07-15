@@ -193,6 +193,10 @@ export async function fetchExplanation(
   opts?: {
     tennisHome?: string; tennisAway?: string; tennisCategory?: string;
     tennisSets?: { home: number; away: number }[]; tennisStatusDetail?: string;
+    // Cricket only: the tapped delivery's key. The backend reducer derives BOTH the play line
+    // and the state snapshot for that exact ball — cricket rows send playKey INSTEAD of playText
+    // (a client-built row label must never become the model-facing play string).
+    playKey?: string;
   },
 ): Promise<ExplanationResponse> {
   const response = await fetch(API_URL, {
@@ -209,6 +213,7 @@ export async function fetchExplanation(
       tennisCategory: opts?.tennisCategory, // "Men's Singles" | "Women's Singles" → pronoun guidance
       tennisSets: opts?.tennisSets,         // ESPN set scores → grounds the read when no RapidAPI data
       tennisStatusDetail: opts?.tennisStatusDetail, // e.g. "2nd Set"
+      playKey: opts?.playKey,               // cricket only — omitted by JSON.stringify when undefined
     }),
   });
 
@@ -217,7 +222,49 @@ export async function fetchExplanation(
 }
 
 // Lazy-loaded play-by-play list for a game, most-recent-first. [] if unsupported.
+// Cricket deliveries → Play[] rows for the SAME PastPlays list MLB uses. The row text is a UI
+// label ONLY — on tap, PastPlays sends the delivery's key (playKey) and the BACKEND reducer
+// produces the model-facing play + gameContext for that exact ball, so this label never reaches
+// the model. Chronological order REVERSED (most recent first) to match the MLB list.
+const CRICKET_DATA_URL = API_URL.replace('/api/explain', '/api/cricket');
+async function fetchCricketPlays(gameId: string): Promise<Play[]> {
+  try {
+    const res = await fetch(`${CRICKET_DATA_URL}?matchId=${gameId}`);
+    if (!res.ok) return [];
+    const match = (await res.json())?.match;
+    if (!match?.innings) return [];
+    const plays: Play[] = [];
+    for (const inn of match.innings) {
+      for (const over of inn.overs ?? []) {
+        for (const d of over.deliveries ?? []) {
+          const w = d.wicket;
+          const outcome = w
+            ? `OUT — ${w.playerOut?.name ?? ''} (${String(w.kind ?? '').replace('_', ' ')})`
+            : d.runsOffBat === 6 ? 'SIX'
+            : d.runsOffBat === 4 ? 'FOUR'
+            : d.extras?.wides ? `wide${d.extras.wides > 1 ? ` (${d.extras.wides})` : ''}`
+            : d.extras?.noballs ? 'no ball'
+            : d.extras?.byes ? `${d.extras.byes} bye${d.extras.byes > 1 ? 's' : ''}`
+            : d.extras?.legbyes ? `${d.extras.legbyes} leg bye${d.extras.legbyes > 1 ? 's' : ''}`
+            : d.runsTotal === 0 ? 'no run'
+            : `${d.runsTotal} run${d.runsTotal > 1 ? 's' : ''}`;
+          plays.push({
+            id: d.key,
+            text: `${d.label} · ${d.bowler?.name ?? '?'} to ${d.striker?.name ?? '?'} — ${outcome}`,
+            period: `${inn.battingTeam} innings`,
+            scoring: !!w || d.runsOffBat === 4 || d.runsOffBat === 6,
+          });
+        }
+      }
+    }
+    return plays.reverse().slice(0, 300); // a full T20 is ~250 deliveries — keep the whole match tappable
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPlays(sport: Sport, gameId: string): Promise<Play[]> {
+  if (sport === 'cricket') return fetchCricketPlays(gameId);
   const path = SUMMARY_PATHS[sport];
   if (!path) return [];
   const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`);
