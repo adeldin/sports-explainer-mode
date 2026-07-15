@@ -55,18 +55,17 @@ export function reduceForExplain(match: CricketMatch, cursorKey: string): Reduce
     frags.push(`Phase: ${phaseClause(cur.over, innings, match.oversPerInnings)}`);
   }
 
-  // batter + bowler — order mirrors the validated examples: on a wicket, bowler then dismissed
-  // batter (Example A); otherwise striker then bowler (Example B).
-  const bowlerFrag = `Bowler ${cur.bowler.name} ${bowlerFigures(f)}.`;
+  // The batter clause. On a wicket, the dismissed batter's figures; otherwise the striker's.
+  // The bowler's NAME rides in the play line; bowler FIGURES are intentionally omitted —
+  // Gate 1.5 found them unused across all real-data outputs (their apparent value at Gate 0.5
+  // was an artifact of a fabricated figure).
   if (cur.wicket) {
     const out = cur.wicket.playerOut;
     const fig = f.batters.get(out.name) ?? [0, 0];
-    frags.push(bowlerFrag);
     frags.push(`Batter dismissed: ${out.name}, ${fig[0]} off ${fig[1]}.`);
   } else {
     const fig = f.batters.get(cur.striker.name) ?? [0, 0];
     frags.push(`Striker ${cur.striker.name} ${fig[0]} off ${fig[1]}.`);
-    frags.push(bowlerFrag);
   }
 
   return { play, gameContext: frags.join(' ') };
@@ -79,14 +78,12 @@ interface Fold {
   wkts: number;
   legalBalls: number;
   batters: Map<string, [number, number]>; // name -> [runs, balls faced]
-  bowlers: Map<string, [number, number, number]>; // name -> [legalBalls, runsConceded, wickets]
   cursor: CricketDelivery;
 }
 
 function foldInnings(innings: CricketInnings, cursorKey: string): Fold {
   let score = 0, wkts = 0, legalBalls = 0;
   const batters = new Map<string, [number, number]>();
-  const bowlers = new Map<string, [number, number, number]>();
   let cursor: CricketDelivery | undefined;
 
   outer: for (const over of innings.overs) {
@@ -100,17 +97,11 @@ function foldInnings(innings: CricketInnings, cursorKey: string): Fold {
       if (d.isLegal) b[1] += 1; // balls faced counted on legal deliveries (matches validated figures)
       batters.set(d.striker.name, b);
 
-      const bw = bowlers.get(d.bowler.name) ?? [0, 0, 0];
-      if (d.isLegal) bw[0] += 1;
-      bw[1] += d.runsOffBat + d.extras.wides + d.extras.noballs; // byes/leg-byes not charged to bowler
-      if (d.wicket && bowlerCredited(d.wicket.kind)) bw[2] += 1;
-      bowlers.set(d.bowler.name, bw);
-
       if (d.key === cursorKey) { cursor = d; break outer; }
     }
   }
   if (!cursor) throw new Error(`[reducer] cursor key not in innings: ${cursorKey}`);
-  return { score, wkts, legalBalls, batters, bowlers, cursor };
+  return { score, wkts, legalBalls, batters, cursor };
 }
 
 function locateCursor(match: CricketMatch, cursorKey: string): { innings: CricketInnings } | null {
@@ -131,11 +122,6 @@ function firstInningsTotal(match: CricketMatch): number {
 }
 
 // ---- string builders ----
-
-function bowlerFigures(f: Fold): string {
-  const [balls, runs, wkts] = f.bowlers.get(f.cursor.bowler.name) ?? [0, 0, 0];
-  return `${Math.floor(balls / 6)}.${balls % 6}–${runs}–${wkts}`; // en-dash separators
-}
 
 function playWicket(d: CricketDelivery, f: Fold): string {
   const w = d.wicket as CricketWicket;
@@ -185,10 +171,6 @@ function phaseClause(over: number, innings: CricketInnings, oversPerInnings: num
     return `death (overs ${oversPerInnings - 4}–${oversPerInnings}).`;
   }
   return `middle overs.`;
-}
-
-function bowlerCredited(kind: CricketWicket['kind']): boolean {
-  return kind === 'bowled' || kind === 'caught' || kind === 'lbw' || kind === 'stumped' || kind === 'hit_wicket';
 }
 
 const plural = (n: number) => (n === 1 ? '' : 's');

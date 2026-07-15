@@ -656,6 +656,14 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
     ? ` The 'Last pitch' line is real data you may reference (the pitch type, velocity, and location shown). Do NOT invent any pitch detail beyond what that line states — no counts, no prior pitches in the sequence, no spin or movement not given.`
     : '';
 
+  // Cricket-only grounding (sport === 'cricket' → clause; any other sport → '' → prompt byte-identical).
+  // The delivery data gives batter/bowler/outcome (+ dismissal kind) but NOTHING about how the ball
+  // was bowled or hit, so the model invents line/length and shot type (Gate 1.5: ~4-5 of 16 outputs).
+  // Redirect to where the teaching actually lives rather than merely forbidding.
+  const cricketGrounding = sport === 'cricket'
+    ? ` CRICKET GROUNDING: the data gives the batter, bowler, and outcome — and on a wicket, who is out and the dismissal kind. It does NOT tell you how the ball was bowled or how it was hit. Do NOT invent the delivery's line or length (no "fuller ball", "short", "yorker", "wide line"), the shot played (no "lofted drive", "mistimed pull", "cut"), or any dismissal mechanics beyond the stated kind. Teach from the match situation — the phase, the required rate, the batter's form, what the outcome means for the game.`
+    : '';
+
   return `Sport: ${sport.toUpperCase()}
 Game situation: ${gameContext}
 Play data: "${play}"${pitchLine ? `\n${pitchLine}` : ''}
@@ -684,7 +692,7 @@ Rules for JSON flags:
 - "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
 - If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
 
-CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${genericRule}`;
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${genericRule}`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
