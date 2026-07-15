@@ -12,6 +12,11 @@ interface Game {
   awayScore: string;
   homeLogo?: string;
   awayLogo?: string;
+  // Flag/crest presentation value (cricket national sides): emoji OR an https URL. The renderer
+  // branches Text-vs-Image on the value so a future licensed flag-art source is a backend
+  // values-only swap. Absent → the existing null-render (name-only row), same as a missing logo.
+  homeFlag?: string;
+  awayFlag?: string;
   status: string;
   isLive: boolean;
   sport: string;
@@ -109,6 +114,10 @@ export default function GameCard({ game, isSelected, isFavorite, onPress, onTogg
             <View style={styles.teamLeft}>
               {game.awayLogo ? (
                 <Image source={{ uri: game.awayLogo }} style={styles.logo} resizeMode="contain" />
+              ) : game.awayFlag ? (
+                game.awayFlag.startsWith('http')
+                  ? <Image source={{ uri: game.awayFlag }} style={styles.logo} resizeMode="contain" />
+                  : <Text style={styles.flag}>{game.awayFlag}</Text>
               ) : null}
               <Text style={[styles.teamName, { color: onCard }]} numberOfLines={1}>{game.awayTeam}</Text>
             </View>
@@ -118,6 +127,10 @@ export default function GameCard({ game, isSelected, isFavorite, onPress, onTogg
             <View style={styles.teamLeft}>
               {game.homeLogo ? (
                 <Image source={{ uri: game.homeLogo }} style={styles.logo} resizeMode="contain" />
+              ) : game.homeFlag ? (
+                game.homeFlag.startsWith('http')
+                  ? <Image source={{ uri: game.homeFlag }} style={styles.logo} resizeMode="contain" />
+                  : <Text style={styles.flag}>{game.homeFlag}</Text>
               ) : null}
               <Text style={[styles.teamName, { color: onCard }]} numberOfLines={1}>{game.homeTeam}</Text>
             </View>
@@ -163,6 +176,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   teamRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   teamLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8, marginRight: 8 },
   logo: { width: 24, height: 24 },
+  // Emoji flag in the logo slot: sized so its rendered width ≈ the 24px logo box, keeping cricket
+  // rows aligned with MLB rows. A ~19px glyph + the row's gap leaves the name column its 12a width
+  // — the flag must never re-crush what the short scores freed (Gate 12 Bug 1).
+  flag: { fontSize: 16, width: 24, textAlign: 'center' },
   teamName: { fontSize: 13, fontWeight: '700', flex: 1 },
   score: { fontSize: 18, fontWeight: '900' },
   status: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },

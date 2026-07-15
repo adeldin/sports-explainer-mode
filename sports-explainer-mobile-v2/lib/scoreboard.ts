@@ -48,6 +48,11 @@ export interface Game {
   weather?: { displayValue?: string; temperature?: number }; // outdoor-MLB color; absent elsewhere
   stage?: string;        // prettified season stage/round, e.g. "Round of 32" — educational stakes
                          // context for newcomers. From event.season.slug; "regular-season" suppressed.
+  // --- ADDITIVE (Gate 12): team flag/crest presentation values (cricket national sides today).
+  // Emoji OR an https URL — GameCard branches Text-vs-Image on the value, so a future licensed
+  // flag-art source is a backend values-only swap. Unset for every non-cricket sport. ---
+  homeFlag?: string;
+  awayFlag?: string;
   sport: string;
 }
 
@@ -117,16 +122,15 @@ async function fetchZylaBoard(
 }
 
 // Cricket board — same posture as fetchZylaBoard (backend-normalized Game[], no key, no
-// re-normalize, best-effort []). Date-aware: with a date the backend filters to that local day
-// (?date=YYYY-MM-DD, matching Cricsheet's match-local date); without one it returns the full
-// board — the nationscup pattern — so the board-derived date-strip effect can find game days.
+// re-normalize, best-effort []). ALWAYS fetches the FULL board (no date param) — the rugby
+// client-filter model: date filtering happens in LiveScreen's displayGames, so `games` never
+// shrinks, the board-derived date strip stays mounted across date taps, and an empty date can't
+// trip learnMode's empty-board clause (Gate 12 Bug 2: server-filtering stranded the user on a
+// dateless EmptyState). The API keeps ?date= support; mobile deliberately doesn't use it.
 const CRICKET_URL = API_URL.replace('/api/explain', '/api/cricket');
-async function fetchCricketBoard(date?: Date): Promise<Game[]> {
+async function fetchCricketBoard(): Promise<Game[]> {
   try {
-    const day = date
-      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-      : null;
-    const response = await fetch(day ? `${CRICKET_URL}?date=${day}` : CRICKET_URL, { method: 'GET' });
+    const response = await fetch(CRICKET_URL, { method: 'GET' });
     if (!response.ok) return [];
     const data = await response.json();
     return Array.isArray(data?.matches) ? data.matches : [];
@@ -146,7 +150,8 @@ export async function fetchScoreboard(
   // (isOffSeason reads ESPN-shaped SEASON_WINDOWS, which would wrongly short-circuit a Zyla sport).
   if (cfg.provider === 'zyla') return fetchZylaBoard(sport, isCancelled, date);
   // Cricket bypasses the ESPN path the same way (no SEASON_WINDOWS entry either — kept symmetric).
-  if (cfg.provider === 'cricket') return fetchCricketBoard(date);
+  // Note: the date arg is deliberately NOT forwarded — cricket client-filters (see fetchCricketBoard).
+  if (cfg.provider === 'cricket') return fetchCricketBoard();
   // Off-season → [] for the DEFAULT (today) fetch; an explicit date bypasses this, since the date
   // strip only asks for days discoverGameDays already found to have games (incl. across an
   // offseason gap — e.g. tapping a preseason day for a currently-out-of-season league).

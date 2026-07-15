@@ -159,6 +159,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Merged Rugby tile league filter: 'all' → the full merged board; a league key → just that league's
   // games (each keeps its own .sport). No-op (returns raw `games`) for every non-rugby sport.
   const displayGames = useMemo(() => {
+    // Cricket: the fetch always returns the FULL board (rugby's client-filter model), so the date
+    // filter lives HERE — `games` never shrinks, the date strip stays mounted, and an empty date
+    // can't trip learnMode's empty-board clause (Gate 12 Bug 2). This is also the exact branch a
+    // future cricket league filter (Gate 11 pills) slots into, mirroring rugbyLeague below.
+    if (sport === 'cricket') {
+      if (!selectedDate) return games;
+      const day = toLocalDayString(selectedDate);
+      return games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
+    }
     if (sport !== 'nationscup') return games;
     let out = games;
     if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
