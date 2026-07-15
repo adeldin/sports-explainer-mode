@@ -13,6 +13,10 @@ import type { SignalKey } from './signalDecoder';
 //   that is genuinely static (a held card, a pointing arm) is one keyframe.
 // - The figure is a filled SILHOUETTE (solid head/torso, thick rounded limbs)
 //   — filled shapes read far better at phone size than hairline stick figures.
+// - HANDS (v2.1 owner-QA pass): the default hand is a clean solid BALL. Finger
+//   glyphs appear ONLY where fingers ARE the meaning: an exact even count
+//   (point/two/three), or open-vs-closed as the signal itself (palm = slab +
+//   even 5-finger fan; flat = paddle). No decorative splays — they read mangled.
 // - Overlap legibility: every limb is drawn twice — a wider background-colored
 //   "outline" pass, then the fill pass — so arms crossing the head, torso, or
 //   each other stay cleanly separated (this fixes v1's mangled-head bug).
@@ -50,14 +54,17 @@ export type Prim =
 
 // ── skeleton geometry ────────────────────────────────────────────────────────
 type Pt = { x: number; y: number };
+// HAND POLICY (owner QA pass): the default hand is a clean solid BALL. Fingers
+// appear ONLY where they carry the meaning (a count, or open-vs-closed IS the
+// signal). Every finger glyph is an even, unambiguous fan — no lopsided splays.
 type Grip =
-  | 'none'    // clean rounded limb end
-  | 'fist'    // solid knuckle ball
-  | 'palm'    // open hand: hub + 5 splayed finger rays
-  | 'point'   // hub + one long index finger
-  | 'flat'    // flat hand: bar perpendicular to the forearm
-  | 'two' | 'three'  // hub + N finger rays
-  | 'thumb'   // fist + thumb ray
+  | 'none'    // default hand: clean knuckle ball
+  | 'fist'    // emphatic fist: slightly bigger ball
+  | 'palm'    // OPEN hand (meaning-bearing): palm slab + even 5-finger fan
+  | 'point'   // ball + ONE long index finger (obviously singular)
+  | 'flat'    // flat blade/paddle hand along the forearm (sweeps, chops, taps)
+  | 'two' | 'three'  // ball + exactly N clean evenly-spaced fingers (counts only)
+  | 'thumb'   // ball + one short upward thumb stub (jump ball only)
   | 'cardY' | 'cardR' // holding a card
   | 'flag';   // holding an assistant referee's flag
 
@@ -124,30 +131,34 @@ function handPrims(arm: Arm): { out: Prim[]; fill: Prim[] } {
     fill.push(seg(a, b, w, SG.body));
   };
   switch (grip) {
-    case 'none': break;
+    // Default + fist: a clean solid ball. No spokes, no nubs — at phone scale a
+    // round knuckle ball is the only closed-hand shape that never reads mangled.
+    case 'none': dot(h, 10); break;
     case 'fist': dot(h, 12); break;
+    // Open hand: a solid palm slab with an EVEN fan of exactly 5 fingers. The
+    // slab is drawn after the finger fills so the fingers emerge from a solid
+    // palm instead of radiating from a bare point (v2's "broken star" bug).
     case 'palm': {
-      dot(h, 8);
-      [-40, -20, 0, 20, 40].forEach(a => ray(h, add(h, rot(u, a), 20), 5));
+      [-36, -18, 0, 18, 36].forEach(a => ray(h, add(h, rot(u, a), 24), 5.5));
+      ray(add(h, u, -8), add(h, u, 0), 16); // palm slab covers the finger bases
       break;
     }
-    case 'point': dot(h, 8); ray(h, add(h, u, 25), 7); break;
-    case 'flat': {
-      const p = rot(u, 90);
-      ray(add(h, p, 16), add(h, p, -16), 9);
-      break;
-    }
+    // One finger: knuckle ball + a single LONG index finger along the forearm
+    // line — long enough that "exactly one finger" is unmistakable.
+    case 'point': dot(h, 10); ray(h, add(h, u, 30), 7); break;
+    // Flat hand: a clean paddle continuing the forearm, visibly WIDER than the
+    // arm and ring-separated at the wrist (was a perpendicular bar, which read
+    // as a mallet/claw at phone size).
+    case 'flat': ray(add(h, u, -2), add(h, u, 14), 20); break;
+    // Finger counts: knuckle ball + exactly N clean, evenly spaced fingers.
     case 'two': case 'three': {
-      dot(h, 8);
-      (grip === 'two' ? [-13, 13] : [-22, 0, 22]).forEach(a => ray(h, add(h, rot(u, a), 20), 5));
+      dot(h, 10);
+      (grip === 'two' ? [-14, 14] : [-20, 0, 20]).forEach(a => ray(h, add(h, rot(u, a), 27), 6));
       break;
     }
-    case 'thumb': {
-      dot(h, 11);
-      const p1 = rot(u, 90), p2 = rot(u, -90);
-      ray(h, add(h, p1.y < p2.y ? p1 : p2, 17), 6); // thumb points up
-      break;
-    }
+    // Thumbs-up: ball + one SHORT screen-up stub (short + stubby so it can never
+    // be misread as a 1-finger point, which is long and along the forearm).
+    case 'thumb': dot(h, 11); ray(h, { x: h.x, y: h.y - 22 }, 10); break;
     case 'cardY': case 'cardR': {
       const c = add(h, u, 18);
       out.push({ k: 'rect', x: c.x - 16, y: c.y - 22, w: 32, h: 44, rx: 5, f: SG.panel });
@@ -176,10 +187,14 @@ function armPrims(shoulder: Pt, arm: Arm): Prim[] {
     // outline pass (separates this arm from whatever is behind it)
     seg(shoulder, arm.e, ARM_W + OUTLINE, SG.panel),
     seg(arm.e, arm.h, ARM_W + OUTLINE, SG.panel),
-    ...hand.out,
     // fill pass
     seg(shoulder, arm.e, ARM_W, SG.body),
     seg(arm.e, arm.h, ARM_W, SG.body),
+    // hand LAST, outline included — the hand's outline draws OVER the arm fill,
+    // cutting a thin separation ring at the wrist so the ball/paddle/finger-fan
+    // reads as a distinct HAND, not a bulge of the forearm (owner-QA fix: with
+    // the old order the arm fill swallowed the glyph and hands vanished).
+    ...hand.out,
     ...hand.fill,
   ];
 }
@@ -216,12 +231,13 @@ function figurePrims(f: Frame): Prim[] {
 // ── shared poses ─────────────────────────────────────────────────────────────
 const REST_L: Arm = { e: { x: 154, y: 180 }, h: { x: 160, y: 236 }, grip: 'none' };
 const REST_R: Arm = { e: { x: 246, y: 180 }, h: { x: 240, y: 236 }, grip: 'none' };
-const UP_L = (grip: Grip = 'none'): Arm => ({ e: { x: 160, y: 62 }, h: { x: 156, y: 8 }, grip });
-const UP_R = (grip: Grip = 'none'): Arm => ({ e: { x: 240, y: 62 }, h: { x: 244, y: 8 }, grip });
-// "Up with a hand glyph": slightly lower so the palm/fist/finger glyph is never
-// clipped by the panel's top edge (QA finding — the NBA fist/palm pair depends on it).
-const UPG_L = (grip: Grip): Arm => ({ e: { x: 162, y: 76 }, h: { x: 157, y: 26 }, grip });
-const UPG_R = (grip: Grip): Arm => ({ e: { x: 238, y: 76 }, h: { x: 243, y: 26 }, grip });
+// (hand y=20: even the default knuckle ball stays clear of the panel's top edge)
+const UP_L = (grip: Grip = 'none'): Arm => ({ e: { x: 160, y: 66 }, h: { x: 156, y: 20 }, grip });
+const UP_R = (grip: Grip = 'none'): Arm => ({ e: { x: 240, y: 66 }, h: { x: 244, y: 20 }, grip });
+// "Up with a hand glyph": lower still so the finger/palm fan is never clipped by
+// the panel's top edge (QA finding — the NBA fist/palm pair depends on it).
+const UPG_L = (grip: Grip): Arm => ({ e: { x: 162, y: 80 }, h: { x: 157, y: 36 }, grip });
+const UPG_R = (grip: Grip): Arm => ({ e: { x: 238, y: 80 }, h: { x: 243, y: 36 }, grip });
 const OUT_L = (grip: Grip = 'none'): Arm => ({ e: { x: 120, y: 118 }, h: { x: 64, y: 118 }, grip });
 const OUT_R = (grip: Grip = 'none'): Arm => ({ e: { x: 280, y: 118 }, h: { x: 336, y: 118 }, grip });
 const HIPS_L: Arm = { e: { x: 138, y: 170 }, h: { x: 172, y: 216 }, grip: 'fist' };
@@ -242,13 +258,16 @@ function rollingFists(): Frame[] {
 }
 
 // Generated keyframes: one hand tracing a circle overhead (home run / free hit).
+// Circle sits low enough that the pointing finger (which extends ~33 beyond the
+// wrist, roughly upward all the way around since the elbow stays below the
+// circle) never clips the panel top, and right enough to clear the head.
 function overheadCircle(grip: Grip): Frame[] {
-  const C = { x: 238, y: 30 }, R = 26, N = 8;
+  const C = { x: 262, y: 64 }, R = 20, N = 8;
   return Array.from({ length: N }, (_, i) => {
     const a = (i / N) * Math.PI * 2;
     return {
       l: REST_L,
-      r: { e: { x: 246, y: 80 }, h: { x: C.x + R * Math.cos(a), y: C.y + R * Math.sin(a) }, grip },
+      r: { e: { x: 258, y: 110 }, h: { x: C.x + R * Math.cos(a), y: C.y + R * Math.sin(a) }, grip },
     };
   });
 }
@@ -310,7 +329,7 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   // Home run: index finger circling overhead.
   'mlb-homerun': { frames: overheadCircle('point'), mode: 'cycle', ease: 'linear', loopMs: 1500 },
   // Infield fly: arm straight up, finger pointing skyward, held.
-  'mlb-infield-fly': { frames: [{ l: REST_L, r: { e: { x: 238, y: 82 }, h: { x: 243, y: 34 }, grip: 'point' } }] },
+  'mlb-infield-fly': { frames: [{ l: REST_L, r: { e: { x: 238, y: 82 }, h: { x: 243, y: 44 }, grip: 'point' } }] },
   // The count: balls on the left hand, strikes on the right (3–2 shown), held.
   'mlb-count': {
     frames: [{
@@ -318,16 +337,17 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
       r: { e: { x: 254, y: 160 }, h: { x: 260, y: 104 }, grip: 'two' },
     }],
   },
-  // Foul tip: one hand brushes up and off the back of the other.
+  // Foul tip: one flat hand brushes up and off the back of the other (both flat
+  // paddles — the brushing MOTION is the signal, fingers carry no meaning here).
   'mlb-foul-tip': {
     frames: [
       {
         l: { e: { x: 158, y: 182 }, h: { x: 196, y: 170 }, grip: 'flat' },
-        r: { e: { x: 250, y: 152 }, h: { x: 212, y: 152 }, grip: 'palm' },
+        r: { e: { x: 250, y: 152 }, h: { x: 212, y: 152 }, grip: 'flat' },
       },
       {
         l: { e: { x: 158, y: 182 }, h: { x: 196, y: 170 }, grip: 'flat' },
-        r: { e: { x: 242, y: 120 }, h: { x: 272, y: 96 }, grip: 'palm' },
+        r: { e: { x: 242, y: 120 }, h: { x: 272, y: 96 }, grip: 'flat' },
       },
     ],
     loopMs: 1100,
@@ -418,8 +438,8 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'nfl-personal-foul': {
     frames: [
       {
-        l: { e: { x: 146, y: 60 }, h: { x: 208, y: 24 }, grip: 'fist' },
-        r: { e: { x: 256, y: 62 }, h: { x: 266, y: 20 }, grip: 'fist' },
+        l: { e: { x: 146, y: 60 }, h: { x: 208, y: 26 }, grip: 'fist' },
+        r: { e: { x: 256, y: 62 }, h: { x: 266, y: 26 }, grip: 'fist' },
       },
       {
         l: { e: { x: 146, y: 60 }, h: { x: 208, y: 24 }, grip: 'fist' },
@@ -428,11 +448,12 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
     ],
     loopMs: 1000,
   },
-  // Safety: palms pressed together straight above the head, held.
+  // Safety: palms pressed together straight above the head, held (the two hand
+  // balls overlap into one joined shape — that IS the read).
   'nfl-safety': {
     frames: [{
-      l: { e: { x: 168, y: 64 }, h: { x: 196, y: 10 }, grip: 'none' },
-      r: { e: { x: 232, y: 64 }, h: { x: 204, y: 10 }, grip: 'none' },
+      l: { e: { x: 168, y: 66 }, h: { x: 196, y: 22 }, grip: 'none' },
+      r: { e: { x: 232, y: 66 }, h: { x: 204, y: 22 }, grip: 'none' },
     }],
   },
   // Delay of game: arms folded across the chest, held.
@@ -446,12 +467,12 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'nfl-timeout': {
     frames: [
       {
-        l: { e: { x: 166, y: 70 }, h: { x: 238, y: 18 }, grip: 'palm' },
-        r: { e: { x: 234, y: 70 }, h: { x: 162, y: 18 }, grip: 'palm' },
+        l: { e: { x: 166, y: 70 }, h: { x: 238, y: 36 }, grip: 'palm' },
+        r: { e: { x: 234, y: 70 }, h: { x: 162, y: 36 }, grip: 'palm' },
       },
       {
-        l: { e: { x: 150, y: 74 }, h: { x: 118, y: 26 }, grip: 'palm' },
-        r: { e: { x: 250, y: 74 }, h: { x: 282, y: 26 }, grip: 'palm' },
+        l: { e: { x: 150, y: 74 }, h: { x: 118, y: 38 }, grip: 'palm' },
+        r: { e: { x: 250, y: 74 }, h: { x: 282, y: 38 }, grip: 'palm' },
       },
     ],
     loopMs: 1000,
@@ -517,11 +538,12 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
     ],
     loopMs: 1200,
   },
-  // Shot-clock violation: fingertips TAP the top of the same-side shoulder.
+  // Shot-clock violation: the flat hand TAPS the top of the same-side shoulder
+  // (flat paddle — the tap is the signal; a finger COUNT here would mislead).
   'nba-shot-clock': {
     frames: [
-      { l: REST_L, r: { e: { x: 266, y: 148 }, h: { x: 246, y: 94 }, grip: 'two' } },
-      { l: REST_L, r: { e: { x: 264, y: 152 }, h: { x: 240, y: 110 }, grip: 'two' } },
+      { l: REST_L, r: { e: { x: 266, y: 148 }, h: { x: 246, y: 94 }, grip: 'flat' } },
+      { l: REST_L, r: { e: { x: 264, y: 152 }, h: { x: 240, y: 110 }, grip: 'flat' } },
     ],
     loopMs: 800,
   },
@@ -687,8 +709,8 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   // Penalty shot: arms crossed in a STATIC X above the head.
   'nhl-penalty-shot': {
     frames: [{
-      l: { e: { x: 168, y: 72 }, h: { x: 244, y: 20 }, grip: 'fist' },
-      r: { e: { x: 232, y: 72 }, h: { x: 156, y: 20 }, grip: 'fist' },
+      l: { e: { x: 168, y: 72 }, h: { x: 244, y: 26 }, grip: 'fist' },
+      r: { e: { x: 232, y: 72 }, h: { x: 156, y: 26 }, grip: 'fist' },
     }],
   },
 
@@ -697,9 +719,9 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'soc-yellow': {
     frames: [
       { l: REST_L, r: { e: { x: 248, y: 158 }, h: { x: 222, y: 124 }, grip: 'cardY' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardY' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardY' } },
     ],
     loopMs: 2200,
   },
@@ -707,9 +729,9 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'soc-red': {
     frames: [
       { l: REST_L, r: { e: { x: 248, y: 158 }, h: { x: 222, y: 124 }, grip: 'cardR' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
-      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 260, y: 32 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardR' } },
+      { l: REST_L, r: { e: { x: 244, y: 84 }, h: { x: 254, y: 50 }, grip: 'cardR' } },
     ],
     loopMs: 2200,
   },
@@ -797,8 +819,8 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   // Knock-on: open hand WAVING back and forth above the head.
   'rug-knock-on': {
     frames: [
-      { l: REST_L, r: { e: { x: 240, y: 70 }, h: { x: 200, y: 20 }, grip: 'palm' } },
-      { l: REST_L, r: { e: { x: 248, y: 72 }, h: { x: 286, y: 28 }, grip: 'palm' } },
+      { l: REST_L, r: { e: { x: 240, y: 70 }, h: { x: 204, y: 34 }, grip: 'palm' } },
+      { l: REST_L, r: { e: { x: 248, y: 72 }, h: { x: 282, y: 38 }, grip: 'palm' } },
     ],
     loopMs: 950,
   },
@@ -865,10 +887,10 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   // Out: the index finger raised, slow and solemn, then held high.
   'crk-out': {
     frames: [
-      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 228, y: 120 }, grip: 'point' } },
-      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
-      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
-      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 250, y: 30 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 246, y: 152 }, h: { x: 244, y: 112 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 252, y: 44 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 252, y: 44 }, grip: 'point' } },
+      { l: REST_L, r: { e: { x: 238, y: 78 }, h: { x: 252, y: 44 }, grip: 'point' } },
     ],
     loopMs: 2200,
   },
@@ -888,17 +910,18 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'crk-noball': { frames: [{ l: REST_L, r: OUT_R() }] },
   // Bye: an OPEN HAND raised above the head, held (vs out's single finger).
   'crk-bye': { frames: [{ l: REST_L, r: UPG_R('palm') }] },
-  // Leg bye: the hand TAPS the raised knee.
+  // Leg bye: the flat hand TAPS the raised knee (paddle — the tap, not fingers,
+  // is the signal).
   'crk-legbye': {
     frames: [
       {
         l: REST_L,
-        r: { e: { x: 258, y: 172 }, h: { x: 268, y: 208 }, grip: 'palm' },
+        r: { e: { x: 258, y: 172 }, h: { x: 268, y: 208 }, grip: 'flat' },
         legs: { l: DEFAULT_LEGS.l, r: [{ x: 264, y: 240 }, { x: 258, y: 330 }] },
       },
       {
         l: REST_L,
-        r: { e: { x: 260, y: 178 }, h: { x: 266, y: 228 }, grip: 'palm' },
+        r: { e: { x: 260, y: 178 }, h: { x: 266, y: 228 }, grip: 'flat' },
         legs: { l: DEFAULT_LEGS.l, r: [{ x: 264, y: 240 }, { x: 258, y: 330 }] },
       },
     ],
@@ -918,22 +941,24 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
     ],
     loopMs: 1150,
   },
-  // Short run: fingertips TAP the NEAR (same-side) shoulder — the arm does NOT cross.
+  // Short run: the flat hand TAPS the NEAR (same-side) shoulder — the arm does
+  // NOT cross (paddle: the tap is the signal, a finger count would mislead).
   'crk-short-run': {
     frames: [
-      { l: REST_L, r: { e: { x: 268, y: 148 }, h: { x: 248, y: 94 }, grip: 'two' } },
-      { l: REST_L, r: { e: { x: 266, y: 152 }, h: { x: 242, y: 110 }, grip: 'two' } },
+      { l: REST_L, r: { e: { x: 268, y: 148 }, h: { x: 248, y: 94 }, grip: 'flat' } },
+      { l: REST_L, r: { e: { x: 266, y: 152 }, h: { x: 242, y: 110 }, grip: 'flat' } },
     ],
     loopMs: 800,
   },
   // Free hit: the arm circling overhead (follows a no-ball in white-ball cricket).
   'crk-free-hit': { frames: overheadCircle('point'), mode: 'cycle', ease: 'linear', loopMs: 1500 },
   // 5 penalty runs to the BATTING side: repeatedly TAPPING the OPPOSITE shoulder
-  // (the arm crosses the chest — and it MOVES).
+  // (the arm crosses the chest — and it MOVES). Flat paddle, same hand as its
+  // static twin below; the tap-vs-placed MOTION carries the distinction.
   'crk-penalty-bat': {
     frames: [
-      { l: REST_L, r: { e: { x: 232, y: 162 }, h: { x: 184, y: 96 }, grip: 'palm' } },
-      { l: REST_L, r: { e: { x: 230, y: 166 }, h: { x: 176, y: 112 }, grip: 'palm' } },
+      { l: REST_L, r: { e: { x: 232, y: 162 }, h: { x: 184, y: 96 }, grip: 'flat' } },
+      { l: REST_L, r: { e: { x: 230, y: 166 }, h: { x: 176, y: 112 }, grip: 'flat' } },
     ],
     loopMs: 750,
   },
@@ -941,11 +966,12 @@ export const SIGNAL_ANIMS: Record<SignalKey, SignalAnim> = {
   'crk-penalty-field': {
     frames: [{ l: REST_L, r: { e: { x: 230, y: 166 }, h: { x: 174, y: 110 }, grip: 'flat' } }],
   },
-  // Revoke last signal: BOTH hands crossed to touch the opposite shoulders, held.
+  // Revoke last signal: BOTH hands crossed to touch the opposite shoulders, held
+  // (flat paddles — a double finger-fan at the neck read as a mangled tangle).
   'crk-revoke': {
     frames: [{
-      l: { e: { x: 176, y: 170 }, h: { x: 228, y: 110 }, grip: 'palm' },
-      r: { e: { x: 224, y: 170 }, h: { x: 172, y: 110 }, grip: 'palm' },
+      l: { e: { x: 176, y: 170 }, h: { x: 228, y: 110 }, grip: 'flat' },
+      r: { e: { x: 224, y: 170 }, h: { x: 172, y: 110 }, grip: 'flat' },
     }],
   },
   // TV referral: mimes a TV screen — the decision goes upstairs.
