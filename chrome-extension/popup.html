@@ -133,22 +133,30 @@
     /* ── Account status strip ────────────────────────────────────────────────
        ONE strip under the header — never a header chip AND a body row saying the same
        thing. Dark-only: the overlay's theme system lives in content.js and is
-       deliberately NOT ported here. */
+       deliberately NOT ported here.
+       Signed-in is a COLUMN: identity line on top (full width — the email ellipsizes
+       instead of hiding behind the Upgrade button), actions on their own row below. */
     #account-strip {
       background: #152444;
       border: 1px solid #2a3d63;
       border-radius: 6px;
       padding: 9px 10px;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 7px;
     }
     #account-strip .who {
-      flex: 1;
       min-width: 0;
       font-size: 11px;
       line-height: 1.35;
       color: #a9b4c9;
+    }
+    /* Actions row — Upgrade leads, Sign out trails as a quiet link. */
+    #account-strip .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     /* Signed-out: "Start free" LEADS. Sign-in is the quiet secondary option — never a
        big orange button, which would read as "you must sign in." You don't. */
@@ -160,10 +168,11 @@
       margin-bottom: 2px;
     }
     /* inline-block + max-width so a long email ellipsizes but the " · Free/Pro" badge that
-       follows it stays on the same line and always stays visible. */
+       follows it stays on the same line and always stays visible. The identity line now owns
+       the strip's full width (actions moved to their own row), so this can be generous. */
     #account-strip .email {
       display: inline-block;
-      max-width: 130px;
+      max-width: 165px;
       vertical-align: bottom;
       color: #f5ecd7;
       font-weight: 700;
@@ -250,7 +259,9 @@
 
     <!-- Sport Picker. The first option is a real placeholder (value="") so NOTHING is
          pre-selected — this is also what fixes the old bug where picking the already-
-         displayed NFL fired no 'change' event and silently loaded no games. -->
+         displayed NFL fired no 'change' event and silently loaded no games.
+         Values are GROUP keys; grouped sports (soccer/rugby/cricket) open the league
+         dropdown below, and the actual leaf sport key comes from that. -->
     <div>
       <label>Sport</label>
       <select id="sport-select">
@@ -258,10 +269,20 @@
         <option value="nfl">🏈 NFL</option>
         <option value="mlb">⚾ MLB</option>
         <option value="nba">🏀 NBA</option>
+        <option value="wnba">🏀 WNBA</option>
         <option value="nhl">🏒 NHL</option>
-        <option value="soccer">⚽ MLS</option>
+        <option value="soccer">⚽ Soccer</option>
         <option value="worldcup">🌍 World Cup</option>
         <option value="rugby">🏉 Rugby</option>
+        <option value="cricket">🏏 Cricket</option>
+      </select>
+    </div>
+
+    <!-- League Picker — only for grouped sports (soccer/rugby/cricket). Filled by popup.js. -->
+    <div id="league-section" style="display:none;">
+      <label>League</label>
+      <select id="league-select">
+        <option value="">— Pick a league —</option>
       </select>
     </div>
 
@@ -295,6 +316,7 @@
 
   </div>
 
+  <script src="sports.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -327,15 +327,64 @@
     { term: "line break", def: "When an attacker bursts clean through the defensive line into open space behind it. One of the most dangerous moments in rugby — a line break often leads to a try if support arrives.", aliases: ["line breaks","linebreak","break the line"] },
   ];
 
-  // Keyed by the EXTENSION's sport keys. soccer + worldcup share the soccer list.
+  // Curated cricket glossary — 34 terms, PORTED VERBATIM from
+  // sports-explainer-mobile-v2/lib/glossary/cricket.ts (same drop of TS types / `sport` /
+  // `match` fields as every other list here). Do NOT rewrite definitions — keep in sync with the app.
+  const CRICKET = [
+    { term: "bat", def: "The flat wooden tool the batter uses to hit the ball." },
+    { term: "ball", def: "The hard ball the bowler delivers toward the batter." },
+    { term: "wicket", def: "The three upright stumps the bowler aims at; also means a batter getting out." },
+    { term: "stumps", def: "The three wooden posts at each end of the pitch." },
+    { term: "batter", def: "The player trying to score runs by hitting the ball. Two bat at once." },
+    { term: "bowler", def: "The player who delivers the ball toward the batter." },
+    { term: "fielder", def: "A player who stops the ball, catches it, or helps get a batter out." },
+    { term: "wicketkeeper", def: "The fielder crouched behind the stumps in gloves." },
+    { term: "run", def: "The basic scoring unit — batters run between the wickets." },
+    { term: "boundary", def: "The edge of the field; reaching it scores extra runs." },
+    { term: "four", def: "A boundary worth four runs, reached along the ground." },
+    { term: "six", def: "A boundary worth six, cleared without bouncing — the biggest hit." },
+    { term: "over", def: "A set of six legal balls from one bowler." },
+    { term: "innings", def: "A team's turn to bat." },
+    { term: "pitch", def: "The central strip where the bowler delivers and the batter faces." },
+    { term: "crease", def: "The marked lines showing safe areas and delivery limits." },
+    { term: "out", def: "When a batter is dismissed and replaced by a teammate." },
+    { term: "bowled", def: "Out when the delivery hits the wicket and knocks the bails off." },
+    { term: "caught", def: "Out when a fielder catches the hit ball before it bounces." },
+    { term: "lbw", def: "Out when the ball hits the leg and would have hit the wicket." },
+    { term: "run out", def: "Out when the wicket is broken while the batter is short of safety." },
+    { term: "stumped", def: "Out when the keeper breaks the wicket as the batter strays out." },
+    { term: "delivery", def: "One ball bowled to the batter." },
+    { term: "no-ball", def: "An illegal delivery; the batting team gets an extra run and ball." },
+    { term: "wide", def: "A delivery too far to reach; an extra run and usually a re-bowl." },
+    { term: "dot ball", def: "A delivery off which no runs are scored, building pressure." },
+    { term: "maiden over", def: "An over with no runs scored — a very tight over." },
+    { term: "appeal", def: "When fielders shout to ask the umpire for an out." },
+    { term: "umpire", def: "The official who judges outs, wides, no-balls, and more." },
+    { term: "powerplay", def: "A phase with fielding limits that encourages attacking batting." },
+    { term: "partnership", def: "The combined runs of two batters batting together." },
+    { term: "chase", def: "When the second team tries to reach the first team's target." },
+    { term: "century", def: "A score of 100+ runs by one batter — a major milestone." },
+    { term: "duck", def: "Getting out without scoring a single run." },
+  ];
+
+  // Keyed by the EXTENSION's LEAF sport keys. League leaves share their sport's list
+  // (soccer family → SOCCER, rugby leagues → RUGBY, wnba → the basketball list).
   const GLOSSARY = {
     mlb: MLB,
     nfl: NFL,
     nba: NBA,
+    wnba: NBA,
     nhl: NHL,
     soccer: SOCCER,
+    epl: SOCCER,
+    laliga: SOCCER,
     worldcup: SOCCER,
     rugby: RUGBY,
+    mlr: RUGBY,
+    nationscup: RUGBY,
+    sixnations: RUGBY,
+    nationschamp: RUGBY,
+    cricket: CRICKET,
   };
 
   // ── MATCHER (ported verbatim from lib/glossary/segment.ts) ─────────────────────────────

@@ -26,6 +26,8 @@
   let selectedPlayText = null; // a manually-tapped play's text — pauses polling until "back to live"
   let openGlossaryTerm = null;  // which glossary term's definition box is open (Tier E)
   let lastRenderedSimple = null; // last explanation text rendered (skip re-segmenting identical polls)
+  let lastStateLabel = '';       // last status-bar label — reused when a poll finds the play unchanged
+  let currentFormatFilter = null; // cricket format filter (T20/ODI/Test) from the league pick
 
   // ── Entitlement + free-tier caps (mirrors the iOS app: lib/entitlement.tsx + lib/caps.ts) ──
   // sePro is the ONE boolean every gate consults. Kept current by refreshProState() and by the
@@ -100,17 +102,22 @@
     { code: 'ar', label: '🇸🇦 Arabic' }
   ];
 
-  // In-overlay selector data. SAME keys the popup/backend use. Sport labels mirror
-  // popup.html; difficulty uses the display-rename rule (label "Rookie" → key "kid").
-  const SPORTS = [
-    { key: 'nfl', label: '🏈 NFL' },
-    { key: 'mlb', label: '⚾ MLB' },
-    { key: 'nba', label: '🏀 NBA' },
-    { key: 'nhl', label: '🏒 NHL' },
-    { key: 'soccer', label: '⚽ MLS' },
-    { key: 'worldcup', label: '🌍 World Cup' },
-    { key: 'rugby', label: '🏉 Rugby' }
-  ];
+  // In-overlay selector data — the SHARED catalog (sports.js, loaded before this file), so the
+  // popup and this panel can never drift. Grouped sports (soccer/rugby/cricket) get a League
+  // dropdown; the LEAF key (currentSport) is what every message carries.
+  const SPORT_GROUPS = (window.SE_SPORTS && window.SE_SPORTS.SPORT_GROUPS) || [];
+  const groupForLeaf = (leaf) => (window.SE_SPORTS ? window.SE_SPORTS.groupForLeaf(leaf) : null);
+
+  // The sport key to use for THIS game's explain/recap/ask/plays calls. On a merged 'All
+  // Matches' board (currentSport = 'soccer-all'/'rugby-all') every game carries its OWN league
+  // key in `sportKey` — the board key must never reach the backend. Gameless calls fall back to
+  // the board's primary league; single-league boards just use currentSport.
+  function sportForGame(gameId) {
+    const g = gameId ? currentGames.find(x => x.id === gameId) : null;
+    if (g && g.sportKey) return g.sportKey;
+    const fb = window.SE_SPORTS && window.SE_SPORTS.ALL_BOARD_EXPLAIN_FALLBACK;
+    return (fb && fb[currentSport]) || currentSport;
+  }
 
   // CHANGE-panel width. Used by BOTH the panel's own CSS and positionSelectorPanel's placement
   // math — they must agree, so it lives in one place. 320 (was 240) leaves real headroom for the
@@ -126,7 +133,7 @@
   ];
 
   // Sports whose ESPN feed exposes a plays[] list (Tier D). Others hide the Play-by-Play section.
-  const PLAYS_SPORTS = ['nfl', 'mlb', 'nba', 'nhl'];
+  const PLAYS_SPORTS = ['nfl', 'mlb', 'nba', 'wnba', 'nhl'];
 
   // "Ask a follow-up" quick-question chips (play-specific — hidden in recap mode). Each sends
   // its canned prompt through the SAME ask path a typed question uses.
@@ -195,6 +202,7 @@
     if (msg.action === 'toggleOverlay') {
       currentSport = msg.sport;
       currentGameId = msg.gameId || null;
+      currentFormatFilter = typeof msg.format === 'string' && msg.format ? msg.format : null;
       loadSettings(() => {
         // Bug fix 1: the popup's chosen level must win over the stored default.
         // Apply it AFTER loadSettings' merge (which would otherwise overwrite it),
@@ -292,6 +300,15 @@
   // The one primary "go Pro" button style (accent-filled).
   function proBtnHtml(id, label) {
     return `<button id="${id}" style="width:100%!important;box-sizing:border-box!important;padding:8px!important;margin-top:4px!important;background:${settings.accentColor}!important;color:#fff!important;border:none!important;border-radius:6px!important;font-size:0.85em!important;font-weight:700!important;cursor:pointer!important;">${label}</button>`;
+  }
+
+  // Pro pricing, shown under every upsell button so nobody has to click through to checkout just
+  // to learn the price. KEEP IN SYNC with the RevenueCat web offering (the checkout page is the
+  // source of truth): $6.99/mo, $39.99/yr. The annual anchor ($3.33/mo, 52% off) is deliberate.
+  const PRO_PRICE_TITLE = '$6.99/month or $39.99/year';
+  function proPriceHtml() {
+    const t = getThemeColors();
+    return `<div style="text-align:center!important;font-size:0.68em!important;line-height:1.35!important;color:${t.subtext}!important;margin-top:5px!important;">$6.99/mo · or $39.99/yr <span style="font-weight:700!important;color:${t.text}!important;">(just $3.33/mo)</span></div>`;
   }
 
   // ONE upgrade entry point for every Pro CTA (cap card, ask row, recap locked rows).
@@ -423,7 +440,7 @@
     lastUpdatedTime = Date.now();
     if (timestamp) timestamp.textContent = 'Just now';
     if (source) {
-      source.textContent = stateLabel || (hasData ? '📡 ESPN' : '⚠️ No live data');
+      source.textContent = stateLabel || (hasData ? '📡 Live' : '⚠️ No live data');
       source.style.color = hasData ? '#34d399' : '#f59e0b';
     }
     if (lastUpdatedTimer) clearInterval(lastUpdatedTimer);
@@ -534,7 +551,7 @@
       selectorPanelEl.style.background = t.settingsBg;
       selectorPanelEl.style.color = t.text;
       selectorPanelEl.style.borderColor = settings.accentColor;
-      ['se-sel-sport', 'se-sel-game'].forEach(id => {
+      ['se-sel-sport', 'se-sel-league', 'se-sel-game'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.style.background = t.selectBg; el.style.color = t.inputText; el.style.borderColor = t.inputBorder; }
       });
@@ -662,6 +679,7 @@
               <p id="se-cap-body" style="font-size:0.92em!important;line-height:1.5!important;margin:0 0 10px!important;color:${t.text}!important;">You've explored ${window.SE_CAPS ? window.SE_CAPS.DAILY_FREE : 5} plays today — nice work. Keep going with Pro for unlimited explanations.</p>
               ${lockedRowHtml('What Happened')}${lockedRowHtml('Why It Matters')}${lockedRowHtml('The Rule')}
               ${proBtnHtml('se-cap-upgrade', 'Unlock unlimited with Pro')}
+              ${proPriceHtml()}
               <button id="se-cap-pbp" style="width:100%!important;background:none!important;border:none!important;padding:7px 0 0!important;font-size:0.75em!important;font-weight:600!important;color:${settings.accentColor}!important;cursor:pointer!important;text-decoration:underline!important;">Browse the play-by-play — still free →</button>
             </div>
 
@@ -732,6 +750,7 @@
             <div style="font-size:0.8em!important;font-weight:700!important;color:${t.text}!important;margin-bottom:2px!important;">That's ${window.SE_CAPS ? window.SE_CAPS.QA_FREE_PER_GAME : 3} questions this game.</div>
             <div style="font-size:0.75em!important;line-height:1.4!important;color:${t.subtext}!important;margin-bottom:6px!important;">Unlock unlimited questions with Pro — or pick another game for a fresh set.</div>
             ${proBtnHtml('se-ask-cap-upgrade', 'Unlock unlimited questions →')}
+            ${proPriceHtml()}
           </div>
 
           <!-- 6d (Q&A). Scarcity hint — only when a free user has ≤1 question left in this game. -->
@@ -753,14 +772,34 @@
 
     document.body.appendChild(overlayEl);
 
-    document.addEventListener('visibilitychange', () => {
-      lastInteraction = Date.now(); // a visibility change counts as activity (resets the idle window)
-      if (document.visibilityState === 'hidden') {
-        // Trigger 1: tab/window hidden → pause polling (no /api/explain until visible again).
-        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-      } else if (overlayVisible) {
-        resumeFromPause(); // back in view → one immediate fetch, then restart the cadence
-      }
+    // Registered ONCE per page (not per showOverlay) — re-registering on every open/close cycle
+    // stacked duplicate listeners, and each resume then fired its own fetchLatestPlay (N overlay
+    // opens = N Groq calls per tab-refocus).
+    if (!window.__seVisibilityHooked) {
+      window.__seVisibilityHooked = true;
+      document.addEventListener('visibilitychange', () => {
+        if (!overlayVisible) return;
+        lastInteraction = Date.now(); // a visibility change counts as activity (resets the idle window)
+        if (document.visibilityState === 'hidden') {
+          // Trigger 1: tab/window hidden → pause polling (no /api/explain until visible again).
+          if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+        } else {
+          resumeFromPause(); // back in view → one immediate fetch, then restart the cadence
+        }
+      });
+    }
+
+    // Restore the last dragged position (saved by makeDraggable), clamped on-screen so a saved
+    // spot from a larger window can't strand the card off-viewport.
+    chrome.storage.local.get(['overlayPosition'], (r) => {
+      const pos = r && r.overlayPosition;
+      if (!overlayEl || !pos || !pos.left || !pos.top) return;
+      const left = Math.max(10, Math.min(parseInt(pos.left, 10) || 0, window.innerWidth - Math.min(overlayEl.offsetWidth || 380, window.innerWidth) - 10));
+      const top = Math.max(10, Math.min(parseInt(pos.top, 10) || 0, window.innerHeight - 80));
+      overlayEl.style.right = 'auto';
+      overlayEl.style.left = left + 'px';
+      overlayEl.style.top = top + 'px';
+      if (selectorOpen) positionSelectorPanel();
     });
 
     setTimeout(() => {
@@ -889,7 +928,7 @@
       document.getElementById('se-glossary-close').addEventListener('click', closeGlossary);
 
       // Load today's games → auto-select → THEN fetch the explanation (guarantees a valid gameId).
-      loadGamesIntoOverlay().then(() => fetchLatestPlay());
+      loadGamesIntoOverlay().then(ok => ok !== false && fetchLatestPlay());
       // Delegated click on the score-card rail → select that game (survives re-renders).
       document.getElementById('se-scorecard-rail').addEventListener('click', (e) => {
         const card = e.target.closest('.se-scorecard');
@@ -903,13 +942,31 @@
       document.getElementById('se-selector-btn').addEventListener('click', () => toggleSelector());
       selectorPanelEl.querySelector('#se-selector-close').addEventListener('click', () => toggleSelector(false));
 
-      document.getElementById('se-sel-sport').addEventListener('change', (e) => {
-        currentSport = e.target.value;   // KEY (nfl/mlb/…), same as popup
+      // Switch to a LEAF sport key (nfl/epl/mlr/…) plus an optional cricket format filter:
+      // reset per-game state, sync the league row, reload the rail → auto-select → fetch.
+      // Shared by the Sport and League dropdowns.
+      const switchSport = (leaf, formatFilter = null) => {
+        if (!leaf || (leaf === currentSport && (formatFilter || null) === currentFormatFilter)) return;
+        currentSport = leaf;
+        currentFormatFilter = formatFilter || null;
         currentGameId = null;            // force auto-select of the new sport's first live/today game
         clearAskAnswer();
         resetPlayByPlay();               // drop the old sport's play list + any manual play selection
         closeGlossary(); lastRenderedSimple = null; // drop stale term box; force re-render for the new sport
-        loadGamesIntoOverlay().then(() => fetchLatestPlay()); // reload rail → auto-select → fetch
+        refreshSelectorLeagueRow();
+        loadGamesIntoOverlay().then(ok => ok !== false && fetchLatestPlay()); // reload rail → auto-select → fetch
+      };
+
+      document.getElementById('se-sel-sport').addEventListener('change', (e) => {
+        const group = SPORT_GROUPS.find(g => g.key === e.target.value);
+        // Grouped sport → its first league (the row appears for finer choice); flat → the key itself.
+        const first = group && group.leagues ? group.leagues[0] : null;
+        switchSport(first ? first.key : (group ? group.key : e.target.value), first ? first.formatFilter : null);
+      });
+
+      document.getElementById('se-sel-league').addEventListener('change', (e) => {
+        const parsed = window.SE_SPORTS.parseLeagueValue(e.target.value);
+        switchSport(parsed.key, parsed.formatFilter);
       });
 
       document.getElementById('se-sel-game').addEventListener('change', (e) => {
@@ -1016,6 +1073,11 @@
     if (/\bFinal\b/i.test(ctx)) return 'post';
     if (/Halftime|End\s|Mid\s|Delay/i.test(ctx)) return 'mid';
     if (/\bPre\b|Scheduled/i.test(ctx)) return 'pre';
+    // A scheduled game's context tail is its start time ("… — 7/15 - 8:00 PM EDT"). Live clocks
+    // ("Q4 2:31", "Bot 1st") never carry AM/PM, so an AM/PM time with no live marker = pre-game.
+    // Without this, scheduled games derived 'in' and burned a Groq call every live-cadence tick
+    // until the real tip-off.
+    if (/\d{1,2}:\d{2}\s*(?:AM|PM)/i.test(ctx) && !/Top |Bot |Q\d|OT|Half|End /i.test(ctx)) return 'pre';
     return 'in'; // live (Top/Bot/quarter/clock) or unmatched → safe live cadence
   }
 
@@ -1030,10 +1092,16 @@
   }
 
   // Live-first ordering for the rail + selector: in-progress, then scheduled, then final.
+  // Within a state, date-aware: upcoming soonest-first, finals most-recent-first (the archival
+  // cricket board and the windowed rugby board span weeks — newest final must lead).
   const GAME_ORDER = { in: 0, pre: 1, post: 2 };
   function sortedGames() {
-    return currentGames.slice().sort((a, b) =>
-      (GAME_ORDER[a.state] ?? 3) - (GAME_ORDER[b.state] ?? 3));
+    return currentGames.slice().sort((a, b) => {
+      const byState = (GAME_ORDER[a.state] ?? 3) - (GAME_ORDER[b.state] ?? 3);
+      if (byState) return byState;
+      const ta = Date.parse(a.date || '') || 0, tb = Date.parse(b.date || '') || 0;
+      return a.state === 'post' ? tb - ta : ta - tb;
+    });
   }
 
   // Is this ESPN event date (ISO) today, in the viewer's local time? Bad/absent date → false.
@@ -1047,19 +1115,32 @@
 
   // Only today's slate belongs on the rail: any LIVE game (defensive vs. TZ-boundary rolls) plus
   // today's scheduled/finals. ESPN returns the full future schedule (Sept games in July) — drop it.
+  // EXCEPT windowed boards (weekly rugby / archival cricket): their fetch is already scoped and a
+  // today-only filter would empty them most days — keep everything they return.
   function todaysGames(games) {
-    return games.filter(g => g.state === 'in' || isTodayLocal(g.date));
+    // Cricket format filter (from the league pick) applies before any date logic.
+    const S = window.SE_SPORTS;
+    const filtered = (S && currentFormatFilter)
+      ? games.filter(g => S.matchesFormat(g, currentFormatFilter))
+      : games;
+    const windowed = (S && S.WINDOW_SPORTS) || [];
+    if (windowed.includes(currentSport)) return filtered;
+    return filtered.filter(g => g.state === 'in' || isTodayLocal(g.date));
   }
 
   // Load this sport's games, filter to today, render the rail + selector dropdown, and AUTO-SELECT
   // a game (first live, else first) whenever the current selection isn't a valid today-game — so an
   // explanation always loads. Does NOT fetch itself; the caller chains fetchLatestPlay() when a
   // fresh explanation is wanted (initial load / sport change), NOT on a mere selector-open refresh.
+  let loadGamesSeq = 0; // guards against a slow board fetch landing after another sport was picked
   async function loadGamesIntoOverlay() {
+    const seq = ++loadGamesSeq;
     try {
       const response = await chrome.runtime.sendMessage({ action: 'fetchGames', sport: currentSport });
+      if (seq !== loadGamesSeq) return false; // superseded — the newer load owns the rail
       currentGames = todaysGames(response?.games || []);
     } catch (err) {
+      if (seq !== loadGamesSeq) return false;
       console.error('Load games error:', err);
       currentGames = [];
     }
@@ -1073,13 +1154,22 @@
     if (sel) {
       sel.innerHTML = '';
       if (!currentGames.length) { sel.innerHTML = '<option value="">No games today</option>'; }
-      else sortedGames().forEach(game => {
-        const option = document.createElement('option');
-        option.value = game.id;
-        option.textContent = `${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}`;
-        if (game.id === currentGameId) option.selected = true;
-        sel.appendChild(option);
-      });
+      else {
+        // Windowed boards (rugby/cricket) span days — tag non-today games with a short date.
+        const todayStr = new Date().toDateString();
+        sortedGames().forEach(game => {
+          const option = document.createElement('option');
+          option.value = game.id;
+          const d = game.date ? new Date(game.date) : null;
+          const dateTag = d && !isNaN(d.getTime()) && d.toDateString() !== todayStr
+            ? ` · ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : '';
+          // Merged 'All Matches' boards stamp each game's league — tag it so the list stays legible.
+          const league = game.sportKey && window.SE_SPORTS ? window.SE_SPORTS.leagueLabelFor(game.sportKey) : '';
+          option.textContent = `${league ? `[${league}] ` : ''}${game.away} @ ${game.home} ${game.state === 'in' ? '🔴 LIVE' : ''}${dateTag}`;
+          if (game.id === currentGameId) option.selected = true;
+          sel.appendChild(option);
+        });
+      }
     }
   }
 
@@ -1107,26 +1197,66 @@
       else { note.textContent = "No live games — today's slate:"; note.style.display = 'block'; }
     }
 
-    const teamRow = (logo, abbrev, score) => `
-      <div style="display:flex!important;align-items:center!important;gap:5px!important;margin-top:2px!important;">
-        ${logo ? `<img src="${logo}" width="18" height="18" style="flex:0 0 auto!important;object-fit:contain!important;" referrerpolicy="no-referrer"/>` : `<span style="width:18px!important;display:inline-block!important;"></span>`}
-        <span style="font-size:0.74em!important;font-weight:700!important;color:${t.text}!important;">${abbrev || '?'}</span>
-        <span style="margin-left:auto!important;font-size:0.82em!important;font-weight:800!important;color:${t.text}!important;">${score || ''}</span>
-      </div>`;
+    // Cards are built via DOM + textContent — feed-derived strings (team abbrevs, status labels,
+    // cricket result sentences) are never interpolated into innerHTML.
+    // Badge priority: ESPN logo URL → flag (emoji, or URL per the backend contract) → spacer.
+    const teamBadge = (logo, flag) => {
+      const src = logo || (flag && /^https?:/i.test(flag) ? flag : '');
+      if (src) {
+        const img = document.createElement('img');
+        img.src = src; img.width = 18; img.height = 18;
+        img.referrerPolicy = 'no-referrer';
+        img.style.cssText = 'flex:0 0 auto!important;object-fit:contain!important;';
+        return img;
+      }
+      const span = document.createElement('span');
+      span.style.cssText = 'width:18px!important;display:inline-block!important;text-align:center!important;flex:0 0 auto!important;';
+      if (flag) span.textContent = flag; // emoji flag (cricket national sides)
+      return span;
+    };
+    const teamRow = (logo, flag, abbrev, score) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex!important;align-items:center!important;gap:5px!important;margin-top:2px!important;';
+      row.appendChild(teamBadge(logo, flag));
+      const ab = document.createElement('span');
+      ab.style.cssText = `font-size:0.74em!important;font-weight:700!important;color:${t.text}!important;`;
+      ab.textContent = abbrev || '?';
+      row.appendChild(ab);
+      const sc = document.createElement('span');
+      sc.style.cssText = `margin-left:auto!important;font-size:0.82em!important;font-weight:800!important;color:${t.text}!important;`;
+      sc.textContent = score || '';
+      row.appendChild(sc);
+      return row;
+    };
 
-    rail.innerHTML = games.map(g => {
+    rail.innerHTML = '';
+    games.forEach(g => {
       const selected = g.id === currentGameId;
       const isLive = g.state === 'in';
       const label = g.statusLabel || (g.state === 'post' ? 'Final' : g.state === 'pre' ? 'Scheduled' : '');
-      return `<div class="se-scorecard" data-id="${g.id}" style="flex:0 0 auto!important;width:126px!important;box-sizing:border-box!important;border:1px solid ${selected ? settings.accentColor : t.inputBorder}!important;border-radius:8px!important;padding:6px 8px!important;background:${t.selectBg}!important;cursor:pointer!important;">
-        <div style="display:flex!important;align-items:center!important;gap:4px!important;margin-bottom:3px!important;">
-          ${isLive ? `<span style="width:6px!important;height:6px!important;border-radius:50%!important;background:${settings.accentColor}!important;flex:0 0 auto!important;"></span>` : ''}
-          <span style="font-size:0.62em!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:0.04em!important;color:${isLive ? settings.accentColor : t.subtext}!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;">${label}</span>
-        </div>
-        ${teamRow(g.awayLogo, g.awayAbbrev, g.awayScore)}
-        ${teamRow(g.homeLogo, g.homeAbbrev, g.homeScore)}
-      </div>`;
-    }).join('');
+
+      const card = document.createElement('div');
+      card.className = 'se-scorecard';
+      card.dataset.id = g.id;
+      card.style.cssText = `flex:0 0 auto!important;width:126px!important;box-sizing:border-box!important;border:1px solid ${selected ? settings.accentColor : t.inputBorder}!important;border-radius:8px!important;padding:6px 8px!important;background:${t.selectBg}!important;cursor:pointer!important;`;
+
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex!important;align-items:center!important;gap:4px!important;margin-bottom:3px!important;';
+      if (isLive) {
+        const dot = document.createElement('span');
+        dot.style.cssText = `width:6px!important;height:6px!important;border-radius:50%!important;background:${settings.accentColor}!important;flex:0 0 auto!important;`;
+        head.appendChild(dot);
+      }
+      const lab = document.createElement('span');
+      lab.style.cssText = `font-size:0.62em!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:0.04em!important;color:${isLive ? settings.accentColor : t.subtext}!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;`;
+      lab.textContent = label;
+      head.appendChild(lab);
+      card.appendChild(head);
+
+      card.appendChild(teamRow(g.awayLogo, g.awayFlag, g.awayAbbrev, g.awayScore));
+      card.appendChild(teamRow(g.homeLogo, g.homeFlag, g.homeAbbrev, g.homeScore));
+      rail.appendChild(card);
+    });
 
     updateChannelLine();
   }
@@ -1206,7 +1336,7 @@
           ` · <span style="font-weight:700!important;color:${isPro ? t.teal : t.subtext}!important;">${isPro ? 'Pro' : 'Free'}</span>` +
         `</div>` +
         `<div style="display:flex!important;align-items:center!important;gap:10px!important;">` +
-          (isPro ? '' : `<button id="se-acct-upgrade" style="${upgradeStyle}">Upgrade to Pro</button>`) +
+          (isPro ? '' : `<button id="se-acct-upgrade" title="${PRO_PRICE_TITLE}" style="${upgradeStyle}">Upgrade to Pro</button>`) +
           `<button id="se-signout-btn" style="${linkStyle}">Sign out</button>` +
         `</div>`;
       const up = document.getElementById('se-acct-upgrade');
@@ -1352,8 +1482,13 @@
       <div style="margin-bottom:10px!important;">
         <label style="${labelStyle}">Sport</label>
         <select id="se-sel-sport" style="${selectStyle}">
-          ${SPORTS.map(s => `<option value="${s.key}"${currentSport === s.key ? ' selected' : ''}>${s.label}</option>`).join('')}
+          ${SPORT_GROUPS.map(g => `<option value="${g.key}"${(groupForLeaf(currentSport) || {}).key === g.key ? ' selected' : ''}>${g.label}</option>`).join('')}
         </select>
+      </div>
+
+      <div id="se-sel-league-row" style="display:none!important;margin-bottom:10px!important;">
+        <label style="${labelStyle}">League</label>
+        <select id="se-sel-league" style="${selectStyle}"></select>
       </div>
 
       <div style="margin-bottom:10px!important;">
@@ -1371,6 +1506,29 @@
       </div>
     `;
     return panel;
+  }
+
+  // Show/populate the League dropdown for grouped sports (soccer/rugby/cricket); hide it for
+  // flat sports. Selection mirrors currentSport (the LEAF key). Called on panel open + on any
+  // sport/league switch, so the row always reflects reality.
+  function refreshSelectorLeagueRow() {
+    if (!selectorPanelEl) return;
+    const row = document.getElementById('se-sel-league-row');
+    const sel = document.getElementById('se-sel-league');
+    const sportSel = document.getElementById('se-sel-sport');
+    if (!row || !sel) return;
+    const group = groupForLeaf(currentSport);
+    if (sportSel && group) sportSel.value = group.key; // keep the Sport dropdown honest
+    if (!group || !group.leagues) { row.style.display = 'none'; sel.innerHTML = ''; return; }
+    sel.innerHTML = '';
+    group.leagues.forEach(l => {
+      const opt = document.createElement('option');
+      // Value encodes key + format filter (cricket's format leagues share one leaf key).
+      opt.value = window.SE_SPORTS.leagueValue(l); opt.textContent = l.label;
+      if (l.key === currentSport && (l.formatFilter || null) === currentFormatFilter) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    row.style.display = 'block';
   }
 
   // Re-tint the difficulty pills to reflect the current settings.level (the KEY).
@@ -1408,6 +1566,7 @@
     selectorOpen = (open === undefined) ? !selectorOpen : open;
     if (selectorOpen) {
       selectorPanelEl.style.display = 'block';
+      refreshSelectorLeagueRow();   // league row reflects the current sport every open
       positionSelectorPanel();
       // Populate the selector's game list on first open (or if empty).
       const g = document.getElementById('se-sel-game');
@@ -1469,7 +1628,7 @@
     const t = getThemeColors();
     if (list) list.innerHTML = `<div style="padding:6px 4px!important;font-size:0.72em!important;color:${t.subtext}!important;">Loading plays…</div>`;
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'fetchPlays', sport: currentSport, gameId: currentGameId });
+      const response = await chrome.runtime.sendMessage({ action: 'fetchPlays', sport: sportForGame(currentGameId), gameId: currentGameId });
       currentPlays = response?.plays || [];
     } catch (err) {
       currentPlays = [];
@@ -1542,6 +1701,7 @@
 
   function hideOverlay() {
     overlayVisible = false;
+    seDrag = null; // abandon any in-flight drag of the card being removed
     if (overlayEl) overlayEl.remove();
     overlayEl = null;
     if (selectorPanelEl) { selectorPanelEl.remove(); selectorPanelEl = null; }
@@ -1574,10 +1734,13 @@
 
     setStatusFetching();
     try {
+      const reqSport = currentSport, reqGame = currentGameId; // what THIS recap is about
       const response = await chrome.runtime.sendMessage({
-        action: 'recap', sport: currentSport, gameId: currentGameId, level: settings.level, language: settings.language,
+        action: 'recap', sport: sportForGame(currentGameId), gameId: currentGameId, level: settings.level, language: settings.language,
         isPro: sePro   // backend withholds turningPoint/keyPerformance/whyItMattered unless true
       });
+      // Selection moved on while the recap was in flight → a newer fetch owns the screen.
+      if (reqSport !== currentSport || reqGame !== currentGameId) return;
       if (response) {
         const scoreEl = document.getElementById('se-recap-score');
         const storyEl = document.getElementById('se-recap-story');
@@ -1632,7 +1795,7 @@
     closeGlossary(); // a NEW explanation loaded → drop any stale term box
 
     const segs = (settings.language === 'en' && window.SE_segmentText)
-      ? window.SE_segmentText(text, currentSport)
+      ? window.SE_segmentText(text, sportForGame(currentGameId))
       : [{ type: 'text', value: text }];
 
     expEl.textContent = ''; // clear
@@ -1714,7 +1877,7 @@
     // The free-surface link only makes sense where a play-by-play list exists (soccer/rugby/
     // worldcup have none — the link would open an empty section).
     const pbpLink = document.getElementById('se-cap-pbp');
-    if (pbpLink) pbpLink.style.display = PLAYS_SPORTS.includes(currentSport) ? 'block' : 'none';
+    if (pbpLink) pbpLink.style.display = PLAYS_SPORTS.includes(sportForGame(currentGameId)) ? 'block' : 'none';
     lastRenderedSimple = null;   // force a fresh render when the user unblocks (re-read / Pro)
   }
 
@@ -1798,6 +1961,7 @@
       btn.style.display = 'none';
     } else {
       btn.style.display = 'inline-block';
+      btn.title = PRO_PRICE_TITLE; // price visible on hover — no click-through needed to learn it
       btn.onclick = openUpgrade;
     }
   }
@@ -1874,7 +2038,8 @@
     box.innerHTML =
       FIELDS.map(f => lockedRowHtml(f.label)).join('') +
       `<div style="font-size:0.68em!important;line-height:1.35!important;color:${t.subtext}!important;margin:0 0 6px!important;">Included with Pro when the game's data supports them.</div>` +
-      proBtnHtml('se-recap-upgrade', 'Unlock the full recap with Pro');
+      proBtnHtml('se-recap-upgrade', 'Unlock the full recap with Pro') +
+      proPriceHtml();
     box.style.display = 'block';
     const btn = document.getElementById('se-recap-upgrade');
     if (btn) btn.addEventListener('click', openUpgrade);
@@ -1901,7 +2066,7 @@
     if (chipsRow) chipsRow.style.display = 'block'; // play-specific chips make sense for live games
     // Play-by-Play only for plays-capable sports (hidden for soccer/worldcup/rugby; recap hides it via #se-live-content).
     const pbpSection = document.getElementById('se-pbp-section');
-    if (pbpSection) pbpSection.style.display = PLAYS_SPORTS.includes(currentSport) ? 'block' : 'none';
+    if (pbpSection) pbpSection.style.display = PLAYS_SPORTS.includes(sportForGame(currentGameId)) ? 'block' : 'none';
 
     const expEl = document.getElementById('se-explanation');
     const teamEl = document.getElementById('se-teams');
@@ -1912,12 +2077,24 @@
     setStatusFetching();
 
     try {
+      const reqSport = currentSport, reqGame = currentGameId; // what THIS request is about
       const response = await chrome.runtime.sendMessage({
-        action: 'fetchPlay', sport: currentSport, level: settings.level, gameId: currentGameId, language: settings.language,
-        playText: selectedPlayText || undefined // Tier D: explain a manually-tapped play instead of the latest
+        action: 'fetchPlay', sport: sportForGame(currentGameId), level: settings.level, gameId: currentGameId, language: settings.language,
+        playText: selectedPlayText || undefined, // Tier D: explain a manually-tapped play instead of the latest
+        isRefresh: isRefresh || undefined        // auto-refresh → background may skip via the unchanged-play pre-check
       });
+      // The user switched sport/game while this was in flight → a newer fetch owns the screen.
+      if (reqSport !== currentSport || reqGame !== currentGameId) return;
 
       if (response) {
+        // ── UNCHANGED PLAY (auto-refresh pre-check) ────────────────────────────────────────
+        // Background compared ESPN's latest play against what we last explained and skipped the
+        // /api/explain call. Keep everything on screen; just confirm freshness in the status bar.
+        // Must be FIRST: an unchanged response carries no simple/gameContext/capped fields.
+        if (response.unchanged === true) {
+          setStatusReady(true, lastStateLabel || '📡 Live');
+          return;
+        }
         // ── SERVER-ENFORCED CAP ──────────────────────────────────────────────────────────────
         // The server is AUTHORITATIVE. It returns { capped:true, reason } with no `simple` /
         // `gameContext`, so this must be intercepted FIRST: falling through would derive a game
@@ -2000,6 +2177,7 @@
 
         // Status label = cleaned gameContext (part after "—"), or a neutral fallback.
         const stateLabel = statusLabelFromContext(response.gameContext);
+        lastStateLabel = stateLabel; // reused by the unchanged-play fast path above
 
         setStatusReady(!!response.homeTeam, stateLabel);
         renderCapIndicators();   // refresh the "N left today" pill (hidden for Pro)
@@ -2043,7 +2221,7 @@
 
     try {
       const response = await chrome.runtime.sendMessage({
-        action: 'askQuestion', sport: currentSport, level: settings.level, question, context: currentPlayText, language: settings.language,
+        action: 'askQuestion', sport: sportForGame(currentGameId), level: settings.level, question, context: currentPlayText, language: settings.language,
         // The per-game Q&A cap is keyed on the game. Null when no game is selected — a gameless
         // "learn mode" ask, which stays UNGATED (same carve-out as iOS).
         gameId: currentGameId || undefined
@@ -2080,25 +2258,32 @@
     });
   }
 
+  // Drag state + the two WINDOW listeners live at module scope, registered ONCE — the old
+  // per-showOverlay registration stacked a new mousemove/mouseup pair on every open/close cycle
+  // (harmless no-ops, but an unbounded leak on long-lived tabs). Only the header's mousedown is
+  // re-attached per open, since the header element itself is recreated.
+  let seDrag = null; // { el, header, startX, startY, startLeft, startTop }
+  window.addEventListener('mousemove', (e) => {
+    if (!seDrag) return;
+    const { el, startX, startY, startLeft, startTop } = seDrag;
+    el.style.left = Math.max(10, Math.min(startLeft + (e.clientX - startX), window.innerWidth - el.offsetWidth - 10)) + 'px';
+    el.style.top = Math.max(10, Math.min(startTop + (e.clientY - startY), window.innerHeight - el.offsetHeight - 10)) + 'px';
+  });
+  window.addEventListener('mouseup', () => {
+    if (!seDrag) return;
+    chrome.storage.local.set({ overlayPosition: { left: seDrag.el.style.left, top: seDrag.el.style.top } });
+    seDrag.header.style.cursor = 'grab';
+    seDrag = null;
+  });
+
   function makeDraggable(el) {
     const header = document.getElementById('se-header');
-    let isDragging = false, startX, startY, startLeft, startTop;
     header.addEventListener('mousedown', (e) => {
       if (['se-close','se-minimize','se-settings-btn','se-selector-btn'].includes(e.target.id)) return;
       const rect = el.getBoundingClientRect();
-      startLeft = rect.left; startTop = rect.top;
-      isDragging = true; startX = e.clientX; startY = e.clientY;
-      el.style.right = 'auto'; el.style.left = startLeft + 'px'; el.style.top = startTop + 'px';
+      seDrag = { el, header, startX: e.clientX, startY: e.clientY, startLeft: rect.left, startTop: rect.top };
+      el.style.right = 'auto'; el.style.left = rect.left + 'px'; el.style.top = rect.top + 'px';
       header.style.cursor = 'grabbing'; e.preventDefault();
-    });
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      el.style.left = Math.max(10, Math.min(startLeft + (e.clientX - startX), window.innerWidth - el.offsetWidth - 10)) + 'px';
-      el.style.top = Math.max(10, Math.min(startTop + (e.clientY - startY), window.innerHeight - el.offsetHeight - 10)) + 'px';
-    });
-    window.addEventListener('mouseup', () => {
-      if (isDragging) chrome.storage.local.set({ overlayPosition: { left: el.style.left, top: el.style.top } });
-      isDragging = false; header.style.cursor = 'grab';
     });
   }
 })();

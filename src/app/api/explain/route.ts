@@ -30,9 +30,12 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 // EXTENSION users are enforceable, and the extension doesn't support tennis/golf.
 //
 // The design is PRESENCE-BASED, and that is what makes it safe to ship:
-//   • No `session` in the body  → anonymous → NEVER enforced. The iOS app sends no identity of
-//     any kind, so it is structurally exempt and cannot be broken by this work.
+//   • No `session` in the body  → anonymous → not session-enforced. The iOS app sends no identity
+//     of any kind, so it is structurally exempt and cannot be broken by this work.
 //   • `session` present         → the Chrome extension → resolvable → enforceable.
+//   • `anonId` present, no session → the SIGNED-OUT extension. Enforced against `anon:<id>`
+//     counters ONLY while ANON_CAPS=1 (default OFF — see anonCapIdentity below). The iOS app
+//     never sends anonId, so it stays exempt under every flag state.
 //
 // Only the two COST-BEARING actions are capped: the play explanation (no `action`) and `ask`.
 // recap/vision/coach/translate are not capped on iOS either, so they're untouched here.
@@ -47,6 +50,32 @@ function enforceable(caller: Caller | undefined): boolean {
     && !caller.isPro          // Pro + trial → uncapped
     && !caller.degraded       // lookup failed → fail open
     && !!caller.email;        // no identity → nothing to count against
+}
+
+// ── ANONYMOUS CAPS (kill-switch: ANON_CAPS, default OFF) ──────────────────────────────────────
+// When ON, a session-LESS caller that self-identifies with an extension install id (`anonId` in
+// the body) is enforced against the SAME counters, keyed `anon:<id>`. Scope, by construction:
+//   • The iOS app sends NO anonId → exempt regardless of the flag (identical to today).
+//   • A body with a `session` NEVER takes this path — the session path (and its fail-open
+//     semantics around invalid/degraded) owns identified callers entirely.
+//   • Deleting the stored id resets the allowance. Accepted: this closes the casual
+//     "clear local counters" bypass, not a determined attacker (IP-keying is a later step).
+// Malformed ids → null → exempt (fail open, never a 4xx).
+const ANON_CAPS = process.env.ANON_CAPS === '1'; // default OFF
+const ANON_ID_RE = /^[a-z0-9][a-z0-9-]{7,63}$/i; // UUID-shaped; bounds the Redis keyspace
+function anonCapIdentity(session: unknown, anonId: unknown): string | null {
+  if (!ANON_CAPS) return null;
+  if (typeof session === 'string' && session.trim()) return null; // identified → session path
+  if (typeof anonId !== 'string' || !ANON_ID_RE.test(anonId)) return null;
+  return `anon:${anonId.toLowerCase()}`;
+}
+
+// The ONE identity caps count against for this request: the validated session email when the
+// caller is enforceable, else the anonymous install id (only while ANON_CAPS is on), else null
+// (exempt — served exactly as today).
+function capIdentityFor(caller: Caller | undefined, body: any): string | null {
+  if (enforceable(caller)) return caller!.email as string;
+  return anonCapIdentity(body?.session, body?.anonId);
 }
 
 // Do we have a TRUSTWORTHY entitlement for this caller? If so, `caller.isPro` is authoritative
@@ -1195,17 +1224,18 @@ export async function POST(req: NextRequest) {
       //   • no gameId ("learn mode" / gameless ask)        → ungated, mirroring the iOS carve-out
       //   • Redis or RevenueCat degraded                   → FAIL OPEN, serve
       const askGameId = typeof gameId === 'string' && gameId.trim() ? gameId.trim() : '';
-      if (enforceable(caller) && askGameId) {
+      const qaIdentity = capIdentityFor(caller, body);
+      if (qaIdentity && askGameId) {
         try {
-          const d = await consumeGameQA(caller!.email as string, askGameId);
+          const d = await consumeGameQA(qaIdentity, askGameId);
           if (!d.allowed) {
-            console.log(`[caps] BLOCKED qa email=${caller!.email} game=${askGameId} used=${d.used}`);
+            console.log(`[caps] BLOCKED qa id=${qaIdentity} game=${askGameId} used=${d.used}`);
             return NextResponse.json(
               { capped: true, reason: 'qa', limit: QA_FREE_PER_GAME, remaining: 0 },
               { headers: corsHeaders },
             );
           }
-          console.log(`[caps] qa allowed email=${caller!.email} game=${askGameId} used=${d.used} remaining=${d.remaining}`);
+          console.log(`[caps] qa allowed id=${qaIdentity} game=${askGameId} used=${d.used} remaining=${d.remaining}`);
         } catch (e) {
           // Counter unavailable → serve. Under-enforcing beats blocking a paying user.
           console.error('[caps] qa counter failed (failing open — request served):', e);
@@ -1524,20 +1554,21 @@ export async function POST(req: NextRequest) {
     //
     // Exempt (served exactly as today): anonymous / no session (the iOS app), Pro + trial,
     // invalid-session, and `degraded` (entitlement or Redis unreachable → FAIL OPEN).
-    if (enforceable(caller)) {
+    const dailyIdentity = capIdentityFor(caller, body);
+    if (dailyIdentity) {
       const dayStr = serverDateStr();
       const pKey = playKeyFor(String(gameId ?? ''), play);
       try {
-        const d = await consumeDailyExplanation(caller!.email as string, dayStr, pKey);
+        const d = await consumeDailyExplanation(dailyIdentity, dayStr, pKey);
         if (!d.allowed) {
-          console.log(`[caps] BLOCKED daily email=${caller!.email} day=${dayStr} used=${d.used} play=${pKey}`);
+          console.log(`[caps] BLOCKED daily id=${dailyIdentity} day=${dayStr} used=${d.used} play=${pKey}`);
           return NextResponse.json(
             { capped: true, reason: 'daily', limit: DAILY_FREE, remaining: 0 },
             { headers: corsHeaders },
           );
         }
         console.log(
-          `[caps] daily ${d.outcome} email=${caller!.email} day=${dayStr} ` +
+          `[caps] daily ${d.outcome} id=${dailyIdentity} day=${dayStr} ` +
           `used=${d.used} remaining=${d.remaining} play=${pKey}`,
         );
       } catch (e) {

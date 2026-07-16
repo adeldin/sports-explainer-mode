@@ -129,6 +129,9 @@ export async function getSmLiveBoard(date?: string): Promise<Game[]> {
         sport: 'cricket',
         state,
         ...(Number.isFinite(ms) ? { startTime: ms } : {}),
+        // Match format for the extension's format dropdown. The fixture's own `type` when present
+        // ("T20"/"T20I"/"ODI"/…); the trial league set (T20I/BBL/CSA T20) is all-T20, hence the fallback.
+        format: str(f?.type) || 'T20',
       });
     }
     return games;

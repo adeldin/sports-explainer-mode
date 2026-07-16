@@ -69,6 +69,8 @@ function toGame(e: CricketIndexEntry): Game {
     ...(e.venue ? { venue: e.venue } : {}),
     ...(homeFlag ? { homeFlag } : {}),
     ...(awayFlag ? { awayFlag } : {}),
+    // Match format (T20/ODI/Test) — additive; the extension's cricket format dropdown filters on it.
+    ...(e.format ? { format: e.format } : {}),
   };
 }
 

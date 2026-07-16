@@ -1,9 +1,32 @@
 // ─────────────────────────────────────────
 // VALID VALUES FOR MESSAGE VALIDATION
 // ─────────────────────────────────────────
-const VALID_SPORTS = ['nfl', 'mlb', 'nba', 'nhl', 'soccer', 'worldcup', 'rugby'];
+// LEAF sport keys — the popup/overlay group soccer/rugby/cricket into sport→league dropdowns,
+// but every message carries the leaf key (same keys the backend's espnConfig routes on).
+const VALID_SPORTS = [
+  'nfl', 'mlb', 'nba', 'wnba', 'nhl',
+  'soccer', 'epl', 'laliga',            // Soccer group: MLS / Premier League / La Liga
+  'worldcup',                           // standalone (tournament ends soon — deliberately not folded in)
+  'rugby', 'mlr', 'nationscup', 'sixnations', 'nationschamp',  // Rugby group (mirrors iOS RUGBY_LEAGUES)
+  'cricket',                            // Cricket group (single merged board; format filter is client-side)
+  'soccer-all', 'rugby-all',            // merged 'All Matches' BOARDS — fetchGames only; per-game
+                                        // sportKey (never the board key) is what explain/recap send
+];
+
+// Merged 'All Matches' boards → their member leagues. KEEP IN SYNC with sports.js SPORT_GROUPS
+// (background is a service worker — it can't load sports.js, same reason SPORT_CONFIG is
+// duplicated below). Mirrors iOS fetchRugbyBoard: fetch each league, concat, and stamp every
+// game with its OWN league key (`sportKey`) — that's what the explain backend routes on.
+const ALL_BOARDS = {
+  'soccer-all': ['soccer', 'epl', 'laliga'],
+  'rugby-all':  ['rugby', 'mlr', 'nationscup', 'sixnations', 'nationschamp'],
+};
 const VALID_LEVELS = ['kid', 'beginner', 'intermediate', 'expert'];
 const VALID_LANGUAGES = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'zh', 'ko', 'it', 'ar'];
+
+// Valid game ids: ESPN + Cricsheet ids are numeric strings; LIVE cricket ids are 'sm-'-prefixed
+// Sportmonks fixture ids ('sm-12345'). The backend routes on the prefix — never strip it.
+const GAME_ID_RE = /^(?:sm-)?\d+$/;
 
 // Auth endpoints (Phase 2 4a — email magic-link sign-in).
 const AUTH_BASE = 'https://sports-explainer-mode.vercel.app/api/auth';
@@ -23,15 +46,25 @@ const PURCHASE_LINK_BASE = 'https://pay.rev.cat/ngnjkdtzqevjpwck/';
 // MV3 service workers can be suspended at any time.
 // Never rely on global variables for persistent state.
 // ─────────────────────────────────────────
-async function getState() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['currentSport', 'currentGameId', 'currentLevel', 'currentLanguage'], resolve);
-  });
-}
-
 async function setState(updates) {
   return new Promise((resolve) => {
     chrome.storage.local.set(updates, resolve);
+  });
+}
+
+// --- Anonymous install id (seAnonId) ---
+// A random per-install id sent with SIGNED-OUT requests so the server can meter the free tier
+// (route.ts ANON_CAPS — ignored until the flag flips, so shipping this first is safe). It is not
+// tracking: never sent alongside a session, never leaves our own backend, and clearing extension
+// storage rotates it.
+async function getAnonId() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['seAnonId'], (r) => {
+      if (r.seAnonId) return resolve(r.seAnonId);
+      const id = (crypto.randomUUID && crypto.randomUUID())
+        || Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+      chrome.storage.local.set({ seAnonId: id }, () => resolve(id));
+    });
   });
 }
 
@@ -76,8 +109,9 @@ function validateFetchPlayMsg(msg) {
   const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
   const level = VALID_LEVELS.includes(msg.level) ? msg.level : 'beginner';
   const language = VALID_LANGUAGES.includes(msg.language) ? msg.language : 'en';
-  // gameId must be a non-empty string of digits (ESPN IDs are numeric strings)
-  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId)
+  // gameId: ESPN/Cricsheet ids are numeric strings; live cricket ids are 'sm-'-prefixed
+  // Sportmonks fixture ids (the prefix is load-bearing — backend routes on it).
+  const gameId = typeof msg.gameId === 'string' && GAME_ID_RE.test(msg.gameId)
     ? msg.gameId
     : null;
   // Optional (Tier D): explain a SPECIFIC historical play by its text. When present the backend
@@ -85,14 +119,17 @@ function validateFetchPlayMsg(msg) {
   const playText = typeof msg.playText === 'string' && msg.playText.trim()
     ? msg.playText.trim().slice(0, 500)
     : null;
+  // AUTO-refresh flag (poll tick / idle-resume). Drives the unchanged-play pre-check only —
+  // it is NOT sent to the backend (the server ignores client isRefresh claims by design).
+  const isRefresh = msg.isRefresh === true;
 
   if (!sport) return null; // sport is required — reject if invalid
-  return { sport, level, gameId, language, playText };
+  return { sport, level, gameId, language, playText, isRefresh };
 }
 
 function validateFetchPlaysMsg(msg) {
   const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
-  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+  const gameId = typeof msg.gameId === 'string' && GAME_ID_RE.test(msg.gameId) ? msg.gameId : null;
   if (!sport || !gameId) return null; // a play list needs a specific game
   return { sport, gameId };
 }
@@ -101,7 +138,7 @@ function validateRecapMsg(msg) {
   const sport = VALID_SPORTS.includes(msg.sport) ? msg.sport : null;
   const level = VALID_LEVELS.includes(msg.level) ? msg.level : 'beginner';
   const language = VALID_LANGUAGES.includes(msg.language) ? msg.language : 'en';
-  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+  const gameId = typeof msg.gameId === 'string' && GAME_ID_RE.test(msg.gameId) ? msg.gameId : null;
   // Pro recap: the backend only sends the 3 narrative fields when isPro is true. Optional,
   // defaults false → free-tier response (score + story + articleLink).
   const isPro = msg.isPro === true;
@@ -125,7 +162,7 @@ function validateAskQuestionMsg(msg) {
 
   // Optional: which game this question is about. Drives the server's per-game Q&A cap. Absent
   // (gameless "learn mode" ask) → the server leaves it ungated.
-  const gameId = typeof msg.gameId === 'string' && /^\d+$/.test(msg.gameId) ? msg.gameId : null;
+  const gameId = typeof msg.gameId === 'string' && GAME_ID_RE.test(msg.gameId) ? msg.gameId : null;
 
   if (!sport || !question) return null; // both required
   return { sport, level, question, context, language, gameId };
@@ -172,7 +209,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       currentLevel: validated.level,
       currentLanguage: validated.language
     });
-    handleFetchPlay(validated.sport, validated.level, validated.gameId, validated.language, validated.playText)
+    handleFetchPlay(validated.sport, validated.level, validated.gameId, validated.language, validated.playText, validated.isRefresh)
       .then(sendResponse)
       .catch(err => sendResponse({ error: err.message }));
     return true;
@@ -289,11 +326,66 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 async function withSession(body) {
   const auth = await getAuth();
   const session = auth && typeof auth.session === 'string' ? auth.session.trim() : '';
-  if (session) body.session = session;
+  if (session) { body.session = session; return body; }
+  // Signed out → attach the per-install anonymous id instead, so the server can meter the free
+  // tier once ANON_CAPS flips on. NEVER sent alongside a session — the two identity paths are
+  // mutually exclusive on the server too.
+  body.anonId = await getAnonId();
   return body;
 }
 
-async function handleFetchPlay(sport, level, gameId, language, playText) {
+// ── UNCHANGED-PLAY PRE-CHECK (auto-refresh only) ────────────────────────────────────────────
+// One keyless ESPN call to see whether the latest play moved since we last explained this game.
+// Unchanged → skip the Groq-backed /api/explain call entirely. This is the extension's single
+// biggest COGS lever: an overlay parked on a live game polls every ~30s whether or not anything
+// happened. Plays-capable sports only (soccer/rugby/cricket have no ESPN plays[] to compare).
+// Best-effort by construction: any failure falls through to the normal explain fetch.
+async function latestPlaySig(sport, gameId) {
+  const path = PLAYS_SUMMARY_PATHS[sport];
+  if (!path) return null;
+  const res = await fetch(
+    `https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`,
+    { cache: 'no-store' }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  const raw = Array.isArray(data?.plays) ? data.plays : [];
+  if (!raw.length) return null;
+  const last = raw[raw.length - 1];
+  return `${last?.id ?? ''}|${String(last?.text ?? '').slice(0, 200)}`;
+}
+
+// Last explained play per (sport|gameId) — a single slot; watching a second game just misses the
+// pre-check once (fail open: it explains, which is exactly today's behavior).
+async function getPlaySig() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['seLastPlaySig'], (r) => resolve(r.seLastPlaySig || null));
+  });
+}
+async function setPlaySig(v) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ seLastPlaySig: v }, resolve);
+  });
+}
+
+async function handleFetchPlay(sport, level, gameId, language, playText, isRefresh = false) {
+  // Auto-refresh + a live game list + not a manually-tapped play → try the cheap pre-check.
+  if (isRefresh && !playText && gameId) {
+    try {
+      const sig = await latestPlaySig(sport, gameId);
+      if (sig) {
+        const key = `${sport}|${gameId}`;
+        const stored = await getPlaySig();
+        if (stored && stored.key === key && stored.sig === sig) {
+          return { unchanged: true };   // nothing new — content.js keeps what's on screen
+        }
+        await setPlaySig({ key, sig }); // play moved (or first look) → explain + remember it
+      }
+    } catch (e) {
+      // Pre-check is best-effort — fall through to the normal fetch.
+    }
+  }
+
   const body = { sport, level, gameId, language };
   if (playText) body.playText = playText; // present → backend explains THAT play, not the latest
   const res = await fetch('https://sports-explainer-mode.vercel.app/api/explain', {
@@ -310,12 +402,12 @@ async function handleFetchPlay(sport, level, gameId, language, playText) {
 // Filters empty-text + period-marker entries, most-recent-first, cap 40. Soccer/rugby → [].
 // ─────────────────────────────────────────
 const PLAYS_SUMMARY_PATHS = {
-  nfl: 'football/nfl', mlb: 'baseball/mlb', nba: 'basketball/nba', nhl: 'hockey/nhl',
+  nfl: 'football/nfl', mlb: 'baseball/mlb', nba: 'basketball/nba', wnba: 'basketball/wnba', nhl: 'hockey/nhl',
 };
 
 async function handleFetchPlays(sport, gameId) {
   const path = PLAYS_SUMMARY_PATHS[sport];
-  if (!path) return { plays: [] }; // soccer/worldcup/rugby have no plays[] — section hides
+  if (!path) return { plays: [] }; // soccer/rugby/cricket have no ESPN plays[] — section hides
   const res = await fetch(
     `https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`,
     { cache: 'no-store' }
@@ -487,7 +579,54 @@ async function handleCheckEntitlement(force) {
 // ─────────────────────────────────────────
 // FETCH TODAY'S GAMES FOR POPUP GAME LIST
 // ─────────────────────────────────────────
+// Short team label for boards whose teams are full names (cricket/rugby national sides have no
+// ESPN abbreviation): initials for multi-word names ("New Zealand" → NZ, "South Africa" → SA),
+// else the first 3 letters uppercased ("India" → IND).
+function teamAbbrev(name) {
+  const n = String(name || '').trim();
+  if (!n) return '?';
+  const words = n.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return words.map(w => w[0]).join('').toUpperCase().slice(0, 3);
+  return n.slice(0, 3).toUpperCase();
+}
+
+// Map a backend canonical Game ({ id, homeTeam, awayTeam, homeScore, awayScore, status, state,
+// startTime?, homeFlag?, awayFlag? } — served by /api/cricket and /api/rugby-live) into the
+// SAME shape buildGame() produces from ESPN, so popup.js + the overlay rail need no branching.
+function mapCanonicalGame(m) {
+  const status = String(m.status || '');
+  return {
+    id: String(m.id),
+    home: m.homeTeam || '?', away: m.awayTeam || '?',
+    homeAbbrev: teamAbbrev(m.homeTeam), awayAbbrev: teamAbbrev(m.awayTeam),
+    homeScore: m.homeScore || '', awayScore: m.awayScore || '',
+    homeLogo: '', awayLogo: '',
+    homeFlag: m.homeFlag || '', awayFlag: m.awayFlag || '', // emoji flags (cricket national sides)
+    state: m.state || 'pre', detail: status, statusLabel: status,
+    broadcasts: '',
+    date: m.startTime ? new Date(m.startTime).toISOString() : '',
+    format: m.format || '', // cricket match format (T20/ODI/Test) — drives the format dropdown
+  };
+}
+
 async function handleFetchGames(sport) {
+  // ── MERGED 'All Matches' BOARDS (soccer-all / rugby-all) ──────────────────────────────────
+  // Fetch every member league concurrently and concat — one slow/failed league can't sink the
+  // board (allSettled, same posture as iOS fetchRugbyBoard). Each game is stamped with its own
+  // league key so the client can route explain/recap to the right backend league.
+  if (ALL_BOARDS[sport]) {
+    const results = await Promise.allSettled(
+      ALL_BOARDS[sport].map(leagueKey =>
+        handleFetchGames(leagueKey).then(res =>
+          (res.games || []).map(g => ({ ...g, sportKey: leagueKey }))
+        )
+      )
+    );
+    const games = [];
+    for (const r of results) if (r.status === 'fulfilled') games.push(...r.value);
+    return { games };
+  }
+
   // Normalize one ESPN competition into an enriched score-card game. Mirrors the app's
   // lib/scoreboard.ts extractors (abbrev / logo / score-string-or-object / broadcasts).
   // Keeps the legacy fields (home/away displayName, state, detail, home/awayScore) so
@@ -528,27 +667,52 @@ async function handleFetchGames(sport) {
     nfl:      { sport: 'football',   league: 'nfl' },
     mlb:      { sport: 'baseball',   league: 'mlb' },
     nba:      { sport: 'basketball', league: 'nba' },
+    wnba:     { sport: 'basketball', league: 'wnba' },
     nhl:      { sport: 'hockey',     league: 'nhl' },
     soccer:   { sport: 'soccer',     league: 'usa.1' },
+    epl:      { sport: 'soccer',     league: 'eng.1' },
+    laliga:   { sport: 'soccer',     league: 'esp.1' },
     worldcup: { sport: 'soccer',     league: 'fifa.world' },
-    rugby:    { sport: 'rugby',      league: '282', useCoreAPI: true },
+    // Rugby leagues — ESPN Core API two-step $ref fetch. League ids MUST match the backend's
+    // espnConfig (route.ts) — the explain path looks the gameId up in the SAME league, so a
+    // mismatched id can never be found server-side. (The old '282' here was Olympic 7s while
+    // the backend explains URC 270557 — every rugby explain silently fell back.)
+    rugby:        { sport: 'rugby', league: '270557', useCoreAPI: true }, // URC
+    mlr:          { sport: 'rugby', league: '289262', useCoreAPI: true },
+    sixnations:   { sport: 'rugby', league: '180659', useCoreAPI: true },
+    nationschamp: { sport: 'rugby', league: '17567',  useCoreAPI: true },
+    // Backend-served boards (API keys live server-side; response is already-normalized
+    // canonical Game[] in { matches } — same contract the iOS app consumes).
+    nationscup: { backendBoard: `${API_BASE}/rugby-live` },
+    cricket:    { backendBoard: `${API_BASE}/cricket` },
   };
 
   const config = SPORT_CONFIG[sport] || SPORT_CONFIG.nfl;
 
-  // ── RUGBY: Two-step $ref fetch ──
+  // ── BACKEND BOARDS (cricket / nationscup): map canonical Game[] → the extension game shape ──
+  if (config.backendBoard) {
+    const res = await fetch(config.backendBoard, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Board API returned ${res.status}`);
+    const data = await res.json();
+    const matches = Array.isArray(data?.matches) ? data.matches : [];
+    return { games: matches.map(mapCanonicalGame) };
+  }
+
+  // ── RUGBY: Two-step $ref fetch over a −3d…+10d window (weekly sport — a today-only
+  //    list is empty most days; mirrors the iOS core-API windowed board). ──
   if (config.useCoreAPI) {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const day = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10).replace(/-/g, '');
     const eventsRes = await fetch(
-      `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/events?dates=${today}`,
+      `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/events?dates=${day(-3)}-${day(10)}&limit=50`,
       { cache: 'no-store' }
     );
     if (!eventsRes.ok) throw new Error(`ESPN Core API returned ${eventsRes.status}`);
     const eventsData = await eventsRes.json();
-    const items = eventsData.items || [];
+    const items = (eventsData.items || []).slice(0, 30); // cap the per-event $ref fan-out
 
     const games = await Promise.all(items.map(async (item) => {
-      const eventRes = await fetch(item.$ref, { cache: 'no-store' });
+      // Core API $refs come back http:// — upgrade to https (same as the iOS httpsRef helper).
+      const eventRes = await fetch(String(item.$ref).replace(/^http:\/\//i, 'https://'), { cache: 'no-store' });
       const eventData = await eventRes.json();
       return buildGame(eventData.id, eventData.competitions?.[0], eventData.status?.type, eventData.date);
     }));

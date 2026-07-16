@@ -33,6 +33,10 @@ export interface Game {
   // builder, so existing sports' emitted JSON is byte-identical.
   homeFlag?: string;
   awayFlag?: string;
+  // Match format (cricket today: "T20" / "ODI" / "Test"). Drives the extension's cricket
+  // format dropdown. Optional + unset by every non-cricket builder — additive, so existing
+  // consumers (the iOS app ignores unknown fields) are unaffected.
+  format?: string;
 }
 
 // --- Defensive parsing (the feed may mix string/number; never blanket-cast) ---
