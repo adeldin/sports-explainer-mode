@@ -259,7 +259,7 @@ builds on the last, never blocked:
 - **Visuals + "don't become a scoreboard" guardrail** → *STRATEGY — visuals, data, and the "don't become a scoreboard" line*.
 - **LLM provider (decided)** → *🔌 LLM PROVIDER (decided)*.
 - **Per-sport data-upgrade roadmap (the framework)** → *Per-sport data upgrade roadmap*.
-- **Platform / [Topic]Wise vision + governing design principle** → *Platform vision — the "[Topic]Wise" family*.
+- **Platform / [Topic]Wise vision + governing design principle** → *Platform vision — the "[Topic]Wise" family*. **UPDATE 2026-07-15: app #2 DECIDED — Finance/Markets ("StockWise"), held until SportsWise is stable; Health re-slotted app #3; Gov/News parked for an election cycle. → 🎯 App #2 DECIDED subsection.**
 - **Free/paid strategy — "come for live, stay for the games"** → *STRATEGY — live as hook, Academy/games as engine* (below).
 - **TV app** → *TV app vision*.
 - **Yahoo-steal** → *Yahoo Sports features to steal*.
@@ -1240,13 +1240,15 @@ The core product is a **real-time complexity translator**. Sports is the beachhe
 **Test for a new vertical:** Live/event-based · Complex · Outsiders feel locked out ·
 Repeated explanation needed · Wildly different expertise levels.
 
-**Candidate verticals:**
-1. **Government / News** — *highest-priority second vertical.* Live legislation, Supreme
+**Candidate verticals:** *(⚠️ ranking SUPERSEDED 2026-07-15 — see 🎯 App #2 DECIDED below; kept for record)*
+1. **Government / News** — ~~*highest-priority second vertical.*~~ Live legislation, Supreme
    Court rulings, election results, political terminology. The AMC pop-up format fits
-   perfectly. Enormous underserved audience.
+   perfectly. Enormous underserved audience. **→ now PARKED for an election cycle (see below).**
 2. **Finance / Markets** — Fed decisions, earnings, market moves, economic terms. Strong fit.
+   **→ now APP #2 (decided — see below).**
 3. **Legal proceedings** — trials, verdicts, contract language. Strong fit.
-4. **Medical / Health** — needs liability guardrails. Later.
+4. **Medical / Health** — needs liability guardrails. ~~Later.~~ **→ re-slotted as APP #3,
+   the sleeper (see below).**
 5. **Science / Space** — more episodic than real-time; a different mode.
 
 **Key:** all verticals share the **same engine** (Groq + four expertise levels + ask
@@ -1255,6 +1257,78 @@ Brand asset: the **"[Topic]Wise"** naming pattern is clean and scalable.
 
 **Sequencing:** prove SportsWise fully first, then expand — but keep the architecture
 **topic-agnostic**: no sports-specific hardcoding in the explanation layer.
+
+### 🎯 App #2 — DECIDED 2026-07-15: Finance/Markets ("StockWise" / "MarketWise")
+
+**Decision (Fable strategy session, 2026-07-15): finance is the second vertical**, overriding
+the earlier Government/News ranking. Politics parked for an election cycle; Health re-slotted
+as app #3. **Timing (Anthony's call, same session): HOLD until SportsWise no longer needs
+constant work** — do not break the SportsWise GTM window (World Cup / Wimbledon / rugby
+Nations Cup event-timed launches are NOW).
+
+**Why finance wins:**
+1. **It's the only other domain that is a LIVE GAME WITH A FIXTURE LIST.** Market hours =
+   game clock; earnings calendar / Fed dates / CPI prints = the fixtures. This matters more
+   than audience size because the whole engine is built around live events.
+2. **Founder is the confused user again** — the proven origin pattern (rugby → SportsWise).
+   The confusion Anthony feels IS the product spec.
+3. **Willingness to pay** — finance monetizes best of any consumer vertical; news/civic worst.
+   RevenueCat plumbing, caps, and the Pro-tier logic transfer directly. Passes the
+   COGS + conversion filter decisively.
+4. **Cadence beats sports** — any one sport is seasonal; the market runs every weekday,
+   year-round. **Volatility spikes are acquisition events**: confusion peaks exactly when
+   downloads peak ("why is my portfolio down 4% today" = maximum motivation to learn;
+   cf. Robinhood signups surging on big red days).
+5. **APIs are abundant, cheap, and CLEANER than sports** — Polygon, Finnhub, Alpha Vantage,
+   FMP free/cheap tiers; structured numbers everywhere, no rugby-style PBP scarcity wall.
+
+**North-star use case (the Ohtani story, transferred):** *"Coworkers won't stop talking about
+NVDA earnings tonight. She opens the app, gets a Kid-level explanation of what earnings are,
+why this one matters, and what 'beat expectations' means — and can participate in the
+conversation."* Same emotional core: social inclusion through understanding, not information.
+
+**Engine mapping (~1:1):** games → tickers/indices moving today · a play → a price move /
+halt / Fed statement / earnings drop · TuneInCard → earnings + Fed calendar · post-game
+recap → market-close recap ("why everything was red today") · GUMBO data-grounding → real
+price/volume/estimate grounding · Coach's Corner → "what experienced investors are watching
+next" · Academy read-the-play → **read-the-chart** (already in the generalization list
+below) · date strip → trading-day strip.
+
+**The novel blend (Duolingo × Khan Academy × live): the market is a DAILY LESSON GENERATOR.**
+Duolingo's weakness: content is abstract, disconnected from the user's life. Khan's weakness:
+pull-only, no urgency. The gap: each day the live feed produces one real teachable moment
+("the Fed held rates today") → explained at the user's level → **the Academy quizzes you on
+it TOMORROW** — formative assessment on events the user actually lived through. Nobody does
+this. The Academy Games v2 registry being built now is the engine for it.
+
+**Identity guardrail — "don't become a scoreboard" becomes "don't become a trading app":**
+educate, NEVER advise. No buy/sell, no price targets, no signals, no portfolio hooks (at
+least initially). Pure education stays clear of the financial-advice regulatory surface —
+same discipline as the no-odds/no-gambling rule, and the same differentiator-not-limitation
+framing.
+
+**New risk unique to this vertical — the founder CAN'T scrutinize it.** In sports Anthony had
+6 comparison apps + deep domain instinct; in finance he's the true naive user (which is also
+the point). Mitigations: (a) ground every explanation in real data — the GUMBO / AP-recap
+grounding lesson applied from day one; (b) recruit 2–3 finance-literate friends as
+correctness reviewers — the Chicago Hounds coach role for this vertical.
+
+**Gate 1 is work already planned anyway:** the core / content-pack / app-shell extraction
+(see the governing design principle below — "design the seam now, extract when app #2 is
+real"). App #2 is now real-on-paper; the extraction improves SportsWise regardless, so
+starting it is never wasted — but it waits until SportsWise is stable enough.
+
+**Vertical re-ranking:**
+1. **Finance/Markets — app #2 (decided).**
+2. **Health — app #3, the sleeper.** Fails the "confuses me" test but FLIPS the model:
+   Anthony IS the coach in the pocket (PhD in Exercise Physiology, professor, dept chair —
+   "built by a health science professor" markets itself). Explaining health-study headlines
+   and debunking fitness/TikTok claims = far lower liability than clinical content, enormous
+   confused audience, and his credibility compounds instead of his confusion.
+3. **Government/News — PARKED for an election cycle.** Bias/brand minefield for a solo
+   founder with an academic reputation to protect; worst consumer monetization; episodic
+   cadence (rulings/elections) vs. finance's daily one. Revisit when an election provides
+   the event-timed hook.
 
 ### 🧱 Governing design principle — generic mechanism + pluggable content + data adapters
 
