@@ -68,6 +68,24 @@ A scenario should be authored so the *same* placement scales across levels by ch
 
 ---
 
+## Output & engine hygiene (the second category — non-tactical failures)
+
+Everything above is about whether a scenario is *tactically sound* — the judgment only Anthony can give. This section is different: it's about whether the *artifact itself* is clean and whether its *behavior* is correct. These failures aren't soccer/football knowledge; they're authoring discipline, and they should never reach review. Real sessions burned multiple correction rounds on exactly these — a debug number leaking into fan-facing text, a runner starting too close to teach the moment, and a runway change silently breaking animation speed. Each is preventable with a stated rule.
+
+**The principle:** Anthony's eye is for tactical judgment. Any round spent catching a leaked coordinate, an illegible motion, or a cascade bug is a round stolen from the thing only he can do. Author to this bar so review stays tactical.
+
+1. **Fan-facing text is prose only — no internals ever surface.** The user reads plain soccer/football, never coordinates ("≈512"), variable names, internal keys, geometry values, or debug references. If a number reasons about the geometry, it lives in code and comments, *never* in the `why`/verdict/label strings the user sees. Before render, scan every user-facing string for digits-as-coordinates and internal tokens; strip them.
+
+2. **Motion must have enough runway to be legible.** Any scenario with movement (a run, a pass, a developing play) must give the moving element enough distance/time for the teaching beat to *read*. A runner who starts already next to the line can't show "he timed it and went a beat early" — the lesson has no room to breathe. If the teaching moment is a *timing* or *developing* read, the setup must visibly build to it, not start at the payoff.
+
+3. **State the animation invariant once, so distance changes can't regress speed.** The classic cascade: giving an element more runway silently makes it move *faster*, because playback advances by timeline-units at a fixed rate regardless of path length — longer path in the same time = higher on-screen speed. Prevent it by fixing the invariant up front: **all moving elements travel at a constant on-screen pace (px/sec) regardless of path length; playback duration scales to distance, not the reverse.** With that stated, a runway change can't cause a speed bug, because the invariant holds automatically. (Durations then legitimately vary — a longer run *should* take longer to watch — but the visual speed stays constant.)
+
+4. **When a change alters one property, check the properties it cascades into.** The runway→speed bug is the template: fixing property A (distance) broke property B (speed) because B depended on A through a shared mechanism (the timeline rate). Before declaring an edit done, name what else the changed value feeds into and verify those didn't move. Distance feeds speed; position feeds spotlight/arrow anchors; adding an option feeds the stacked-line check; changing a label feeds the localization/leak scan. Edits are rarely as local as they look.
+
+5. **Consistency across a set is itself a rule.** In a multi-scenario module (six VAR clips, five modules), the scenarios must feel like siblings — same visual pace, same interaction grammar, same framing, same text voice. One scenario that moves faster, uses a different tap behavior, or shows numbers when the others don't reads as *broken*, not varied. Author each new scenario against the set, not in isolation, and re-check the whole set's consistency after adding one.
+
+---
+
 ## UX / interaction hygiene (learned the hard way)
 
 - **Whole tap target clickable** — a stroked ring with no fill passes clicks through its center. Fill the tap target (invisible is fine) so the whole disc taps.
@@ -78,6 +96,7 @@ A scenario should be authored so the *same* placement scales across levels by ch
 
 ## The pre-flight checklist (run before every scenario is rendered)
 
+*Tactical soundness:*
 1. Have I named, in text, the specific defender/line that punishes each wrong option?
 2. Is the correct option contested (threading it), not the only open lane?
 3. Are all options at distinct depths *and* angles (nothing stacked)?
@@ -86,5 +105,12 @@ A scenario should be authored so the *same* placement scales across levels by ch
 6. (Multi-step) Does *every* step independently pass 1–5?
 7. (Offside) Is the line anchored to the 2nd-last defender at the moment of the pass?
 8. Any hardcoded number checked against a published reference?
+
+*Output & engine hygiene:*
+9. Is every fan-facing string prose only — no coordinates, variable names, or internal tokens?
+10. Does any moving element have enough runway/time for its teaching beat to read?
+11. Does the animation hold the constant-pace invariant (so this scenario moves at the same visual speed as the rest of the set)?
+12. For every value I changed, have I checked what else it feeds into (distance→speed, position→anchors, new option→stacking, label→leaks)?
+13. Does this scenario feel like a sibling of the others in the set (pace, grammar, framing, voice)?
 
 If any answer is no, the scenario isn't ready for review yet.
