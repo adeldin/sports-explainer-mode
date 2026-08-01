@@ -25,7 +25,9 @@ export type CCPieceId =
   | "switch-the-play"                                                 // soccer
   | "serve-target"                                                    // tennis
   | "the-pinch"                                                       // golf
-  | "set-the-trap";                                                   // cricket
+  | "set-the-trap"                                                    // cricket
+  | "numbers-out-wide" | "draw-and-pass" | "how-many-in" | "wheres-the-line"   // rugby
+  | "pick-your-poison" | "two-for-one" | "foul-up-three";                      // NBA
 
 // Formations + read-the-play are soccer-only by construction.
 const SOCCER_KEYS: Sport[] = ["soccer", "epl", "laliga", "worldcup"];
@@ -67,6 +69,8 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "tennis") pieces.push("serve-target");
   if (sport === "golf") pieces.push("the-pinch");
   if (sport === "cricket") pieces.push("set-the-trap");
+  if (isRugby(sport)) pieces.push("numbers-out-wide", "draw-and-pass", "how-many-in", "wheres-the-line");
+  if (sport === "nba") pieces.push("pick-your-poison", "two-for-one", "foul-up-three");
   return pieces;
 }
 

@@ -43,6 +43,13 @@ import SwitchThePlayGame from '../components/academy/SwitchThePlayGame';
 import ServeTargetGame from '../components/academy/ServeTargetGame';
 import ThePinchGame from '../components/academy/ThePinchGame';
 import SetTheTrapGame from '../components/academy/SetTheTrapGame';
+import NumbersOutWideGame from '../components/academy/NumbersOutWideGame';
+import DrawAndPassGame from '../components/academy/DrawAndPassGame';
+import HowManyInGame from '../components/academy/HowManyInGame';
+import WheresTheLineGame from '../components/academy/WheresTheLineGame';
+import PickYourPoisonGame from '../components/academy/PickYourPoisonGame';
+import TwoForOneGame from '../components/academy/TwoForOneGame';
+import FoulUpThreeGame from '../components/academy/FoulUpThreeGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -78,6 +85,13 @@ const PIECE_GAME = {
   'serve-target': { id: 'cc-serve-target', title: 'Serve Target', icon: '🎾', blurb: 'Read his feet — serve the door he left open', Component: ServeTargetGame, landscape: true },
   'the-pinch': { id: 'cc-the-pinch', title: 'The Pinch', icon: '⛳', blurb: 'Safety is a yardage, not a club', Component: ThePinchGame, landscape: true },
   'set-the-trap': { id: 'cc-set-the-trap', title: 'Set the Trap', icon: '🏏', blurb: 'Move a man onto the evidence', Component: SetTheTrapGame, landscape: true },
+  'numbers-out-wide': { id: 'cc-numbers-out-wide', title: 'Numbers Out Wide', icon: '🏉', blurb: 'Count shirts, then beat the slide', Component: NumbersOutWideGame, landscape: true },
+  'draw-and-pass': { id: 'cc-draw-and-pass', title: 'Draw and Pass', icon: '🤾', blurb: 'Two on one — time the release', Component: DrawAndPassGame, landscape: true },
+  'how-many-in': { id: 'cc-how-many-in', title: 'How Many In?', icon: '💥', blurb: 'The ruck is a market — spend wisely', Component: HowManyInGame, landscape: true },
+  'wheres-the-line': { id: 'cc-wheres-the-line', title: "Where's the Line?", icon: '📏', blurb: 'Drag the offside fence, lock it in', Component: WheresTheLineGame, landscape: true },
+  'pick-your-poison': { id: 'cc-pick-your-poison', title: 'Pick Your Poison', icon: '🏀', blurb: 'Drop, switch or blitz — every coverage sends a bill', Component: PickYourPoisonGame, landscape: true },
+  'two-for-one': { id: 'cc-two-for-one', title: 'Two-for-One', icon: '⏱️', blurb: "Shoot early and the ball comes back", Component: TwoForOneGame, landscape: true },
+  'foul-up-three': { id: 'cc-foul-up-three', title: 'Foul Up Three?', icon: '🚨', blurb: 'Two free throws can never tie you', Component: FoulUpThreeGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -108,6 +122,13 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'serve-target': { icon: '🎾', title: 'Serve Target' },
   'the-pinch': { icon: '⛳', title: 'The Pinch' },
   'set-the-trap': { icon: '🏏', title: 'Set the Trap' },
+  'numbers-out-wide': { icon: '🏉', title: 'Numbers Out Wide' },
+  'draw-and-pass': { icon: '🤾', title: 'Draw and Pass' },
+  'how-many-in': { icon: '💥', title: 'How Many In?' },
+  'wheres-the-line': { icon: '📏', title: "Where's the Line?" },
+  'pick-your-poison': { icon: '🏀', title: 'Pick Your Poison' },
+  'two-for-one': { icon: '⏱️', title: 'Two-for-One' },
+  'foul-up-three': { icon: '🚨', title: 'Foul Up Three?' },
 };
 
 export default function CoachesCornerScreen() {
