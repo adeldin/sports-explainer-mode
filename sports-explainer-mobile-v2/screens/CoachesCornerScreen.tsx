@@ -33,6 +33,16 @@ import ApproachOrStayGame from '../components/academy/ApproachOrStayGame';
 import GoOrLayGame from '../components/academy/GoOrLayGame';
 import SuckerPinGame from '../components/academy/SuckerPinGame';
 import ReviewOrSaveGame from '../components/academy/ReviewOrSaveGame';
+// v1.5 wave 2
+import RpoGiveOrPullGame from '../components/academy/RpoGiveOrPullGame';
+import MotionManOrZoneGame from '../components/academy/MotionManOrZoneGame';
+import ReadTheCoverageGame from '../components/academy/ReadTheCoverageGame';
+import InfieldInOrBackGame from '../components/academy/InfieldInOrBackGame';
+import TagUpGame from '../components/academy/TagUpGame';
+import SwitchThePlayGame from '../components/academy/SwitchThePlayGame';
+import ServeTargetGame from '../components/academy/ServeTargetGame';
+import ThePinchGame from '../components/academy/ThePinchGame';
+import SetTheTrapGame from '../components/academy/SetTheTrapGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -58,6 +68,16 @@ const PIECE_GAME = {
   'go-or-lay': { id: 'cc-go-or-lay', title: 'Go or Lay?', icon: '⛳', blurb: 'Par-5 second shot — closer is better', Component: GoOrLayGame, landscape: true },
   'sucker-pin': { id: 'cc-sucker-pin', title: 'Sucker Pin', icon: '🚩', blurb: "You don't aim a shot — you aim an oval", Component: SuckerPinGame, landscape: true },
   'review-or-save': { id: 'cc-review-or-save', title: 'Review or Save?', icon: '🏏', blurb: 'DRS: challenge the umpire, or bank it', Component: ReviewOrSaveGame, landscape: true },
+  // — wave 2 —
+  'rpo-give-or-pull': { id: 'cc-rpo-give-or-pull', title: 'Give or Pull?', icon: '🏈', blurb: 'RPO mesh — one defender is wrong either way', Component: RpoGiveOrPullGame, landscape: true },
+  'motion-man-or-zone': { id: 'cc-motion-man-or-zone', title: 'Man or Zone?', icon: '🏃', blurb: 'Send him in motion — watch who follows', Component: MotionManOrZoneGame, landscape: true },
+  'read-the-coverage': { id: 'cc-read-the-coverage', title: 'Read the Coverage', icon: '🛡️', blurb: 'Count the safeties — middle open or shut?', Component: ReadTheCoverageGame, landscape: true },
+  'infield-in-or-back': { id: 'cc-infield-in-or-back', title: 'Infield In or Back?', icon: '🧤', blurb: "Cut the run, or take the outs — not both", Component: InfieldInOrBackGame, landscape: true },
+  'tag-up': { id: 'cc-tag-up', title: 'Tag and Go', icon: '⏱️', blurb: 'The first touch is the starting gun', Component: TagUpGame, landscape: true },
+  'switch-the-play': { id: 'cc-switch-the-play', title: 'Switch the Play', icon: '🔄', blurb: "They all slid over — where ISN'T the defense?", Component: SwitchThePlayGame, landscape: true },
+  'serve-target': { id: 'cc-serve-target', title: 'Serve Target', icon: '🎾', blurb: 'Read his feet — serve the door he left open', Component: ServeTargetGame, landscape: true },
+  'the-pinch': { id: 'cc-the-pinch', title: 'The Pinch', icon: '⛳', blurb: 'Safety is a yardage, not a club', Component: ThePinchGame, landscape: true },
+  'set-the-trap': { id: 'cc-set-the-trap', title: 'Set the Trap', icon: '🏏', blurb: 'Move a man onto the evidence', Component: SetTheTrapGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -79,6 +99,15 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'go-or-lay': { icon: '⛳', title: 'Go or Lay?' },
   'sucker-pin': { icon: '🚩', title: 'Sucker Pin' },
   'review-or-save': { icon: '🏏', title: 'Review or Save?' },
+  'rpo-give-or-pull': { icon: '🏈', title: 'Give or Pull?' },
+  'motion-man-or-zone': { icon: '🏃', title: 'Man or Zone?' },
+  'read-the-coverage': { icon: '🛡️', title: 'Read the Coverage' },
+  'infield-in-or-back': { icon: '🧤', title: 'Infield In or Back?' },
+  'tag-up': { icon: '⏱️', title: 'Tag and Go' },
+  'switch-the-play': { icon: '🔄', title: 'Switch the Play' },
+  'serve-target': { icon: '🎾', title: 'Serve Target' },
+  'the-pinch': { icon: '⛳', title: 'The Pinch' },
+  'set-the-trap': { icon: '🏏', title: 'Set the Trap' },
 };
 
 export default function CoachesCornerScreen() {

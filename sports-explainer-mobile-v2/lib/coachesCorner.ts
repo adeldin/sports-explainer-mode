@@ -18,7 +18,14 @@ export type CCPieceId =
   | "help-or-stay"                                       // NBA
   | "approach-or-stay"                                   // tennis
   | "go-or-lay" | "sucker-pin"                           // golf
-  | "review-or-save";                                    // cricket
+  | "review-or-save"                                     // cricket
+  // — v1.5 wave 2 —
+  | "rpo-give-or-pull" | "motion-man-or-zone" | "read-the-coverage"   // NFL
+  | "infield-in-or-back" | "tag-up"                                   // MLB
+  | "switch-the-play"                                                 // soccer
+  | "serve-target"                                                    // tennis
+  | "the-pinch"                                                       // golf
+  | "set-the-trap";                                                   // cricket
 
 // Formations + read-the-play are soccer-only by construction.
 const SOCCER_KEYS: Sport[] = ["soccer", "epl", "laliga", "worldcup"];
@@ -52,6 +59,14 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "tennis") pieces.push("approach-or-stay");
   if (sport === "golf") pieces.push("go-or-lay", "sucker-pin");
   if (sport === "cricket") pieces.push("review-or-save");
+
+  // wave 2 — same tier-independent rule
+  if (sport === "nfl") pieces.push("rpo-give-or-pull", "motion-man-or-zone", "read-the-coverage");
+  if (sport === "mlb") pieces.push("infield-in-or-back", "tag-up");
+  if (isSoccer(sport)) pieces.push("switch-the-play");
+  if (sport === "tennis") pieces.push("serve-target");
+  if (sport === "golf") pieces.push("the-pinch");
+  if (sport === "cricket") pieces.push("set-the-trap");
   return pieces;
 }
 
