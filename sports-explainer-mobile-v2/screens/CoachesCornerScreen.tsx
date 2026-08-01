@@ -50,6 +50,11 @@ import WheresTheLineGame from '../components/academy/WheresTheLineGame';
 import PickYourPoisonGame from '../components/academy/PickYourPoisonGame';
 import TwoForOneGame from '../components/academy/TwoForOneGame';
 import FoulUpThreeGame from '../components/academy/FoulUpThreeGame';
+import ServePlusOneGame from '../components/academy/ServePlusOneGame';
+import PassOrLobGame from '../components/academy/PassOrLobGame';
+import EscapeOrHeroGame from '../components/academy/EscapeOrHeroGame';
+import PaceTheChaseGame from '../components/academy/PaceTheChaseGame';
+import BowlOrChangeGame from '../components/academy/BowlOrChangeGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -92,6 +97,11 @@ const PIECE_GAME = {
   'pick-your-poison': { id: 'cc-pick-your-poison', title: 'Pick Your Poison', icon: '🏀', blurb: 'Drop, switch or blitz — every coverage sends a bill', Component: PickYourPoisonGame, landscape: true },
   'two-for-one': { id: 'cc-two-for-one', title: 'Two-for-One', icon: '⏱️', blurb: "Shoot early and the ball comes back", Component: TwoForOneGame, landscape: true },
   'foul-up-three': { id: 'cc-foul-up-three', title: 'Foul Up Three?', icon: '🚨', blurb: 'Two free throws can never tie you', Component: FoulUpThreeGame, landscape: true },
+  'serve-plus-one': { id: 'cc-serve-plus-one', title: 'Serve +1', icon: '🎾', blurb: 'Read his recovery trail, not the ball', Component: ServePlusOneGame, landscape: true },
+  'pass-or-lob': { id: 'cc-pass-or-lob', title: 'Pass or Lob?', icon: '🎾', blurb: 'His distance picks the shot; his lean picks the lane', Component: PassOrLobGame, landscape: true },
+  'escape-or-hero': { id: 'cc-escape-or-hero', title: 'Escape or Hero?', icon: '🌲', blurb: 'Gap width vs shot width — the 9-of-10 rule', Component: EscapeOrHeroGame, landscape: true },
+  'pace-the-chase': { id: 'cc-pace-the-chase', title: 'Pace the Chase', icon: '🏏', blurb: 'Balls or wickets — which one is scarce?', Component: PaceTheChaseGame, landscape: true },
+  'bowl-or-change': { id: 'cc-bowl-or-change', title: 'Bowl or Change?', icon: '🏏', blurb: 'Figures are the past; geometry is the next over', Component: BowlOrChangeGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -129,6 +139,11 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'pick-your-poison': { icon: '🏀', title: 'Pick Your Poison' },
   'two-for-one': { icon: '⏱️', title: 'Two-for-One' },
   'foul-up-three': { icon: '🚨', title: 'Foul Up Three?' },
+  'serve-plus-one': { icon: '🎾', title: 'Serve +1' },
+  'pass-or-lob': { icon: '🎾', title: 'Pass or Lob?' },
+  'escape-or-hero': { icon: '🌲', title: 'Escape or Hero?' },
+  'pace-the-chase': { icon: '🏏', title: 'Pace the Chase' },
+  'bowl-or-change': { icon: '🏏', title: 'Bowl or Change?' },
 };
 
 export default function CoachesCornerScreen() {

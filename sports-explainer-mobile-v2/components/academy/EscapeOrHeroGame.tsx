@@ -183,13 +183,17 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
   if (s.gate2) nodes.push(...bracketNodes('gate2', s.gate2, CHALK, false, brOp));
 
   // ── resolve layer (pure function of e) ──
+  // A FLOWN shot swells mid-flight (the height pulse) and a RUN shot stays flat on the deck —
+  // that difference is how "punch/low squirt" reads differently from "the long club".
   let ballP: P = s.ball;
+  let ballR = 5;
   if (o && T) {
     const col = gradeColor(o.k);
     if (o.type === 'ric' && o.via) {
       const k1 = clamp01(e / RIC_FLY);
       if (e < RIC_FLY) {
         ballP = lerpP(s.ball, o.via, k1);
+        ballR = 5 + 3.2 * Math.sin(Math.PI * k1);
       } else {
         ballP = lerpP(o.via, o.land, clamp01((e - RIC_FLY) / RIC_RUN));
       }
@@ -203,7 +207,9 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
         nodes.push(<Polyline key="tr2" points={`${o.via[0]},${o.via[1]} ${o.land[0]},${o.land[1]}`} fill="none" stroke={RED} strokeWidth={2} strokeDasharray="4 5" opacity={0.6} />);
       }
     } else if (o.type === 'fly') {
-      ballP = lerpP(s.ball, o.land, clamp01(e / FLY_MS));
+      const kf = clamp01(e / FLY_MS);
+      ballP = lerpP(s.ball, o.land, kf);
+      ballR = 5 + 3.2 * Math.sin(Math.PI * kf);
       nodes.push(<Polyline key="tr1" points={`${s.ball[0]},${s.ball[1]} ${o.land[0]},${o.land[1]}`} fill="none" stroke={CHALK} strokeWidth={2} strokeDasharray="4 5" opacity={0.5} />);
     } else if (o.via) {
       ballP = e < RUN_LEG ? lerpP(s.ball, o.via, clamp01(e / RUN_LEG)) : lerpP(o.via, o.land, clamp01((e - RUN_LEG) / RUN_LEG));
@@ -237,7 +243,7 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
       nodes.push(...lbl('ghLbl', o.ghost.to[0], o.ghost.to[1] + 22, o.ghost.lab, '#7be0bf', 9.5));
     }
   }
-  nodes.push(<Circle key="ball" cx={ballP[0]} cy={ballP[1]} r={5} fill="#fff" stroke="#8a8f98" strokeWidth={1} />);
+  nodes.push(<Circle key="ball" cx={ballP[0]} cy={ballP[1]} r={ballR} fill="#fff" stroke="#8a8f98" strokeWidth={1} />);
   nodes.push(...lbl('youL', s.ball[0], s.ball[1] - 14, 'you', '#fff', 10, readsOp));
   nodes.push(...lbl('flagL', gc[0], gc[1] + gr + 16, `${yds(s.ball, gc)} to the flag`, '#d9e2d9', 9.5, readsOp));
 
@@ -374,8 +380,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
   foot: { color: t.textSecondaryOnDark, fontSize: 11, lineHeight: 17, opacity: 0.85 },
   controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
-  ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
-  ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
   lsPostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border },
   lsNextFill: { flex: 1, alignSelf: 'center', alignItems: 'center', paddingVertical: 10 },
