@@ -1,0 +1,461 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { Circle, Line, Polygon } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
+import type { Level } from '../../lib/api';
+import { useAppState } from '../../lib/appState';
+import { useTheme, Theme } from '../../lib/theme';
+import type { AcademyGameProps } from '../../lib/academyGames';
+import { LandscapeGameShell, ScenarioPills, DifficultyTabs, NextButton } from '../FieldEngine';
+import {
+  BasketballCourt, Basketball, OutlinedLabel, boldSegments, BASKETBALL_COURT_RATIO, RIM, HOOPS,
+} from './fields/BasketballCourt';
+import {
+  SCEN, BASE, FREEZE, SCREEN, DRIVE_MID, STATIC_LABELS, FIVE_CAP, FILM_PROMPT, CLOSE_PROMPT,
+  HINT_IDLE, HINT_DONE, TAG_TEXT,
+  type Pt, type Depth, type Grade, type HelpOpt, type HelpActorId, type HelpScenario, type HelpEnd,
+  type GhostSpec, type NoteSpec,
+} from '../../lib/helpOrStay';
+
+// Help or Stay? — weak-side low-man decision on a high pick-and-roll. Develop film plays first
+// (the C plants the screen, the PG turns the corner), freezes at the choice, then help/stay/stunt
+// resolves with the spike's authored choreography. All motion runs on ONE rAF timeline with a
+// generation guard (replay/reset/choose/unmount all invalidate the running loop). Content verbatim
+// from lib/helpOrStay.ts. Court = fields/BasketballCourt (half-court, 680×460).
+const TEAL = HOOPS.teal, AMBER = HOOPS.amber, RED = HOOPS.red;
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const hand = (p: Pt): Pt => [p[0] + 11, p[1] - 3];
+const gradeColor = (k: Grade) => (k === 'good' ? TEAL : k === 'ok' ? AMBER : RED);
+
+// ── the single-rafRef timeline: tracks (sorted position segs per actor/ball) + one-shot events ──
+interface Seg { at: number; dur: number; to: Pt; arc?: number }
+interface Track { from: Pt; segs: Seg[] }
+interface TL { tracks: Record<string, Track>; events: { at: number; fn: () => void }[]; total: number }
+const lerpPt = (a: Pt, b: Pt, k: number): Pt => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+const arcAt = (a: Pt, b: Pt, peak: number, k: number): Pt => {
+  const mx = (a[0] + b[0]) / 2, my = Math.min(a[1], b[1]) - peak, mk = 1 - k;
+  return [mk * mk * a[0] + 2 * mk * k * mx + k * k * b[0], mk * mk * a[1] + 2 * mk * k * my + k * k * b[1]];
+};
+function trackPos(tr: Track, e: number): Pt {
+  let cur = tr.from;
+  for (const s of tr.segs) {
+    if (e >= s.at + s.dur) { cur = s.to; continue; }
+    if (e >= s.at) {
+      const k = s.dur > 0 ? clamp01((e - s.at) / s.dur) : 1;
+      return s.arc != null ? arcAt(cur, s.to, s.arc, k) : lerpPt(cur, s.to, k);
+    }
+    break;
+  }
+  return cur;
+}
+
+type Phase = 'film' | 'idle' | 'run' | 'done';
+interface Fx { pos: Pt; color: string; r: number; opacity: number }
+interface Frame { pos: Record<HelpActorId, Pt>; ball: Pt; fx: Fx[] }
+interface Decor { runway: boolean; cone: boolean; ghosts: GhostSpec[]; notes: NoteSpec[] }
+const EMPTY_DECOR: Decor = { runway: false, cone: false, ghosts: [], notes: [] };
+
+const ATT_IDS: HelpActorId[] = ['h', 'r', 'c', 'w', 'pf'];
+const DEF_IDS: HelpActorId[] = ['x1', 'x5', 'x3', 'dpf', 'you'];
+
+const JUDGE: { key: HelpOpt; label: string; sub: string; alt?: boolean }[] = [
+  { key: 'help', label: 'Help at the rim', sub: 'tag the roller' },
+  { key: 'stay', label: 'Stay on the corner', sub: 'your man, your shot' },
+  { key: 'stunt', label: 'Stunt & recover', sub: 'fake the tag, sprint home', alt: true },
+];
+
+export default function HelpOrStayGame(_props: AcademyGameProps) {
+  const { level: appLevel } = useAppState();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { width, height } = useWindowDimensions();
+  const landscape = width > height;
+
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState<Phase>('film');
+  const [chosen, setChosen] = useState<HelpOpt | null>(null);
+  const [level, setLevel] = useState<Level>(appLevel);
+  const [prompt, setPrompt] = useState<string>(FILM_PROMPT);
+  const [hint, setHint] = useState<string>(HINT_IDLE);
+  const [decor, setDecor] = useState<Decor>(EMPTY_DECOR);
+  const [frame, setFrame] = useState<Frame>(() => ({ pos: { ...BASE }, ball: hand(BASE.h), fx: [] }));
+
+  const rafRef = useRef<number | null>(null);
+  const genRef = useRef(0);
+  const basePosRef = useRef<Record<HelpActorId, Pt>>({ ...BASE });
+  const ballBaseRef = useRef<Pt>(hand(BASE.h));
+  const burstsRef = useRef<{ pos: Pt; color: string; at: number }[]>([]);
+
+  const s = SCEN[idx];
+  const depth: Depth = level === 'kid' ? 'rookie' : level;
+  const answered = phase === 'done';
+
+  const stopLoop = () => { if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
+  useEffect(() => () => { genRef.current++; stopLoop(); }, []);
+
+  // One rAF owner. Events fire once, in order; positions derive from the tracks each frame.
+  const run = (tl: TL) => {
+    stopLoop();
+    const gen = ++genRef.current;
+    burstsRef.current = [];
+    const evs = [...tl.events].sort((a, b) => a.at - b.at);
+    let ei = 0;
+    let t0: number | null = null;
+    const loop = (now: number) => {
+      if (gen !== genRef.current) return;
+      if (t0 == null) t0 = now;
+      const e = now - t0;
+      while (ei < evs.length && evs[ei].at <= e) { evs[ei].fn(); ei++; }
+      const pos = { ...basePosRef.current };
+      let ball = ballBaseRef.current;
+      Object.keys(tl.tracks).forEach(k => {
+        const p = trackPos(tl.tracks[k], e);
+        if (k === 'ball') ball = p; else pos[k as HelpActorId] = p;
+      });
+      const fx: Fx[] = [];
+      burstsRef.current.forEach(b => {
+        const k = clamp01((e - b.at) / 600);
+        if (k < 1) fx.push({ pos: b.pos, color: b.color, r: 8 + 18 * k, opacity: 0.9 * (1 - k) });
+      });
+      setFrame({ pos, ball, fx });
+      if (e < tl.total) rafRef.current = requestAnimationFrame(loop);
+      else rafRef.current = null;
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  };
+
+  // ── the develop film (spike-verbatim keyframes): C plants the screen ON the blue PG's path,
+  // the PG shoulder-grazes around it, the blue PG fights OVER the top and trails. Then freeze. ──
+  const runFilm = (sc: HelpScenario) => {
+    basePosRef.current = { ...BASE };
+    ballBaseRef.current = hand(BASE.h);
+    const tracks: Record<string, Track> = {
+      r:   { from: BASE.r,   segs: [{ at: 650, dur: 850, to: SCREEN }, { at: 2250, dur: 900, to: FREEZE.r }] },
+      h:   { from: BASE.h,   segs: [{ at: 1550, dur: 550, to: DRIVE_MID }, { at: 2100, dur: 750, to: FREEZE.h }] },
+      ball: { from: hand(BASE.h), segs: [{ at: 1550, dur: 550, to: hand(DRIVE_MID) }, { at: 2100, dur: 750, to: hand(FREEZE.h) }] },
+      x1:  { from: BASE.x1,  segs: [{ at: 1600, dur: 240, to: [378, 144] }, { at: 2140, dur: 140, to: [372, 120] }, { at: 2280, dur: 160, to: [356, 116] }, { at: 2440, dur: 600, to: FREEZE.x1 }] },
+      x5:  { from: BASE.x5,  segs: [{ at: 1800, dur: 780, to: FREEZE.x5 }] },
+      you: { from: BASE.you, segs: [{ at: 1900, dur: 750, to: FREEZE.you }] },
+      x3:  { from: BASE.x3,  segs: [{ at: 1950, dur: 700, to: FREEZE.x3 }] },
+      pf:  { from: BASE.pf,  segs: [{ at: 2000, dur: 700, to: FREEZE.pf }] },
+      dpf: { from: BASE.dpf, segs: [{ at: 2050, dur: 700, to: FREEZE.dpf }] },
+    };
+    const events = [{
+      at: 3300, fn: () => {
+        basePosRef.current = { ...FREEZE };
+        ballBaseRef.current = hand(FREEZE.h);
+        setPhase('idle');
+        setPrompt(sc.prompt);
+      },
+    }];
+    run({ tracks, events, total: 3350 });
+  };
+
+  const resetTo = (i: number) => {
+    genRef.current++;
+    stopLoop();
+    setIdx(i); setPhase('film'); setChosen(null); setDecor(EMPTY_DECOR);
+    setPrompt(FILM_PROMPT); setHint(HINT_IDLE);
+    setFrame({ pos: { ...BASE }, ball: hand(BASE.h), fx: [] });
+    runFilm(SCEN[i]);
+  };
+  useEffect(() => { resetTo(0); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const resetPlay = () => resetTo(idx);   // Reset AND the replay button: full generation-guarded rebuild
+  const nextScenario = () => resetTo((idx + 1) % SCEN.length);
+
+  // ── resolve: the chosen option's authored choreography → finish snaps the audited end state ──
+  const choose = (opt: HelpOpt) => {
+    if (phase !== 'idle') return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setChosen(opt); setPhase('run');
+    const e = s.end[opt];
+    const hb = hand(FREEZE.h);
+    const tracks: Record<string, Track> = {};
+    const events: { at: number; fn: () => void }[] = [];
+    const mv = (key: string, at: number, dur: number, to: Pt, arc?: number) => {
+      const from = key === 'ball' ? hb : FREEZE[key as HelpActorId];
+      (tracks[key] ?? (tracks[key] = { from, segs: [] })).segs.push({ at, dur, to, arc });
+    };
+    const say = (at: number, text: string) => events.push({ at, fn: () => setPrompt(text) });
+    let finishAt = 0;
+
+    if (e.shot === null) {                          // the tag: help arrives, lob dies
+      say(0, 'You fly in — <b>hit their C early, chest to shoulder…</b>');
+      mv('you', 0, 460, e.pos.you!);
+      mv('r', 300, 430, e.pos.r!);
+      mv('h', 620, 430, e.pos.h!);
+      mv('ball', 620, 430, hand(e.pos.h!));
+      finishAt = 1250;
+
+    } else if (e.shot === 'lob') {                  // no tag (or only a bluff): the dive wins
+      say(0, opt === 'stunt' ? 'You jab… and sprint home — but the lob is already up…' : 'You stay glued to the corner — <b>the runway is open…</b>');
+      if (e.runway) events.push({ at: 0, fn: () => setDecor(d => ({ ...d, runway: true })) });
+      if (opt === 'stunt') { mv('you', 0, 320, [285, 374]); mv('you', 320, 550, e.pos.you!); }
+      else mv('you', 0, 550, e.pos.you!);
+      mv('r', 180, 600, e.pos.r!);
+      mv('x5', 440, 550, e.pos.x5!);                // your C turns, late
+      mv('ball', 0, 900, [e.pos.r![0], e.pos.r![1] - 14], 110);
+      mv('ball', 900, 340, [RIM[0], RIM[1] - 4], 26);
+      finishAt = 1240;
+
+    } else if (e.shot === 'skip3') {                // the skip finds the corner
+      say(0, 'Skip pass — <b>all the way to the corner…</b>');
+      mv('you', 0, 380, opt === 'stunt' ? [285, 374] : e.pos.you!);
+      if (opt === 'stunt') mv('you', 380, 600, e.pos.you!);
+      mv('r', 220, 460, e.pos.r!);
+      mv('ball', 0, 750, [BASE.c[0] + 8, BASE.c[1] - 10], 90);
+      if (e.cone) events.push({ at: 750, fn: () => setDecor(d => ({ ...d, cone: true })) });
+      mv('x5', 870, 600, e.pos.x5!);                // scramble, too late
+      if (e.pos.x1) mv('x1', 870, 680, e.pos.x1);
+      mv('ball', 750, 1000, [RIM[0], RIM[1] - 4], 130);
+      finishAt = 1750;
+
+    } else if (e.shot === 'floater') {              // drive into the drop, floater rims out
+      say(0, "You don't move. Their PG has to try the floater <b>over your C…</b>");
+      mv('you', 0, 430, e.pos.you!);
+      mv('h', 0, 600, e.pos.h!);
+      mv('ball', 0, 600, hand(e.pos.h!));
+      mv('x5', 600, 370, e.pos.x5!);                // your C walls up
+      mv('r', 690, 430, e.pos.r!);
+      mv('ball', 600, 690, [RIM[0], RIM[1] - 6], 60);
+      mv('ball', 1290, 340, e.ball, 24);            // rim-out
+      finishAt = 1630;
+
+    } else if (e.shot === 'layup') {                // the conceded two
+      say(0, 'You give him the lane on purpose — <b>a two changes nothing…</b>');
+      mv('you', 0, 430, e.pos.you!);
+      mv('x5', 0, 490, e.pos.x5!);                  // your C opens the gate, no foul
+      mv('r', 120, 490, e.pos.r!);
+      mv('h', 0, 680, e.pos.h!);
+      mv('ball', 0, 680, hand(e.pos.h!));
+      mv('ball', 680, 420, [RIM[0], RIM[1] - 4], 30);
+      finishAt = 1100;
+
+    } else {                                        // pullup — the stunt wins: forced late-clock pull-up
+      say(0, 'Two hard steps in — <b>their PG picks up his dribble</b> — now sprint home…');
+      mv('you', 0, 350, [285, 374]); mv('you', 350, 660, e.pos.you!);
+      mv('r', 260, 430, e.pos.r!);                  // their C hesitates
+      mv('h', 870, 340, e.pos.h!);
+      mv('ball', 870, 900, [RIM[0], RIM[1] - 6], 110);
+      mv('ball', 1770, 340, e.ball, 26);
+      finishAt = 2110;
+    }
+
+    // finish: snap the authored end state, reveal the teaching layers, verdict.
+    Object.entries(e.pos).forEach(([k, p]) => mv(k, finishAt, 0, p as Pt));
+    mv('ball', finishAt, 0, e.ball);
+    events.push({ at: finishAt, fn: () => finish(e, finishAt) });
+    run({ tracks, events, total: finishAt + 660 });
+  };
+
+  const finish = (e: HelpEnd, at: number) => {
+    setDecor(d => ({
+      ...d,
+      ghosts: e.ghost ? [e.ghost] : d.ghosts,
+      notes: e.note ? [...d.notes, e.note] : d.notes,
+    }));
+    burstsRef.current.push({
+      pos: e.burst ? e.burst[0] : (e.make ? RIM : e.ball),
+      color: e.burst ? e.burst[1] : gradeColor(e.k),
+      at,
+    });
+    basePosRef.current = { ...FREEZE, ...e.pos };
+    ballBaseRef.current = e.ball;
+    setPhase('done');
+    setPrompt(CLOSE_PROMPT);
+    setHint(HINT_DONE);
+  };
+
+  // ── the dynamic SVG layer (spike group order: zones → def → att → ball → fx → labels) ──
+  const dyn: ReactNode[] = [];
+  if (decor.runway) dyn.push(<Line key="rw" x1={352} y1={300} x2={341} y2={382} stroke={RED} strokeWidth={26} strokeLinecap="round" opacity={0.18} />);
+  if (decor.cone) dyn.push(<Polygon key="cone" points={`${BASE.c[0]},${BASE.c[1]} 326,376 352,410`} fill={TEAL} opacity={0.16} />);
+  decor.ghosts.forEach((g, i) => dyn.push(<Circle key={`gh${i}`} cx={g[0]} cy={g[1]} r={16} fill="none" stroke={TEAL} strokeWidth={2.5} strokeDasharray="5 5" opacity={0.95} />));
+  const labelFor = (id: HelpActorId): string => (s.lab as Record<string, string>)[id] ?? STATIC_LABELS[id] ?? '';
+  DEF_IDS.forEach(id => {
+    const p = frame.pos[id];
+    dyn.push(<Circle key={`d${id}`} cx={p[0]} cy={p[1]} r={11} fill={id === 'you' ? HOOPS.you : HOOPS.def} stroke={HOOPS.navy} strokeWidth={2} />);
+  });
+  ATT_IDS.forEach(id => {
+    const p = frame.pos[id];
+    dyn.push(<Circle key={`a${id}`} cx={p[0]} cy={p[1]} r={11} fill={HOOPS.orange} stroke={HOOPS.navy} strokeWidth={2} />);
+  });
+  dyn.push(<Basketball key="ball" x={frame.ball[0]} y={frame.ball[1]} />);
+  frame.fx.forEach((f, i) => dyn.push(<Circle key={`fx${i}`} cx={f.pos[0]} cy={f.pos[1]} r={f.r} fill="none" stroke={f.color} strokeWidth={3} opacity={f.opacity} />));
+  ([...DEF_IDS, ...ATT_IDS] as HelpActorId[]).forEach(id => {
+    const p = frame.pos[id];
+    const color = id === 'you' ? '#e6d8f2' : DEF_IDS.includes(id) ? '#bcd3ff' : '#fff';
+    dyn.push(<OutlinedLabel key={`l${id}`} x={p[0]} y={p[1] - 16} text={labelFor(id)} color={color} size={10.5} outline={3.5} />);
+  });
+  decor.ghosts.forEach((g, i) => dyn.push(<OutlinedLabel key={`ghl${i}`} x={g[3] ?? g[0]} y={g[4] ?? g[1] + 32} text={g[2]} color="#bfe9da" size={9.5} />));
+  decor.notes.forEach((n, i) => dyn.push(<OutlinedLabel key={`nt${i}`} x={n[0]} y={n[1]} text={n[2]} color={n[3]} size={11} />));
+
+  const field = (
+    <View style={styles.stageWrap}>
+      <BasketballCourt fill="width">{dyn}</BasketballCourt>
+      {phase === 'idle' && (
+        <TouchableOpacity style={styles.replay} activeOpacity={0.8} hitSlop={10} onPress={resetPlay}>
+          <Text style={styles.replayTxt}>↺ watch the play again</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // ── control fragments ──
+  const rich = (text: string, boldColor: string, base: object, bold: object) => (
+    <Text style={base}>
+      {boldSegments(text).map((seg, i) => seg.bold
+        ? <Text key={i} style={[bold, { color: boldColor }]}>{seg.text}</Text>
+        : <Text key={i}>{seg.text}</Text>)}
+    </Text>
+  );
+  const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
+  const chips = (
+    <View style={styles.hud}>
+      {s.chips.map((c, i) => <View key={i} style={styles.chip}>{rich(c, HOOPS.orange, styles.chipTxt, styles.chipBold)}</View>)}
+    </View>
+  );
+  const fiveStrip = (
+    <View>
+      <Text style={styles.fiveCap}>{FIVE_CAP}</Text>
+      <View style={styles.five}>
+        {s.five.map(([posn, txt], i) => (
+          <View key={i} style={styles.pcard}>
+            <Text style={styles.pcardPos}>{posn}</Text>
+            <Text style={styles.pcardTxt}>{txt}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+  const promptBlock = <View style={styles.prompt}>{rich(prompt, AMBER, styles.promptTxt, styles.promptBold)}</View>;
+  const judge = (
+    <View style={[styles.judge, landscape && styles.judgeCol]}>
+      {JUDGE.map(b => (
+        <TouchableOpacity key={b.key} disabled={phase !== 'idle'} activeOpacity={0.85} onPress={() => choose(b.key)}
+          style={[styles.judgeBtn, b.alt && styles.judgeBtnAlt, phase !== 'idle' && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}>
+          <Text style={styles.judgeTxt}>{b.label}</Text>
+          <Text style={styles.judgeSub}>{b.sub}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+  const legend = (
+    <View style={styles.legend}>
+      {([['Their offense', HOOPS.orange], ['Your defense', HOOPS.def], ['YOU (low man)', HOOPS.you]] as [string, string][]).map(([lbl, c]) => (
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+      ))}
+      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: 'rgba(20,184,166,.35)' }]} /><Text style={styles.legendTxt}>open shot window</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: 'rgba(226,75,74,.4)' }]} /><Text style={styles.legendTxt}>open runway</Text></View>
+      <View style={styles.legendItem}><View style={styles.legendGhost} /><Text style={styles.legendTxt}>where the right call was</Text></View>
+    </View>
+  );
+  const verdict = answered && chosen ? (
+    <View style={styles.verdict}>
+      <Text style={[styles.vtag, s.end[chosen].k === 'good' ? styles.vtagGood : s.end[chosen].k === 'ok' ? styles.vtagOk : styles.vtagBad]}>
+        {TAG_TEXT[s.end[chosen].k]}
+      </Text>
+      <Text style={styles.vtitle}>{s.grade[chosen].t}</Text>
+      <Text style={styles.vbody}>{s.grade[chosen].b}</Text>
+      <Text style={styles.readLbl}>COACH'S READ</Text>
+      <DifficultyTabs level={level} onSelect={setLevel} compact={landscape} />
+      <Text style={styles.vread}>{s.why[depth]}</Text>
+    </View>
+  ) : null;
+  const resetBtn = (
+    <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={resetPlay}>
+      <Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text>
+    </TouchableOpacity>
+  );
+  const lsFooter = (
+    <View style={styles.lsPostRow}>
+      {resetBtn}
+      {answered
+        ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
+        : <Text style={styles.hintTxt} numberOfLines={2}>{hint}</Text>}
+    </View>
+  );
+
+  // ── LANDSCAPE: court-left via the shell; scout + prompt + calls (pre) / verdict (post) right. ──
+  if (landscape) {
+    return (
+      <LandscapeGameShell
+        aspectRatio={BASKETBALL_COURT_RATIO}
+        belowFieldReserve={0}
+        pills={pills}
+        field={field}
+        controls={answered ? <>{verdict}</> : <>{chips}{fiveStrip}{promptBlock}{judge}</>}
+        controlsFooter={lsFooter}
+      />
+    );
+  }
+
+  // ── PORTRAIT: vertical stack. ──
+  return (
+    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {pills}
+      {chips}
+      {fiveStrip}
+      {field}
+      {legend}
+      {answered ? verdict : promptBlock}
+      {!answered && judge}
+      <View style={styles.controls}>
+        {resetBtn}
+        {answered && <NextButton visible variant="filled" label="Next possession →" onPress={nextScenario} />}
+        <Text style={[styles.hintTxt, styles.hintFlex]}>{hint}</Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: t.background },
+  content: { padding: 16, paddingBottom: 40, gap: 10 },
+  stageWrap: { position: 'relative' },
+  replay: { position: 'absolute', top: 10, right: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(244,244,238,.75)', backgroundColor: 'rgba(13,27,62,.6)', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 9 },
+  replayTxt: { color: '#F4F4EE', fontSize: 11.5, fontWeight: '700' },
+  hud: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  chipTxt: { color: t.textPrimary, fontSize: 12, fontWeight: '700' },
+  chipBold: { fontWeight: '800' },
+  fiveCap: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: t.textSecondaryOnDark, marginBottom: 3 },
+  five: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  pcard: { flexGrow: 1, minWidth: 112, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderLeftWidth: 3, borderLeftColor: t.accent, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  pcardPos: { fontSize: 11, fontWeight: '800', color: t.textPrimary },
+  pcardTxt: { fontSize: 10.5, color: t.textSecondaryOnDark, lineHeight: 14 },
+  prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptBold: { fontWeight: '800' },
+  judge: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  judgeCol: { flexDirection: 'column' },
+  judgeBtn: { flexGrow: 1, minWidth: 140, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', minHeight: 48 },
+  judgeBtnLs: { minWidth: 0 },
+  judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
+  judgeBtnOff: { opacity: 0.4 },
+  judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6, justifyContent: 'center' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendSwatch: { width: 14, height: 8, borderRadius: 2 },
+  legendGhost: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderStyle: 'dashed', borderColor: '#14B8A6' },
+  legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
+  vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
+  vtagGood: { backgroundColor: '#e7f7f1', color: '#0c7a5e' },
+  vtagOk: { backgroundColor: '#fef3e2', color: '#8a5a1c' },
+  vtagBad: { backgroundColor: '#fdecec', color: '#b3261e' },
+  vtitle: { color: t.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  vbody: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20, marginBottom: 8 },
+  readLbl: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4, color: t.textSecondaryOnDark, marginTop: 2 },
+  vread: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
+  controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
+  ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
+  hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600' },
+  hintFlex: { flex: 1, textAlign: 'right' },
+  lsPostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border },
+  lsNextFill: { flex: 1, alignSelf: 'center', alignItems: 'center', paddingVertical: 10 },
+});
