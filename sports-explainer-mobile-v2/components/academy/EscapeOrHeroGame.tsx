@@ -367,7 +367,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendSq: { width: 10, height: 10, borderRadius: 2 },
-  legendDashed: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'transparent' },
+  legendDashed: { borderWidth: 2, backgroundColor: 'transparent' },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendAmber: { color: OK_C, fontWeight: '700' },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },

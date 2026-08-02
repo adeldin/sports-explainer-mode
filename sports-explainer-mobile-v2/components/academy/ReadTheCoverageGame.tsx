@@ -261,7 +261,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderStyle: 'dashed', borderColor: AMBER },
+  legendRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: AMBER },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: t.border },
   verdictCompact: { padding: 12 },

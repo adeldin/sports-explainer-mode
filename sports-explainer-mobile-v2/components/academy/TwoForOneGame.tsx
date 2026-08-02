@@ -569,7 +569,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendSwatch: { width: 14, height: 8, borderRadius: 2 },
-  legendGhost: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderStyle: 'dashed', borderColor: '#14B8A6' },
+  legendGhost: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#14B8A6' },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
