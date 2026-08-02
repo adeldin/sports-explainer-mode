@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -7,11 +7,30 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { Sport } from '../../lib/api';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGame } from '../../lib/academyGames';
+import { setImmersive } from '../../lib/immersive';
+import GameErrorBoundary from './GameErrorBoundary';
 
 // Generic full-screen host for any Academy game. Renders a back affordance + the game
 // title, then the game's own Component with the uniform { sportKeys } contract. It
 // holds NO game-specific logic — that's the seam: the host is the same for every game,
 // so adding a game is "register a descriptor," never "edit the host."
+// Orientation is device-global state, so we track what we last ASKED for and skip
+// redundant requests. Two reasons, both learned the hard way:
+//   1. lockAsync returns a promise. A re-entrant effect that calls it every cycle floods
+//      the microtask queue; the resulting allocation churn crashed Hermes' GC outright
+//      (EXC_BAD_ACCESS in HadesGC::writeBarrierSlow during drainJobs) rather than merely
+//      rotating the screen back and forth.
+//   2. An unhandled rejection from lockAsync (iOS can refuse a lock) would otherwise
+//      surface as a crash with no useful stack.
+// Idempotence turns "how often does this run" from a correctness question into a
+// performance one — the failure mode above can't return even if an effect misbehaves.
+let lastRequestedLock: ScreenOrientation.OrientationLock | null = null;
+function requestLock(lock: ScreenOrientation.OrientationLock) {
+  if (lastRequestedLock === lock) return;
+  lastRequestedLock = lock;
+  ScreenOrientation.lockAsync(lock).catch(() => { lastRequestedLock = null; });
+}
+
 export default function GameHost({
   game, sportKeys, categoryEmoji, onBack, backLabel = 'Academy',
 }: { game: AcademyGame; sportKeys: Sport[]; categoryEmoji?: string; onBack: () => void; backLabel?: string }) {
@@ -28,19 +47,31 @@ export default function GameHost({
   // landscape piece, on any host tab, inherits the fix — no per-screen wiring. Portrait games no-op.
   // useFocusEffect (not a bare useEffect) is what makes the tab-switch case correct. The restore style
   // mirrors App.tsx's tabBarStyle so the bar returns identically.
+  // The effect below MUST depend on `game.landscape` and nothing else.
+  //
+  // It calls navigation.setOptions(), which updates the navigator — and `navigation` and
+  // `theme` are objects whose identity can change as a result. If either sits in the dep
+  // array, the callback is recreated, useFocusEffect tears down and re-runs, the teardown
+  // locks PORTRAIT_UP, and the effect immediately re-locks LANDSCAPE. That is a feedback
+  // loop the effect feeds itself, and on device it reads as "the screen rotates back to
+  // portrait on its own" mid-module. (It was misdiagnosed once before as an accidental tap
+  // on the camouflaged tab bar; hiding the bar is what introduced the setOptions call that
+  // closes the loop.) Refs give the callback fresh values without making it unstable.
+  const navRef = useRef(navigation);
+  navRef.current = navigation;
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+
   useFocusEffect(
     useCallback(() => {
-      if (game.landscape) {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        navigation.setOptions({ tabBarStyle: { display: 'none' } });
-      }
+      if (!game.landscape) return;
+      requestLock(ScreenOrientation.OrientationLock.LANDSCAPE);
+      setImmersive(true);
       return () => {
-        if (game.landscape) {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          navigation.setOptions({ tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border, borderTopWidth: 1 } });
-        }
+        requestLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        setImmersive(false);
       };
-    }, [game.landscape, navigation, theme])
+    }, [game.landscape])
   );
 
   return (
@@ -54,7 +85,9 @@ export default function GameHost({
         {/* Spacer to keep the title visually centered against the back button. */}
         <View style={styles.backBtn} />
       </View>
-      <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
+      <GameErrorBoundary title={game.title}>
+        <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
+      </GameErrorBoundary>
     </SafeAreaView>
   );
 }

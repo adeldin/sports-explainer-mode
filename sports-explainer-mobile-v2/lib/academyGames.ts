@@ -119,6 +119,11 @@ export const ACADEMY_GAMES: AcademyGame[] = [
       'soccer', 'epl', 'laliga', 'worldcup', 'cricket',
     ],
   },
+  // Signal Decoder is WITHHELD from the Academy for this release — the referee art
+  // doesn't meet the bar yet (owner call). Everything it needs is intact and still
+  // compiles: the component, lib/signalDecoder's banks, and this descriptor. To bring
+  // it back, delete this comment block's /* */ wrapper — no other file needs a change.
+  /*
   {
     id: 'signal-decoder',
     title: 'Signal Decoder',
@@ -134,6 +139,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
       'rugby', 'mlr', 'cricket',
     ],
   },
+  */
   {
     id: 'zone-tap',
     title: 'Zone Tap',

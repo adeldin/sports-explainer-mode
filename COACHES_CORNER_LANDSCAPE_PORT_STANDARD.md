@@ -191,6 +191,86 @@ Port #1 flagged an apparently-intermittent bug: while in a landscape module, the
 **Lesson:** if a landscape module "spontaneously" exits, suspect an **invisible/camouflaged touch target** (a navy control on a dark field) BEFORE a focus/orientation race. Cheap to check, and it was the answer. Hide the tab bar in landscape pieces as standard practice (immersive + prevents accidental exit).
 ---
 
+## Traps that only appear ON DEVICE (v1.5 port — 36 modules, found the hard way)
+
+`npx tsc --noEmit` passing and a clean Metro bundle prove **neither** that a module runs.
+Both gates passed on code that crashed the app natively on launch of the module. The
+port standard's own "device-verify" step is the gate that catches these — it is not
+optional polish, it is the only gate that tests the thing you are shipping.
+
+### Trap #9 — dashed/dotted View borders crash iOS when combined with borderRadius ⚠️
+**Symptom:** tapping into a module killed the app instantly. No error-boundary card (a
+boundary only catches render-phase JS errors), no JS stack. The device crash log showed
+`EXC_CRASH / SIGABRT`, an uncaught ObjC exception rethrown from
+`ObjCTurboModule::performVoidMethodInvocation`, with the main thread deep in Fabric's
+`calculateShadowViewMutations`.
+**Cause:** `borderStyle: 'dashed'` (or `'dotted'`) on a React Native `View` that also has
+a non-zero `borderRadius`. iOS cannot stroke a dashed rounded rect and raises rather than
+degrading. HTML renders it happily, which is exactly why it survives a port from a spike.
+**The part that makes it hard to find:** it also arises by *composition*. Neither of these
+is illegal alone:
+```
+legendSq:     { width: 10, height: 10, borderRadius: 2 }
+legendDashed: { borderWidth: 2, borderStyle: 'dashed' }
+<View style={[styles.legendSq, styles.legendDashed]} />   // flattens to the fatal pair
+```
+A grep for the two properties in one object literal finds the direct cases and misses
+every composed one. Search for `borderStyle` alone, then check what each style is
+composed with at the call site.
+**Fix:** don't dash RN View borders at all. SVG `strokeDasharray` is unaffected and is
+where the meaningful dashes live (ghost rings, lanes, chalk) — those render fine.
+
+### Trap #11 — a hook after an early return aborts the app when content runs out ⚠️⚠️
+**This one cost three wrong builds. It was not in any ported module — it was latent in a
+card that had shipped months earlier.**
+**Symptom:** tapping a NEW sport in the Coach's Corner strip killed the app instantly.
+Soccer/MLB/NFL were fine. No error-boundary card (the crash is not render-phase JS),
+`SIGABRT` with an uncaught ObjC exception.
+**Cause:** `StrategyTipCard` (and its twin `DidYouKnow`) did this:
+```
+if (tips.length === 0) return null;      // ← bails out
+...
+const tipStyle = useAnimatedStyle(...);  // ← hook that now never runs
+```
+Sports WITH tips render 4 hooks; sports WITHOUT tips return early and render 3. Switching
+between them changes the hook count on a MOUNTED component. React forbids it, and because
+the skipped hook is a **Reanimated** hook holding native state, it does not surface as a
+tidy JS error — it aborts the process.
+**Why it stayed hidden:** unreachable while every Coach's Corner sport had tips. Adding
+five sports with empty banks pulled the trigger. The bug was months old and in a file the
+port never touched.
+**Fix:** all hooks above every conditional return, always.
+**Lessons, in order of how much time they would have saved:**
+1. When a NEW code path crashes, suspect OLD code that the new path reaches for the first
+   time. "It must be in what I just wrote" cost three build cycles here.
+2. Ask WHERE it dies before asking WHY. "Does the piece list appear, or does it die on the
+   sport tap?" is one question that would have eliminated 31 modules immediately.
+3. An empty content bank is a code path. Any component that early-returns on empty data
+   must be tested with empty data — adding a sport/level with no content is a real user
+   action, not a hypothetical.
+
+### Trap #10 — an effect that calls navigation.setOptions must not depend on `navigation`
+**Symptom (two faces, one bug):** landscape modules rotated back to portrait on their own,
+and heavier modules crashed outright — `EXC_BAD_ACCESS` inside
+`hermes::vm::HadesGC::writeBarrierSlow`, under `Runtime::drainJobs()`.
+**Cause:** `GameHost`'s `useFocusEffect` hid the tab bar via `navigation.setOptions(...)`
+while listing `navigation` (and `theme`) in its dependency array. setOptions updates the
+navigator, which changes those identities, which recreates the callback, which makes
+useFocusEffect tear down and re-run — and the teardown locks PORTRAIT before the effect
+re-locks LANDSCAPE. `lockAsync` returns a promise, so each cycle also queued microtasks;
+the allocation churn eventually faulted Hermes' GC write barrier.
+**Why it outlived its first fix:** the rotate-back was originally blamed on accidental taps
+on the surface-coloured tab bar (Gate A-bis). Hiding that bar is what introduced the
+setOptions call that closes the loop, so the "fix" created the real cause.
+**Fix:** depend only on the stable flag (`game.landscape`); read `navigation`/`theme`
+through refs. Make orientation requests idempotent (track the last requested lock, skip
+repeats) and `.catch()` every `lockAsync` so an iOS refusal can't surface as an
+unhandled rejection with no stack.
+**Lesson:** if an effect mutates the thing it depends on, it is a loop. On device that
+reads as a visual glitch first and a fatal crash second.
+
+---
+
 ## Reusable constants / seams (already in code — REUSE, don't rebuild)
 
 - **`LandscapeGameShell`** (FieldEngine) — the layout frame. Fill its slots; it owns the measurement, `controlW`/`fieldW` math, the cushion, the pinned footer, and controls-absorb-slack. You pass `aspectRatio` + `belowFieldReserve`; you do NOT hand-set `fill='height'` or the sizing constants anymore.

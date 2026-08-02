@@ -34,6 +34,15 @@ export default function StrategyTipCard({ sport }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sport]);
 
+  // useAnimatedStyle MUST be called before any conditional return. A sport with no tips
+  // used to bail out at the early return below, skipping this hook — so switching from a
+  // sport WITH tips (soccer/MLB/NFL) to one WITHOUT (NBA/rugby/tennis/golf/cricket)
+  // changed the hook count on a mounted component. React forbids that, and because this
+  // is a Reanimated hook holding native state, it aborted the process rather than raising
+  // a JS error. Latent since this card shipped; only reachable once Coach's Corner gained
+  // a sport with an empty tip bank.
+  const tipStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
   if (tips.length === 0) return null;
 
   const swap = () => {
@@ -47,8 +56,6 @@ export default function StrategyTipCard({ sport }: Props) {
       if (finished) runOnJS(swap)();
     });
   };
-
-  const tipStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
     <View style={styles.card}>

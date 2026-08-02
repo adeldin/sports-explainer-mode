@@ -1,4 +1,5 @@
 import { ReactNode, useMemo, useState } from 'react';
+import ZoomableField from './ZoomableField';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -602,7 +603,11 @@ export function LandscapeGameShell({
       <View style={s.body} onLayout={e => setLs({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {fieldW > 0 && (
           <View style={[s.fieldCol, { width: fieldW }]}>
-            {field}
+            {/* Zoom lives here, once, so all 36 field modules inherit it — the same reason
+                the orientation lock and the tab-bar hide live in GameHost. It wraps ONLY the
+                field, never the controls column, so the verdict and the call buttons stay
+                exactly where they are while the art scales. */}
+            <ZoomableField>{field}</ZoomableField>
             {belowField}
           </View>
         )}
@@ -673,5 +678,8 @@ const shellStyles = (t: Theme) => StyleSheet.create({
   // controlsFooter, if present, pins to the bottom instead of being pushed off by tall content.
   controlsCol: { flexShrink: 0, alignSelf: 'stretch', flexDirection: 'column' },
   controlsScroll: { flex: 1 },
-  controlsScrollContent: { gap: 10, paddingBottom: 12 },
+  // gap 8 (was 10): landscape-only, and the tightest pre-call stacks (PickYourPoison,
+  // HelpOrStay, FoulUpThree, TwoForOne) sit within a few points of the fold. Buys ~8pt
+  // across four gaps for every module at once, which per-module trims cannot.
+  controlsScrollContent: { gap: 8, paddingBottom: 12 },
 });

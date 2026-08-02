@@ -186,7 +186,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // Call buttons — distinct semantic action colors (teal run / orange pass), from the spike. Always
   // enabled during the read; disabled only AFTER a call (making a call ends the read — not a count gate).
   callBtn: { borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, alignItems: 'center' },
-  callBtnLs: { alignSelf: 'stretch' },   // landscape right-column: full-width stacked buttons
+  callBtnLs: { alignSelf: 'stretch', minHeight: 44, justifyContent: 'center' },   // landscape right-column: full-width stacked buttons
   callRun: { backgroundColor: RUN_TEAL },
   callPass: { backgroundColor: t.accent },
   callDisabled: { opacity: 0.4 },

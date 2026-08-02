@@ -1,116 +1,150 @@
-// FormationDiagram — on-device react-native-svg render of the formation diagram. Same approved
-// visual as the standalone lib/formationSvg.ts string renderer, but emitted as <Svg> primitives so it
-// draws in Expo Go. Pure presentational: reuses lib/formationLayout (coords) + lib/formationExplanations
-// (text) + lib/formationSvg's wrap() (line-wrap w/ ellipsis). No data fetching here — pass a rosters[]
-// team entry (has .roster, .formation, .team.displayName) + the difficulty level.
-
-import { View } from 'react-native';
-import Svg, { Rect, Circle, Line, Text as SvgText, G } from 'react-native-svg';
+import { View, StyleSheet } from 'react-native';
+import Svg, { Rect, Line, Circle, G, Text as SvgText } from 'react-native-svg';
+import { FE } from './FieldEngine';
 import { layoutFormation, PlacedPlayer } from '../lib/formationLayout';
-import { FORMATION_EXPLANATIONS } from '../lib/formationExplanations';
-import { wrap } from '../lib/formationSvg';
-import type { Level } from '../lib/api';
 
-// Fonts — RN-registry family names (loaded in App.tsx via @expo-google-fonts/space-grotesk).
-const F_BOLD = 'SpaceGrotesk_700Bold';
-const F_SEMI = 'SpaceGrotesk_600SemiBold';
-const F_MED = 'SpaceGrotesk_500Medium';
-const NAVY = '#0d1b3e', TEAL = '#14B8A6', ORANGE = '#E87722', WHITE = '#ffffff', MUTED = '#cbd5e1';
+// ============================================================================
+// FormationDiagram — the team sheet for Formations + Read the Play.
+//
+// It draws the SAME visual language as every modern module (striped turf, chalk
+// boundary, halfway, centre circle, both penalty areas, outlined actors with
+// travelling role labels) but on a PORTRAIT pitch attacking UP, not the shared
+// landscape SoccerPitch.
+//
+// Why not reuse SoccerPitch: these two pieces are portrait, and a formation is a
+// depth-and-width sheet. Projecting it a quarter-turn onto a 680x420 landscape
+// canvas fits the whole pitch into a portrait column's WIDTH, which halves every
+// player dot (~27pt across → ~11pt) — jersey numbers at that size are unreadable,
+// and legibility is the one thing this screen exists for. A portrait viewBox uses
+// the tall axis the layout actually has, so the dots stay the size they were while
+// the pitch itself gets the modern treatment. Same reason the landscape modules
+// size by height: match the canvas to the axis the content needs.
+// ============================================================================
 
-// Geometry — MIRRORS lib/formationSvg.ts (keep in sync). EXPL_H 170 fits up to 7 Coach-tier lines.
-const MARGIN = 24, TITLE_H = 64, PITCH_W = 380, PITCH_H = 560, GAP = 18, EXPL_H = 170, TOP = 18;
-const PAD = 34, R = 16;
-const pitchLeft = MARGIN, pitchTop = TOP + TITLE_H, pitchRight = pitchLeft + PITCH_W, pitchBottom = pitchTop + PITCH_H;
-const SVG_W = PITCH_W + MARGIN * 2;          // 428
-const explTop = pitchBottom + GAP;           // 660
-const SVG_H = explTop + EXPL_H + MARGIN;      // 854
-const innerLeft = pitchLeft + PAD, innerRight = pitchRight - PAD, innerTop = pitchTop + PAD, innerBottom = pitchBottom - PAD;
-const cx = (pitchLeft + pitchRight) / 2, cy = (pitchTop + pitchBottom) / 2;
+const VB_W = 440, VB_H = 680;
+const F_BOLD = 'SpaceGrotesk_700Bold';   // RN-registry family name (loaded in App.tsx)
+const GK_C = '#8e44ad';                  // keeper — shared with the modern soccer modules
+const LBL_OUT = '#1b3a1b';               // dark outline so a label survives on turf
+const CHALK = '#F4F4EE';
 
-const trunc = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-// normalized (x lateral, depth y=0 own end) → pixels (own end at BOTTOM, attack UP)
-const px = (x: number) => innerLeft + x * (innerRight - innerLeft);
-const py = (depth: number) => innerTop + (1 - depth) * (innerBottom - innerTop);
+// Attacking UP: depth 0 = own goal line (bottom), depth 1 = attacking third (top).
+// The band stops short of both goals so keeper and front line stay on the grass, and
+// leaves room under the lowest dot for its travelling label.
+const DY0 = 622, DY1 = 92;
+const LX0 = 44, LX1 = 396;
+const R = 16;                            // actor radius in viewBox units (~27pt on a phone — the size it was)
+const pitchY = (depth: number) => DY0 + depth * (DY1 - DY0);
+const pitchX = (lateral: number) => LX0 + lateral * (LX1 - LX0);
 
-interface Props {
-  team: any;            // a summary.rosters[] entry
-  level: Level;
-  // Quiz mode (additive; both default false → existing behavior UNCHANGED). hideFormationLabel hides
-  // the formation title + team subtitle (so name-the-formation doesn't reveal the answer);
-  // hideExplanation drops the COACH'S READ slot (and crops the now-unused bottom space).
-  hideFormationLabel?: boolean;
-  hideExplanation?: boolean;
+const ROLE_TAG: Record<string, string> = {
+  G: 'GK', GK: 'GK',
+  SW: 'SW',
+  LB: 'LB', RB: 'RB',
+  CB: 'CB', CD: 'CB', D: 'CB', CDL: 'CB', CDR: 'CB', CBL: 'CB', CBR: 'CB', LCB: 'CB', RCB: 'CB',
+  LWB: 'LWB', RWB: 'RWB', WBL: 'LWB', WBR: 'RWB',
+  DM: 'DM', CDM: 'DM', DMC: 'DM', LDM: 'DM', RDM: 'DM', DML: 'DM', DMR: 'DM',
+  CM: 'CM', M: 'CM', MC: 'CM', LCM: 'CM', RCM: 'CM', CML: 'CM', CMR: 'CM',
+  LM: 'LM', ML: 'LM', RM: 'RM', MR: 'RM',
+  AM: 'AM', CAM: 'AM', AMC: 'AM', LAM: 'AM', RAM: 'AM', AML: 'AM', AMR: 'AM',
+  F: 'ST', CF: 'ST', ST: 'ST', S: 'ST', LS: 'ST', RS: 'ST', SS: 'SS',
+  LF: 'LW', LW: 'LW', FL: 'LW', RF: 'RW', RW: 'RW', FR: 'RW',
+};
+const roleTag = (abbr: string) => {
+  const k = abbr.toUpperCase().replace(/[-\s]/g, '');
+  return ROLE_TAG[k] ?? (k || '—');
+};
+
+// react-native-svg draws a Text stroke OVER its fill (no CSS paint-order), so an outlined
+// label is two passes: outline first, fill on top. Same technique as every modern module.
+function OutlinedText({ x, y, text, fill, size = 13, anchor = 'middle', outlineW = 3 }: {
+  x: number; y: number; text: string; fill: string;
+  size?: number; anchor?: 'middle' | 'start'; outlineW?: number;
+}) {
+  const common = { x, y, textAnchor: anchor, fontSize: size, fontFamily: F_BOLD };
+  return (
+    <>
+      <SvgText {...common} fill="none" stroke={LBL_OUT} strokeWidth={outlineW} strokeLinejoin="round">{text}</SvgText>
+      <SvgText {...common} fill={fill}>{text}</SvgText>
+    </>
+  );
 }
 
-export default function FormationDiagram({ team, level, hideFormationLabel = false, hideExplanation = false }: Props) {
-  const formation: string = team?.formation ?? '';
-  const teamName: string = team?.team?.displayName ?? '';
-  const players: PlacedPlayer[] = layoutFormation(team);
-  const explanation = (FORMATION_EXPLANATIONS as Record<string, Record<string, string>>)[formation]?.[level];
-  const lines = explanation ? wrap(explanation, 58, 7) : [];
+function Actor({ x, y, num, role, gk }: { x: number; y: number; num: string; role: string; gk: boolean }) {
+  return (
+    <G>
+      <Circle cx={x} cy={y} r={R} fill={gk ? GK_C : FE.orange} stroke={FE.navy} strokeWidth={2.5} />
+      <SvgText x={x} y={y + 5.5} textAnchor="middle" fontSize={15} fontFamily={F_BOLD} fill="#ffffff">{num}</SvgText>
+      <OutlinedText x={x} y={y + R + 14} text={role} fill="#ffffff" size={12} />
+    </G>
+  );
+}
 
-  // pitch markings (subtle teal)
-  const boxW = PITCH_W * 0.55, boxH = PITCH_H * 0.14, boxX = cx - boxW / 2;
-  const gaW = PITCH_W * 0.28, gaH = PITCH_H * 0.06, gaX = cx - gaW / 2;
-  const ccR = PITCH_W * 0.13;
-  const mark = { stroke: TEAL, strokeWidth: 1.5, strokeOpacity: 0.32, fill: 'none' as const };
-  // When the explanation slot is hidden, crop the canvas to the pitch (no empty bottom band). Full
-  // mode (hideExplanation=false) keeps SVG_H → viewBox/aspectRatio byte-identical to before.
-  const bottom = hideExplanation ? pitchBottom + MARGIN : SVG_H;
+// The pitch itself — the modern paint, rotated to portrait. Stripes run across the
+// short axis so they read as the mown bands a broadcast camera shows.
+function PortraitPitch() {
+  const stripeH = VB_H / 10;
+  return (
+    <>
+      {Array.from({ length: 10 }, (_, i) => (
+        <Rect key={`s${i}`} x={0} y={i * stripeH} width={VB_W} height={stripeH}
+          fill={i % 2 ? FE.turfD : FE.turfL} />
+      ))}
+      <Rect x={6} y={6} width={VB_W - 12} height={VB_H - 12} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.7} />
+      <Line x1={6} y1={VB_H / 2} x2={VB_W - 6} y2={VB_H / 2} stroke={CHALK} strokeWidth={2} opacity={0.6} />
+      <Circle cx={VB_W / 2} cy={VB_H / 2} r={58} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.6} />
+      <Circle cx={VB_W / 2} cy={VB_H / 2} r={3} fill={CHALK} opacity={0.7} />
+      {/* attacking end (top) and own end (bottom): penalty area, 6-yard box, goal */}
+      <Rect x={110} y={6} width={220} height={86} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.7} />
+      <Rect x={165} y={6} width={110} height={34} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.7} />
+      <Rect x={190} y={0} width={60} height={6} fill={CHALK} opacity={0.85} />
+      <Rect x={110} y={VB_H - 92} width={220} height={86} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.7} />
+      <Rect x={165} y={VB_H - 40} width={110} height={34} fill="none" stroke={CHALK} strokeWidth={2} opacity={0.7} />
+      <Rect x={190} y={VB_H - 6} width={60} height={6} fill={CHALK} opacity={0.85} />
+    </>
+  );
+}
+
+interface Props {
+  team: any;                      // a summary.rosters[]-shaped entry (real team OR canonicalFormations.synthTeam)
+  // Quiz mode: hide the formation name, which IS the answer to a name-the-shape question.
+  hideFormationLabel?: boolean;
+  fill?: 'width' | 'height';      // kept for call-site compatibility; portrait sizes by width
+}
+
+export default function FormationDiagram({ team, hideFormationLabel = false }: Props) {
+  const formation: string = team?.formation ?? '';
+  const players: PlacedPlayer[] = layoutFormation(team);
 
   return (
-    <View style={{ width: '100%', aspectRatio: SVG_W / bottom }}>
-      <Svg width="100%" height="100%" viewBox={`0 0 ${SVG_W} ${bottom}`}>
-        {/* ground */}
-        <Rect x={0} y={0} width={SVG_W} height={bottom} fill={NAVY} />
-
-        {/* title + team — hidden in name-the-formation quiz mode (would reveal the answer) */}
-        {hideFormationLabel ? (
-          <SvgText x={pitchLeft} y={TOP + 30} fontFamily={F_BOLD} fontSize={26} fill={MUTED} fillOpacity={0.5}>?</SvgText>
-        ) : (
-          <>
-            <SvgText x={pitchLeft} y={TOP + 30} fontFamily={F_BOLD} fontSize={26} fill={ORANGE}>{formation || '—'}</SvgText>
-            <SvgText x={pitchLeft} y={TOP + 50} fontFamily={F_MED} fontSize={13} fill={MUTED}>{teamName ? `${teamName} · starting XI` : 'Starting XI'}</SvgText>
-          </>
-        )}
-
-        {/* pitch markings */}
-        <Rect x={pitchLeft} y={pitchTop} width={PITCH_W} height={PITCH_H} rx={6} fill="none" stroke={TEAL} strokeWidth={1.5} strokeOpacity={0.4} />
-        <Line x1={pitchLeft} y1={cy} x2={pitchRight} y2={cy} {...mark} />
-        <Circle cx={cx} cy={cy} r={ccR} {...mark} />
-        <Circle cx={cx} cy={cy} r={2} fill={TEAL} fillOpacity={0.4} />
-        <Rect x={boxX} y={pitchBottom - boxH} width={boxW} height={boxH} {...mark} />
-        <Rect x={gaX} y={pitchBottom - gaH} width={gaW} height={gaH} {...mark} />
-        <Rect x={boxX} y={pitchTop} width={boxW} height={boxH} {...mark} />
-        <Rect x={gaX} y={pitchTop} width={gaW} height={gaH} {...mark} />
-
-        {/* players */}
+    <View style={styles.wrap}>
+      <Svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={styles.svg}>
+        <PortraitPitch />
+        {/* Formation name — an on-pitch callout, hidden (→ "?") when the name is the answer. */}
+        <OutlinedText
+          x={20} y={34} anchor="start" size={22} outlineW={4}
+          text={hideFormationLabel ? '?' : (formation || '—')}
+          fill={hideFormationLabel ? '#dbe4f2' : FE.orange}
+        />
+        <OutlinedText x={VB_W - 18} y={34} anchor="middle" size={11} text="attacking ↑" fill="#dbe4f2" />
         {players.map((p, i) => {
-          const X = px(p.x), Y = py(p.y);
+          const role = roleTag(p.abbr);
           return (
-            <G key={`${p.jersey}-${i}`}>
-              <Circle cx={X} cy={Y} r={R} fill={ORANGE} stroke={NAVY} strokeWidth={1.5} />
-              <SvgText x={X} y={Y + 5} fontFamily={F_BOLD} fontSize={14} fill={WHITE} textAnchor="middle">{p.jersey}</SvgText>
-              <SvgText x={X} y={Y + R + 11} fontFamily={F_MED} fontSize={8} fill={WHITE} textAnchor="middle">{trunc(p.shortName, 16)}</SvgText>
-            </G>
+            <Actor
+              key={`${p.jersey}-${p.abbr}-${i}`}
+              x={pitchX(p.x)}
+              y={pitchY(p.y)}
+              num={p.jersey}
+              role={role}
+              gk={role === 'GK'}
+            />
           );
         })}
-
-        {/* COACH'S READ slot — suppressed in quiz mode (would reveal the answer) */}
-        {!hideExplanation && (
-          <>
-            <Rect x={pitchLeft} y={explTop} width={PITCH_W} height={EXPL_H} rx={8} fill={WHITE} fillOpacity={0.03} stroke={TEAL} strokeWidth={1} strokeOpacity={0.3} strokeDasharray="4 4" />
-            <SvgText x={pitchLeft + 12} y={explTop + 20} fontFamily={F_SEMI} fontSize={10} fill={TEAL}>{`COACH'S READ · ${formation}`}</SvgText>
-            {lines.length > 0 ? (
-              lines.map((ln, i) => (
-                <SvgText key={`l${i}`} x={pitchLeft + 12} y={explTop + 42 + i * 17} fontFamily={F_MED} fontSize={11} fill={MUTED}>{ln}</SvgText>
-              ))
-            ) : (
-              <SvgText x={pitchLeft + 12} y={explTop + 46} fontFamily={F_MED} fontSize={11} fill={MUTED} fillOpacity={0.5}>— no read for this formation —</SvgText>
-            )}
-          </>
-        )}
       </Svg>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { borderRadius: 14, overflow: 'hidden', backgroundColor: FE.turfD },
+  svg: { width: '100%', aspectRatio: VB_W / VB_H },
+});

@@ -1,18 +1,28 @@
-// FormationQuizCard — the read-the-play quiz card. Mirrors the live QuizCard's mechanic (level pills,
-// 4 animated options, reveal + explanation + Next, no-repeat cycling) but renders a FormationDiagram
-// (quiz mode) as the QUESTION VISUAL above the options. Questions come from lib/formationQuiz (generated
-// from the canonical formations), NOT from facts.QUIZ. QuizOption is COPIED from the live QuizCard so
-// the shipped Academy quiz is left completely untouched.
+// FormationQuizCard — the "Read the Play" quiz card. The MECHANIC is untouched (4 shuffled options,
+// no-repeat cycling over a 12-question pool, haptics, green/red reveal, explanation + Next, and the
+// difficulty tabs that swap the question TYPE: kid/beginner → name-the-formation, intermediate/expert
+// → weakness). What changed is the SKIN, which had drifted a generation behind the rest of Coach's
+// Corner: the question visual is now FormationDiagram on FieldEngine's shared SoccerPitch (striped
+// turf, chalk, boxes, modern actors) at full content width instead of a thin outlined diagram squeezed
+// into 62% of a card; the bespoke level pills are the shared DifficultyTabs; the question and the
+// reveal sit in the modern prompt/verdict cards; and Next is the shared NextButton.
+//
+// PORTRAIT, deliberately: a four-option text quiz with a scoring header is a portrait form, and the
+// tiers here mutate the app-wide level (they always have) — that behaviour is load-bearing and is
+// preserved exactly. Pinch-to-zoom on the pitch covers close reading of the shape.
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withSequence, interpolateColor, runOnJS, Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../../lib/theme';
 import { useAppState } from '../../lib/appState';
+import type { Level } from '../../lib/api';
+import ZoomableField from '../ZoomableField';
 import FormationDiagram from '../FormationDiagram';
+import { DifficultyTabs, NextButton, FE } from '../FieldEngine';
 import { FormationQuizQuestion, buildFormationQuestionPool } from '../../lib/formationQuiz';
 import { synthTeam } from '../../lib/canonicalFormations';
 
@@ -23,16 +33,10 @@ interface Props {
 
 const CORRECT = '#34C759';
 const WRONG = '#FF3B30';
+const GK_C = '#8e44ad';
 
 const ENCOURAGEMENT = ['Nice work! 🎯', 'You got it! 🏆', "That's right! ⭐", 'Correct! 🔥', 'Nailed it! 🎉'];
 const WRONG_MESSAGES = ['So close! 📚', 'Not quite — but now you know! 🎓', 'Good try! 💪', 'Almost! Check below 👇'];
-
-const LEVELS: Array<{ key: 'kid' | 'beginner' | 'intermediate' | 'expert'; label: string }> = [
-  { key: 'kid', label: 'Rookie' },
-  { key: 'beginner', label: 'Beginner' },
-  { key: 'intermediate', label: 'Intermediate' },
-  { key: 'expert', label: 'Expert' },
-];
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -61,8 +65,9 @@ interface OptionProps {
   styles: ReturnType<typeof makeStyles>;
 }
 
-// COPIED VERBATIM from the live QuizCard so the shipped quiz isn't touched. Owns its own Reanimated
-// values: green/red fill, scale bounce on chosen-correct, shake on chosen-wrong.
+// All four options share ONE style — the accent fill every modern module uses for peer choices. A
+// colour difference between options would leak the answer key, so the ONLY colour that ever differs
+// is the post-answer RESULT (green correct / red chosen-wrong / dimmed rest).
 function QuizOption({ label, mode, bounce, shake, disabled, onPress, theme, styles }: OptionProps) {
   const scale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -75,7 +80,7 @@ function QuizOption({ label, mode, bounce, shake, disabled, onPress, theme, styl
       op.value = withTiming(1, { duration: 150 });
     } else if (mode === 'dim') {
       fill.value = withTiming(0, { duration: 150 });
-      op.value = withTiming(0.5, { duration: 150 });
+      op.value = withTiming(0.45, { duration: 150 });
     } else {
       fill.value = withTiming(0, { duration: 150 });
       op.value = withTiming(1, { duration: 150 });
@@ -100,15 +105,14 @@ function QuizOption({ label, mode, bounce, shake, disabled, onPress, theme, styl
   const aStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }, { translateX: tx.value }],
     opacity: op.value,
-    backgroundColor: interpolateColor(fill.value, [0, 1], [theme.surfaceAlt, target]),
-    borderColor: interpolateColor(fill.value, [0, 1], [theme.border, target]),
+    backgroundColor: interpolateColor(fill.value, [0, 1], [theme.accent, target]),
+    borderColor: interpolateColor(fill.value, [0, 1], [theme.accent, target]),
   }));
 
-  const revealed = mode === 'green' || mode === 'red';
   return (
     <Animated.View style={[styles.option, aStyle]}>
       <Pressable style={styles.optionPress} onPress={onPress} disabled={disabled}>
-        <Text style={[styles.optionText, revealed && styles.optionTextRevealed]}>{label}</Text>
+        <Text style={styles.optionText}>{label}</Text>
         {mode === 'green' && <Text style={styles.mark}>✓</Text>}
         {mode === 'red' && <Text style={styles.mark}>✕</Text>}
       </Pressable>
@@ -162,6 +166,7 @@ export default function FormationQuizCard({ onCorrect, onWrong }: Props) {
   const question = pool[qIdx];
   const view = shuffled ?? (question ? { options: question.options, answer: question.answer } : { options: [] as string[], answer: -1 });
   const answered = selected !== null;
+  const correct = answered && selected === view.answer;
 
   const choose = async (i: number) => {
     if (answered) return;
@@ -205,40 +210,36 @@ export default function FormationQuizCard({ onCorrect, onWrong }: Props) {
   const optMode = (i: number): OptMode =>
     !answered ? 'idle' : i === view.answer ? 'green' : i === selected ? 'red' : 'dim';
 
+  // Tier tabs — SAME behaviour as before (they set the app level, which re-pools and flips the
+  // question type at the intermediate boundary); only the control is now the shared one.
+  const onPickLevel = async (l: Level) => { await Haptics.selectionAsync(); setLevel(l); };
+
   return (
-    <Animated.View style={[styles.card, cardStyle]}>
-      {/* Level picker — tapping re-pools (and flips the question type at the int/expert boundary). */}
-      <View style={styles.levelRow}>
-        {LEVELS.map((l) => {
-          const active = level === l.key;
-          return (
-            <TouchableOpacity
-              key={l.key}
-              style={[styles.levelPill, active && styles.levelPillActive]}
-              onPress={async () => { await Haptics.selectionAsync(); setLevel(l.key); }}
-              activeOpacity={0.7}>
-              <Text style={[styles.levelPillText, active && styles.levelPillTextActive]} numberOfLines={1} adjustsFontSizeToFit>
-                {l.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+    <Animated.View style={[styles.wrap, cardStyle]}>
+      <DifficultyTabs level={level} onSelect={onPickLevel} />
 
       {question ? (
         <>
-          {/* The QUESTION VISUAL: the canonical formation diagram in quiz mode. Name-the questions hide
-              the label; weakness questions show it. The coach's read is always hidden (it's the answer). */}
-          <View style={styles.diagramWrap}>
-            <FormationDiagram
-              team={synthTeam(question.formation)}
-              level={level}
-              hideFormationLabel={!question.showLabel}
-              hideExplanation
-            />
+          {/* The QUESTION VISUAL: the canonical formation on the shared pitch. Name-the questions hide
+              the formation label; weakness questions show it. The coach's read is never drawn on the
+              pitch (it is the reveal). */}
+          <ZoomableField>
+            <FormationDiagram team={synthTeam(question.formation)} hideFormationLabel={!question.showLabel} />
+          </ZoomableField>
+
+          <View style={styles.legend}>
+            {([['Outfield', FE.orange], ['Keeper', GK_C]] as [string, string][]).map(([lbl, c]) => (
+              <View key={lbl} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: c }]} />
+                <Text style={styles.legendTxt}>{lbl}</Text>
+              </View>
+            ))}
+            <Text style={styles.legendTxt}>Own goal left · attacking right</Text>
           </View>
 
-          <Text style={styles.question}>{question.q}</Text>
+          <View style={styles.prompt}>
+            <Text style={styles.promptTxt}>{question.q}</Text>
+          </View>
 
           <View style={styles.options}>
             {view.options.map((opt, i) => (
@@ -257,13 +258,17 @@ export default function FormationQuizCard({ onCorrect, onWrong }: Props) {
           </View>
 
           {answered && (
-            <Animated.View style={revealStyle}>
-              {message && <Text style={styles.message}>{message}</Text>}
-              <Text style={styles.explanation}>{question.explanation}</Text>
+            <Animated.View style={[styles.revealCol, revealStyle]}>
+              <View style={styles.verdict}>
+                <Text style={[styles.vtag, correct ? styles.vtagGood : styles.vtagBad]}>
+                  {correct ? 'Correct' : 'Not quite'}
+                </Text>
+                {message && <Text style={styles.vtitle}>{message}</Text>}
+                <Text style={styles.readlbl}>COACH'S READ</Text>
+                <Text style={styles.vbody}>{question.explanation}</Text>
+              </View>
               {pool.length > 1 && (
-                <TouchableOpacity onPress={next} activeOpacity={0.7} style={styles.nextRow}>
-                  <Text style={styles.nextText}>Next question →</Text>
-                </TouchableOpacity>
+                <NextButton visible variant="filled" label="Next question →" onPress={next} style={styles.nextFill} />
               )}
             </Animated.View>
           )}
@@ -276,27 +281,30 @@ export default function FormationQuizCard({ onCorrect, onWrong }: Props) {
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  card: {
-    backgroundColor: t.surface, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: t.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 5,
-  },
-  levelRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  levelPill: { flex: 1, minHeight: 34, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 8, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center' },
-  levelPillActive: { backgroundColor: t.accent, borderColor: t.accent },
-  levelPillText: { color: t.textSecondary, fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  levelPillTextActive: { color: t.onAccent },
-  // The diagram sits in a constrained-width box so the tall pitch doesn't dominate the card.
-  diagramWrap: { width: '62%', alignSelf: 'center', marginBottom: 14 },
-  question: { color: t.textPrimary, fontSize: 17, fontWeight: '800', lineHeight: 24, marginBottom: 16 },
-  options: { gap: 10 },
-  option: { borderRadius: 14, borderWidth: 1, minHeight: 52, overflow: 'hidden' },
-  optionPress: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  optionText: { color: t.textPrimary, fontSize: 16, fontWeight: '600', flex: 1 },
-  optionTextRevealed: { color: '#ffffff', fontWeight: '800' },
+  wrap: { gap: 10 },
+  // Legend.
+  legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 2 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  // Question prompt.
+  prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptTxt: { color: t.textPrimary, fontSize: 15, lineHeight: 22, fontWeight: '800' },
+  // Options — one shared style; 52pt clears the 44pt touch minimum.
+  options: { gap: 8 },
+  option: { borderRadius: 12, borderWidth: 1, minHeight: 52, overflow: 'hidden' },
+  optionPress: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
+  optionText: { color: '#ffffff', fontSize: 15, fontWeight: '800', flex: 1 },
   mark: { color: '#ffffff', fontSize: 17, fontWeight: '900', marginLeft: 10 },
-  emptyText: { color: t.textSecondary, fontSize: 15, lineHeight: 22 },
-  message: { color: t.accentText, fontSize: 15, fontWeight: '800', marginTop: 16 },
-  explanation: { color: t.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 8 },
-  nextRow: { marginTop: 16, alignSelf: 'flex-end' },
-  nextText: { color: t.accentText, fontSize: 14, fontWeight: '700' },
+  emptyText: { color: t.textSecondaryOnDark, fontSize: 15, lineHeight: 22 },
+  // Reveal.
+  revealCol: { gap: 10 },
+  verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
+  vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
+  vtagGood: { backgroundColor: FE.goodBg, color: FE.good },
+  vtagBad: { backgroundColor: FE.badBg, color: FE.bad },
+  vtitle: { color: t.textPrimary, fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  readlbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
+  vbody: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20, marginTop: 4 },
+  nextFill: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingVertical: 10 },
 });

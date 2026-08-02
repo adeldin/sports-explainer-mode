@@ -21,6 +21,40 @@ import BoxCountGame from '../components/academy/BoxCountGame';
 import OnsideOrOffGame from '../components/academy/OnsideOrOffGame';
 import WheresThePlayGame from '../components/academy/WheresThePlayGame';
 import FindTheOpenMan from '../components/academy/FindTheOpenMan';
+// v1.5 field modules
+import FourthDownCallGame from '../components/academy/FourthDownCallGame';
+import CountLeverageGame from '../components/academy/CountLeverageGame';
+import StealOrStayGame from '../components/academy/StealOrStayGame';
+import PressTriggerGame from '../components/academy/PressTriggerGame';
+import CounterOrKeepGame from '../components/academy/CounterOrKeepGame';
+import PostsCornerOrScrumGame from '../components/academy/PostsCornerOrScrumGame';
+import HelpOrStayGame from '../components/academy/HelpOrStayGame';
+import ApproachOrStayGame from '../components/academy/ApproachOrStayGame';
+import GoOrLayGame from '../components/academy/GoOrLayGame';
+import SuckerPinGame from '../components/academy/SuckerPinGame';
+import ReviewOrSaveGame from '../components/academy/ReviewOrSaveGame';
+// v1.5 wave 2
+import RpoGiveOrPullGame from '../components/academy/RpoGiveOrPullGame';
+import MotionManOrZoneGame from '../components/academy/MotionManOrZoneGame';
+import ReadTheCoverageGame from '../components/academy/ReadTheCoverageGame';
+import InfieldInOrBackGame from '../components/academy/InfieldInOrBackGame';
+import TagUpGame from '../components/academy/TagUpGame';
+import SwitchThePlayGame from '../components/academy/SwitchThePlayGame';
+import ServeTargetGame from '../components/academy/ServeTargetGame';
+import ThePinchGame from '../components/academy/ThePinchGame';
+import SetTheTrapGame from '../components/academy/SetTheTrapGame';
+import NumbersOutWideGame from '../components/academy/NumbersOutWideGame';
+import DrawAndPassGame from '../components/academy/DrawAndPassGame';
+import HowManyInGame from '../components/academy/HowManyInGame';
+import WheresTheLineGame from '../components/academy/WheresTheLineGame';
+import PickYourPoisonGame from '../components/academy/PickYourPoisonGame';
+import TwoForOneGame from '../components/academy/TwoForOneGame';
+import FoulUpThreeGame from '../components/academy/FoulUpThreeGame';
+import ServePlusOneGame from '../components/academy/ServePlusOneGame';
+import PassOrLobGame from '../components/academy/PassOrLobGame';
+import EscapeOrHeroGame from '../components/academy/EscapeOrHeroGame';
+import PaceTheChaseGame from '../components/academy/PaceTheChaseGame';
+import BowlOrChangeGame from '../components/academy/BowlOrChangeGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
@@ -34,6 +68,40 @@ const PIECE_GAME = {
   'onside-or-off': { id: 'cc-onside-or-off', title: 'Onside or Off?', icon: '🚩', blurb: 'Judge it live, rewind like a fan', Component: OnsideOrOffGame, landscape: true },
   'wheres-the-play': { id: 'cc-wheres-the-play', title: "Where's the Play?", icon: '⚾', blurb: 'Watch the grounder, read the force', Component: WheresThePlayGame, landscape: true },
   'find-the-open-man': { id: 'cc-find-the-open-man', title: 'Find the Open Man', icon: '🎯', blurb: 'Read the coverage, hit the open receiver', Component: FindTheOpenMan, landscape: true },
+  // — v1.5 —
+  'fourth-down-call': { id: 'cc-fourth-down-call', title: 'Fourth Down Call', icon: '🏈', blurb: 'Go, kick, or punt — the nose decides it', Component: FourthDownCallGame, landscape: true },
+  'count-leverage': { id: 'cc-count-leverage', title: 'Own the Count', icon: '⚾', blurb: "Whose count is it? Pick your pitch", Component: CountLeverageGame, landscape: true },
+  'steal-or-stay': { id: 'cc-steal-or-stay', title: 'Steal or Stay?', icon: '🏃', blurb: 'Read the arm, time the jump', Component: StealOrStayGame, landscape: true },
+  'press-trigger': { id: 'cc-press-trigger', title: 'Press or Drop', icon: '⚽', blurb: 'Time the trigger — cut it, trap it, or chase', Component: PressTriggerGame, landscape: true },
+  'counter-or-keep': { id: 'cc-counter-or-keep', title: 'Counter or Keep?', icon: '⚡', blurb: 'The window is open for five seconds', Component: CounterOrKeepGame, landscape: true },
+  'posts-corner-or-scrum': { id: 'cc-posts-corner-or-scrum', title: 'Posts, Corner, or Scrum?', icon: '🏉', blurb: "Penalty won — the captain's menu", Component: PostsCornerOrScrumGame, landscape: true },
+  'help-or-stay': { id: 'cc-help-or-stay', title: 'Help or Stay?', icon: '🏀', blurb: "Tag the roller or guard the corner", Component: HelpOrStayGame, landscape: true },
+  'approach-or-stay': { id: 'cc-approach-or-stay', title: 'Approach or Stay?', icon: '🎾', blurb: 'Short ball — invitation or trap?', Component: ApproachOrStayGame, landscape: true },
+  'go-or-lay': { id: 'cc-go-or-lay', title: 'Go or Lay?', icon: '⛳', blurb: 'Par-5 second shot — closer is better', Component: GoOrLayGame, landscape: true },
+  'sucker-pin': { id: 'cc-sucker-pin', title: 'Sucker Pin', icon: '🚩', blurb: "You don't aim a shot — you aim an oval", Component: SuckerPinGame, landscape: true },
+  'review-or-save': { id: 'cc-review-or-save', title: 'Review or Save?', icon: '🏏', blurb: 'DRS: challenge the umpire, or bank it', Component: ReviewOrSaveGame, landscape: true },
+  // — wave 2 —
+  'rpo-give-or-pull': { id: 'cc-rpo-give-or-pull', title: 'Give or Pull?', icon: '🏈', blurb: 'RPO mesh — one defender is wrong either way', Component: RpoGiveOrPullGame, landscape: true },
+  'motion-man-or-zone': { id: 'cc-motion-man-or-zone', title: 'Man or Zone?', icon: '🏃', blurb: 'Send him in motion — watch who follows', Component: MotionManOrZoneGame, landscape: true },
+  'read-the-coverage': { id: 'cc-read-the-coverage', title: 'Read the Coverage', icon: '🛡️', blurb: 'Count the safeties — middle open or shut?', Component: ReadTheCoverageGame, landscape: true },
+  'infield-in-or-back': { id: 'cc-infield-in-or-back', title: 'Infield In or Back?', icon: '🧤', blurb: "Cut the run, or take the outs — not both", Component: InfieldInOrBackGame, landscape: true },
+  'tag-up': { id: 'cc-tag-up', title: 'Tag and Go', icon: '⏱️', blurb: 'The first touch is the starting gun', Component: TagUpGame, landscape: true },
+  'switch-the-play': { id: 'cc-switch-the-play', title: 'Switch the Play', icon: '🔄', blurb: "They all slid over — where ISN'T the defense?", Component: SwitchThePlayGame, landscape: true },
+  'serve-target': { id: 'cc-serve-target', title: 'Serve Target', icon: '🎾', blurb: 'Read his feet — serve the door he left open', Component: ServeTargetGame, landscape: true },
+  'the-pinch': { id: 'cc-the-pinch', title: 'The Pinch', icon: '⛳', blurb: 'Safety is a yardage, not a club', Component: ThePinchGame, landscape: true },
+  'set-the-trap': { id: 'cc-set-the-trap', title: 'Set the Trap', icon: '🏏', blurb: 'Move a man onto the evidence', Component: SetTheTrapGame, landscape: true },
+  'numbers-out-wide': { id: 'cc-numbers-out-wide', title: 'Numbers Out Wide', icon: '🏉', blurb: 'Count shirts, then beat the slide', Component: NumbersOutWideGame, landscape: true },
+  'draw-and-pass': { id: 'cc-draw-and-pass', title: 'Draw and Pass', icon: '🤾', blurb: 'Two on one — time the release', Component: DrawAndPassGame, landscape: true },
+  'how-many-in': { id: 'cc-how-many-in', title: 'How Many In?', icon: '💥', blurb: 'The ruck is a market — spend wisely', Component: HowManyInGame, landscape: true },
+  'wheres-the-line': { id: 'cc-wheres-the-line', title: "Where's the Line?", icon: '📏', blurb: 'Drag the offside fence, lock it in', Component: WheresTheLineGame, landscape: true },
+  'pick-your-poison': { id: 'cc-pick-your-poison', title: 'Pick Your Poison', icon: '🏀', blurb: 'Drop, switch or blitz — every coverage sends a bill', Component: PickYourPoisonGame, landscape: true },
+  'two-for-one': { id: 'cc-two-for-one', title: 'Two-for-One', icon: '⏱️', blurb: "Shoot early and the ball comes back", Component: TwoForOneGame, landscape: true },
+  'foul-up-three': { id: 'cc-foul-up-three', title: 'Foul Up Three?', icon: '🚨', blurb: 'Two free throws can never tie you', Component: FoulUpThreeGame, landscape: true },
+  'serve-plus-one': { id: 'cc-serve-plus-one', title: 'Serve +1', icon: '🎾', blurb: 'Read his recovery trail, not the ball', Component: ServePlusOneGame, landscape: true },
+  'pass-or-lob': { id: 'cc-pass-or-lob', title: 'Pass or Lob?', icon: '🎾', blurb: 'His distance picks the shot; his lean picks the lane', Component: PassOrLobGame, landscape: true },
+  'escape-or-hero': { id: 'cc-escape-or-hero', title: 'Escape or Hero?', icon: '🌲', blurb: 'Gap width vs shot width — the 9-of-10 rule', Component: EscapeOrHeroGame, landscape: true },
+  'pace-the-chase': { id: 'cc-pace-the-chase', title: 'Pace the Chase', icon: '🏏', blurb: 'Balls or wickets — which one is scarce?', Component: PaceTheChaseGame, landscape: true },
+  'bowl-or-change': { id: 'cc-bowl-or-change', title: 'Bowl or Change?', icon: '🏏', blurb: 'Figures are the past; geometry is the next over', Component: BowlOrChangeGame, landscape: true },
 } as const;
 
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
@@ -44,6 +112,38 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'onside-or-off': { icon: '🚩', title: 'Onside or Off?' },
   'wheres-the-play': { icon: '⚾', title: "Where's the Play?" },
   'find-the-open-man': { icon: '🎯', title: 'Find the Open Man' },
+  'fourth-down-call': { icon: '🏈', title: 'Fourth Down Call' },
+  'count-leverage': { icon: '⚾', title: 'Own the Count' },
+  'steal-or-stay': { icon: '🏃', title: 'Steal or Stay?' },
+  'press-trigger': { icon: '⚽', title: 'Press or Drop' },
+  'counter-or-keep': { icon: '⚡', title: 'Counter or Keep?' },
+  'posts-corner-or-scrum': { icon: '🏉', title: 'Posts, Corner, or Scrum?' },
+  'help-or-stay': { icon: '🏀', title: 'Help or Stay?' },
+  'approach-or-stay': { icon: '🎾', title: 'Approach or Stay?' },
+  'go-or-lay': { icon: '⛳', title: 'Go or Lay?' },
+  'sucker-pin': { icon: '🚩', title: 'Sucker Pin' },
+  'review-or-save': { icon: '🏏', title: 'Review or Save?' },
+  'rpo-give-or-pull': { icon: '🏈', title: 'Give or Pull?' },
+  'motion-man-or-zone': { icon: '🏃', title: 'Man or Zone?' },
+  'read-the-coverage': { icon: '🛡️', title: 'Read the Coverage' },
+  'infield-in-or-back': { icon: '🧤', title: 'Infield In or Back?' },
+  'tag-up': { icon: '⏱️', title: 'Tag and Go' },
+  'switch-the-play': { icon: '🔄', title: 'Switch the Play' },
+  'serve-target': { icon: '🎾', title: 'Serve Target' },
+  'the-pinch': { icon: '⛳', title: 'The Pinch' },
+  'set-the-trap': { icon: '🏏', title: 'Set the Trap' },
+  'numbers-out-wide': { icon: '🏉', title: 'Numbers Out Wide' },
+  'draw-and-pass': { icon: '🤾', title: 'Draw and Pass' },
+  'how-many-in': { icon: '💥', title: 'How Many In?' },
+  'wheres-the-line': { icon: '📏', title: "Where's the Line?" },
+  'pick-your-poison': { icon: '🏀', title: 'Pick Your Poison' },
+  'two-for-one': { icon: '⏱️', title: 'Two-for-One' },
+  'foul-up-three': { icon: '🚨', title: 'Foul Up Three?' },
+  'serve-plus-one': { icon: '🎾', title: 'Serve +1' },
+  'pass-or-lob': { icon: '🎾', title: 'Pass or Lob?' },
+  'escape-or-hero': { icon: '🌲', title: 'Escape or Hero?' },
+  'pace-the-chase': { icon: '🏏', title: 'Pace the Chase' },
+  'bowl-or-change': { icon: '🏏', title: 'Bowl or Change?' },
 };
 
 export default function CoachesCornerScreen() {
