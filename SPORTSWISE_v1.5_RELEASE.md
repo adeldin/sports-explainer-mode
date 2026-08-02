@@ -2,32 +2,38 @@
 
 *Cut 2026-08-01. Previous binary: **v1.4.0, built 2026-07-07**. Everything below has been sitting in `main` unshipped since then, plus this session's Coach's Corner port.*
 
-Branch: `v1.5-coaches-corner-ports` · EAS build: `15bdbae1-5107-401e-ba31-c1e303b62847`
+Branch: `v1.5-coaches-corner-ports` · **Shipped binary: build 33** (`0ee1d330-8952-4520-b15c-30c3f24800ab`, marketing version 1.5.0)
+App Store Connect version **1.5** — `bdc407cd-b25d-4ae3-a32c-f349c44034dc`, state `PREPARE_FOR_SUBMISSION`, release `AFTER_APPROVAL`.
+
+Store version string is **1.5**, not 1.5.0 — that matches the precedent set by 1.0–1.4, all of which
+carried an `x.y` store string against an `x.y.0` binary.
 
 ---
 
-## What's New (App Store copy — draft)
+## What's New (App Store copy — as set on the 1.5 version)
 
-**Coach's Corner goes to eight sports.**
-Eleven new interactive field modules join the tab, and five sports arrive with them: Basketball, Rugby, Tennis, Golf and Cricket. Each module drops you into one real decision — go for it or kick, press or drop, review the umpire or bank it — plays the moment out on the field, then grades your call with a coach's read at four depths.
+> NEW IN 1.5:
+>
+> Coach's Corner goes to eight sports — basketball, rugby, tennis, golf and cricket join NFL, MLB and soccer, with 32 new drills and 38 in all. Each one puts you inside a single real decision: go for it or punt, press or drop, attack the short ball or stay back, kick for the posts or go to the corner, review the umpire's call or save it. Make your call, watch it play out on the field, then get the coach's read at every level from Rookie to Expert.
+>
+> Pinch to zoom — every field, court, pitch and hole now zooms with two fingers, so the small details stay readable on a phone.
+>
+> Six new Academy games — Higher or Lower, Zone Tap, Crest Rush, Kit Clash and Read the Score, plus a full Jeopardy board, across all ten sports.
+>
+> Cricket, live — ball-by-ball coverage with live scores, the required run rate, national flags, and browsing by date.
+>
+> Fixes — live games no longer open on an error card, Higher or Lower now names the season it's asking about, and Coach's Corner stays in landscape instead of snapping back to portrait mid-drill. Plus polish and stability improvements throughout.
 
-**New in Coach's Corner**
-· NFL — Fourth Down Call: go, field goal, or punt; the ball's nose decides it
-· MLB — Own the Count, Steal or Stay?
-· Soccer — Press or Drop, Counter or Keep?
-· NBA — Help or Stay?
-· Rugby — Posts, Corner, or Scrum?
-· Tennis — Approach or Stay?
-· Golf — Go or Lay?, Sucker Pin
-· Cricket — Review or Save? (with a DRS scrubber you can drag frame by frame)
+Counts in that copy are verified against the code, not estimated: `piecesForSport()` yields 38 sport
+pieces across the 8 `CC_CANDIDATES` (NFL 6, soccer 6, MLB 5, rugby 5, NBA 4, tennis 4, golf 4,
+cricket 4), of which 32 are new this release; Make the Call is level-gated and deliberately not
+counted. The Academy ships 8 games — `quiz`, `term-match`, `read-the-score`, `crest-rush`,
+`kit-clash`, `higher-or-lower`, `zone-tap`, `jeopardy`.
 
-**Academy: six new visual games.**
-Higher or Lower, Signal Decoder, Zone Tap, Crest Rush, Kit Clash and Read the Score — now across all ten sports, with the signals actually animated instead of described. Plus the Jeopardy board.
-
-**Cricket, live.**
-Full ball-by-ball coverage: live scores, the required-run-rate line anchored to the true after-this-ball state, national-side flags, and date filtering.
-
-**Fixes.** Live games no longer open on an error card. Higher or Lower questions name their own season.
+**Signal Decoder is withheld from this release** at the owner's call — the referee figure needs more
+work. The component, its signal banks and its descriptor all remain in the tree and still compile;
+the descriptor in `lib/academyGames.ts` is wrapped in a block comment. Deleting that wrapper is the
+entire restore. This is why the copy above says *six* new Academy games and names five visual ones.
 
 ---
 
@@ -57,7 +63,7 @@ CC sport strip: 3 sports → 8 (NBA, Rugby, Tennis, Golf, Cricket added).
 ### Unshipped since the v1.4 binary (24 mobile commits)
 - **Academy v2** — six visual games across all ten sports (`796006d`)
 - **Jeopardy** — the capstone board (`141bda2`)
-- **Signal Decoder v2** — animated signals; hands read as a ball unless fingers matter; jump-ball thumbs fixed (`8ed7f52`, `caac9cb`, `8576237`)
+- ~~**Signal Decoder v2**~~ — built (`8ed7f52`, `caac9cb`, `8576237`) but **withheld from 1.5**; see above
 - **Zone Tap** — orienting context (markers, players), LOS label alignment (`9260c5d`)
 - **Higher or Lower** — every question names its season; no "so far" on finished seasons (`e1e0eeb`, `829a3c5`)
 - **Live games error card** — fixed opening on the error state until "Try again" (`d694fea`)
@@ -103,3 +109,37 @@ testing standards would fail. Decision needed: rebuild to standard, or retire.
 **Stat verification queue:** every module's numbers are crowdsource-consensus values with honest rounding ("about 70%"). A verification pass against primary sources (PGA Tour ShotLink, ATP, NBA.com, ESPN cricket) is queued before these numbers are treated as citable.
 
 **Device-verify checklist for this build** (from the port standard): each new module rotates to landscape and back; the tab bar hides in-module; no accidental exits; verdict fits without scrolling; tiers on one line; existing landscape modules (Box Count, Onside, Where's the Play, Find the Open Man) unregressed.
+
+---
+
+## App Store Connect — staged, not submitted
+
+Everything App Review checks is set. The Submit button is deliberately not pressed; that stays the
+owner's action.
+
+| Gate | State |
+|---|---|
+| Version | 1.5 · `PREPARE_FOR_SUBMISSION` · release AFTER_APPROVAL |
+| Build | 33 attached, processing `VALID` |
+| Export compliance | answered (`usesNonExemptEncryption: false`) — no Missing Compliance flag |
+| What's New | set, 1098 chars |
+| Description / keywords / support URL | carried over from 1.4 |
+| Screenshots | 9 × `APP_IPHONE_65`, all `COMPLETE` — carried over from 1.4 |
+| Review contact + demo account | carried over, untouched |
+| Review notes | rewritten for 1.5 (1.4's still said "reviewing SportsWise 1.3") |
+| Age rating | `TWELVE_PLUS` |
+| Privacy policy | https://privacy.sportswise.app |
+
+The review notes now tell the reviewer the drills are **landscape** and how to reach them without a
+subscription — the previous notes did not, and a reviewer who never rotates the device sees none of
+what this release is about.
+
+### Two things deliberately left for a decision
+
+**Screenshots are 1.4's.** They carried over intact, so nothing blocks submission — but they show
+none of the eight-sport Coach's Corner, which is the entire headline of this release. New shots are a
+marketing improvement, not a compliance fix.
+
+**Stat verification is still queued.** Every number spoken by a coach's read is a crowdsource-consensus
+value with honest rounding ("about 70%"). That was fine for TestFlight. Verification against primary
+sources (PGA Tour ShotLink, ATP, NBA.com, ESPN cricket) has not been run.
