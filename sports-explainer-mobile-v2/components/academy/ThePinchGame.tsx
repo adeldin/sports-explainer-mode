@@ -335,12 +335,12 @@ export default function ThePinchGame(_props: AcademyGameProps) {
   const legend = (
     <View style={[styles.legend, landscape && styles.legendLs]}>
       <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#999' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Your ball</Text></View>
-      <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>⌖ Aim marker — it moves first</Text>
-      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Dispersion oval — every normal outcome of this swing</Text></View>
+      <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>⌖ Aim — moves first</Text>
+      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Oval — every normal outcome</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendSq, { backgroundColor: SAND }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Sand</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: WATER }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Water</Text></View>
-      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: TEAL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ghost = the club that misses the trouble</Text></View>
-      <Text style={styles.legendMuted}>numbers along the fairway are yards from the tee</Text>
+      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: TEAL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ghost = the safer club</Text></View>
+      <Text style={styles.legendMuted}>numbers = yards from tee</Text>
     </View>
   );
   // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.

@@ -273,8 +273,8 @@ export default function SuckerPinGame(_props: AcademyGameProps) {
   const legend = (
     <View style={[styles.legend, landscape && styles.legendLs]}>
       <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#999' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Your ball</Text></View>
-      <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>⌖ Aim marker — it moves first</Text>
-      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Dispersion oval — re-centers on your aim</Text></View>
+      <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>⌖ Aim — moves first</Text>
+      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Oval — re-centers on aim</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendSq, { backgroundColor: SAND }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Sand</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: WATER }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Water</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: TEAL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ghost = the better aim</Text></View>

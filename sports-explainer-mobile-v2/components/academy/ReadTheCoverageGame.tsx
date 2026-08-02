@@ -31,7 +31,7 @@ const LS_HINT_RESERVE = 34;       // navy room reserved UNDER the field for the 
 // This gridiron is WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art;
 // both strips are reserved ALWAYS so the art size never jumps, and the key's height comes back to the
 // controls column.
-const LS_LEGEND_RESERVE = 26;
+const LS_LEGEND_RESERVE = 42;
 const LS_BELOW_RESERVE = LS_HINT_RESERVE + LS_LEGEND_RESERVE;
 const PRESS_MAX = 32;             // a corner within this of the LOS is pressing (computed, not declared)
 const HINT_PRE = '👆 Optional: tap the deep safeties to count them';

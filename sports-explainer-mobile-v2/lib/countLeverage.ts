@@ -75,9 +75,9 @@ export const SCEN: CountScenario[] = [
     tab: "0–2: you're ahead", hud: ['Count: 0–2', 'Nobody on, 1 out', 'Hitter: aggressive'],
     grade: {
       chase: { k: 'good', res: 'whiff', t: 'Strike three, chasing',
-        b: "At 0-2 the hitter is defending, not hunting — he'll swing at anything close to protect. The breaking ball starting on the corner and finishing off the plate is exactly the pitch he can't lay off and can't hit. You made him get himself out." },
+        b: "At 0-2 the hitter is defending, not hunting — he'll swing at anything close to protect. The breaking ball starting on the corner and finishing off the plate is exactly the pitch he can't lay off and can't hit. You made him get himself out. And if he lays off it? Ball one — you're 1-2, still ahead, and the same pitch is still available. A putaway pitch doesn't have to produce the out to be the right call." },
       ladder: { k: 'good', res: 'whiff', t: 'Strike three, climbing the ladder',
-        b: 'The other 0-2 putaway, at the opposite end of the zone. A hitter geared to protect the bottom half is late deciding on a fastball above the letters — his eyes read strike and the barrel arrives underneath it. Same idea as the chase pitch: a ball he has to respect, thrown where he can\'t do damage.' },
+        b: 'The other 0-2 putaway, at the opposite end of the zone. A hitter geared to protect the bottom half is late deciding on a fastball above the letters — his eyes read strike and the barrel arrives underneath it. Same idea as the chase pitch: a ball he has to respect, thrown where he can\'t do damage. Take it and you\'re 1-2 with everything still in front of you — the pitch is right whether or not he chases.' },
       edge: { k: 'ok', res: 'called', t: "A strike — you didn't need to buy",
         b: "It's a quality pitch and it might freeze him. But at 0-2 you can win without throwing a strike at all — the corner risks the barrel that a chase pitch doesn't. You paid retail with a coupon in your pocket." },
       middle: { k: 'bad', res: 'barrel', t: "Barreled — the free strike you didn't owe",

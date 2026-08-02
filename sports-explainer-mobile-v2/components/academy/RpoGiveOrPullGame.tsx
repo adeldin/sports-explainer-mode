@@ -78,7 +78,7 @@ function lacedBall(key: string, x: number, y: number, ang: number, op: number): 
 // WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
 // (~26pt, one compact row at the field width) so the art size never jumps between states, and the
 // height it frees is real height back in the controls column.
-const LS_LEGEND_RESERVE = 26;
+const LS_LEGEND_RESERVE = 42;
 
 export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
