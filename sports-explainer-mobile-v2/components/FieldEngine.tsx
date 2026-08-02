@@ -678,5 +678,8 @@ const shellStyles = (t: Theme) => StyleSheet.create({
   // controlsFooter, if present, pins to the bottom instead of being pushed off by tall content.
   controlsCol: { flexShrink: 0, alignSelf: 'stretch', flexDirection: 'column' },
   controlsScroll: { flex: 1 },
-  controlsScrollContent: { gap: 10, paddingBottom: 12 },
+  // gap 8 (was 10): landscape-only, and the tightest pre-call stacks (PickYourPoison,
+  // HelpOrStay, FoulUpThree, TwoForOne) sit within a few points of the fold. Buys ~8pt
+  // across four gaps for every module at once, which per-module trims cannot.
+  controlsScrollContent: { gap: 8, paddingBottom: 12 },
 });

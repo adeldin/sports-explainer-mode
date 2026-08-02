@@ -304,27 +304,27 @@ export default function PassOrLobGame(_props: AcademyGameProps) {
     </View>
   );
   const promptBlock = (
-    <View style={styles.prompt}>
-      <RichText text={promptRef.current} style={styles.promptTxt} boldStyle={styles.promptBold} />
-      <Text style={styles.hintTxt}>{hintRef.current}</Text>
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
+      <RichText text={promptRef.current} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} />
+      <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>{hintRef.current}</Text>
     </View>
   );
   const ready = phase === 'ready';
   const judge = (
     <View style={styles.judgeWrap}>
       {OPTIONS.map(o => (
-        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, !ready && styles.judgeBtnOff]}
+        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, !ready && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}
           disabled={!ready} activeOpacity={0.85} onPress={() => choose(o.key)}>
-          <Text style={styles.judgeTxt}>{o.title}</Text>
-          <Text style={styles.judgeSub}>{o.sub}</Text>
+          <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
+          <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
         </TouchableOpacity>
       ))}
     </View>
   );
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['You (baseline)', YOU_C], ['Net player', OPP_C]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
       <Text style={styles.legendBlue}>blue circle = his volley reach</Text>
       <Text style={styles.legendAmber}>amber arc = his smash zone (lobs die inside it)</Text>
@@ -479,19 +479,27 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chipTxt: { color: t.textPrimary, fontSize: 11, fontWeight: '700' },
   chipVal: { color: t.accentText, fontWeight: '800' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: AMBER, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 11.5, marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   judgeWrap: { gap: 8 },
   judgeBtn: { backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeBtnAlt: { backgroundColor: '#0d1b3e' },
   judgeBtnOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  judgeSubLs: { fontSize: 10 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   legendBlue: { color: OPP_C, fontSize: 11, fontWeight: '700' },
   legendAmber: { color: OK_C, fontSize: 11, fontWeight: '700' },
   legendTeal: { color: TEAL, fontSize: 11, fontWeight: '700' },

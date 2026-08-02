@@ -283,12 +283,12 @@ export default function DrawAndPassGame(_props: AcademyGameProps) {
     : showVerdict
       ? 'Check the timeline — <b>the green band is when he was fixed.</b> Reset to try again.'
       : s.runPrompt;
-  const prompt = <View style={styles.prompt}><Rich text={promptText} style={styles.promptTxt} boldStyle={styles.promptBold} /></View>;
+  const prompt = <View style={[styles.prompt, landscape && styles.promptLs]}><Rich text={promptText} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} /></View>;
   const pills = <ScenarioPills wrap={landscape} items={SCENARIOS.map((x, i) => ({ key: String(i), name: x.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Carrier (13) + support (11)', RUGBY.att], ['Defense', RUGBY.def], ['Fullback (last line)', RUGBY.fb]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
@@ -296,8 +296,8 @@ export default function DrawAndPassGame(_props: AcademyGameProps) {
   const actions = (
     <>
       {phase === 'idle' && (
-        <TouchableOpacity style={styles.playBtn} activeOpacity={0.85} onPress={play}>
-          <Text style={styles.playTxt}>▶ Play</Text>
+        <TouchableOpacity style={[styles.playBtn, landscape && styles.playBtnLs]} activeOpacity={0.85} onPress={play}>
+          <Text style={[styles.playTxt, landscape && styles.playTxtLs]}>▶ Play</Text>
         </TouchableOpacity>
       )}
       {phase === 'running' && (
@@ -380,15 +380,23 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   winInfo: { color: RUGBY.amber, fontSize: 11.5, fontWeight: '700' },
   // Chrome.
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: t.accentText, fontWeight: '800' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
-  playBtn: { marginTop: 10, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-  playTxt: { color: t.textPrimary, fontSize: 15, fontWeight: '800' },
+  legendTxtLs: { fontSize: 10 },
+  // Play is the ONLY pressable control pre-run, so it carries the accent; PASS! (below) takes it
+  // over once the play is live. The eye should land on the button you can actually press.
+  playBtn: { marginTop: 10, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.accent, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  playBtnLs: { minHeight: 44, paddingVertical: 10, marginTop: 6 },
+  playTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
   // The live control — deliberately the biggest target on screen; it is tapped under time pressure.
+  playTxtLs: { fontSize: 14 },
   passBtn: { marginTop: 10, minHeight: 60, borderRadius: 12, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   passTxt: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 0.5 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },

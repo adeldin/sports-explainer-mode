@@ -35,11 +35,11 @@ interface Fx { kind: 'good' | 'bad'; pos: Pt; born: number }
 interface OutLabel { pos: Pt; text: string; color: string }
 
 // Prompt text with **bold** segments rendered in the prototype's amber.
-function Prompt({ text, styles }: { text: string; styles: ReturnType<typeof makeStyles> }) {
+function Prompt({ text, styles, compact }: { text: string; styles: ReturnType<typeof makeStyles>; compact?: boolean }) {
   const parts = text.split('**');
   return (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, compact && styles.promptLs]}>
+      <Text style={[styles.promptTxt, compact && styles.promptTxtLs]}>
         {parts.map((p, i) => (i % 2 ? <Text key={i} style={styles.promptB}>{p}</Text> : p))}
       </Text>
     </View>
@@ -336,19 +336,21 @@ export default function PressTriggerGame(_props: AcademyGameProps) {
       ? 'A press is a **decision**, not an effort level. **Drag the slider** back to the green band — see the picture at the trigger.'
       : "They're building… **wait for the weakness.**";
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Them (building out)', DEF], ['Keepers', GK_C], ['Your press', ATT]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
   const actionRow = phase !== 'done' && (
     <View style={styles.controls}>
-      <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} disabled={phase !== 'idle'} onPress={play}>
-        <Text style={[styles.ghostTxt, phase !== 'idle' && styles.disabledTxt]}>▶ Play</Text>
+      {/* Colour follows the LIVE action, not the loudest word: Play is primary until it is pressed,
+          then PRESS! takes the accent and Play drops back to muted. Enablement is untouched. */}
+      <TouchableOpacity style={[styles.ghostBtn, phase === 'idle' && styles.playHot]} activeOpacity={0.8} disabled={phase !== 'idle'} onPress={play}>
+        <Text style={[styles.ghostTxt, phase === 'idle' && styles.playHotTxt, phase !== 'idle' && styles.disabledTxt]}>▶ Play</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.pressBtn, phase !== 'running' && styles.pressBtnOff]} activeOpacity={0.85} disabled={phase !== 'running'} onPress={pressNow}>
-        <Text style={styles.pressTxt}>PRESS!</Text>
+      <TouchableOpacity style={[styles.pressBtn, phase !== 'running' && styles.pressBtnOff, landscape && styles.pressBtnLs]} activeOpacity={0.85} disabled={phase !== 'running'} onPress={pressNow}>
+        <Text style={[styles.pressTxt, phase !== 'running' && styles.pressTxtOff, landscape && styles.pressTxtLs]}>PRESS!</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={() => resetScenario()}>
         <Text style={styles.ghostTxt}>↺ Reset</Text>
@@ -386,7 +388,7 @@ export default function PressTriggerGame(_props: AcademyGameProps) {
         controls={
           phase === 'done'
             ? <>{verdict}{legend}</>
-            : <><Prompt text={promptText} styles={styles} />{actionRow}{legend}</>
+            : <><Prompt text={promptText} styles={styles} compact={landscape} />{actionRow}{legend}</>
         }
         controlsFooter={phase === 'done' ? postRow : undefined}
       />
@@ -399,7 +401,7 @@ export default function PressTriggerGame(_props: AcademyGameProps) {
       {pitch}
       {timeline}
       {legend}
-      <Prompt text={promptText} styles={styles} />
+      <Prompt text={promptText} styles={styles} compact={landscape} />
       {actionRow}
       {verdict}
       {phase === 'done' && postRow}
@@ -422,18 +424,30 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   winInfo: { color: AMBER, fontSize: 10.5, fontWeight: '700' },
   // Legend.
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Prompt.
+  legendTxtLs: { fontSize: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: AMBER, fontWeight: '800' },
   // Actions.
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
   pressBtn: { flex: 1, minWidth: 120, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  pressBtnOff: { opacity: 0.4 },
+  pressBtnLs: { minHeight: 44, paddingVertical: 9 },
+  // Not-yet-live PRESS!: muted blue (the module's own surface), NOT a dimmed accent — the accent
+  // belongs to whichever button is actually pressable right now.
+  pressBtnOff: { backgroundColor: t.surface },
+  pressTxtOff: { color: t.textSecondaryOnDark },
+  // Play carries the accent until it is pressed.
+  playHot: { backgroundColor: t.accent, borderColor: t.accent },
+  playHotTxt: { color: '#fff', fontWeight: '800' },
   pressTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+  pressTxtLs: { fontSize: 14 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },

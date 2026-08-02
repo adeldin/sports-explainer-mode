@@ -472,26 +472,26 @@ export default function TwoForOneGame(_props: AcademyGameProps) {
     </Text>
   );
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
-  const promptBlock = <View style={styles.prompt}>{rich(prompt, AMBER, styles.promptTxt, styles.promptBold)}</View>;
+  const promptBlock = <View style={[styles.prompt, landscape && styles.promptLs]}>{rich(prompt, AMBER, landscape ? [styles.promptTxt, styles.promptTxtLs] : styles.promptTxt, styles.promptBold)}</View>;
   const judge = (
     <View style={[styles.judge, landscape && styles.judgeCol]}>
       {JUDGE.map(b => (
         <TouchableOpacity key={b.key} disabled={phase !== 'idle'} activeOpacity={0.85} onPress={() => choose(b.key)}
           style={[styles.judgeBtn, b.alt && styles.judgeBtnAlt, phase !== 'idle' && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}>
-          <Text style={styles.judgeTxt}>{b.label}</Text>
-          <Text style={styles.judgeSub}>{b.sub}</Text>
+          <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{b.label}</Text>
+          <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{b.sub}</Text>
         </TouchableOpacity>
       ))}
     </View>
   );
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your offense', HOOPS.orange], ['Their defense', HOOPS.def]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
-      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: HOOPS.orange }]} /><Text style={styles.legendTxt}>your possession (map)</Text></View>
-      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: HOOPS.def }]} /><Text style={styles.legendTxt}>their possession (map)</Text></View>
-      <View style={styles.legendItem}><View style={styles.legendGhost} /><Text style={styles.legendTxt}>the shot you passed up</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: HOOPS.orange }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>your possession (map)</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendSwatch, { backgroundColor: HOOPS.def }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>their possession (map)</Text></View>
+      <View style={styles.legendItem}><View style={styles.legendGhost} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>the shot you passed up</Text></View>
     </View>
   );
   const verdict = answered && chosen ? (
@@ -516,7 +516,7 @@ export default function TwoForOneGame(_props: AcademyGameProps) {
       {resetBtn}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
-        : <Text style={styles.hintTxt} numberOfLines={2}>{hint}</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>{hint}</Text>}
     </View>
   );
 
@@ -545,7 +545,7 @@ export default function TwoForOneGame(_props: AcademyGameProps) {
       <View style={styles.controls}>
         {resetBtn}
         {answered && <NextButton visible variant="filled" label="Next clock →" onPress={nextScenario} />}
-        <Text style={[styles.hintTxt, styles.hintFlex]}>{hint}</Text>
+        <Text style={[styles.hintTxt, styles.hintFlex, landscape && styles.hintTxtLs]}>{hint}</Text>
       </View>
     </ScrollView>
   );
@@ -555,22 +555,28 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { fontWeight: '800' },
   judge: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  judgeCol: { flexDirection: 'column' },
+  judgeCol: { flexDirection: 'column', flexWrap: 'nowrap' },
   judgeBtn: { flexGrow: 1, minWidth: 140, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', minHeight: 48 },
-  judgeBtnLs: { minWidth: 0 },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
   judgeBtnOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  judgeSubLs: { fontSize: 10 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6, justifyContent: 'center' },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendSwatch: { width: 14, height: 8, borderRadius: 2 },
   legendGhost: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#14B8A6' },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: '#e7f7f1', color: '#0c7a5e' },
@@ -584,6 +590,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600' },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   hintFlex: { flex: 1, textAlign: 'right' },
   lsPostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border },
   lsNextFill: { flex: 1, alignSelf: 'center', alignItems: 'center', paddingVertical: 10 },

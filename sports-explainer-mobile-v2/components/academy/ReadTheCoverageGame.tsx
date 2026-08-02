@@ -147,19 +147,19 @@ export default function ReadTheCoverageGame(_props: AcademyGameProps) {
   // Shells are numbered, not named: the coverage NAME is the payoff and lands in the verdict chip.
   const pills = <ScenarioPills wrap={landscape} items={COVERAGES.map((_c, i) => ({ key: String(i), name: `Shell ${i + 1}` }))} currentKey={String(idx)} onSelect={k => selectShell(Number(k))} />;
   const promptNode = (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
+      <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>
         {answered
           ? <>The safeties told you before the ball moved. <Text style={styles.promptB}>Count the deep men first, every time.</Text></>
           : <>Pre-snap. <Text style={styles.promptB}>How many safeties are deep — and what does that say about the middle?</Text></>}
       </Text>
-      <Text style={styles.hintTxt}>{answered ? 'Reset, or take another shell.' : 'Two deep = the middle is soft. One deep = it\'s shut.'}</Text>
+      <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>{answered ? 'Reset, or take another shell.' : 'Two deep = the middle is soft. One deep = it\'s shut.'}</Text>
     </View>
   );
   const callBtn = (opt: Call, title: string, sub: string, alt?: boolean) => (
     <TouchableOpacity key={opt} style={[styles.callBtn, alt && styles.callBtnAlt, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => call(opt)}>
-      <Text style={styles.callTitle}>{title}</Text>
-      <Text style={styles.callSub}>{sub}</Text>
+      <Text style={[styles.callTitle, landscape && styles.callTitleLs]}>{title}</Text>
+      <Text style={[styles.callSub, landscape && styles.callSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   const callButtons = !answered ? (
@@ -169,11 +169,11 @@ export default function ReadTheCoverageGame(_props: AcademyGameProps) {
     </View>
   ) : null;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Offense', FE.orange], ['Defense', FE.blue]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
-      <View style={styles.legendItem}><View style={styles.legendRing} /><Text style={styles.legendTxt}>tap to count the deep men</Text></View>
+      <View style={styles.legendItem}><View style={styles.legendRing} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>tap to count the deep men</Text></View>
     </View>
   );
   const verdictCard = answered ? (
@@ -197,7 +197,7 @@ export default function ReadTheCoverageGame(_props: AcademyGameProps) {
       {resetBtnC}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextShell} />
-        : <Text style={styles.hintTxt} numberOfLines={2}>Four shells. One question.</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>Four shells. One question.</Text>}
     </View>
   );
 
@@ -248,21 +248,28 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   countPill: { backgroundColor: FE.modeBg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   countPillTxt: { color: FE.mode, fontSize: 12, fontWeight: '700' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: t.accentText, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   callRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  callCol: { gap: 8 },
+  callCol: { gap: 8, flexWrap: 'nowrap' },
   callBtn: { flexGrow: 1, minWidth: 140, minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  callBtnLs: { minWidth: 0 },
+  callBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   callBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
   callTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  callTitleLs: { fontSize: 13 },
   callSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  callSubLs: { fontSize: 10 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: AMBER },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: t.border },
   verdictCompact: { padding: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 },

@@ -33,11 +33,11 @@ const PROMPT_DONE = 'The touch is the **starting gun** — and some races you de
 type Phase = 'idle' | 'running' | 'resolving' | 'done';
 
 // Prompt text with **bold** segments in the prototype's amber.
-function Prompt({ text, styles }: { text: string; styles: ReturnType<typeof makeStyles> }) {
+function Prompt({ text, styles, compact }: { text: string; styles: ReturnType<typeof makeStyles>; compact?: boolean }) {
   const parts = text.split('**');
   return (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, compact && styles.promptLs]}>
+      <Text style={[styles.promptTxt, compact && styles.promptTxtLs]}>
         {parts.map((p, i) => (i % 2 ? <Text key={i} style={styles.promptB}>{p}</Text> : p))}
       </Text>
     </View>
@@ -204,9 +204,9 @@ export default function TagUpGame(_props: AcademyGameProps) {
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const hudChips = <View style={styles.hud}>{s.hud.map(h => <Text key={h} style={styles.chip}>{h}</Text>)}</View>;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Defense', FE.blue], ['Runner', FE.orange], ['Ball', '#fff']] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
@@ -214,15 +214,17 @@ export default function TagUpGame(_props: AcademyGameProps) {
     : phase === 'running' ? PROMPT_RUN
       : phase === 'resolving' ? (ch?.prompts[0]?.text ?? PROMPT_RUN)
         : PROMPT_DONE;
-  const promptBlock = <Prompt text={promptText} styles={styles} />;
+  const promptBlock = <Prompt text={promptText} styles={styles} compact={landscape} />;
   // Play / GO! — both UNMOUNT on reveal (the verdict takes their space); Reset + Next live in the footer.
   const actionRow = !answered ? (
     <View style={styles.controls}>
-      <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} disabled={phase !== 'idle'} onPress={play}>
-        <Text style={[styles.ghostTxt, phase !== 'idle' && styles.disabledTxt]}>▶ Play</Text>
+      {/* Colour follows the LIVE action, not the loudest word: Play is primary until it is pressed,
+          then GO! takes the accent and Play drops back to muted. Enablement is untouched. */}
+      <TouchableOpacity style={[styles.ghostBtn, phase === 'idle' && styles.playHot]} activeOpacity={0.8} disabled={phase !== 'idle'} onPress={play}>
+        <Text style={[styles.ghostTxt, phase === 'idle' && styles.playHotTxt, phase !== 'idle' && styles.disabledTxt]}>▶ Play</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.goBtn, phase !== 'running' && styles.goBtnOff]} activeOpacity={0.85} disabled={phase !== 'running'} onPress={go}>
-        <Text style={styles.goTxt}>GO!</Text>
+      <TouchableOpacity style={[styles.goBtn, phase !== 'running' && styles.goBtnOff, landscape && styles.goBtnLs]} activeOpacity={0.85} disabled={phase !== 'running'} onPress={go}>
+        <Text style={[styles.goTxt, phase !== 'running' && styles.goTxtOff, landscape && styles.goTxtLs]}>GO!</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={resetPlay}>
         <Text style={styles.ghostTxt}>↺ Reset</Text>
@@ -293,13 +295,23 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   winInfo: { color: AMBER, fontSize: 10.5, fontWeight: '700' },
   // Prompt.
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: AMBER, fontWeight: '800' },
   // Actions.
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
   goBtn: { flex: 1, minWidth: 110, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  goBtnOff: { opacity: 0.4 },
+  goBtnLs: { minHeight: 44, paddingVertical: 9 },
+  // Not-yet-live GO!: muted blue (the module's own surface), NOT a dimmed accent — the accent
+  // belongs to whichever button is actually pressable right now.
+  goBtnOff: { backgroundColor: t.surface },
+  goTxtOff: { color: t.textSecondaryOnDark },
+  // Play carries the accent until it is pressed.
+  playHot: { backgroundColor: t.accent, borderColor: t.accent },
+  playHotTxt: { color: '#fff', fontWeight: '800' },
   goTxt: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+  goTxtLs: { fontSize: 14 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
@@ -314,10 +326,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
   // Legend.
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Post-call rows.
+  legendTxtLs: { fontSize: 10 },
   postRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   lsPostRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: t.border },
   lsNextFill: { flex: 1, alignSelf: 'center', alignItems: 'center', paddingVertical: 10 },

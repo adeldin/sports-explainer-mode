@@ -310,8 +310,8 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
   // ── control fragments ──
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => selectScenario(Number(k))} />;
   const promptNode = (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
+      <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>
         {phase === 'develop'
           ? <>The mesh is forming. <Text style={styles.promptB}>Watch the ringed backer's first two steps.</Text></>
           : phase === 'mesh'
@@ -320,7 +320,7 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
               ? <>Handed off — the back is into the lane…</>
               : <>Pulled — the ball is out…</>}
       </Text>
-      <Text style={styles.hintTxt}>
+      <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>
         {phase === 'mesh'
           ? 'He can defend the run or the pass. Not both.'
           : phase === 'develop' ? 'Downhill at the back = pull. Widening under the slant = give.' : ''}
@@ -329,8 +329,8 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
   );
   const callBtn = (opt: RpoCall, title: string, sub: string, alt?: boolean) => (
     <TouchableOpacity key={opt} style={[styles.callBtn, alt && styles.callBtnAlt, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
-      <Text style={styles.callTitle}>{title}</Text>
-      <Text style={styles.callSub}>{sub}</Text>
+      <Text style={[styles.callTitle, landscape && styles.callTitleLs]}>{title}</Text>
+      <Text style={[styles.callSub, landscape && styles.callSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   const callButtons = phase === 'mesh' ? (
@@ -340,11 +340,11 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
     </View>
   ) : null;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Offense', FE.orange], ['Defense', FE.blue], ['Ball', BALL_BROWN]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
-      <View style={styles.legendItem}><View style={styles.legendRing} /><Text style={styles.legendTxt}>the read defender</Text></View>
+      <View style={styles.legendItem}><View style={styles.legendRing} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>the read defender</Text></View>
     </View>
   );
   const verdictCard = answered && v ? (
@@ -369,7 +369,7 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
       {resetBtnC}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
-        : <Text style={styles.hintTxt} numberOfLines={2}>Same play, three answers.</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>Same play, three answers.</Text>}
     </View>
   );
 
@@ -411,21 +411,28 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   replay: { position: 'absolute', top: 10, left: 10, borderWidth: 1.5, borderColor: 'rgba(244,244,238,.75)', backgroundColor: 'rgba(13,27,62,.6)', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 9 },
   replayTxt: { color: '#F4F4EE', fontSize: 11.5, fontWeight: '700' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: t.accentText, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   callRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  callCol: { gap: 8 },
+  callCol: { gap: 8, flexWrap: 'nowrap' },
   callBtn: { flexGrow: 1, minWidth: 140, minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  callBtnLs: { minWidth: 0 },
+  callBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   callBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
   callTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  callTitleLs: { fontSize: 13 },
   callSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  callSubLs: { fontSize: 10 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: AMBER },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: t.border },
   verdictCompact: { padding: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 },

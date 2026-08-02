@@ -107,9 +107,9 @@ export default function StealOrStayGame(_props: AcademyGameProps) {
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const hudChips = <View style={styles.hud}>{s.hud.map(h => <Text key={h} style={styles.chip}>{h}</Text>)}</View>;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Defense', FE.blue], ['Runner', FE.orange], ['Ball', '#fff']] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
@@ -117,19 +117,19 @@ export default function StealOrStayGame(_props: AcademyGameProps) {
     ? [...ch.prompts].reverse().find(p => e >= p.at)?.text ?? PROMPT_IDLE
     : answered ? PROMPT_DONE : PROMPT_IDLE;
   const promptBlock = (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>{livePrompt}</Text>
-      {phase !== 'run' && <Text style={styles.hintTxt}>{answered ? HINT_DONE : HINT_IDLE}</Text>}
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
+      <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>{livePrompt}</Text>
+      {phase !== 'run' && <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>{answered ? HINT_DONE : HINT_IDLE}</Text>}
     </View>
   );
   // the two call buttons — UNMOUNT on reveal (the verdict takes their space); disabled mid-play
   const judge = !answered ? (
     <View style={styles.judgeRow}>
-      <TouchableOpacity style={[styles.goBtn, phase !== 'idle' && styles.btnDisabled]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose('go')}>
-        <Text style={styles.judgeTxt}>SEND HIM</Text>
+      <TouchableOpacity style={[styles.goBtn, phase !== 'idle' && styles.btnDisabled, landscape && styles.goBtnLs]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose('go')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>SEND HIM</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.stayBtn, phase !== 'idle' && styles.btnDisabled]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose('stay')}>
-        <Text style={styles.judgeTxt}>HOLD HIM</Text>
+      <TouchableOpacity style={[styles.stayBtn, phase !== 'idle' && styles.btnDisabled, landscape && styles.stayBtnLs]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose('stay')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>HOLD HIM</Text>
       </TouchableOpacity>
     </View>
   ) : null;
@@ -188,13 +188,19 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   hud: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, fontSize: 12, fontWeight: '700', color: t.textPrimary, overflow: 'hidden' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   judgeRow: { flexDirection: 'row', gap: 10 },
   goBtn: { flex: 1, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  goBtnLs: { minHeight: 44, paddingVertical: 9 },
   stayBtn: { flex: 1, backgroundColor: FE.navy, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  stayBtnLs: { minHeight: 44, paddingVertical: 9 },
   btnDisabled: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 14 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },
@@ -205,9 +211,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
   vread: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },

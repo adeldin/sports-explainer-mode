@@ -345,26 +345,26 @@ export default function NumbersOutWideGame(_props: AcademyGameProps) {
     : showVerdict
       ? "Look at the counts on the pitch — <b>that's the whole read.</b>"
       : (sc?.prompts.filter(p => e >= p.at).pop()?.text ?? s.prompt);
-  const prompt = <View style={styles.prompt}><Rich text={promptText} style={styles.promptTxt} boldStyle={styles.promptBold} /></View>;
+  const prompt = <View style={[styles.prompt, landscape && styles.promptLs]}><Rich text={promptText} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} /></View>;
   const hintText = showVerdict ? 'Reset, or pick another ruck.' : 'Count both sides before you call it.';
   const pills = <ScenarioPills wrap={landscape} items={SCENARIOS.map((x, i) => ({ key: String(i), name: x.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Attack (going right)', RUGBY.att], ['Defense', RUGBY.def], ['Fullback (last line)', RUGBY.fb]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
   const judgeButtons = (
     <View style={styles.judgeWrap}>
-      <TouchableOpacity style={styles.judgeBtn} activeOpacity={0.85} onPress={() => choose('open')}>
-        <Text style={styles.judgeTxt}>{s.open.label}</Text>
+      <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('open')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{s.open.label}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.judgeBtn} activeOpacity={0.85} onPress={() => choose('short')}>
-        <Text style={styles.judgeTxt}>{s.short.label}</Text>
+      <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('short')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{s.short.label}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.judgeBtn, styles.judgeBtnAlt]} activeOpacity={0.85} onPress={() => choose('kick')}>
-        <Text style={styles.judgeTxt}>Kick behind</Text>
+      <TouchableOpacity style={[styles.judgeBtn, styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('kick')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>Kick behind</Text>
       </TouchableOpacity>
     </View>
   );
@@ -380,7 +380,7 @@ export default function NumbersOutWideGame(_props: AcademyGameProps) {
       <Text style={styles.vread}>{s.why[depth]}</Text>
     </View>
   ) : null;
-  const hint = <Text style={styles.hint}>{hintText}</Text>;
+  const hint = <Text style={[styles.hint, landscape && styles.hintLs]}>{hintText}</Text>;
   const resetBtn = (
     <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={() => resetTo(idx)}>
       <Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text>
@@ -432,16 +432,22 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: t.accentText, fontWeight: '800' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   judgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   judgeBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  judgeBtnLs: { minHeight: 46, paddingVertical: 8 },
   judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800', textAlign: 'center' },
+  judgeTxtLs: { fontSize: 13 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: RUGBY_TAG.goodBg, color: RUGBY_TAG.good },
@@ -451,6 +457,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 2 },
   vread: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
   hint: { color: t.textSecondaryOnDark, fontSize: 12, marginTop: 4, flexShrink: 1 },
+  hintLs: { fontSize: 10.5, marginTop: 2 },
   controlsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, minHeight: 44, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },

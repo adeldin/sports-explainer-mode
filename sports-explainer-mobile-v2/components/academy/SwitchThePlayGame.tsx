@@ -39,14 +39,14 @@ const arcCtrl = (from: Pt, to: Pt, peak: number): Pt => ({ x: (from.x + to.x) / 
 const lblAbove = (y: number) => (y >= 40 && y < 75) || y > 385;
 
 // Prompt text with **bold** segments in the prototype's amber.
-function Prompt({ text, hint, styles }: { text: string; hint?: string; styles: ReturnType<typeof makeStyles> }) {
+function Prompt({ text, hint, styles, compact }: { text: string; hint?: string; styles: ReturnType<typeof makeStyles>; compact?: boolean }) {
   const parts = text.split('**');
   return (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, compact && styles.promptLs]}>
+      <Text style={[styles.promptTxt, compact && styles.promptTxtLs]}>
         {parts.map((p, i) => (i % 2 ? <Text key={i} style={styles.promptB}>{p}</Text> : p))}
       </Text>
-      {!!hint && <Text style={styles.hintTxt}>{hint}</Text>}
+      {!!hint && <Text style={[styles.hintTxt, compact && styles.hintTxtLs]}>{hint}</Text>}
     </View>
   );
 }
@@ -323,19 +323,21 @@ export default function SwitchThePlayGame(_props: AcademyGameProps) {
             : chosen === 'line'
               ? (grade?.k === 'good' ? 'One touch past him — **into the channel!**' : 'Down the line — **into bodies.**')
               : 'Back to the six — **keep it moving.**';
-  const promptBlock = <Prompt text={promptText} hint={answered ? HINT_DONE : HINT_LIVE} styles={styles} />;
+  const promptBlock = <Prompt text={promptText} hint={answered ? HINT_DONE : HINT_LIVE} styles={styles} compact={landscape} />;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your team (attacking right)', ATT], ['Their block — sliding to the ball', DEF], ['Keepers', GK_C]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
   // ▶ Play the build-up — the film that produces the frozen picture the whole read depends on.
   const filmRow = !answered ? (
     <View style={styles.controls}>
-      <TouchableOpacity style={[styles.filmBtn, phase !== 'idle' && styles.btnOff]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={play}>
-        <Text style={styles.filmTxt}>▶ Play the build-up</Text>
+      {/* Colour follows the LIVE action: Play carries the accent until it is pressed, then the three
+          calls take it and Play drops to muted blue. Enablement is untouched. */}
+      <TouchableOpacity style={[styles.filmBtn, phase !== 'idle' && styles.btnMuted, landscape && styles.filmBtnLs]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={play}>
+        <Text style={[styles.filmTxt, phase !== 'idle' && styles.btnMutedTxt, landscape && styles.filmTxtLs]}>▶ Play the build-up</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={resetPlay}>
         <Text style={styles.ghostTxt}>↺ Reset</Text>
@@ -343,9 +345,9 @@ export default function SwitchThePlayGame(_props: AcademyGameProps) {
     </View>
   ) : null;
   const judgeBtn = (o: StpOption, main: string, sub: string, alt: boolean) => (
-    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'ready' && styles.btnOff]} activeOpacity={0.85} disabled={phase !== 'ready'} onPress={() => choose(o)}>
-      <Text style={styles.judgeTxt}>{main}</Text>
-      <Text style={styles.judgeSub}>{sub}</Text>
+    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'ready' && styles.btnMuted, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'ready'} onPress={() => choose(o)}>
+      <Text style={[styles.judgeTxt, phase !== 'ready' && styles.btnMutedTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
+      <Text style={[styles.judgeSub, phase !== 'ready' && styles.btnMutedTxt, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   // the three balls — UNMOUNT on reveal so the verdict takes their space (Reset + Next stay, in the footer)
@@ -410,27 +412,40 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   // Legend.
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Prompt.
+  legendTxtLs: { fontSize: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: AMBER, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
   // Film row.
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
   filmBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  filmBtnLs: { minHeight: 44, paddingVertical: 9 },
   filmTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  btnOff: { opacity: 0.4 },
+  filmTxtLs: { fontSize: 13 },
+  // Not-yet-live control: muted blue (the module's own surface), NOT a dimmed accent — the accent
+  // belongs to whichever button is actually pressable right now.
+  btnMuted: { backgroundColor: t.surface },
+  btnMutedTxt: { color: t.textSecondaryOnDark },
   // Choice buttons.
   judgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  judgeCol: { gap: 8, marginTop: 4 },
+  judgeCol: { gap: 8, marginTop: 4, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeAlt: { backgroundColor: '#22345e' },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
   // Verdict.
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

@@ -31,14 +31,14 @@ const HINT_DONE = 'Reset, or set a different depth.';
 type Phase = 'idle' | 'run' | 'done';
 
 // Prompt text with **bold** segments in the prototype's amber.
-function Prompt({ text, hint, styles }: { text: string; hint?: string; styles: ReturnType<typeof makeStyles> }) {
+function Prompt({ text, hint, styles, compact }: { text: string; hint?: string; styles: ReturnType<typeof makeStyles>; compact?: boolean }) {
   const parts = text.split('**');
   return (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, compact && styles.promptLs]}>
+      <Text style={[styles.promptTxt, compact && styles.promptTxtLs]}>
         {parts.map((p, i) => (i % 2 ? <Text key={i} style={styles.promptB}>{p}</Text> : p))}
       </Text>
-      {!!hint && <Text style={styles.hintTxt}>{hint}</Text>}
+      {!!hint && <Text style={[styles.hintTxt, compact && styles.hintTxtLs]}>{hint}</Text>}
     </View>
   );
 }
@@ -132,21 +132,21 @@ export default function InfieldInOrBackGame(_props: AcademyGameProps) {
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const hudChips = <View style={styles.hud}>{s.hud.map(h => <Text key={h} style={styles.chip}>{h}</Text>)}</View>;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your defense', FE.blue], ['Their runners', FE.orange], ['Ball', '#fff']] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c, borderWidth: c === '#fff' ? 1 : 0, borderColor: '#999' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
   const livePrompt = ch && phase === 'run'
     ? [...ch.prompts].reverse().find(p => e >= p.at)?.text ?? PROMPT_IDLE
     : answered ? PROMPT_DONE : PROMPT_IDLE;
-  const promptBlock = <Prompt text={livePrompt} hint={phase === 'run' ? undefined : answered ? HINT_DONE : HINT_IDLE} styles={styles} />;
+  const promptBlock = <Prompt text={livePrompt} hint={phase === 'run' ? undefined : answered ? HINT_DONE : HINT_IDLE} styles={styles} compact={landscape} />;
   // the three depth buttons — UNMOUNT on reveal (the verdict takes their space); disabled mid-play
   const judgeBtn = (o: DepthChoice, main: string, sub: string, alt: boolean) => (
-    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'idle' && styles.judgeOff]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(o)}>
-      <Text style={styles.judgeTxt}>{main}</Text>
-      <Text style={styles.judgeSub}>{sub}</Text>
+    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'idle' && styles.judgeOff, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(o)}>
+      <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
+      <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   const judge = !answered ? (
@@ -212,18 +212,24 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chip: { backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, fontSize: 12, fontWeight: '700', color: t.textPrimary, overflow: 'hidden' },
   // Prompt.
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: '#F5A623', fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
   // Depth buttons.
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   judgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  judgeCol: { gap: 8, marginTop: 4 },
+  judgeCol: { gap: 8, marginTop: 4, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeAlt: { backgroundColor: '#22345e' },
   judgeOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
   // Verdict.
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },
@@ -234,10 +240,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
   // Legend.
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Buttons / footers.
+  legendTxtLs: { fontSize: 10 },
   controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14 },
   ghostBtnC: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },

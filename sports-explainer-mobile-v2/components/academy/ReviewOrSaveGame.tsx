@@ -329,22 +329,22 @@ export default function ReviewOrSaveGame(_props: AcademyGameProps) {
     </View>
   );
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Fielding side (you, most tabs)', CK.orange], ['Batters', CK.def], ['Wicket-keeper', CK.keeper], ['Umpire', CK.chalk]] as [string, string][]).map(([l, c]) => (
-        <View key={l} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{l}</Text></View>
+        <View key={l} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{l}</Text></View>
       ))}
     </View>
   );
-  const promptBlock = <View style={styles.prompt}><Rich s={prompt} style={styles.promptTxt} boldStyle={styles.promptBold} /></View>;
+  const promptBlock = <View style={[styles.prompt, landscape && styles.promptLs]}><Rich s={prompt} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} /></View>;
   const judgeRow = phase === 'idle' ? (
-    <View style={styles.judgeRow}>
-      <TouchableOpacity style={styles.judgeBtn} activeOpacity={0.85} onPress={() => choose('review')}>
-        <Text style={styles.judgeTxt}>REVIEW IT</Text>
-        <Text style={styles.judgeSub}>send it upstairs — lose it if the call stands</Text>
+    <View style={landscape ? styles.judgeCol : styles.judgeRow}>
+      <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('review')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>REVIEW IT</Text>
+        <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>send it upstairs — lose it if the call stands</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.judgeBtn, styles.judgeAlt]} activeOpacity={0.85} onPress={() => choose('save')}>
-        <Text style={styles.judgeTxt}>SAVE THE REVIEW</Text>
-        <Text style={styles.judgeSub}>trust the umpire — keep the token</Text>
+      <TouchableOpacity style={[styles.judgeBtn, styles.judgeAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('save')}>
+        <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>SAVE THE REVIEW</Text>
+        <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>trust the umpire — keep the token</Text>
       </TouchableOpacity>
     </View>
   ) : null;
@@ -361,7 +361,7 @@ export default function ReviewOrSaveGame(_props: AcademyGameProps) {
       <Text style={styles.vbody}>{s.why[depth]}</Text>
     </View>
   ) : null;
-  const hintLine = <Text style={styles.hint}>{hint}</Text>;
+  const hintLine = <Text style={[styles.hint, landscape && styles.hintLs]}>{hint}</Text>;
   const subLine = phase !== 'done' ? <Text style={styles.foot}>{RS_SUB}</Text> : null;
   const footLine = <Text style={styles.foot}>{RS_FOOT}</Text>;
   const resetBtn = <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={() => resetTo(idx)}><Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text></TouchableOpacity>;
@@ -510,17 +510,25 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tinfoBold: { fontWeight: '800', color: t.textPrimary },
   tinfoBeat: { color: t.accent, fontSize: 11, fontWeight: '700' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 2 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: t.accentText, fontWeight: '800' },
   judgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  judgeCol: { flexDirection: 'column', flexWrap: 'nowrap', gap: 8 },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeAlt: { backgroundColor: '#28407a' },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2, textAlign: 'center' },
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },
@@ -530,6 +538,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   vbody: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
   readLbl: { color: t.textSecondaryOnDark, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 8 },
   hint: { color: t.textSecondaryOnDark, fontSize: 12.5, flexShrink: 1 },
+  hintLs: { fontSize: 10.5, marginTop: 2 },
   foot: { color: t.textSecondaryOnDark, fontSize: 11, lineHeight: 17, opacity: 0.8 },
   controlsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },

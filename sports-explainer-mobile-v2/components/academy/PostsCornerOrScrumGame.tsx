@@ -393,13 +393,13 @@ export default function PostsCornerOrScrumGame(_props: AcademyGameProps) {
     : showVerdict
       ? 'Every penalty is a <b>trade</b> — points now, or a platform for more.'
       : (sc?.prompts.filter(p => e >= p.at).pop()?.text ?? '');
-  const prompt = <View style={styles.prompt}><Rich text={promptText} style={styles.promptTxt} boldStyle={styles.promptBold} /></View>;
+  const prompt = <View style={[styles.prompt, landscape && styles.promptLs]}><Rich text={promptText} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} /></View>;
   const hintText = showVerdict ? 'Reset, or take another penalty.' : 'Score, clock, spot — the board has everything.';
   const pills = <ScenarioPills wrap={landscape} items={SCENARIOS.map((x, i) => ({ key: String(i), name: x.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your team (attacking right)', RUGBY.att], ['Their defense', RUGBY.def], ['Their fullback', RUGBY.fb]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
@@ -412,9 +412,9 @@ export default function PostsCornerOrScrumGame(_props: AcademyGameProps) {
   const judgeButtons = (
     <View style={styles.judgeWrap}>
       {JUDGE.map(j => (
-        <TouchableOpacity key={j.o} style={[styles.judgeBtn, j.alt && styles.judgeBtnAlt]} activeOpacity={0.85} onPress={() => choose(j.o)}>
-          <Text style={styles.judgeTxt}>{j.t}</Text>
-          <Text style={styles.judgeSub}>{j.sub}</Text>
+        <TouchableOpacity key={j.o} style={[styles.judgeBtn, j.alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(j.o)}>
+          <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{j.t}</Text>
+          <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{j.sub}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -431,7 +431,7 @@ export default function PostsCornerOrScrumGame(_props: AcademyGameProps) {
       <Text style={styles.vread}>{s.why[depth]}</Text>
     </View>
   ) : null;
-  const hint = <Text style={styles.hint}>{hintText}</Text>;
+  const hint = <Text style={[styles.hint, landscape && styles.hintLs]}>{hintText}</Text>;
   const resetBtn = (
     <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={() => resetTo(idx)}>
       <Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text>
@@ -482,17 +482,24 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: t.accentText, fontWeight: '800' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   judgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   judgeBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 52, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  judgeBtnLs: { minHeight: 46, paddingVertical: 8 },
   judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: RUGBY_TAG.goodBg, color: RUGBY_TAG.good },
@@ -503,6 +510,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 2 },
   vread: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
   hint: { color: t.textSecondaryOnDark, fontSize: 12, marginTop: 4, flexShrink: 1 },
+  hintLs: { fontSize: 10.5, marginTop: 2 },
   controlsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },

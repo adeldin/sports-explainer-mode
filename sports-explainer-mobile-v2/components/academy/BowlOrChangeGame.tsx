@@ -310,18 +310,18 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
     </View>
   );
   const promptBlock = (
-    <View style={styles.prompt}>
-      <RichText text={promptRef.current} style={styles.promptTxt} boldStyle={styles.promptBold} />
-      <Text style={styles.hintTxt}>{hintRef.current}</Text>
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
+      <RichText text={promptRef.current} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} />
+      <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>{hintRef.current}</Text>
     </View>
   );
   const judge = phase === 'idle' ? (
     <View style={styles.judgeWrap}>
       {OPTIONS.map(o => (
         <View key={o.key} style={styles.judgeRow}>
-          <TouchableOpacity style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt]} activeOpacity={0.85} onPress={() => choose(o.key)}>
-            <Text style={styles.judgeTxt}>{o.title}</Text>
-            <Text style={styles.judgeSub}>{o.sub}</Text>
+          <TouchableOpacity style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(o.key)}>
+            <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
+            <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.pvBtn, preview === o.key && styles.pvBtnOn]}
@@ -336,11 +336,11 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
     </View>
   ) : null;
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your XI (positions on dots)', CK.orange], ['Your keeper', CK.keeper], ['Their batter', CK.def]] as [string, string][]).map(([l, c]) => (
-        <View key={l} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{l}</Text></View>
+        <View key={l} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{l}</Text></View>
       ))}
-      <Text style={styles.legendTxt}>hatched strip = rope pulled in short</Text>
+      <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>hatched strip = rope pulled in short</Text>
     </View>
   );
   const o: BOCResult | null = chosen ? s.opts[chosen] : null;
@@ -424,24 +424,32 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chipTxt: { color: t.textPrimary, fontSize: 11, fontWeight: '700' },
   chipTxtWarn: { color: '#e24b4a' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: AMBER, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 11.5, marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   judgeWrap: { gap: 8 },
   judgeRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   judgeBtn: { flex: 1, backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
+  judgeBtnLs: { minHeight: 44, paddingVertical: 9 },
   judgeBtnAlt: { backgroundColor: '#0d1b3e' },
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2, textAlign: 'center' },
+  judgeSubLs: { fontSize: 10 },
   pvBtn: { width: 48, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
   pvBtnOn: { borderColor: FE.orange, backgroundColor: t.explanationBg },
   pvTxt: { fontSize: 18, opacity: 0.65 },
   pvTxtOn: { opacity: 1 },
   pvHint: { color: t.textSecondaryOnDark, fontSize: 10.5, marginTop: 2 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

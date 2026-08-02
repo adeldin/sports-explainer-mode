@@ -295,21 +295,21 @@ export default function FourthDownCallGame(_props: AcademyGameProps) {
   // ── control fragments ──
   const pills = <ScenarioPills wrap={landscape} items={SCEN.map((sc, i) => ({ key: String(i), name: sc.tab }))} currentKey={String(idx)} onSelect={kk => selectScenario(Number(kk))} />;
   const promptNode = (
-    <View style={styles.prompt}>
+    <View style={[styles.prompt, landscape && styles.promptLs]}>
       {phase === 'idle' ? (
-        <Text style={styles.promptTxt}>Fourth down. The punt team, the kicker, and the offense are all looking at you. <Text style={styles.promptB}>Your call, coach.</Text></Text>
+        <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>Fourth down. The punt team, the kicker, and the offense are all looking at you. <Text style={styles.promptB}>Your call, coach.</Text></Text>
       ) : phase === 'run' ? (
-        <Text style={styles.promptTxt}>{chosen === 'go' ? 'Offense stays on the field…' : chosen === 'fg' ? 'Field-goal unit… the kick is up…' : 'Punt team…'}</Text>
+        <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>{chosen === 'go' ? 'Offense stays on the field…' : chosen === 'fg' ? 'Field-goal unit… the kick is up…' : 'Punt team…'}</Text>
       ) : (
-        <Text style={styles.promptTxt}>Fourth down is a <Text style={styles.promptB}>trade</Text>: the drive, the points, or the field.</Text>
+        <Text style={[styles.promptTxt, landscape && styles.promptTxtLs]}>Fourth down is a <Text style={styles.promptB}>trade</Text>: the drive, the points, or the field.</Text>
       )}
-      <Text style={styles.hintTxt}>{answered ? 'Reset, or take another fourth down.' : 'Distance, spot, score, clock — all four vote.'}</Text>
+      <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]}>{answered ? 'Reset, or take another fourth down.' : 'Distance, spot, score, clock — all four vote.'}</Text>
     </View>
   );
   const judgeBtn = (opt: CallOption, title: string, sub: string, alt?: boolean) => (
-    <TouchableOpacity key={opt} style={[styles.judgeBtn, alt && styles.judgeBtnAlt]} activeOpacity={0.85} onPress={() => choose(opt)}>
-      <Text style={styles.judgeTitle}>{title}</Text>
-      <Text style={styles.judgeSub}>{sub}</Text>
+    <TouchableOpacity key={opt} style={[styles.judgeBtn, alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
+      <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{title}</Text>
+      <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   const judgeButtons = phase === 'idle' ? (
@@ -376,15 +376,21 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: t.accentText, fontWeight: '800' },
   hintTxt: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600', marginTop: 6 },
+  hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   judgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  judgeCol: { gap: 8 },
+  judgeCol: { gap: 8, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 140, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
   judgeTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTitleLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: t.border },
   verdictCompact: { padding: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 },

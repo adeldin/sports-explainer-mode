@@ -31,11 +31,11 @@ interface Fx { kind: 'good' | 'bad' | 'pulse'; pos: Pt; color?: string; born: nu
 interface OutLabel { pos: Pt; text: string; color: string }
 interface Ghost { pos: Pt; txt: string }
 
-function Prompt({ text, styles }: { text: string; styles: ReturnType<typeof makeStyles> }) {
+function Prompt({ text, styles, compact }: { text: string; styles: ReturnType<typeof makeStyles>; compact?: boolean }) {
   const parts = text.split('**');
   return (
-    <View style={styles.prompt}>
-      <Text style={styles.promptTxt}>
+    <View style={[styles.prompt, compact && styles.promptLs]}>
+      <Text style={[styles.promptTxt, compact && styles.promptTxtLs]}>
         {parts.map((p, i) => (i % 2 ? <Text key={i} style={styles.promptB}>{p}</Text> : p))}
       </Text>
     </View>
@@ -326,16 +326,16 @@ export default function CounterOrKeepGame(_props: AcademyGameProps) {
         ? 'Too slow — **the picture closed.** Whatever you do now, do it knowing that.'
         : '**Ball won.** The five-second clock starts now — what do you do with it?';
   const legend = (
-    <View style={styles.legend}>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
       {([['Your team (attacking right)', ATT], ['Them — caught in transition', DEF], ['Keepers', GK_C]] as [string, string][]).map(([lbl, c]) => (
-        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={styles.legendTxt}>{lbl}</Text></View>
+        <View key={lbl} style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: c }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>{lbl}</Text></View>
       ))}
     </View>
   );
   const judgeBtn = (o: CoKOption, main: string, sub: string, alt: boolean) => (
-    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'live' && styles.judgeOff]} activeOpacity={0.85} disabled={phase !== 'live'} onPress={() => choose(o)}>
-      <Text style={styles.judgeTxt}>{main}</Text>
-      <Text style={styles.judgeSub}>{sub}</Text>
+    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'live' && styles.judgeOff, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'live'} onPress={() => choose(o)}>
+      <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
+      <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
   );
   const judge = phase !== 'done' && (
@@ -378,7 +378,7 @@ export default function CounterOrKeepGame(_props: AcademyGameProps) {
         controls={
           phase === 'done'
             ? <>{verdict}{legend}</>
-            : <><Prompt text={promptText} styles={styles} />{judge}{legend}</>
+            : <><Prompt text={promptText} styles={styles} compact={landscape} />{judge}{legend}</>
         }
         controlsFooter={phase === 'done' ? postRow : undefined}
       />
@@ -391,7 +391,7 @@ export default function CounterOrKeepGame(_props: AcademyGameProps) {
       {pitch}
       {windowBar}
       {legend}
-      <Prompt text={promptText} styles={styles} />
+      <Prompt text={promptText} styles={styles} compact={landscape} />
       {judge}
       {verdict}
       {phase === 'done' && postRow}
@@ -411,22 +411,29 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   winInfo: { color: AMBER, fontSize: 10.5, fontWeight: '700' },
   // Legend.
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Prompt.
+  legendTxtLs: { fontSize: 10 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptB: { color: AMBER, fontWeight: '800' },
   // Judge buttons.
   judgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  judgeCol: { gap: 8, marginTop: 4 },
+  judgeCol: { gap: 8, marginTop: 4, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
   judgeAlt: { backgroundColor: '#22345e' },
   judgeOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
+  judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
   // Verdict.
+  judgeSubLs: { fontSize: 10 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

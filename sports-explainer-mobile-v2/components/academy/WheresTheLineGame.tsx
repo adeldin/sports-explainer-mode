@@ -128,28 +128,28 @@ export default function WheresTheLineGame(_props: AcademyGameProps) {
   // ── chrome fragments ──
   // The prototype never rewrites the prompt on lock — the scenario question stays put and the
   // verdict card does the talking. Only the hint changes.
-  const prompt = <View style={styles.prompt}><Rich text={s.prompt} style={styles.promptTxt} boldStyle={styles.promptBold} /></View>;
+  const prompt = <View style={[styles.prompt, landscape && styles.promptLs]}><Rich text={s.prompt} style={[styles.promptTxt, landscape && styles.promptTxtLs]} boldStyle={styles.promptBold} /></View>;
   // Adapted for the ported control: the spike said "drag anywhere on the pitch"; here the drag lives
   // on the native slider directly under it (port standard's native-control rule).
   const hintText = locked ? 'Reset, or pick another ruck.' : 'Drag the slider under the pitch to move your line.';
   const pills = <ScenarioPills wrap={landscape} items={SCENARIOS.map((x, i) => ({ key: String(i), name: x.tab }))} currentKey={String(idx)} onSelect={k => resetTo(Number(k))} />;
   const legend = (
-    <View style={styles.legend}>
-      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: RUGBY.att }]} /><Text style={styles.legendTxt}>Attack (going right) — circles are on their feet</Text></View>
-      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: RUGBY.def }]} /><Text style={styles.legendTxt}>Defense</Text></View>
-      <View style={styles.legendItem}><View style={styles.legendBall} /><Text style={styles.legendTxt}>Ball</Text></View>
-      <View style={styles.legendItem}><View style={[styles.legendPill, { backgroundColor: RUGBY.def }]} /><Text style={styles.legendTxt}>On the ground (out of the contest)</Text></View>
-      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: LINE_COL }]} /><Text style={styles.legendTxt}>True offside line</Text></View>
+    <View style={[styles.legend, landscape && styles.legendLs]}>
+      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: RUGBY.att }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Attack (going right) — circles are on their feet</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: RUGBY.def }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Defense</Text></View>
+      <View style={styles.legendItem}><View style={styles.legendBall} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ball</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendPill, { backgroundColor: RUGBY.def }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>On the ground (out of the contest)</Text></View>
+      <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: LINE_COL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>True offside line</Text></View>
     </View>
   );
   // PRE-CALL actions only — both UNMOUNT on reveal so the verdict takes their space.
   const callButtons = (
     <View style={styles.callWrap}>
-      <TouchableOpacity style={styles.lockBtn} activeOpacity={0.85} onPress={() => call('lock')}>
-        <Text style={styles.lockTxt}>Lock it in</Text>
+      <TouchableOpacity style={[styles.lockBtn, landscape && styles.lockBtnLs]} activeOpacity={0.85} onPress={() => call('lock')}>
+        <Text style={[styles.lockTxt, landscape && styles.lockTxtLs]}>Lock it in</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.noLineBtn} activeOpacity={0.85} onPress={() => call('no-line')}>
-        <Text style={styles.noLineTxt}>There's no line yet</Text>
+      <TouchableOpacity style={[styles.noLineBtn, landscape && styles.noLineBtnLs]} activeOpacity={0.85} onPress={() => call('no-line')}>
+        <Text style={[styles.noLineTxt, landscape && styles.noLineTxtLs]}>There's no line yet</Text>
       </TouchableOpacity>
     </View>
   );
@@ -163,7 +163,7 @@ export default function WheresTheLineGame(_props: AcademyGameProps) {
       <Text style={styles.vread}>{s.why[depth]}</Text>
     </View>
   ) : null;
-  const hint = <Text style={styles.hint}>{hintText}</Text>;
+  const hint = <Text style={[styles.hint, landscape && styles.hintLs]}>{hintText}</Text>;
   const resetBtn = (
     <TouchableOpacity style={styles.ghostBtn} activeOpacity={0.8} onPress={() => resetTo(idx)}>
       <Text style={styles.ghostTxt} numberOfLines={1}>↺ Reset</Text>
@@ -220,19 +220,27 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   slider: { width: '100%', height: 34 },
   dragHint: { color: t.textSecondaryOnDark, fontSize: 11.5, fontWeight: '600', textAlign: 'center', marginTop: 2 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
+  promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  promptTxtLs: { fontSize: 12.5, lineHeight: 17 },
   promptBold: { color: t.accentText, fontWeight: '800' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6 },
+  legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendPill: { width: 16, height: 8, borderRadius: 6 },
   legendBall: { width: 14, height: 9, borderRadius: 5, backgroundColor: '#f3ead8', borderWidth: 1, borderColor: '#b39c6b' },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  legendTxtLs: { fontSize: 10 },
   callWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   lockBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.accent, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 8 },
+  lockBtnLs: { minHeight: 46, paddingVertical: 8 },
   lockTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  lockTxtLs: { fontSize: 13 },
   noLineBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 8 },
+  noLineBtnLs: { minHeight: 46, paddingVertical: 8 },
   noLineTxt: { color: t.textPrimary, fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
+  noLineTxtLs: { fontSize: 13 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: RUGBY_TAG.goodBg, color: RUGBY_TAG.good },
@@ -242,6 +250,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   readLbl: { color: t.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.4, marginTop: 2 },
   vread: { color: t.textSecondaryOnDark, fontSize: 13, lineHeight: 20 },
   hint: { color: t.textSecondaryOnDark, fontSize: 12, marginTop: 4, flexShrink: 1 },
+  hintLs: { fontSize: 10.5, marginTop: 2 },
   controlsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   ghostBtn: { borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 10, minHeight: 44, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   ghostTxt: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600' },
