@@ -7,6 +7,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { Sport } from '../../lib/api';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGame } from '../../lib/academyGames';
+import { setImmersive } from '../../lib/immersive';
 import GameErrorBoundary from './GameErrorBoundary';
 
 // Generic full-screen host for any Academy game. Renders a back affordance + the game
@@ -65,11 +66,10 @@ export default function GameHost({
     useCallback(() => {
       if (!game.landscape) return;
       requestLock(ScreenOrientation.OrientationLock.LANDSCAPE);
-      navRef.current.setOptions({ tabBarStyle: { display: 'none' } });
+      setImmersive(true);
       return () => {
         requestLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        const t = themeRef.current;
-        navRef.current.setOptions({ tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border, borderTopWidth: 1 } });
+        setImmersive(false);
       };
     }, [game.landscape])
   );

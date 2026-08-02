@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { useImmersive } from './lib/immersive';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -43,6 +44,7 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function App() {
+  const immersive = useImmersive();   // hides the tab bar while a landscape piece is open
   const [fontsLoaded] = useFonts({
     SpaceGrotesk_700Bold,     // "SportsWise" wordmark (cinematic — applied separately)
     SpaceGrotesk_600SemiBold, // main header
@@ -180,11 +182,16 @@ export default function App() {
           ),
           tabBarActiveTintColor: theme.accent,
           tabBarInactiveTintColor: theme.textMuted,
-          tabBarStyle: {
-            backgroundColor: theme.surface,
-            borderTopColor: theme.border,
-            borderTopWidth: 1,
-          },
+          // Driven by the immersive store, NOT by a per-screen setOptions override: this
+          // function re-runs on every navigator render and would otherwise reinstate the bar
+          // underneath an open landscape piece. See lib/immersive.ts.
+          tabBarStyle: immersive
+            ? { display: 'none' as const }
+            : {
+                backgroundColor: theme.surface,
+                borderTopColor: theme.border,
+                borderTopWidth: 1,
+              },
         })}>
         <Tab.Screen name="Live" options={{ tabBarLabel: 'Live' }}>
           {({ navigation }) => (
