@@ -7,6 +7,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { Sport } from '../../lib/api';
 import { useTheme, Theme } from '../../lib/theme';
 import type { AcademyGame } from '../../lib/academyGames';
+import GameErrorBoundary from './GameErrorBoundary';
 
 // Generic full-screen host for any Academy game. Renders a back affordance + the game
 // title, then the game's own Component with the uniform { sportKeys } contract. It
@@ -54,7 +55,9 @@ export default function GameHost({
         {/* Spacer to keep the title visually centered against the back button. */}
         <View style={styles.backBtn} />
       </View>
-      <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
+      <GameErrorBoundary title={game.title}>
+        <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
+      </GameErrorBoundary>
     </SafeAreaView>
   );
 }
