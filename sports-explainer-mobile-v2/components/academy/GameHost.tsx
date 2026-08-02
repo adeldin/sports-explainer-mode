@@ -13,6 +13,23 @@ import GameErrorBoundary from './GameErrorBoundary';
 // title, then the game's own Component with the uniform { sportKeys } contract. It
 // holds NO game-specific logic — that's the seam: the host is the same for every game,
 // so adding a game is "register a descriptor," never "edit the host."
+// Orientation is device-global state, so we track what we last ASKED for and skip
+// redundant requests. Two reasons, both learned the hard way:
+//   1. lockAsync returns a promise. A re-entrant effect that calls it every cycle floods
+//      the microtask queue; the resulting allocation churn crashed Hermes' GC outright
+//      (EXC_BAD_ACCESS in HadesGC::writeBarrierSlow during drainJobs) rather than merely
+//      rotating the screen back and forth.
+//   2. An unhandled rejection from lockAsync (iOS can refuse a lock) would otherwise
+//      surface as a crash with no useful stack.
+// Idempotence turns "how often does this run" from a correctness question into a
+// performance one — the failure mode above can't return even if an effect misbehaves.
+let lastRequestedLock: ScreenOrientation.OrientationLock | null = null;
+function requestLock(lock: ScreenOrientation.OrientationLock) {
+  if (lastRequestedLock === lock) return;
+  lastRequestedLock = lock;
+  ScreenOrientation.lockAsync(lock).catch(() => { lastRequestedLock = null; });
+}
+
 export default function GameHost({
   game, sportKeys, categoryEmoji, onBack, backLabel = 'Academy',
 }: { game: AcademyGame; sportKeys: Sport[]; categoryEmoji?: string; onBack: () => void; backLabel?: string }) {
@@ -47,10 +64,10 @@ export default function GameHost({
   useFocusEffect(
     useCallback(() => {
       if (!game.landscape) return;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      requestLock(ScreenOrientation.OrientationLock.LANDSCAPE);
       navRef.current.setOptions({ tabBarStyle: { display: 'none' } });
       return () => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        requestLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         const t = themeRef.current;
         navRef.current.setOptions({ tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border, borderTopWidth: 1 } });
       };

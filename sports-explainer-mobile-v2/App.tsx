@@ -69,7 +69,7 @@ export default function App() {
 
   // Base orientation: portrait everywhere. app.json is now "default" (so field-game screens can opt
   // into LANDSCAPE via GameHost); this root lock keeps every OTHER screen portrait, unchanged.
-  useEffect(() => { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP); }, []);
+  useEffect(() => { ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {}); }, []);
 
   // --- Gate keys (onboarding + cinematic). Shared state is loaded by the provider. ---
   useEffect(() => {
