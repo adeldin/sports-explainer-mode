@@ -36,6 +36,11 @@ export default function DidYouKnow({ sportKeys }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportKeys.join(',')]);
 
+  // Same rule as StrategyTipCard: every hook runs on every render. A sport bank with no
+  // facts would otherwise bail out here and skip useAnimatedStyle below, changing the hook
+  // count on a mounted component — which aborts natively, since it is a Reanimated hook.
+  const factStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
   if (facts.length === 0) return null;
 
   const swap = () => {
@@ -49,8 +54,6 @@ export default function DidYouKnow({ sportKeys }: Props) {
       if (finished) runOnJS(swap)();
     });
   };
-
-  const factStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
     <View style={styles.card}>

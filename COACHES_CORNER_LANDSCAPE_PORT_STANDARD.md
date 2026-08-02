@@ -220,6 +220,35 @@ composed with at the call site.
 **Fix:** don't dash RN View borders at all. SVG `strokeDasharray` is unaffected and is
 where the meaningful dashes live (ghost rings, lanes, chalk) — those render fine.
 
+### Trap #11 — a hook after an early return aborts the app when content runs out ⚠️⚠️
+**This one cost three wrong builds. It was not in any ported module — it was latent in a
+card that had shipped months earlier.**
+**Symptom:** tapping a NEW sport in the Coach's Corner strip killed the app instantly.
+Soccer/MLB/NFL were fine. No error-boundary card (the crash is not render-phase JS),
+`SIGABRT` with an uncaught ObjC exception.
+**Cause:** `StrategyTipCard` (and its twin `DidYouKnow`) did this:
+```
+if (tips.length === 0) return null;      // ← bails out
+...
+const tipStyle = useAnimatedStyle(...);  // ← hook that now never runs
+```
+Sports WITH tips render 4 hooks; sports WITHOUT tips return early and render 3. Switching
+between them changes the hook count on a MOUNTED component. React forbids it, and because
+the skipped hook is a **Reanimated** hook holding native state, it does not surface as a
+tidy JS error — it aborts the process.
+**Why it stayed hidden:** unreachable while every Coach's Corner sport had tips. Adding
+five sports with empty banks pulled the trigger. The bug was months old and in a file the
+port never touched.
+**Fix:** all hooks above every conditional return, always.
+**Lessons, in order of how much time they would have saved:**
+1. When a NEW code path crashes, suspect OLD code that the new path reaches for the first
+   time. "It must be in what I just wrote" cost three build cycles here.
+2. Ask WHERE it dies before asking WHY. "Does the piece list appear, or does it die on the
+   sport tap?" is one question that would have eliminated 31 modules immediately.
+3. An empty content bank is a code path. Any component that early-returns on empty data
+   must be tested with empty data — adding a sport/level with no content is a real user
+   action, not a hypothetical.
+
 ### Trap #10 — an effect that calls navigation.setOptions must not depend on `navigation`
 **Symptom (two faces, one bug):** landscape modules rotated back to portrait on their own,
 and heavier modules crashed outright — `EXC_BAD_ACCESS` inside
