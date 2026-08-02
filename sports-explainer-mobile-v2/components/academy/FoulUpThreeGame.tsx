@@ -481,7 +481,7 @@ export default function FoulUpThreeGame(_props: AcademyGameProps) {
       {resetBtn}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
-        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>{hint}</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs, { flex: 1 }]} numberOfLines={2}>{hint}</Text>}
     </View>
   );
 
@@ -521,10 +521,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   fiveCap: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: t.textSecondaryOnDark, marginBottom: 3 },
-  five: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  pcard: { flexGrow: 1, minWidth: 112, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderLeftWidth: 3, borderLeftColor: t.accent, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  five: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  pcard: { flexGrow: 1, minWidth: 104, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderLeftWidth: 3, borderLeftColor: t.accent, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   pcardPos: { fontSize: 11, fontWeight: '800', color: t.textPrimary },
-  pcardTxt: { fontSize: 10.5, color: t.textSecondaryOnDark, lineHeight: 14 },
+  pcardTxt: { fontSize: 10, color: t.textSecondaryOnDark, lineHeight: 12.5 },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
   promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },

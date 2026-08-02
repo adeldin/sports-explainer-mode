@@ -373,7 +373,7 @@ export default function HelpOrStayGame(_props: AcademyGameProps) {
       {resetBtn}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
-        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>{hint}</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs, { flex: 1 }]} numberOfLines={2}>{hint}</Text>}
     </View>
   );
 

@@ -298,8 +298,8 @@ export default function GoOrLayGame(_props: AcademyGameProps) {
       <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: WATER }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Water</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendSq, { backgroundColor: SAND }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Sand</Text></View>
       <Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}><Text style={styles.legendBold}>E 2.92</Text> = expected strokes to hole out from that spot</Text>
-      <Text style={styles.legendMuted}>assumes flat lie · calm air</Text>
-      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Dispersion oval — where your misses land</Text></View>
+      <Text style={styles.legendMuted}>flat lie · calm air</Text>
+      <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: '#F4F4EE' }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Oval — where misses land</Text></View>
       <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: TEAL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ghost = the better zone</Text></View>
     </View>
   );

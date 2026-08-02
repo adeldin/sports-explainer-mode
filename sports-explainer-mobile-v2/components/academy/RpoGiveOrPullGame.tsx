@@ -377,7 +377,7 @@ export default function RpoGiveOrPullGame(_props: AcademyGameProps) {
       {resetBtnC}
       {answered
         ? <NextButton visible variant="filled" style={styles.lsNextFill} label="Next →" onPress={nextScenario} />
-        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs]} numberOfLines={2}>Same play, three answers.</Text>}
+        : <Text style={[styles.hintTxt, landscape && styles.hintTxtLs, { flex: 1 }]} numberOfLines={2}>Same play, three answers.</Text>}
     </View>
   );
 
