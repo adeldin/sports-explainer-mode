@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -29,19 +29,32 @@ export default function GameHost({
   // landscape piece, on any host tab, inherits the fix — no per-screen wiring. Portrait games no-op.
   // useFocusEffect (not a bare useEffect) is what makes the tab-switch case correct. The restore style
   // mirrors App.tsx's tabBarStyle so the bar returns identically.
+  // The effect below MUST depend on `game.landscape` and nothing else.
+  //
+  // It calls navigation.setOptions(), which updates the navigator — and `navigation` and
+  // `theme` are objects whose identity can change as a result. If either sits in the dep
+  // array, the callback is recreated, useFocusEffect tears down and re-runs, the teardown
+  // locks PORTRAIT_UP, and the effect immediately re-locks LANDSCAPE. That is a feedback
+  // loop the effect feeds itself, and on device it reads as "the screen rotates back to
+  // portrait on its own" mid-module. (It was misdiagnosed once before as an accidental tap
+  // on the camouflaged tab bar; hiding the bar is what introduced the setOptions call that
+  // closes the loop.) Refs give the callback fresh values without making it unstable.
+  const navRef = useRef(navigation);
+  navRef.current = navigation;
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+
   useFocusEffect(
     useCallback(() => {
-      if (game.landscape) {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        navigation.setOptions({ tabBarStyle: { display: 'none' } });
-      }
+      if (!game.landscape) return;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      navRef.current.setOptions({ tabBarStyle: { display: 'none' } });
       return () => {
-        if (game.landscape) {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          navigation.setOptions({ tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border, borderTopWidth: 1 } });
-        }
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        const t = themeRef.current;
+        navRef.current.setOptions({ tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border, borderTopWidth: 1 } });
       };
-    }, [game.landscape, navigation, theme])
+    }, [game.landscape])
   );
 
   return (
