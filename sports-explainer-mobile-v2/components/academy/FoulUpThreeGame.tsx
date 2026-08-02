@@ -444,7 +444,7 @@ export default function FoulUpThreeGame(_props: AcademyGameProps) {
     <View style={[styles.judge, landscape && styles.judgeCol]}>
       {JUDGE.map(b => (
         <TouchableOpacity key={b.key} disabled={phase !== 'idle'} activeOpacity={0.85} onPress={() => choose(b.key)}
-          style={[styles.judgeBtn, b.alt && styles.judgeBtnAlt, phase !== 'idle' && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}>
+          style={[styles.judgeBtn, phase !== 'idle' && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}>
           <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{b.label}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{b.sub}</Text>
         </TouchableOpacity>
@@ -534,7 +534,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { flexDirection: 'column', flexWrap: 'nowrap' },
   judgeBtn: { flexGrow: 1, minWidth: 140, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', minHeight: 48 },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },

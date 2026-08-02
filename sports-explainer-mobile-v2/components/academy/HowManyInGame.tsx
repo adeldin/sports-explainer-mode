@@ -27,7 +27,10 @@ import {
 // pure function of a single elapsed-ms clock on one rafRef, with a generation guard.
 
 // No under-field content in this module (the wide-count readout is drawn ON the pitch).
-const LS_BELOW_RESERVE = 0;
+// The explanation key rides UNDER the field (two compact rows at the field width): this pitch
+// is WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved
+// ALWAYS so the art size never jumps, and it hands that height back to the controls column.
+const LS_BELOW_RESERVE = 42;
 
 interface Leg { t0: number; t1: number; from: XY; to: XY }
 interface LabelEv { at: number; x: number; y: number; text: string; fill: string; size: number }
@@ -256,6 +259,8 @@ export default function HowManyInGame(_props: AcademyGameProps) {
       <View style={styles.legendItem}><View style={[styles.legendPill, { backgroundColor: RUGBY.def }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Tackler (on the ground)</Text></View>
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const judgeButtons = (
     <View style={styles.judgeWrap}>
       {SEND_OPTIONS.map(o => (
@@ -299,9 +304,10 @@ export default function HowManyInGame(_props: AcademyGameProps) {
         belowFieldReserve={LS_BELOW_RESERVE}
         pills={pills}
         field={pitch}
+        belowField={lsLegendUnder}
         controls={showVerdict
-          ? <>{verdictCard}{legend}</>
-          : <>{prompt}{phase === 'idle' && judgeButtons}{legend}{hint}</>}
+          ? <>{verdictCard}</>
+          : <>{prompt}{phase === 'idle' && judgeButtons}{hint}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -341,6 +347,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendPill: { width: 16, height: 8, borderRadius: 6 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendTxtLs: { fontSize: 10 },
+  lsLegendUnder: { minHeight: LS_BELOW_RESERVE, paddingTop: 4, justifyContent: 'center' },
   judgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   judgeBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 52, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   judgeBtnLs: { minHeight: 46, paddingVertical: 8 },

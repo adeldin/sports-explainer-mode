@@ -49,6 +49,12 @@ const initialFrame = (p: Play): Frame => ({
   ball: null, ballAngle: 0, ballOpacity: 1, win: null, ghost: null, ghostPulse: null, fx: null,
 });
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~26pt, one compact row at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 26;
+
 export default function FindTheOpenMan(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -242,6 +248,8 @@ export default function FindTheOpenMan(_props: AcademyGameProps) {
       ))}
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const snapBtn = <TouchableOpacity style={styles.snapBtn} activeOpacity={0.85} onPress={snap}><Text style={styles.snapTxt}>Snap the ball</Text></TouchableOpacity>;
   const promptBlock = <View style={styles.prompt}><Text style={styles.promptTxt}>{hint}</Text></View>;
   const verdictBody = chosen
@@ -267,10 +275,11 @@ export default function FindTheOpenMan(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={FOOTBALL_FIELD_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={field}
-        controls={answered ? <>{verdictCard}{legend}</> : <>{promptBlock}{phase === 'preSnap' && snapBtn}{legend}</>}
+        belowField={lsLegendUnder}
+        controls={answered ? <>{verdictCard}</> : <>{promptBlock}{phase === 'preSnap' && snapBtn}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -301,6 +310,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   snapBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 4 },
   snapTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
   controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },

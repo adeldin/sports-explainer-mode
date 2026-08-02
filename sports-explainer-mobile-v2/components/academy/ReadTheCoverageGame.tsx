@@ -27,6 +27,12 @@ const F_BOLD = 'SpaceGrotesk_700Bold';
 const TEAL = '#14B8A6', RED = '#e24b4a', AMBER = '#F5A623';
 const HIT_R = 36;                 // viewBox hit radius → ~44px on-screen at football scale
 const LS_HINT_RESERVE = 34;       // navy room reserved UNDER the field for the 👆 hint (never reflows)
+// The explanation key rides UNDER the field too (one compact row at the field width), below the hint.
+// This gridiron is WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art;
+// both strips are reserved ALWAYS so the art size never jumps, and the key's height comes back to the
+// controls column.
+const LS_LEGEND_RESERVE = 26;
+const LS_BELOW_RESERVE = LS_HINT_RESERVE + LS_LEGEND_RESERVE;
 const PRESS_MAX = 32;             // a corner within this of the LOS is pressing (computed, not declared)
 const HINT_PRE = '👆 Optional: tap the deep safeties to count them';
 
@@ -157,7 +163,7 @@ export default function ReadTheCoverageGame(_props: AcademyGameProps) {
     </View>
   );
   const callBtn = (opt: Call, title: string, sub: string, alt?: boolean) => (
-    <TouchableOpacity key={opt} style={[styles.callBtn, alt && styles.callBtnAlt, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => call(opt)}>
+    <TouchableOpacity key={opt} style={[styles.callBtn, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => call(opt)}>
       <Text style={[styles.callTitle, landscape && styles.callTitleLs]}>{title}</Text>
       <Text style={[styles.callSub, landscape && styles.callSubLs]}>{sub}</Text>
     </TouchableOpacity>
@@ -207,12 +213,12 @@ export default function ReadTheCoverageGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={FOOTBALL_FIELD_RATIO}
-        belowFieldReserve={LS_HINT_RESERVE}
+        belowFieldReserve={LS_BELOW_RESERVE}
         pills={pills}
         topRight={countPill}
         field={field}
-        belowField={<View style={styles.underWrap}>{hintUnderField}</View>}
-        controls={answered ? <>{verdictCard}{legend}</> : <>{promptNode}{callButtons}{legend}</>}
+        belowField={<><View style={styles.underWrap}>{hintUnderField}</View><View style={styles.lsLegendUnder}>{legend}</View></>}
+        controls={answered ? <>{verdictCard}</> : <>{promptNode}{callButtons}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -243,6 +249,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: t.background },
   content: { padding: 16, paddingBottom: 40, gap: 10 },
   underWrap: { height: LS_HINT_RESERVE, justifyContent: 'center' },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, justifyContent: 'center' },
   underHint: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600' },
   readoutRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   countPill: { backgroundColor: FE.modeBg, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
@@ -258,7 +265,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   callCol: { gap: 8, flexWrap: 'nowrap' },
   callBtn: { flexGrow: 1, minWidth: 140, minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   callBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  callBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   callTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   callTitleLs: { fontSize: 13 },
   callSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },

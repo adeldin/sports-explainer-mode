@@ -396,7 +396,7 @@ export default function ApproachOrStayGame(_props: AcademyGameProps) {
         ['stay', 'Stay back', 'reset, keep the baseline', true],
         ['drop', 'Drop shot', 'make him run the runway', true],
       ] as [AOSOption, string, string, boolean][]).map(([o, main, sub, alt]) => (
-        <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeBtnAlt, !ready && styles.judgeBtnOff, landscape && styles.judgeBtnLs]} disabled={!ready} activeOpacity={0.85} onPress={() => choose(o)}>
+        <TouchableOpacity key={o} style={[styles.judgeBtn, !ready && styles.judgeBtnOff, landscape && styles.judgeBtnLs]} disabled={!ready} activeOpacity={0.85} onPress={() => choose(o)}>
           <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
         </TouchableOpacity>
@@ -586,7 +586,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeWrap: { gap: 8 },
   judgeBtn: { backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#2b3f6e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },

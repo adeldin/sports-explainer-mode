@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
-import { Circle, Line, Path, G } from 'react-native-svg';
+import { Circle, Line, Path, Rect, G } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import type { Level } from '../../lib/api';
 import { useAppState } from '../../lib/appState';
@@ -11,7 +11,7 @@ import { LandscapeGameShell, ScenarioPills, DifficultyTabs, NextButton, FE } fro
 import { CricketOval, CRICKET_OVAL_RATIO, CricketBall, ActorDot, OutlinedLabel, clampLabelX, CK } from './fields/CricketOval';
 import {
   SCENARIOS, OPTIONS, OUTCOME_PROMPT, PROMPT_KEEP, PROMPT_SET, changePrompt, BOWLER_ON_LABEL,
-  HINT_IDLE, HINT_DONE, SUB, FOOT, MARK, ropePt, gradeColor, gradeTag,
+  BOWLER_TAKES_BALL, HINT_IDLE, HINT_DONE, SUB, FOOT, MARK, ropePt, gradeColor, gradeTag,
   type BOCOption, type BOCScenario, type BOCResult, type P, type Depth,
 } from '../../lib/bowlOrChange';
 
@@ -40,6 +40,45 @@ const arcAt = (from: P, to: P, peak: number, k: number): P => {
 };
 // A fielder's POST, stripped of his bowling role — what the outgoing bowler inherits.
 const postOf = (n: string) => n.split('·')[0].trim();
+
+// ── GHOST FIELD PREVIEW — the delta, computed from the SAME data `choose` animates ──
+// An 👁 that produces no visible change is worse than no 👁 at all (owner: "when I click on the top
+// one I can't find what it does"). So the preview is derived, per SCENARIO and per option, from the
+// option's own newBowler + morphs: a null return means "this choice moves nobody here" and the module
+// then renders NO eye for it in that scenario — the affordance can never promise a move that isn't
+// coming. `caption` names the change in words; when exactly ONE thing moves it says so explicitly and
+// spells out from→to, because otherwise the user has no idea where on the ground to look.
+interface PvMove { key: string; from: P; to: P; lab: string }
+interface PvDelta { moves: PvMove[]; caption: string }
+
+function previewDelta(scn: BOCScenario, opt: BOCOption): PvDelta | null {
+  const o = scn.opts[opt];
+  const homeOf = (id: string) => scn.fielders.find(f => f.id === id);
+  const moves: PvMove[] = [];
+  const brief: string[] = [];   // destination posts — the multi-move caption
+  const detail: string[] = [];  // from → to — the single-change caption
+  if (o.newBowler) {
+    const nb = o.newBowler;
+    const h = homeOf(nb);
+    if (h) {
+      // the swap is ONE change with two moving men: he walks to the mark, the spinner takes his post
+      const post = postOf(h.n);
+      moves.push({ key: `on-${nb}`, from: h.p, to: MARK, lab: BOWLER_ON_LABEL[nb] });
+      moves.push({ key: 'off-spinner', from: MARK, to: h.p, lab: `${post} · spinner` });
+      brief.push(`${BOWLER_TAKES_BALL[nb]} on`);
+      detail.push(`${BOWLER_TAKES_BALL[nb]} on — ${post} → the mark`);
+    }
+  }
+  o.morphs.forEach(m => {
+    const h = homeOf(m.f);
+    if (!h || (h.p[0] === m.to[0] && h.p[1] === m.to[1])) return;   // a morph that doesn't actually move
+    moves.push({ key: `mv-${m.f}`, from: h.p, to: m.to, lab: m.relab });
+    brief.push(postOf(m.relab));
+    detail.push(`${postOf(h.n)} → ${postOf(m.relab)}`);
+  });
+  if (!moves.length) return null;
+  return { moves, caption: detail.length === 1 ? `only change: ${detail[0]}` : brief.join(' · ') };
+}
 
 // ── scene model (mutable ref; one bump/frame re-renders the SVG) ──
 interface SceneLabel { x: number; y: number; txt: string; fill: string; size: number }
@@ -92,6 +131,14 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
 
   const s = SCENARIOS[idx];
   const depth: Depth = level === 'kid' ? 'rookie' : level;
+  // Which options actually MOVE somebody in THIS scenario. Per scenario, never global: a choice that
+  // is a no-op on one tab can rebuild half the field on the next, so the 👁 is decided per tab.
+  const previewOf = useMemo(() => {
+    const m = {} as Record<BOCOption, PvDelta | null>;
+    OPTIONS.forEach(op => { m[op.key] = previewDelta(s, op.key); });
+    return m;
+  }, [s]);
+  const anyPreview = OPTIONS.some(op => previewOf[op.key] !== null);
   const bump = () => setTick(t => (t + 1) % 1000000);
   const stopLoop = () => { genRef.current += 1; if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
   useEffect(() => () => stopLoop(), []);
@@ -268,16 +315,6 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
     els.push(<Line key="wide" x1={s.wide.from[0]} y1={s.wide.from[1]} x2={s.wide.to[0]} y2={s.wide.to[1]} stroke={AMBER} strokeWidth={2.5} strokeDasharray="6 5" opacity={wideGhost ? 0.55 : 0.85} />);
     els.push(<G key="wideL"><OutlinedLabel x={clampLabelX(s.wide.to[0] - 154, s.wide.lab, 3)} y={s.wide.to[1] + 34} text={s.wide.lab} fill="#ffd9a8" size={8.5} /></G>);
   }
-  // GHOST FIELD PREVIEW: where this choice would put the field, before you commit
-  if (phase === 'idle' && preview) {
-    const po = s.opts[preview];
-    po.morphs.forEach((m, mi) => els.push(<Circle key={`pv${mi}`} cx={m.to[0]} cy={m.to[1]} r={10} fill="none" stroke={CK.chalk} strokeWidth={2} strokeDasharray="3 4" opacity={0.55} />));
-    if (po.newBowler) {
-      const home = scene.fielders[po.newBowler]?.p ?? MARK;
-      els.push(<Circle key="pvm" cx={MARK[0]} cy={MARK[1]} r={11} fill="none" stroke={AMBER} strokeWidth={2.5} strokeDasharray="3 4" opacity={0.8} />);
-      els.push(<Line key="pvl" x1={home[0]} y1={home[1]} x2={MARK[0]} y2={MARK[1]} stroke={AMBER} strokeWidth={1.5} strokeDasharray="2 5" opacity={0.5} />);
-    }
-  }
   // reveals that live under the actors
   scene.reveals.forEach((r, ri) => {
     if (r.kind === 'ring' && r.p) els.push(<Circle key={`rv${ri}`} cx={r.p[0]} cy={r.p[1]} r={13} fill="none" stroke={TEAL} strokeWidth={2.5} strokeDasharray="4 4" />);
@@ -298,6 +335,31 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
   scene.fx.forEach((fx, i) => els.push(<FxEl key={`fx${i}`} fx={fx} clock={clock} />));
   scene.labels.forEach((l, i) => els.push(<G key={`lbl${i}`}><OutlinedLabel x={l.x} y={l.y} text={l.txt} fill={l.fill} size={l.size} /></G>));
 
+  // GHOST FIELD PREVIEW — LAST, so it sits ON TOP of every actor and can't be lost behind a dot.
+  // Four reinforcing signals per moving man (one alone was missable on device): a bright dashed
+  // ghost where he stands NOW, a dashed TEAL arrow to where he'd go, a TEAL destination dot (the
+  // "this is the alternative" colour, per the ghost-ring convention) with his new post named, and
+  // a caption pill naming the whole change in words.
+  const pv = phase === 'idle' && preview ? previewOf[preview] : null;
+  if (pv) {
+    pv.moves.forEach(m => {
+      const dx = m.to[0] - m.from[0], dy = m.to[1] - m.from[1], len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len, uy = dy / len;
+      const x0 = m.from[0] + ux * 15, y0 = m.from[1] + uy * 15;
+      const tx = m.to[0] - ux * 13, ty = m.to[1] - uy * 13;
+      els.push(<Circle key={`pvg${m.key}`} cx={m.from[0]} cy={m.from[1]} r={14} fill="none" stroke={CK.chalk} strokeWidth={2.2} strokeDasharray="3 4" opacity={0.95} />);
+      els.push(<Line key={`pvl${m.key}`} x1={x0} y1={y0} x2={tx} y2={ty} stroke={TEAL} strokeWidth={2.4} strokeDasharray="6 5" opacity={0.95} />);
+      els.push(<Path key={`pva${m.key}`} d={`M${tx} ${ty} L${tx - ux * 13 - uy * 5.5} ${ty - uy * 13 + ux * 5.5} L${tx - ux * 13 + uy * 5.5} ${ty - uy * 13 - ux * 5.5} Z`} fill={TEAL} />);
+      els.push(<Circle key={`pvr${m.key}`} cx={m.to[0]} cy={m.to[1]} r={15} fill="none" stroke={TEAL} strokeWidth={1.6} strokeDasharray="4 4" opacity={0.9} />);
+      els.push(<Circle key={`pvd${m.key}`} cx={m.to[0]} cy={m.to[1]} r={9} fill={TEAL} stroke={CK.navy} strokeWidth={2} />);
+      els.push(<G key={`pvt${m.key}`}><OutlinedLabel x={clampLabelX(m.to[0], m.lab, 2.8)} y={m.to[1] - 20} text={m.lab} fill="#9ff0e2" size={9} /></G>);
+    });
+    const cap = `PREVIEW — ${pv.caption}`;
+    const capW = Math.min(650, cap.length * 5.7 + 24);
+    els.push(<Rect key="pvcapbg" x={340 - capW / 2} y={5} width={capW} height={23} rx={8} fill={CK.navy} opacity={0.9} stroke={TEAL} strokeWidth={1.5} />);
+    els.push(<G key="pvcap"><OutlinedLabel x={340} y={21} text={cap} fill="#9ff0e2" size={10} /></G>);
+  }
+
   const field = <CricketOval>{els}</CricketOval>;
 
   // ── control fragments ──
@@ -317,22 +379,40 @@ export default function BowlOrChangeGame(_props: AcademyGameProps) {
   );
   const judge = phase === 'idle' ? (
     <View style={styles.judgeWrap}>
-      {OPTIONS.map(o => (
-        <View key={o.key} style={styles.judgeRow}>
-          <TouchableOpacity style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(o.key)}>
-            <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
-            <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.pvBtn, preview === o.key && styles.pvBtnOn]}
-            activeOpacity={0.8}
-            accessibilityLabel={`Preview the field for ${o.title}`}
-            onPress={() => setPreview(p => (p === o.key ? null : o.key))}>
-            <Text style={[styles.pvTxt, preview === o.key && styles.pvTxtOn]}>👁</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-      <Text style={styles.pvHint}>👁 previews the field that choice would set — tap again to clear.</Text>
+      {OPTIONS.map(o => {
+        const pvd = previewOf[o.key];
+        const on = preview === o.key;
+        return (
+          <View key={o.key} style={styles.judgeRow}>
+            {/* Peer choices, one style. The module must not leak its answer key through colour. */}
+            <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(o.key)}>
+              <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
+              <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
+            </TouchableOpacity>
+            {/* No 👁 at all when the preview would change nothing (KEEP THIS BOWLER keeps the field
+                exactly as drawn) — an affordance that does nothing is worse than no affordance. */}
+            {!!pvd && (
+              <TouchableOpacity
+                style={[styles.pvBtn, on && styles.pvBtnOn]}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={on ? `Hide the field preview for ${o.title}` : `Preview the field for ${o.title}`}
+                onPress={() => setPreview(p => (p === o.key ? null : o.key))}>
+                <Text style={[styles.pvTxt, on && styles.pvTxtOn]}>👁</Text>
+                <Text style={[styles.pvTag, on && styles.pvTagOn]}>{on ? 'ON' : 'see'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })}
+      {anyPreview && (
+        <Text style={[styles.pvHint, !!preview && styles.pvHintOn]}>
+          {preview
+            ? '👁 ON — teal is where those men would stand, white dashed rings are where they stand now. Tap 👁 again to clear.'
+            : '👁 previews the field that choice would set. A choice with no 👁 moves nobody — the field stays exactly as drawn.'}
+        </Text>
+      )}
     </View>
   ) : null;
   const legend = (
@@ -434,16 +514,19 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   judgeBtn: { flex: 1, backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
   judgeBtnLs: { minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e' },
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800', textAlign: 'center' },
   judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2, textAlign: 'center' },
   judgeSubLs: { fontSize: 10 },
-  pvBtn: { width: 48, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
-  pvBtnOn: { borderColor: FE.orange, backgroundColor: t.explanationBg },
-  pvTxt: { fontSize: 18, opacity: 0.65 },
+  pvBtn: { width: 50, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, alignItems: 'center', justifyContent: 'center' },
+  // ON state is unmistakable: the teal preview colour fills the button, not a hairline border tweak.
+  pvBtnOn: { borderColor: TEAL, backgroundColor: TEAL },
+  pvTxt: { fontSize: 17, opacity: 0.7 },
   pvTxtOn: { opacity: 1 },
+  pvTag: { color: t.textSecondaryOnDark, fontSize: 8.5, fontWeight: '800', letterSpacing: 0.4, marginTop: 1 },
+  pvTagOn: { color: '#052e28' },
   pvHint: { color: t.textSecondaryOnDark, fontSize: 10.5, marginTop: 2 },
+  pvHintOn: { color: TEAL, fontWeight: '700' },
   legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 4 },
   legendLs: { gap: 7, marginTop: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

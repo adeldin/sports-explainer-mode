@@ -281,7 +281,7 @@ export default function ServeTargetGame(_props: AcademyGameProps) {
   const judgeBtns = (
     <View style={styles.judgeCol}>
       {OPTION_UI.filter(o => !!s.grade[o.key]).map(o => (
-        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, phase !== 'idle' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
+        <TouchableOpacity key={o.key} style={[styles.judgeBtn, phase !== 'idle' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
           activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(o.key)}>
           <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{o.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
@@ -438,7 +438,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8 },
   judgeBtn: { backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#2b3f6e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnDim: { opacity: 0.4 },
   judgeTitle: { color: '#fff', fontSize: 13, fontWeight: '800' },
   judgeTitleLs: { fontSize: 13 },

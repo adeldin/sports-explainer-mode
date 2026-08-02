@@ -58,6 +58,12 @@ function fieldLabel(key: string, x: number, y: number, text: string, fill: strin
   );
 }
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~26pt, one compact row at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 26;
+
 export default function MotionManOrZoneGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -259,7 +265,7 @@ export default function MotionManOrZoneGame(_props: AcademyGameProps) {
     ? <TouchableOpacity style={[styles.goBtn, landscape && styles.goBtnLs]} activeOpacity={0.85} onPress={sendMotion}><Text style={[styles.goTxt, landscape && styles.goTxtLs]}>Send him in motion</Text></TouchableOpacity>
     : null;
   const callBtn = (opt: CoverageCall, title: string, sub: string, alt?: boolean) => (
-    <TouchableOpacity key={opt} style={[styles.callBtn, alt && styles.callBtnAlt, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
+    <TouchableOpacity key={opt} style={[styles.callBtn, landscape && styles.callBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
       <Text style={[styles.callTitle, landscape && styles.callTitleLs]}>{title}</Text>
       <Text style={[styles.callSub, landscape && styles.callSubLs]}>{sub}</Text>
     </TouchableOpacity>
@@ -278,6 +284,8 @@ export default function MotionManOrZoneGame(_props: AcademyGameProps) {
       <View style={styles.legendItem}><View style={styles.legendRing} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>the man in motion</Text></View>
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const verdictCard = answered && v ? (
     <View style={[styles.verdict, landscape && styles.verdictCompact]}>
       <View style={styles.tagRow}>
@@ -309,10 +317,11 @@ export default function MotionManOrZoneGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={FOOTBALL_FIELD_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={field}
-        controls={answered ? <>{verdictCard}{legend}</> : <>{promptNode}{motionBtn}{callButtons}{legend}</>}
+        belowField={lsLegendUnder}
+        controls={answered ? <>{verdictCard}</> : <>{promptNode}{motionBtn}{callButtons}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -357,7 +366,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   callCol: { gap: 8, flexWrap: 'nowrap' },
   callBtn: { flexGrow: 1, minWidth: 140, minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   callBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  callBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   callTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   callTitleLs: { fontSize: 13 },
   callSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },
@@ -369,6 +378,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: AMBER },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendTxtLs: { fontSize: 10 },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: t.border },
   verdictCompact: { padding: 12 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 8 },

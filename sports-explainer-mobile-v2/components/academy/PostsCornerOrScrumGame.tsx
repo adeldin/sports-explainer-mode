@@ -412,7 +412,7 @@ export default function PostsCornerOrScrumGame(_props: AcademyGameProps) {
   const judgeButtons = (
     <View style={styles.judgeWrap}>
       {JUDGE.map(j => (
-        <TouchableOpacity key={j.o} style={[styles.judgeBtn, j.alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(j.o)}>
+        <TouchableOpacity key={j.o} style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(j.o)}>
           <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{j.t}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{j.sub}</Text>
         </TouchableOpacity>
@@ -495,7 +495,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   judgeBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 52, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   judgeBtnLs: { minHeight: 46, paddingVertical: 8 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },

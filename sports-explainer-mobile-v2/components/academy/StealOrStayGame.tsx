@@ -196,7 +196,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeRow: { flexDirection: 'row', gap: 10 },
   goBtn: { flex: 1, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   goBtnLs: { minHeight: 44, paddingVertical: 9 },
-  stayBtn: { flex: 1, backgroundColor: FE.navy, borderWidth: 1, borderColor: t.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  // SEND HIM and HOLD HIM are PEER choices — same accent, no visual privilege (the navy it used to
+  // carry implied a meaning it doesn't have, and hinted at the answer).
+  stayBtn: { flex: 1, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   stayBtnLs: { minHeight: 44, paddingVertical: 9 },
   btnDisabled: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },

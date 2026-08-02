@@ -307,7 +307,7 @@ export default function FourthDownCallGame(_props: AcademyGameProps) {
     </View>
   );
   const judgeBtn = (opt: CallOption, title: string, sub: string, alt?: boolean) => (
-    <TouchableOpacity key={opt} style={[styles.judgeBtn, alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
+    <TouchableOpacity key={opt} style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(opt)}>
       <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{title}</Text>
       <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
@@ -386,7 +386,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 140, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: FE.navy, borderWidth: 1, borderColor: '#2b3a5e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTitleLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },

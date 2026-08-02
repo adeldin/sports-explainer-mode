@@ -62,6 +62,12 @@ function OutlinedText({ x, y, text, fill, size = 11 }: { x: number; y: number; t
   );
 }
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~42pt, two compact rows at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 42;
+
 export default function SwitchThePlayGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -331,6 +337,8 @@ export default function SwitchThePlayGame(_props: AcademyGameProps) {
       ))}
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   // ▶ Play the build-up — the film that produces the frozen picture the whole read depends on.
   const filmRow = !answered ? (
     <View style={styles.controls}>
@@ -345,7 +353,7 @@ export default function SwitchThePlayGame(_props: AcademyGameProps) {
     </View>
   ) : null;
   const judgeBtn = (o: StpOption, main: string, sub: string, alt: boolean) => (
-    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'ready' && styles.btnMuted, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'ready'} onPress={() => choose(o)}>
+    <TouchableOpacity key={o} style={[styles.judgeBtn, phase !== 'ready' && styles.btnMuted, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'ready'} onPress={() => choose(o)}>
       <Text style={[styles.judgeTxt, phase !== 'ready' && styles.btnMutedTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
       <Text style={[styles.judgeSub, phase !== 'ready' && styles.btnMutedTxt, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
@@ -383,10 +391,11 @@ export default function SwitchThePlayGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={SOCCER_PITCH_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={pitch}
-        controls={answered ? <>{verdictCard}{legend}</> : <>{promptBlock}{filmRow}{judge}{legend}</>}
+        belowField={lsLegendUnder}
+        controls={answered ? <>{verdictCard}</> : <>{promptBlock}{filmRow}{judge}</>}
         controlsFooter={answered ? postRow : undefined}
       />
     );
@@ -418,6 +427,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   // Prompt.
   legendTxtLs: { fontSize: 10 },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   prompt: { backgroundColor: t.explanationBg, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: t.border },
   promptLs: { padding: 9 },
   promptTxt: { color: t.textPrimary, fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
@@ -427,20 +437,22 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // Film row.
   hintTxtLs: { fontSize: 10.5, marginTop: 4 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
-  filmBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  // Border on the BASE (transparent) so the muted state can show one without a 1pt size jump.
+  filmBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   filmBtnLs: { minHeight: 44, paddingVertical: 9 },
   filmTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
   filmTxtLs: { fontSize: 13 },
   // Not-yet-live control: muted blue (the module's own surface), NOT a dimmed accent — the accent
   // belongs to whichever button is actually pressable right now.
-  btnMuted: { backgroundColor: t.surface },
+  // A dark button always carries a visible border, so it never reads as an unoutlined floating block.
+  btnMuted: { backgroundColor: t.surface, borderColor: t.border },
   btnMutedTxt: { color: t.textSecondaryOnDark },
   // Choice buttons.
   judgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   judgeCol: { gap: 8, marginTop: 4, flexWrap: 'nowrap' },
-  judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeAlt: { backgroundColor: '#22345e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2 },

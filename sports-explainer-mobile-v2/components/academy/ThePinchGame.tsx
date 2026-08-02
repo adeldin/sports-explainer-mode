@@ -84,6 +84,12 @@ const DOGLEG_GREEN: Vec = [431, 74];
 
 type Phase = 'idle' | 'run' | 'done';
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~58pt, three compact rows at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 58;
+
 export default function ThePinchGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -318,7 +324,7 @@ export default function ThePinchGame(_props: AcademyGameProps) {
   const judgeBtns = (
     <View style={styles.judgeCol}>
       {OPTIONS.map(o => (
-        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, phase === 'run' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
+        <TouchableOpacity key={o.key} style={[styles.judgeBtn, phase === 'run' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
           activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(o.key)}>
           <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{o.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.key !== 'away' ? `${s.clubs[o.key]} yds` : o.sub}</Text>
@@ -337,6 +343,8 @@ export default function ThePinchGame(_props: AcademyGameProps) {
       <Text style={styles.legendMuted}>numbers along the fairway are yards from the tee</Text>
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const verdictCard = answered && r ? (
     <View style={styles.verdict}>
       <Text style={[styles.vtag, r.k === 'good' ? styles.vtagGood : r.k === 'ok' ? styles.vtagOk : styles.vtagBad]}>
@@ -359,10 +367,11 @@ export default function ThePinchGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={THE_PINCH_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={field}
-        controls={answered ? <>{promptBlock}{verdictCard}{legend}</> : <>{hudChips}{promptBlock}{judgeBtns}{legend}</>}
+        belowField={lsLegendUnder}
+        controls={answered ? <>{promptBlock}{verdictCard}</> : <>{hudChips}{promptBlock}{judgeBtns}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -406,7 +415,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8 },
   judgeBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', minHeight: 48 },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnDim: { opacity: 0.4 },
   judgeTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTitleLs: { fontSize: 13 },
@@ -421,6 +430,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendTxtLs: { fontSize: 10 },
   legendMuted: { color: t.textSecondaryOnDark, fontSize: 11, opacity: 0.7 },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

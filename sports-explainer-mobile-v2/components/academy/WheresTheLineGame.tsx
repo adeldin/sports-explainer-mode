@@ -237,9 +237,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   lockBtnLs: { minHeight: 46, paddingVertical: 8 },
   lockTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
   lockTxtLs: { fontSize: 13 },
-  noLineBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 8 },
+  // "Lock it in" and "There's no line yet" are PEER answers — same accent, no visual privilege.
+  noLineBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.accent, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 8 },
   noLineBtnLs: { minHeight: 46, paddingVertical: 8 },
-  noLineTxt: { color: t.textPrimary, fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
+  noLineTxt: { color: '#fff', fontSize: 13.5, fontWeight: '700', textAlign: 'center' },
   noLineTxtLs: { fontSize: 13 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },

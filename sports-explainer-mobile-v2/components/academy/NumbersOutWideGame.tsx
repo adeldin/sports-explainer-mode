@@ -29,7 +29,10 @@ import {
 
 // No under-field content in this module (the counts live ON the pitch), so the shell reserves
 // nothing below the field and the pitch takes the full body height.
-const LS_BELOW_RESERVE = 0;
+// The explanation key rides UNDER the field (one compact row at the field width): this pitch
+// is WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved
+// ALWAYS so the art size never jumps, and it hands that height back to the controls column.
+const LS_BELOW_RESERVE = 26;
 
 // ── the keyframe script ──
 interface Leg { t0: number; t1: number; from: XY; to: XY; peak?: number } // peak → tumbling chip arc
@@ -355,6 +358,8 @@ export default function NumbersOutWideGame(_props: AcademyGameProps) {
       ))}
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const judgeButtons = (
     <View style={styles.judgeWrap}>
       <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('open')}>
@@ -363,7 +368,7 @@ export default function NumbersOutWideGame(_props: AcademyGameProps) {
       <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('short')}>
         <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{s.short.label}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.judgeBtn, styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('kick')}>
+      <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('kick')}>
         <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>Kick behind</Text>
       </TouchableOpacity>
     </View>
@@ -402,9 +407,10 @@ export default function NumbersOutWideGame(_props: AcademyGameProps) {
         belowFieldReserve={LS_BELOW_RESERVE}
         pills={pills}
         field={pitch}
+        belowField={lsLegendUnder}
         controls={showVerdict
-          ? <>{verdictCard}{legend}</>
-          : <>{prompt}{phase === 'idle' && judgeButtons}{legend}{hint}</>}
+          ? <>{verdictCard}</>
+          : <>{prompt}{phase === 'idle' && judgeButtons}{hint}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -442,10 +448,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendTxtLs: { fontSize: 10 },
+  lsLegendUnder: { minHeight: LS_BELOW_RESERVE, paddingTop: 4, justifyContent: 'center' },
   judgeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   judgeBtn: { flexGrow: 1, flexBasis: '45%', minHeight: 48, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
   judgeBtnLs: { minHeight: 46, paddingVertical: 8 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e', borderWidth: 1, borderColor: t.border },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800', textAlign: 'center' },
   judgeTxtLs: { fontSize: 13 },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },

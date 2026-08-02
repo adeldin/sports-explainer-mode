@@ -342,7 +342,7 @@ export default function ReviewOrSaveGame(_props: AcademyGameProps) {
         <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>REVIEW IT</Text>
         <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>send it upstairs — lose it if the call stands</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.judgeBtn, styles.judgeAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('save')}>
+      <TouchableOpacity style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose('save')}>
         <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>SAVE THE REVIEW</Text>
         <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>trust the umpire — keep the token</Text>
       </TouchableOpacity>
@@ -524,7 +524,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { flexDirection: 'column', flexWrap: 'nowrap', gap: 8 },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeAlt: { backgroundColor: '#28407a' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2, textAlign: 'center' },

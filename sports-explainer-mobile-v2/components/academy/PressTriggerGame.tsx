@@ -437,11 +437,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   promptB: { color: AMBER, fontWeight: '800' },
   // Actions.
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
-  pressBtn: { flex: 1, minWidth: 120, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  // The border is on the BASE (transparent) so the muted state can show one without a 1pt size jump.
+  pressBtn: { flex: 1, minWidth: 120, backgroundColor: t.accent, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   pressBtnLs: { minHeight: 44, paddingVertical: 9 },
   // Not-yet-live PRESS!: muted blue (the module's own surface), NOT a dimmed accent — the accent
-  // belongs to whichever button is actually pressable right now.
-  pressBtnOff: { backgroundColor: t.surface },
+  // belongs to whichever button is actually pressable right now. A dark button always carries a
+  // visible border, so it never reads as a floating unoutlined block.
+  pressBtnOff: { backgroundColor: t.surface, borderColor: t.border },
   pressTxtOff: { color: t.textSecondaryOnDark },
   // Play carries the accent until it is pressed.
   playHot: { backgroundColor: t.accent, borderColor: t.accent },

@@ -228,7 +228,7 @@ export default function SetTheTrapGame(_props: AcademyGameProps) {
   const judgeBtns = (
     <View style={styles.judgeCol}>
       {OPTION_UI.map(ob => (
-        <TouchableOpacity key={ob.key} style={[styles.judgeBtn, ob.alt && styles.judgeBtnAlt, phase === 'run' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
+        <TouchableOpacity key={ob.key} style={[styles.judgeBtn, phase === 'run' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
           activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(ob.key)}>
           <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{ob.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{ob.sub}</Text>
@@ -325,7 +325,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8 },
   judgeBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', minHeight: 48 },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#28407a' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnDim: { opacity: 0.4 },
   judgeTitle: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTitleLs: { fontSize: 13 },

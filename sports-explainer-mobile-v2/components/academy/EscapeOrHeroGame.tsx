@@ -81,6 +81,12 @@ function times(o: EHResult) {
   return { viaAt, landAt, finishAt, total: finishAt + BURST_MS };
 }
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~42pt, two compact rows at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 42;
+
 export default function EscapeOrHeroGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -274,7 +280,7 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
   const judgeBtns = (
     <View style={styles.judgeCol}>
       {OPTIONS.map(op => (
-        <TouchableOpacity key={op.key} style={[styles.judgeBtn, op.alt && styles.judgeBtnAlt, phase !== 'idle' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
+        <TouchableOpacity key={op.key} style={[styles.judgeBtn, phase !== 'idle' && styles.judgeBtnDim, landscape && styles.judgeBtnLs]}
           activeOpacity={0.85} disabled={phase !== 'idle'} onPress={() => choose(op.key)}>
           <Text style={[styles.judgeTitle, landscape && styles.judgeTitleLs]}>{op.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{op.sub}</Text>
@@ -290,6 +296,8 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
       <View style={styles.legendItem}><View style={[styles.legendSq, styles.legendDashed, { borderColor: TEAL }]} /><Text style={[styles.legendTxt, landscape && styles.legendTxtLs]}>Ghost = the smarter route</Text></View>
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const verdictCard = answered && o ? (
     <View style={styles.verdict}>
       <Text style={[styles.vtag, o.k === 'good' ? styles.vtagGood : o.k === 'ok' ? styles.vtagOk : styles.vtagBad]}>{gradeTag(o.k)}</Text>
@@ -312,10 +320,11 @@ export default function EscapeOrHeroGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={ESCAPE_OR_HERO_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={field}
-        controls={answered ? <>{promptBlock}{verdictCard}{legend}{footLine}</> : <>{hudChips}{promptBlock}{judgeBtns}{legend}{subLine}</>}
+        belowField={lsLegendUnder}
+        controls={answered ? <>{promptBlock}{verdictCard}{footLine}</> : <>{hudChips}{promptBlock}{judgeBtns}{subLine}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -363,7 +372,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8 },
   judgeBtn: { backgroundColor: t.accent, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnDim: { opacity: 0.4 },
   judgeTitle: { color: '#fff', fontSize: 13, fontWeight: '800' },
   judgeTitleLs: { fontSize: 13 },
@@ -378,6 +387,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendTxt: { color: t.textSecondaryOnDark, fontSize: 11 },
   legendTxtLs: { fontSize: 10 },
   legendAmber: { color: OK_C, fontWeight: '700' },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

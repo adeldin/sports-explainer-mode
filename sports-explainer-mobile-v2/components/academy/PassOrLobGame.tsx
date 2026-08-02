@@ -74,6 +74,12 @@ type TAnim = { at: number; d: number; f: (k: number, e: number) => void };
 type TEv = { at: number; f: () => void };
 type Phase = 'intro' | 'ready' | 'run' | 'done';
 
+// The explanation key rides UNDER the field, not at the bottom of the controls scroll: this field is
+// WIDTH-bound in landscape, so the shell leaves unused navy height beneath the art. Reserved ALWAYS
+// (~58pt, three compact rows at the field width) so the art size never jumps between states, and the
+// height it frees is real height back in the controls column.
+const LS_LEGEND_RESERVE = 58;
+
 export default function PassOrLobGame(_props: AcademyGameProps) {
   const { level: appLevel } = useAppState();
   const { theme } = useTheme();
@@ -313,7 +319,7 @@ export default function PassOrLobGame(_props: AcademyGameProps) {
   const judge = (
     <View style={styles.judgeWrap}>
       {OPTIONS.map(o => (
-        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, !ready && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}
+        <TouchableOpacity key={o.key} style={[styles.judgeBtn, !ready && styles.judgeBtnOff, landscape && styles.judgeBtnLs]}
           disabled={!ready} activeOpacity={0.85} onPress={() => choose(o.key)}>
           <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
@@ -331,6 +337,8 @@ export default function PassOrLobGame(_props: AcademyGameProps) {
       <Text style={styles.legendTeal}>dashed teal = the read you missed</Text>
     </View>
   );
+  // The legend, in the shell's under-field strip — a compact wrap row sized to the field width.
+  const lsLegendUnder = <View style={styles.lsLegendUnder}>{legend}</View>;
   const g = chosen ? s.grade[chosen] : null;
   const verdict = phase === 'done' && g ? (
     <View style={styles.verdict}>
@@ -353,10 +361,11 @@ export default function PassOrLobGame(_props: AcademyGameProps) {
     return (
       <LandscapeGameShell
         aspectRatio={TENNIS_COURT_RATIO}
-        belowFieldReserve={0}
+        belowFieldReserve={LS_LEGEND_RESERVE}
         pills={pills}
         field={field}
-        controls={phase === 'done' ? <>{verdict}{legend}{footLine}</> : <>{hudChips}{promptBlock}{judge}{legend}{subLine}</>}
+        belowField={lsLegendUnder}
+        controls={phase === 'done' ? <>{verdict}{footLine}</> : <>{hudChips}{promptBlock}{judge}{subLine}</>}
         controlsFooter={lsFooter}
       />
     );
@@ -488,7 +497,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeWrap: { gap: 8 },
   judgeBtn: { backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeBtnOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
@@ -503,6 +512,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   legendBlue: { color: OPP_C, fontSize: 11, fontWeight: '700' },
   legendAmber: { color: OK_C, fontSize: 11, fontWeight: '700' },
   legendTeal: { color: TEAL, fontSize: 11, fontWeight: '700' },
+  lsLegendUnder: { minHeight: LS_LEGEND_RESERVE, paddingTop: 4, justifyContent: 'center' },
   verdict: { backgroundColor: t.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: t.border },
   vtag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   vtagGood: { backgroundColor: FE.goodBg, color: FE.good },

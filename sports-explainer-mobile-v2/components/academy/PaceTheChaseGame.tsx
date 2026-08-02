@@ -322,7 +322,7 @@ export default function PaceTheChaseGame(_props: AcademyGameProps) {
   const judge = phase === 'idle' ? (
     <View style={styles.judgeWrap}>
       {OPTIONS.map(o => (
-        <TouchableOpacity key={o.key} style={[styles.judgeBtn, o.alt && styles.judgeBtnAlt, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(o.key)}>
+        <TouchableOpacity key={o.key} style={[styles.judgeBtn, landscape && styles.judgeBtnLs]} activeOpacity={0.85} onPress={() => choose(o.key)}>
           <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{o.title}</Text>
           <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{o.sub}</Text>
         </TouchableOpacity>
@@ -465,7 +465,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeWrap: { gap: 8 },
   judgeBtn: { backgroundColor: FE.orange, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeBtnAlt: { backgroundColor: '#0d1b3e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
   judgeSub: { color: '#fff', fontSize: 10.5, fontWeight: '600', opacity: 0.85, marginTop: 2, textAlign: 'center' },

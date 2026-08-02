@@ -333,7 +333,7 @@ export default function CounterOrKeepGame(_props: AcademyGameProps) {
     </View>
   );
   const judgeBtn = (o: CoKOption, main: string, sub: string, alt: boolean) => (
-    <TouchableOpacity key={o} style={[styles.judgeBtn, alt && styles.judgeAlt, phase !== 'live' && styles.judgeOff, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'live'} onPress={() => choose(o)}>
+    <TouchableOpacity key={o} style={[styles.judgeBtn, phase !== 'live' && styles.judgeOff, landscape && styles.judgeBtnLs]} activeOpacity={0.85} disabled={phase !== 'live'} onPress={() => choose(o)}>
       <Text style={[styles.judgeTxt, landscape && styles.judgeTxtLs]}>{main}</Text>
       <Text style={[styles.judgeSub, landscape && styles.judgeSubLs]}>{sub}</Text>
     </TouchableOpacity>
@@ -427,7 +427,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   judgeCol: { gap: 8, marginTop: 4, flexWrap: 'nowrap' },
   judgeBtn: { flex: 1, minWidth: 150, backgroundColor: t.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   judgeBtnLs: { alignSelf: 'stretch', flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 0, minHeight: 44, paddingVertical: 9 },
-  judgeAlt: { backgroundColor: '#22345e' },
+  // Peer CHOICE buttons share ONE style (accent) — a colour difference would leak the answer key.
   judgeOff: { opacity: 0.4 },
   judgeTxt: { color: '#fff', fontSize: 13.5, fontWeight: '800' },
   judgeTxtLs: { fontSize: 13 },
