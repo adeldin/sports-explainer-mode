@@ -170,7 +170,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   statHeader: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12, alignItems: 'center', gap: 4 },
   statPts: { color: t.accent, fontSize: 15, fontWeight: '900' },
   comboActive: { color: t.accent, fontSize: 16, fontWeight: '900', textAlign: 'center' },
-  comboIdle: { color: t.textMuted, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  // textSecondaryOnDark (NOT textSecondary): this header rides the navy app background, where the
+  // light-card secondary value is too dark to clear AA. Same token every field module uses.
+  comboIdle: { color: t.textSecondaryOnDark, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   pointsFloat: { position: 'absolute', top: 4, right: 20 },
   pointsFloatText: { color: t.accent, fontSize: 20, fontWeight: '900' },
   milestoneWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
@@ -178,5 +180,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rankUpOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: t.accent, borderRadius: 14 },
   rankUpKicker: { color: t.onAccent, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
   rankUpName: { color: t.onAccent, fontSize: 22, fontWeight: '900', marginTop: 4 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  // Matches the modern field modules' portrait content box (16 all round, generous bottom).
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
 });
