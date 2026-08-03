@@ -116,14 +116,14 @@ The `route.ts:200` ladder ("difficulty changes WHAT is taught, not tone") maps c
 
 ## 7. Phase plan (gated, per the BUILD-doc working model)
 
-| Phase | What | Gate |
-|---|---|---|
-| **0. Decisions + day-zero** | Anthony decides §8; then the day-zero API-first script: repo, Expo scaffold, RC project, ASC app record (reserves the name), Vercel project | Name cleared + repo exists |
-| **1. Data recon** | Live curl probes of Finnhub/FMP/Twelve Data/Stooq/FRED + static FOMC/BLS calendars → `STOCKWISE_DATA_RECON_BANK.md` | Base provider + enrichers chosen on evidence |
-| **2. Core port** | Copy the ~15 clean files + PROVENANCE.md; re-derive backend (dataProvider registry + llmProvider + finance personas + guardrail clause); app shell: Today · Academy · Settings | App boots; one hello-world explanation grounded in a real quote |
-| **3. Content pack v1** | Glossary (4-tier), quiz bank, read-the-quote bank, 2–3 games registered; `marketContext` prompt map | **Reviewer sign-off** (the finance-literate friends) |
-| **4. Live loop MVP** | Today tab: market pulse + week's fixtures + market-close recap; caps + paywall armed | Anthony passes the naive-user test on a real market day |
-| **5. Daily lesson generator** | Yesterday's event → today's quiz (the novel thesis; rides the Academy registry) | Post-MVP |
+| Phase | What | Gate | Status |
+|---|---|---|---|
+| **0. Decisions + day-zero** | Anthony decides §8; then the day-zero API-first script: repo, Expo scaffold, RC project, ASC app record (reserves the name), Vercel project | Name cleared + repo exists | ✅ **DONE 2026-08-02** (RC project + ASC record still pending — not blockers) |
+| **1. Data recon** | Live curl probes of Finnhub/FMP/Twelve Data/Stooq/FRED + static FOMC/BLS calendars → `STOCKWISE_DATA_RECON_BANK.md` | Base provider + enrichers chosen on evidence | ✅ **DONE 2026-08-02** — architecture LOCKED (Finnhub base + FMP candles + FRED/Treasury/BLS) |
+| **2. Core port** | Copy the ~15 clean files + PROVENANCE.md; re-derive backend (dataProvider registry + llmProvider + finance personas + guardrail clause); app shell: Today · Academy · Settings | App boots; one hello-world explanation grounded in a real quote | ✅ **GATE PASSED 2026-08-02** — /api/explain returned a grounded kid-level NVDA lesson; guardrail refused "should I buy"; all TS clean |
+| **3. Content pack v1** | Glossary (4-tier), quiz bank, read-the-quote bank, 2–3 games registered; `marketContext` prompt map | **Reviewer sign-off** (the finance-literate friends) | 🔶 IN PROGRESS — quiz bank (24q) + glossary (16 terms) authored, Quick Quiz live; **review gate OPEN — recruit reviewers** |
+| **4. Live loop MVP** | Today tab: market pulse + week's fixtures + market-close recap; caps + paywall armed | Anthony passes the naive-user test on a real market day | 🔶 IN PROGRESS — Today tab live (pulse + fixtures + tap-to-explain); caps engine ported but unarmed; paywall waits on RC project |
+| **5. Daily lesson generator** | Yesterday's event → today's quiz (the novel thesis; rides the Academy registry) | Post-MVP | — |
 
 Working model carries over from `HANDOFF_COACHES_CORNER.md` §HOW WE WORK: Anthony runs all git; gated build docs per feature; HTML-spike-first for any visual module (read-the-chart will get a spike before RN port).
 
