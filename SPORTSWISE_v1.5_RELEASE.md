@@ -112,14 +112,19 @@ testing standards would fail. Decision needed: rebuild to standard, or retire.
 
 ---
 
-## App Store Connect — staged, not submitted
+## App Store Connect — LIVE
 
-Everything App Review checks is set. The Submit button is deliberately not pressed; that stays the
-owner's action.
+**Shipped.** Submitted 2026-08-02 19:11 UTC, approved and on sale 2026-08-03 — inside a day.
+Version 1.5 · `READY_FOR_SALE` / `READY_FOR_DISTRIBUTION` · build 33 · review submission
+`75bf907f-e463-477c-9d37-48ea25af913b` (`APPROVED`).
+
+Shipped from commit **3fc4c9f** (the v1.5 merge). Tagged `v1.5`.
+
+The gates as they stood at submission:
 
 | Gate | State |
 |---|---|
-| Version | 1.5 · `PREPARE_FOR_SUBMISSION` · release AFTER_APPROVAL |
+| Version | 1.5 · `PREPARE_FOR_SUBMISSION` → approved · release AFTER_APPROVAL |
 | Build | 33 attached, processing `VALID` |
 | Export compliance | answered (`usesNonExemptEncryption: false`) — no Missing Compliance flag |
 | What's New | set, 1098 chars |
@@ -134,11 +139,17 @@ The review notes now tell the reviewer the drills are **landscape** and how to r
 subscription — the previous notes did not, and a reviewer who never rotates the device sees none of
 what this release is about.
 
-### Two things deliberately left for a decision
+### Carried forward
 
-**Screenshots are 1.4's.** They carried over intact, so nothing blocks submission — but they show
-none of the eight-sport Coach's Corner, which is the entire headline of this release. New shots are a
-marketing improvement, not a compliance fix.
+**Screenshots are 1.4's, and that was the right call.** Three of the nine are already Coach's Corner
+— "Turn your phone. Step into the play." (Where's the Play?), "Make the call. Just like VAR."
+(Onside or Off?) and "Read the defense. Call the play." (Box Count). Between them they show the
+landscape format, the scenario tabs, the verdict card and the four difficulty tiers — every part of
+the interaction model a 1.5 drill uses, just with a different sport on the field. Reshooting buys
+new sports, not a new story.
+
+*(An earlier draft of this doc claimed the screenshots showed none of the Coach's Corner. That was
+inferred from "carried over from 1.4" without opening a single image, and it was wrong.)*
 
 **Stat verification is still queued.** Every number spoken by a coach's read is a crowdsource-consensus
 value with honest rounding ("about 70%"). That was fine for TestFlight. Verification against primary
