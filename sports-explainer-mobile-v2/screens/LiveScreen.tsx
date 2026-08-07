@@ -137,12 +137,18 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
   const followUps = [`🤔 ${S.fuWhy}`, `📜 ${S.fuRule}`, `👋 ${S.fuNew}`, `👀 ${S.fuNext}`];
-  // Learn Mode = explicit Learn sport (tennis/golf/cricket) OR an off-season Live sport.
+  // Learn Mode = explicit Learn sport (tennis/golf/cricket) OR a Live sport with no games.
   // Both show the educational state (no PLAY card; ask box + FAQ).
+  //
+  // `offSeason` is a CALENDAR guess and is deliberately NOT part of learnMode any more. It used to
+  // be, and that made the month table authoritative over the live feed: NFL's window was Sep–Feb, so
+  // an August preseason game that ESPN was actively serving could not appear at any tier of the UI.
+  // The feed already answers this question exactly — no games means no games — so emptiness is now
+  // derived from the fetch, and the calendar only picks the wording (see EmptyState).
   const offSeason = isOffSeason(sport);
-  // Learn/Academy state: explicit Learn sport, off-season, OR a fetch came back empty
-  // (covers a season that ended mid-window, e.g. NBA/NHL in June).
-  const learnMode = SPORT_CONFIG[sport]?.learnMode === true || offSeason || (gamesFetched && games.length === 0);
+  // Learn/Academy state: explicit Learn sport, OR a real fetch came back empty (covers both a
+  // season that ended mid-window and a genuine off-season — they look identical to the fetcher).
+  const learnMode = SPORT_CONFIG[sport]?.learnMode === true || (gamesFetched && games.length === 0);
   // Distinguish "season just ended" (in-window Live sport, fetched empty) from
   // off-season / explicit Learn sports — drives the EmptyState message.
   const seasonEnded = gamesFetched && games.length === 0 && !offSeason && SPORT_CONFIG[sport]?.learnMode !== true;
@@ -238,10 +244,14 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // non-effect callers (pull-to-refresh, auto-refresh) behave exactly as before.
   const fetchGames = useCallback(async (isCancelled: () => boolean = () => false) => {
     const cfg = SPORT_CONFIG[sport];
-    // Learn Mode (explicit tennis/golf/cricket) or an off-season Live sport: no
-    // head-to-head games. Tennis/golf fetch the current tournament for the card;
-    // cricket / off-season have no card (EmptyState shows the right message).
-    if (cfg.learnMode || isOffSeason(sport)) {
+    // Learn Mode (explicit tennis/golf/cricket): no head-to-head games by definition, so
+    // tennis/golf fetch the current tournament for the card instead; cricket has no card.
+    //
+    // Off-season Live sports used to be routed here too, which meant they never reached the
+    // scoreboard fetch at all. They now take the normal games path and simply come back empty,
+    // which re-enters learn mode through learnMode's empty-fetch clause — same destination when
+    // there really is nothing on, but a live slate can now overrule the calendar.
+    if (cfg.learnMode) {
       setGames([]);
       setSelectedGameId(null);
       setResult(null);

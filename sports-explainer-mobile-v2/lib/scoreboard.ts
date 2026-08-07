@@ -6,7 +6,6 @@
 // Watch Next (lib/watchNext.ts) reuses this same function to gather candidates.
 
 import { Sport, API_URL } from './api';
-import { isOffSeason } from './sports';
 
 // A probable starter (MLB probable pitcher today; other sports have no analog). `record` is ESPN's
 // pre-formatted "(W-L, ERA)" string, ready to display verbatim.
@@ -152,10 +151,17 @@ export async function fetchScoreboard(
   // Cricket bypasses the ESPN path the same way (no SEASON_WINDOWS entry either — kept symmetric).
   // Note: the date arg is deliberately NOT forwarded — cricket client-filters (see fetchCricketBoard).
   if (cfg.provider === 'cricket') return fetchCricketBoard();
-  // Off-season → [] for the DEFAULT (today) fetch; an explicit date bypasses this, since the date
-  // strip only asks for days discoverGameDays already found to have games (incl. across an
-  // offseason gap — e.g. tapping a preseason day for a currently-out-of-season league).
-  if (!date && isOffSeason(sport)) return [];
+  // NO calendar gate here, deliberately. There used to be one — `if (!date && isOffSeason(sport))
+  // return []` — which skipped the network call for any sport outside a hardcoded month window.
+  // It was a fetch-saving optimization that quietly outranked the live feed: NFL's window ran
+  // Sep–Feb, so a live August preseason game came back as "no games" without ESPN ever being asked.
+  // The same table also had MLB ending in October (the World Series runs into November), MLS ending
+  // in October (MLS Cup is December) and NHL starting in October (preseason is late September), so
+  // the failure was structural rather than one bad row.
+  //
+  // ESPN is the authority on whether games exist, and it answers that question for free on every
+  // call. An out-of-season sport simply returns no events, which every caller already handles.
+  // The month table survives only to phrase the empty state ("season runs September to February").
 
   // Team labels: prefer abbreviation, fall back for sports that lack it (rugby/soccer).
   const teamName = (c: any) =>
@@ -394,6 +400,27 @@ export async function fetchScoreboard(
         return (e.date || '').slice(0, 10) >= todayStr;
       });
       if (!hasCurrent && parsed.length > 0) {
+        parsed = [];
+      }
+
+      // Off-season guard, the mirror image of the one above and the replacement for the deleted
+      // calendar gate. When a league is between seasons, ESPN's bare scoreboard does not return
+      // nothing — it returns the NEXT scheduled events, which can be months away (checked in
+      // August: NBA offered a single October 3rd game, NHL seven games on September 19th).
+      //
+      // Those are real, but they are not a slate. Letting them through would swap the Academy /
+      // learn surface for one lone pre-game card dated two months out, which is a worse answer to
+      // "what's on?" than the teaching content it replaced. So: if NOTHING is live and nothing is
+      // scheduled inside the horizon, treat the day as empty and let the caller re-enter learn
+      // mode — the same destination the calendar gate reached, arrived at from the data instead.
+      //
+      // Only fires in that off-season shape. Mid-season there is always something inside the
+      // horizon, so this is inert. The horizon is generous (a fortnight) because in-season feeds
+      // legitimately run a week or more ahead — NFL returns a full week, soccer a whole matchweek.
+      const HORIZON_MS = 14 * 24 * 60 * 60 * 1000;
+      const hasNearTerm = parsed.some(g =>
+        g.isLive || g.startTime == null || g.startTime - now <= HORIZON_MS);
+      if (!hasNearTerm && parsed.length > 0) {
         parsed = [];
       }
     }
