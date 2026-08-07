@@ -65,7 +65,7 @@ const LEAGUE_SOURCES: Record<Exclude<CrestSport, 'cricket'>, { path: string; lab
 const KEY_TO_CREST_SPORT: Partial<Record<Sport, CrestSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
   cricket: 'cricket',
 };
 

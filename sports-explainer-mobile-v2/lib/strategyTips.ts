@@ -5,6 +5,7 @@
 // so no sport shows an empty card. (BUILD_COACHES_CORNER_GATE5.md Gate 5B.)
 
 import type { Sport } from "./api";
+import { isRugby } from './leagueGroups';
 
 export interface StrategyTip {
   id: string;          // stable, e.g. "soccer-001"
@@ -277,7 +278,7 @@ export function tipsForSport(sport: Sport): StrategyTip[] {
     return STRATEGY_TIPS.filter(t => t.sport === "soccer");
   // v1.5 sports. Rugby ships under several competition keys; they all share the rugby bank.
   if (sport === "nba" || sport === "wnba") return STRATEGY_TIPS.filter(t => t.sport === "nba");
-  if (sport === "rugby" || sport === "mlr" || sport === "nationscup" || sport === "sixnations" || sport === "nationschamp")
+  if (isRugby(sport))
     return STRATEGY_TIPS.filter(t => t.sport === "rugby");
   if (sport === "tennis") return STRATEGY_TIPS.filter(t => t.sport === "tennis");
   if (sport === "golf") return STRATEGY_TIPS.filter(t => t.sport === "golf");

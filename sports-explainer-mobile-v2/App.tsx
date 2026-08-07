@@ -18,6 +18,7 @@ import {
 import { Sport } from './lib/api';
 import { registerForPushNotificationsAsync, setupNotificationHandler } from './lib/notifications';
 import { resyncGameAlerts } from './lib/gameAlerts';
+import { resyncTeamAlerts } from './lib/teamAlerts';
 import { useTheme } from './lib/theme';
 import { useAppState } from './lib/appState';
 
@@ -117,6 +118,9 @@ export default function App() {
     // prunes games that have already started. Independent of `notificationsEnabled`, which governs
     // the daily quiz nudge; a game alert is something the user asked for one game at a time.
     resyncGameAlerts();
+    // Followed teams must be RE-materialized, not just repaired: their fixtures roll forward, so
+    // without this a team follow would stop notifying once its first few games had been played.
+    resyncTeamAlerts();
 
     import('expo-notifications').then(Notifications => {
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

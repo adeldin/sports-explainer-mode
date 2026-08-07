@@ -13,6 +13,7 @@ import * as Sharing from 'expo-sharing';
 // Components
 import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
+import { isSoccer } from '../lib/leagueGroups';
 import NextGameFinder from '../components/NextGameFinder';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
@@ -1204,7 +1205,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
 
               {/* Soccer Match Timeline (Highlightly events from the explain response). Soccer-only;
                   renders the no-events state intentionally when the match is early/goalless. Free. */}
-              {['soccer', 'worldcup', 'epl', 'laliga'].includes(sport) && (
+              {isSoccer(sport) && (
                 <MatchTimeline
                   events={result.events || []}
                   language={language}

@@ -105,7 +105,7 @@ export const READ_THE_SCORE: Record<ScoreSport, ScoreScenario[]> = {
 const KEY_TO_SCORE_SPORT: Partial<Record<Sport, ScoreSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
   tennis: 'tennis', golf: 'golf', cricket: 'cricket',
 };
 

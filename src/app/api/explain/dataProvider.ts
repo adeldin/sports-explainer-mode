@@ -81,6 +81,7 @@ const ESPN_CONFIG: Record<string, EspnCfg> = {
   laliga: { sport: 'soccer', league: 'esp.1' },
   rugby: { sport: 'rugby', league: '270557', core: true },
   mlr: { sport: 'rugby', league: '289262', core: true },
+  superrugby: { sport: 'rugby', league: '242041', core: true },
   tennis: { sport: 'tennis', league: 'atp', learnMode: true },
   golf: { sport: 'golf', league: 'pga', learnMode: true },
 };
@@ -133,11 +134,50 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
     }
 
     // Site-API sports: identity + (where present) situation.
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard`, { cache: 'no-store' });
-    const data = await res.json();
-    const game = gameId
-      ? data?.events?.find((e: any) => String(e.id) === String(gameId))
-      : data?.events?.find((e: any) => e.status?.type?.state === 'in');
+    //
+    // The BARE scoreboard is today's slate only. That was fine when the app could only ever ask
+    // about a current game, but the date strip lets a user open any past day — and a game from
+    // another day is simply NOT in this response, so find-by-id returned undefined and every
+    // caller degraded silently: Coach's Read fell back to its "coming soon" state as though the
+    // sport were data-thin. Measured against live MLB, ALL 15 of the previous day's games were
+    // unfindable this way, and every day before that.
+    //
+    // So: bare board first (the common case, one request, and the only one that carries a live
+    // `situation`), then a dated retry that walks outward from today until the id turns up. The
+    // retry only runs when the bare board missed, so the hot path costs nothing extra.
+    const board = async (q = '') =>
+      (await (await fetch(
+        `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/scoreboard${q}`,
+        { cache: 'no-store' },
+      )).json())?.events || [];
+
+    const events: any[] = await board();
+    let game = gameId
+      ? events.find((e: any) => String(e.id) === String(gameId))
+      : events.find((e: any) => e.status?.type?.state === 'in');
+
+    if (!game && gameId) {
+      // Not on today's board — resolve the id DIRECTLY. /summary?event= answers for any game at any
+      // age in one request, where date-ranged scoreboard queries do not: ESPN caps a range response,
+      // so scanning back over a busy league silently drops games (measured: a 14-day MLB range missed
+      // a game only 3 days old). Verified this path resolves games 3 and 30 days back.
+      //
+      // The summary has no `situation` — correct, not a loss. A game that isn't on today's board has
+      // no live down-and-distance or count to report; identity, score and final status are exactly
+      // what a past game can offer, and they're all here.
+      try {
+        const sum = await (await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${gameId}`,
+          { cache: 'no-store' },
+        )).json();
+        const hc = sum?.header?.competitions?.[0];
+        if (hc?.competitors?.length) {
+          // Reshape into the scoreboard-event form the rest of this function expects: status lives
+          // on the competition here, but on the event in a scoreboard response.
+          game = { id: sum?.header?.id ?? gameId, date: hc.date, competitions: [hc], status: hc.status };
+        }
+      } catch { /* fall through to null — a missing game stays missing, never a throw */ }
+    }
     if (!game) return null;
     const comp = game.competitions?.[0];
     const sit = comp?.situation || {};
@@ -158,7 +198,7 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
     // Soccer family — the play text lives in the summary keyEvents/commentary (NOT the scoreboard
     // situation), exactly as the explain path's fetchGameData pulls it. Replicated here so routing
     // soccer-explain through getGameData is NO WORSE than today on ESPN fields (the audit fix).
-    if (['soccer', 'worldcup', 'epl', 'laliga'].includes(sport)) {
+    if (['soccer', 'worldcup', 'epl', 'laliga', 'seriea', 'bundesliga'].includes(sport)) {
       try {
         const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
         const ke: any[] = sum?.keyEvents || [];
