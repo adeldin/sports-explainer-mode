@@ -13,6 +13,7 @@ import * as Sharing from 'expo-sharing';
 // Components
 import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
+import NextGameFinder from '../components/NextGameFinder';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
@@ -37,7 +38,7 @@ import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedb
 import { useTheme, Theme } from '../lib/theme';
 import { SPORT_FAQS } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
-import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, RUGBY_LEAGUES, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
+import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, RUGBY_LEAGUES, fetchSoccerBoard, SOCCER_LEAGUES, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
@@ -79,6 +80,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [tennisRead, setTennisRead] = useState<ExplanationResponse | null>(null); // Gate-3 situational explanation
   const [tennisFilter, setTennisFilter] = useState<'all' | 'mens' | 'womens'>('all'); // category filter (All/Men's/Women's)
   const [rugbyLeague, setRugbyLeague] = useState<string>('all'); // merged Rugby tile league filter ('all' | game.sport)
+  const [soccerLeague, setSoccerLeague] = useState<string>('all'); // merged Soccer tile league filter ('all' | game.sport)
+  const [finderOpen, setFinderOpen] = useState(false);             // Next Game Finder modal
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
@@ -174,6 +177,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       const day = toLocalDayString(selectedDate);
       return games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
     }
+    // Merged Soccer tile: same client-filter model as rugby — `games` holds every league's board,
+    // the chip row narrows what's displayed. 'all' shows the combined board.
+    if (sport === 'soccer') {
+      if (soccerLeague === 'all') return games;
+      return games.filter(g => g.sport === soccerLeague);
+    }
     if (sport !== 'nationscup') return games;
     let out = games;
     if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
@@ -182,7 +191,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       out = out.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
     }
     return out;
-  }, [games, sport, rugbyLeague, selectedDate]);
+  }, [games, sport, rugbyLeague, soccerLeague, selectedDate]);
+  // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
+  // chip row / empty-league message are identical for both — so the tile-specific bits (which
+  // leagues, which state) are selected here and the render below stays generic. A third merged
+  // tile only needs a branch here.
+  const leagueFilter = sport === 'nationscup'
+    ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague }
+    : sport === 'soccer'
+    ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague }
+    : null;
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
@@ -307,6 +325,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // leagues (each game keeps its own .sport). fetchRugbyBoard ignores date (Gate D's concern).
       const parsed = sport === 'nationscup'
         ? await fetchRugbyBoard(isCancelled, selectedDate ?? undefined)
+        // The 'soccer' tile is the combined Soccer board (MLS + EPL + La Liga + World Cup), each
+        // game keeping its own .sport. fetchScoreboard('soccer') still means MLS alone and is what
+        // the per-league fan-out inside fetchSoccerBoard calls, so there is no recursion here.
+        : sport === 'soccer'
+        ? await fetchSoccerBoard(isCancelled, selectedDate ?? undefined)
         : await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
@@ -574,11 +597,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [sport, favorites, selectedDate]);
 
-  // Merged Rugby tile: keep the selection valid within the active league filter. When the filter
-  // narrows past the current pick (or the league is empty), re-select the first live-preferred visible
-  // game, or clear. Only runs on the rugby tile; a no-op elsewhere (displayGames === games).
+  // Merged tiles (Rugby, Soccer): keep the selection valid within the active league filter. When the
+  // filter narrows past the current pick (or the league is empty), re-select the first live-preferred
+  // visible game, or clear. A no-op on single-league tiles (displayGames === games).
   useEffect(() => {
-    if (sport !== 'nationscup') return;
+    if (sport !== 'nationscup' && sport !== 'soccer') return;
     if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) return;
     const live = displayGames.find(g => g.isLive);
     setSelectedGameId(displayGames.length ? (live?.id ?? displayGames[0].id) : null);
@@ -590,7 +613,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   useEffect(() => {
     let cancelled = false;
     const cfg = SPORT_CONFIG[sport];
-    if (sport === 'nationscup') return; // merged Rugby tile derives days from the board (effect below)
+    // Merged tiles derive their days from the board instead (effect below): discoverGameDays can
+    // only see ONE league, so on a merged tile it would advertise MLS's / URC's game-days as if
+    // they were the whole tile's.
+    if (sport === 'nationscup' || sport === 'soccer') return;
     if (!cfg || cfg.learnMode || cfg.core) { setGameDays([]); return; }
     (async () => {
       const disc = await discoverGameDays(sport);
@@ -602,12 +628,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     return () => { cancelled = true; };
   }, [sport]);
 
-  // Merged Rugby tile + Cricket: derive the date strip's game-days from the board's OWN startTimes
-  // (discoverGameDays can't serve core/Zyla/cricket leagues — it needs ESPN espnSport/league).
+  // Merged tiles (Rugby, Soccer) + Cricket: derive the date strip's game-days from the board's OWN
+  // startTimes (discoverGameDays can't serve core/Zyla/cricket leagues — it needs ESPN
+  // espnSport/league — and on a merged tile it would only ever see one of the leagues).
   // Recomputes as the board changes; always includes today so there's a "TODAY" cell to return to.
   // Other sports are unaffected (guarded above + here).
   useEffect(() => {
-    if (sport !== 'nationscup' && sport !== 'cricket') return;
+    if (sport !== 'nationscup' && sport !== 'cricket' && sport !== 'soccer') return;
     const days = Array.from(new Set(
       games.filter(g => g.startTime).map(g => toLocalDayString(new Date(g.startTime!)))
     ));
@@ -862,17 +889,18 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             />
           }>
 
-          {/* Rugby league filter — merged tile only. ALL leagues shown (even empty); selecting an
-              empty league shows a "no games" message below. Horizontal-scrollable chip row. */}
-          {sport === 'nationscup' && (
+          {/* Merged-tile league filter (Rugby, Soccer). ALL leagues shown even when empty, so the
+              row is a stable map of what the tile covers; selecting an empty league shows a "no
+              games" message below rather than silently showing the combined board. */}
+          {leagueFilter && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tFilterRow}>
-              {[{ key: 'all', label: S.tennisFilterAll }, ...RUGBY_LEAGUES.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
+              {[{ key: 'all', label: S.tennisFilterAll }, ...leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
                 <TouchableOpacity
                   key={opt.key}
-                  onPress={async () => { await Haptics.selectionAsync(); setRugbyLeague(opt.key); }}
-                  style={[styles.tFilterChip, rugbyLeague === opt.key && styles.tFilterChipActive]}
+                  onPress={async () => { await Haptics.selectionAsync(); leagueFilter.set(opt.key); }}
+                  style={[styles.tFilterChip, leagueFilter.value === opt.key && styles.tFilterChipActive]}
                   activeOpacity={0.8}>
-                  <Text style={[styles.tFilterChipText, rugbyLeague === opt.key && styles.tFilterChipTextActive]}>
+                  <Text style={[styles.tFilterChipText, leagueFilter.value === opt.key && styles.tFilterChipTextActive]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -917,11 +945,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 )}
               />
             </View>
-          ) : sport === 'nationscup' && rugbyLeague !== 'all' ? (
-            // Merged Rugby tile, a specific league selected with no games in-window → "no games".
+          ) : leagueFilter && leagueFilter.value !== 'all' ? (
+            // Merged tile, a specific league selected with no games in-window → "no games".
+            // `noLeagueGames` already carries a {league} placeholder in all ten locales, so this
+            // reads correctly for Soccer without a single new translation.
             <View style={styles.rugbyEmptyLeague}>
               <Text style={styles.rugbyEmptyLeagueText}>
-                {S.noLeagueGames.replace('{league}', RUGBY_LEAGUES.find(l => l.sportKey === rugbyLeague)?.label ?? '')}
+                {S.noLeagueGames.replace('{league}', leagueFilter.leagues.find(l => l.sportKey === leagueFilter.value)?.label ?? '')}
               </Text>
             </View>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'tennis' && tennisMatches.length > 0 ? (
@@ -1024,7 +1054,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>
             </View>
-          ) : !loading ? <EmptyState sport={sport} reason="no-games" language={language} seasonEnded={seasonEnded} /> : null}
+          ) : !loading ? (
+            <EmptyState
+              sport={sport}
+              reason="no-games"
+              language={language}
+              seasonEnded={seasonEnded}
+              // Fixture sports only. Tennis/golf/cricket run tournaments, so "the next game" isn't a
+              // thing they have — EmptyState also guards this, but not offering it is the honest signal.
+              onFindNextGame={SPORT_CONFIG[sport]?.learnMode ? undefined : () => setFinderOpen(true)}
+            />
+          ) : null}
 
           {/* Watch Next / Live Now — under the score card, above THE PLAY. Serves the
               final-game ("Watch Next" 👀) and no-games/off-season ("Live Now" 🔴) states;
@@ -1332,6 +1372,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             status: selectedGame.status,
           } : undefined}
           onUnlock={() => { setVisionOpen(false); presentPaywall(); }}
+        />
+        {/* Next Game Finder — opened from the empty state. Mounted at the root so it presents over
+            the whole screen rather than inside the scroll view it was launched from. */}
+        <NextGameFinder
+          visible={finderOpen}
+          sport={sport}
+          onClose={() => setFinderOpen(false)}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>

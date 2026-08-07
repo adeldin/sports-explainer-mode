@@ -17,6 +17,7 @@ import {
 
 import { Sport } from './lib/api';
 import { registerForPushNotificationsAsync, setupNotificationHandler } from './lib/notifications';
+import { resyncGameAlerts } from './lib/gameAlerts';
 import { useTheme } from './lib/theme';
 import { useAppState } from './lib/appState';
 
@@ -109,6 +110,13 @@ export default function App() {
     if (onboardingComplete && notificationsEnabled) {
       registerForPushNotificationsAsync().then(token => setExpoPushToken(token || ''));
     }
+
+    // Re-arm starred-game kickoff alerts. Stars are persisted, but the OS's pending-notification
+    // list is not guaranteed to survive a reinstall or a restore from backup — rescheduling by
+    // stable identifier is idempotent, so this repairs that without ever double-notifying. Also
+    // prunes games that have already started. Independent of `notificationsEnabled`, which governs
+    // the daily quiz nudge; a game alert is something the user asked for one game at a time.
+    resyncGameAlerts();
 
     import('expo-notifications').then(Notifications => {
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

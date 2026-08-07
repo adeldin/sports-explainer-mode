@@ -10,6 +10,7 @@ import { sportsWithContent, resolveBank } from "./makeTheCall";
 export type CCPieceId =
   | "make-the-call" | "formations" | "read-the-play" | "box-count" | "onside-or-off"
   | "wheres-the-play" | "find-the-open-man"
+  | "coach-speak"                                        // NFL terminology explorer (no scoring)
   // — v1.5 field modules, ported from the Coach's Corner spikes —
   | "fourth-down-call"                                   // NFL
   | "count-leverage" | "steal-or-stay"                   // MLB
@@ -57,6 +58,8 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   // v1.5 field modules. Like Where's the Play, these are scenario-tabbed and tier-independent
   // (all four COACH'S READ depths are authored inside each module), so they're pushed at every level.
   if (sport === "nfl") pieces.push("fourth-down-call");
+  // Coach Speak — a glossary, not a scenario. Tier-independent like the other explorers.
+  if (sport === "nfl") pieces.push("coach-speak");
   if (sport === "mlb") pieces.push("count-leverage", "steal-or-stay");
   if (isSoccer(sport)) pieces.push("press-trigger", "counter-or-keep");
   if (isRugby(sport)) pieces.push("posts-corner-or-scrum");

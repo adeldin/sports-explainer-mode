@@ -586,3 +586,40 @@ export async function fetchRugbyBoard(
   }
   return out;
 }
+
+// ============================================================================
+// Multi-league SOCCER board — the same merge, one tile later.
+//
+// Structurally identical to the rugby board above, and deliberately so: MLS, the Premier League,
+// La Liga and the World Cup were four separate tiles competing for space in the sport grid, three
+// of which are dark most of the year. One ⚽ tile with a league filter matches how a fan actually
+// thinks ("what soccer is on?") rather than how ESPN partitions its API.
+//
+// Note the umbrella key is 'soccer', which is ALSO a league key (MLS / usa.1) — exactly how
+// 'nationscup' doubles as both the Rugby tile and the Nations Cup league. That is why no new Sport
+// key is needed and SPORT_CONFIG is untouched: the umbrella lives in the CALLER (LiveScreen picks
+// fetchSoccerBoard for the tile) while fetchScoreboard('soccer') still means MLS specifically.
+// Every game keeps its own .sport, so explain/recap/coach routing stays per-league.
+// ============================================================================
+export const SOCCER_LEAGUES: { sportKey: Sport; label: string }[] = [
+  { sportKey: 'soccer', label: 'MLS' },
+  { sportKey: 'epl', label: 'Premier League' },
+  { sportKey: 'laliga', label: 'La Liga' },
+  { sportKey: 'worldcup', label: 'World Cup' },
+];
+
+export async function fetchSoccerBoard(
+  isCancelled: () => boolean = () => false,
+  date?: Date,
+): Promise<Game[]> {
+  const results = await Promise.allSettled(
+    SOCCER_LEAGUES.map(l => fetchScoreboard(l.sportKey, isCancelled, date)),
+  );
+  if (isCancelled()) return [];
+  const out: Game[] = [];
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue; // one slow/failed league can't sink the board
+    out.push(...r.value);
+  }
+  return out;
+}

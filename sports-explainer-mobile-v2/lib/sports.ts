@@ -12,10 +12,12 @@ export const SPORTS: SportTab[] = [
   { key: 'nba', emoji: '🏀', label: 'NBA' },
   { key: 'wnba', emoji: '🏀', label: 'WNBA' },
   { key: 'nfl', emoji: '🏈', label: 'NFL' },
-  { key: 'soccer', emoji: '⚽', label: 'MLS' },
-  { key: 'worldcup', emoji: '🌍', label: 'World Cup' },
-  { key: 'epl', emoji: '⚽', label: 'EPL' },
-  { key: 'laliga', emoji: '⚽', label: 'La Liga' },
+  // One combined Soccer tile (key 'soccer') folds MLS + Premier League + La Liga + World Cup via
+  // fetchSoccerBoard and the league filter — the same shape as the Rugby tile below. 'epl',
+  // 'laliga' and 'worldcup' stay valid Sport KEYS (SOCCER_LEAGUES + game.sport route explain /
+  // recap / coach per league) but have NO standalone tile. Note 'soccer' doubles as the umbrella
+  // AND the MLS league key, exactly as 'nationscup' does for rugby.
+  { key: 'soccer', emoji: '⚽', label: 'Soccer' },
   // One combined Rugby tile (key 'nationscup') folds ALL rugby leagues via fetchRugbyBoard + the league
   // filter. 'rugby' (URC) and 'mlr' stay valid Sport KEYS (RUGBY_LEAGUES + game.sport) but have NO
   // standalone tile — omitted from SPORTS so the grid shows a single 🏉 Rugby tile.
