@@ -12,10 +12,12 @@ export const SPORTS: SportTab[] = [
   { key: 'nba', emoji: '🏀', label: 'NBA' },
   { key: 'wnba', emoji: '🏀', label: 'WNBA' },
   { key: 'nfl', emoji: '🏈', label: 'NFL' },
-  { key: 'soccer', emoji: '⚽', label: 'MLS' },
-  { key: 'worldcup', emoji: '🌍', label: 'World Cup' },
-  { key: 'epl', emoji: '⚽', label: 'EPL' },
-  { key: 'laliga', emoji: '⚽', label: 'La Liga' },
+  // One combined Soccer tile (key 'soccer') folds MLS + Premier League + La Liga + World Cup via
+  // fetchSoccerBoard and the league filter — the same shape as the Rugby tile below. 'epl',
+  // 'laliga' and 'worldcup' stay valid Sport KEYS (SOCCER_LEAGUES + game.sport route explain /
+  // recap / coach per league) but have NO standalone tile. Note 'soccer' doubles as the umbrella
+  // AND the MLS league key, exactly as 'nationscup' does for rugby.
+  { key: 'soccer', emoji: '⚽', label: 'Soccer' },
   // One combined Rugby tile (key 'nationscup') folds ALL rugby leagues via fetchRugbyBoard + the league
   // filter. 'rugby' (URC) and 'mlr' stay valid Sport KEYS (RUGBY_LEAGUES + game.sport) but have NO
   // standalone tile — omitted from SPORTS so the grid shows a single 🏉 Rugby tile.
@@ -58,20 +60,30 @@ export function orderSports(savedKeys: unknown): SportTab[] {
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-// IN-season month windows (1-12). Drives both off-season detection and the
-// displayed "season runs X to Y" copy. World Cup has no annual window — handled
-// specially (every 4 years).
+// IN-season month windows (1-12), used for COPY ONLY — the "season runs X to Y" line in
+// EmptyState. This table does NOT decide whether to fetch or whether games exist; the live
+// feed decides that (see the note in lib/scoreboard.ts). It used to gate fetching, which let
+// a stale month boundary hide games ESPN was actively serving.
+//
+// Boundaries below were probed against ESPN's own scoreboard rather than recalled, because
+// four of the ten were wrong in exactly the direction that hides a postseason or a preseason:
+//   nfl  — games on 2025-07-31 (Hall of Fame game) and 2025-08-07; was Sep, hid all preseason
+//   mlb  — World Series game on 2025-11-01, none by 11-05; was Oct, hid the World Series
+//   soccer — MLS Cup on 2025-12-06, playoffs through Nov; was Oct, hid the entire postseason
+//   nhl  — preseason on 2025-09-25; was Oct
+// A window that is too WIDE is harmless now (it only changes wording on a day with no games);
+// one that is too NARROW used to be invisible and load-bearing. Prefer generous edges.
 export const SEASON_WINDOWS: Record<string, { start: number; end: number }> = {
-  mlb: { start: 3, end: 10 },    // March–October
-  nfl: { start: 9, end: 2 },     // September–February
-  nba: { start: 10, end: 6 },    // October–June
-  nhl: { start: 10, end: 6 },    // October–June
+  mlb: { start: 3, end: 11 },    // March–November (World Series runs into early Nov)
+  nfl: { start: 7, end: 2 },     // late July–February (HOF game, then preseason through August)
+  nba: { start: 10, end: 6 },    // October–June (preseason early Oct, Finals mid-June)
+  nhl: { start: 9, end: 6 },     // late September–June (preseason late Sep, Cup mid-June)
   wnba: { start: 5, end: 10 },   // May–October
-  soccer: { start: 3, end: 10 }, // March–October (MLS)
+  soccer: { start: 2, end: 12 }, // February–December (MLS: Feb start, MLS Cup in December)
   epl: { start: 8, end: 5 },     // August–May
   laliga: { start: 8, end: 5 },  // August–May
   rugby: { start: 9, end: 6 },   // September–June (URC)
-  mlr: { start: 2, end: 7 },     // February–July
+  mlr: { start: 2, end: 8 },     // February–August (MLR final falls in early August)
 };
 
 export function isOffSeason(sport: string): boolean {

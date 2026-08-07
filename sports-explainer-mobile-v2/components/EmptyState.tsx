@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme, Theme } from '../lib/theme';
 import { Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
@@ -10,6 +10,10 @@ interface Props {
   reason: 'no-games' | 'off-season' | 'select-game';
   language: Language;
   seasonEnded?: boolean; // in-window sport whose season just finished (NBA/NHL in June)
+  // Opens the Next Game Finder. Optional so this stays a pure presentational component: the caller
+  // owns the modal and decides which surfaces get the action. Passing nothing renders no button —
+  // which is what tennis/golf/cricket want, since they have tournaments rather than fixtures.
+  onFindNextGame?: () => void;
 }
 
 const SPORT_EMOJI: Record<string, string> = {
@@ -17,10 +21,18 @@ const SPORT_EMOJI: Record<string, string> = {
   wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉', nationscup: '🏉', tennis: '🎾', golf: '⛳', cricket: '🏏',
 };
 
-export default function EmptyState({ sport, reason, language, seasonEnded }: Props) {
+export default function EmptyState({ sport, reason, language, seasonEnded, onFindNextGame }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
+
+  // The way OUT of an empty state. Rendered in the fixture-sport branches below (not tennis/golf/
+  // cricket, and not 'select-game' — there the user already has games and just hasn't picked one).
+  const findBtn = onFindNextGame ? (
+    <TouchableOpacity style={styles.findBtn} onPress={onFindNextGame} activeOpacity={0.85}>
+      <Text style={styles.findBtnTxt}>{S.findNextGame} →</Text>
+    </TouchableOpacity>
+  ) : null;
 
   const emoji = SPORT_EMOJI[sport] || '📡';
   const names: Record<string, string> = {
@@ -57,6 +69,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{seasonSub}</Text>
+        {findBtn}
       </View>
     );
   }
@@ -68,6 +81,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{S.worldCupRuns}</Text>
+        {findBtn}
       </View>
     );
   }
@@ -102,6 +116,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{seasonSub}</Text>
+        {findBtn}
       </View>
     );
   }
@@ -112,6 +127,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded }: Pro
       <Text style={styles.emoji}>{emoji}</Text>
       <Text style={styles.title}>{S.noGames.replace('{sport}', sportName)}</Text>
       <Text style={styles.subtitle}>{S.pullRefresh}</Text>
+      {findBtn}
     </View>
   );
 }
@@ -123,4 +139,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   subtitle: { color: t.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   badge: { marginTop: 16, backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   badgeText: { color: t.warn, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  // The one action on an otherwise dead screen — deliberately the brightest thing in the container.
+  findBtn: {
+    marginTop: 6, backgroundColor: t.accent, borderRadius: 10,
+    paddingHorizontal: 18, paddingVertical: 11,
+  },
+  findBtnTxt: { color: '#ffffff', fontSize: 14.5, fontWeight: '800' },
 });

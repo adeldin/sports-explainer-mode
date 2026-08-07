@@ -15,6 +15,7 @@ import CoachesCornerHeader from '../components/CoachesCornerHeader';
 import RankCard from '../components/RankCard';
 import StrategyTipCard from '../components/StrategyTipCard';
 import FormationBrowser from '../components/FormationBrowser';
+import CoachSpeakBrowser from '../components/CoachSpeakBrowser';
 import MakeTheCallGame from '../components/academy/MakeTheCallGame';
 import FormationQuizGame from '../components/academy/FormationQuizGame';
 import BoxCountGame from '../components/academy/BoxCountGame';
@@ -104,9 +105,24 @@ const PIECE_GAME = {
   'bowl-or-change': { id: 'cc-bowl-or-change', title: 'Bowl or Change?', icon: '🏏', blurb: 'Figures are the past; geometry is the next over', Component: BowlOrChangeGame, landscape: true },
 } as const;
 
+// Explorer pieces — browse-only, portrait, no scoring. Keyed by piece id; anything listed here
+// bypasses PIECE_GAME/GameHost entirely (see the mount below). Deliberately a separate table from
+// PIECE_GAME rather than a flag on it, because the two have genuinely different shapes: a game takes
+// AcademyGameProps and owns a verdict, an explorer takes nothing and owns a scroll view.
+type ExplorerPieceId = 'formations' | 'coach-speak';
+const EXPLORER_PIECE: Record<ExplorerPieceId, { title: string; icon: string; Component: React.ComponentType }> = {
+  'formations':   { title: 'Formations', icon: '🗺️', Component: FormationBrowser },
+  'coach-speak':  { title: 'Coach Speak', icon: '🗣️', Component: CoachSpeakBrowser },
+};
+// A type predicate, not an `in` check inline: this is what lets TS narrow activePiece to the
+// GAME-backed ids after the explorer branch returns, so PIECE_GAME[...] stays fully typed and a
+// piece added to neither table is still a compile error rather than an undefined at runtime.
+const isExplorerPiece = (id: CCPieceId): id is ExplorerPieceId => id in EXPLORER_PIECE;
+
 const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'make-the-call': { icon: '📋', title: 'Make the Call' },
   'formations':    { icon: '🗺️', title: 'Formations' },
+  'coach-speak':   { icon: '🗣️', title: 'Coach Speak' },
   'read-the-play': { icon: '🎯', title: 'Read the Play' },
   'box-count':     { icon: '🏈', title: 'Box Count' },
   'onside-or-off': { icon: '🚩', title: 'Onside or Off?' },
@@ -185,19 +201,25 @@ export default function CoachesCornerScreen() {
 
   // ── Full-screen piece view (mirrors AcademyScreen's activeGame early-return) ──
   if (activePiece) {
-    if (activePiece === 'formations') {
+    // Explorers mount here rather than through GameHost: they're portrait, scrolling, and have no
+    // call to make, so they need none of GameHost's orientation lock, tab-bar hide or verdict
+    // plumbing — just a back bar. Formations was the first and lived here as a hardcoded branch;
+    // Coach Speak is the second, so the branch became a table. A third costs one line.
+    if (isExplorerPiece(activePiece)) {
+      const explorer = EXPLORER_PIECE[activePiece];
+      const Explorer = explorer.Component;
       return (
-        <Animated.View key="cc-formations" style={styles.root} entering={SlideInRight.duration(220)}>
+        <Animated.View key={`cc-${activePiece}`} style={styles.root} entering={SlideInRight.duration(220)}>
           <SafeAreaView style={styles.safe} edges={['top']}>
             <StatusBar barStyle={theme.statusBar} />
             <View style={styles.topBar}>
               <TouchableOpacity onPress={() => setActivePiece(null)} style={styles.backBtn} hitSlop={10} activeOpacity={0.7}>
                 <Text style={styles.backText}>‹ Coach's Corner</Text>
               </TouchableOpacity>
-              <Text style={styles.topTitle} numberOfLines={1}>🗺️ Formations</Text>
+              <Text style={styles.topTitle} numberOfLines={1}>{explorer.icon} {explorer.title}</Text>
               <View style={styles.backBtn} />
             </View>
-            <FormationBrowser />
+            <Explorer />
           </SafeAreaView>
         </Animated.View>
       );
