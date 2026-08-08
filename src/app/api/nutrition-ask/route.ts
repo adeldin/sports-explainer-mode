@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createChatCompletion } from '../explain/llmProvider';
 
-// NutritionWise "Ask anything" endpoint. Lives in the SportsWise backend TEMPORARILY so it can
-// reuse this deployment's Groq/Gemini keys and llmProvider fallback — when NutritionWise gets its
+// PlateFluent "Ask anything" endpoint. Lives in the SportsWise backend TEMPORARILY so it can
+// reuse this deployment's Groq/Gemini keys and llmProvider fallback — when PlateFluent gets its
 // own Vercel project, move this file there and update ASK_URL in the mobile app (one constant).
 //
 // Guardrail architecture: the SYSTEM PROMPT is the filter. Education questions (food facts,
@@ -24,7 +24,7 @@ export async function OPTIONS() {
 
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-const SYSTEM_PROMPT = `You are the "Ask" feature inside NutritionWise, a nutrition education app. Your job is to teach everyday food and nutrition literacy in plain, friendly language to people who often feel confused or intimidated by nutrition.
+const SYSTEM_PROMPT = `You are the "Ask" feature inside PlateFluent, a nutrition education app. Your job is to teach everyday food and nutrition literacy in plain, friendly language to people who often feel confused or intimidated by nutrition.
 
 YOU ANSWER (education):
 - Food facts and comparisons ("Which has more calories per tablespoon, butter or margarine?"). For "is X healthier than Y" questions, skip the verdict and give what each food brings — most whole foods aren't simply better or worse.
@@ -42,7 +42,21 @@ When a question crosses the line, warmly decline in one short sentence and point
 STYLE:
 - 2 to 6 short sentences. Plain words; briefly define any technical term you use.
 - Never moralize or food-shame. Use frequency framing ("a sometimes food") instead of "bad food".
-- You are not a doctor or dietitian and never imply otherwise.`;
+- You are not a doctor or dietitian and never imply otherwise.
+
+SOURCES:
+When your answer states reference values, guidelines, or health claims, end your reply with a final line in EXACTLY this format:
+SOURCES: Name|URL; Name|URL
+Use ONLY these organizations and ONLY these exact URLs — never invent, modify, or deep-link:
+- NIH Office of Dietary Supplements|https://ods.od.nih.gov
+- CDC Nutrition|https://www.cdc.gov/nutrition
+- USDA MyPlate|https://www.myplate.gov
+- Dietary Guidelines for Americans|https://www.dietaryguidelines.gov
+- FDA Nutrition Facts Label|https://www.fda.gov/food/nutrition-facts-label
+- Mayo Clinic|https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating
+- Cleveland Clinic|https://health.clevelandclinic.org
+- American Heart Association|https://www.heart.org/en/healthy-living/healthy-eating
+Cite 1-2 that genuinely back the claim. For simple food comparisons or swaps with no health claim, omit the SOURCES line entirely.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,9 +76,30 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    const answer = completion.choices?.[0]?.message?.content?.trim();
-    if (!answer) throw new Error('empty completion');
-    return NextResponse.json({ answer }, { headers: corsHeaders });
+    const raw = completion.choices?.[0]?.message?.content?.trim();
+    if (!raw) throw new Error('empty completion');
+
+    // Peel the SOURCES line into structured data; whitelist-check every URL so
+    // a hallucinated link can never reach a phone.
+    const ALLOWED_HOSTS = new Set([
+      'ods.od.nih.gov', 'www.cdc.gov', 'www.myplate.gov', 'www.dietaryguidelines.gov',
+      'www.fda.gov', 'www.mayoclinic.org', 'health.clevelandclinic.org', 'www.heart.org',
+    ]);
+    let answer = raw;
+    const sources: { name: string; url: string }[] = [];
+    const m = raw.match(/\nSOURCES:\s*(.+)\s*$/i);
+    if (m) {
+      answer = raw.slice(0, m.index).trim();
+      for (const part of m[1].split(';')) {
+        const [name, url] = part.split('|').map(s => s?.trim());
+        try {
+          if (name && url && ALLOWED_HOSTS.has(new URL(url).hostname)) sources.push({ name, url });
+        } catch {
+          // malformed URL — drop it
+        }
+      }
+    }
+    return NextResponse.json({ answer, sources }, { headers: corsHeaders });
   } catch (e) {
     console.error('[nutrition-ask]', (e as Error)?.message || e);
     return NextResponse.json({ error: 'llm' }, { status: 502, headers: corsHeaders });
