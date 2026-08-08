@@ -175,6 +175,9 @@ const espnConfig: Record<string, EspnCfg> = {
   nationscup: { provider: 'zyla' },
   // Filter-only ESPN rugby leagues (no top-level tile): same Core-API two-step fetch as URC/MLR.
   sixnations: { sport: 'rugby', league: '180659', core: true },
+  superrugby: { sport: 'rugby', league: '242041', core: true },
+  seriea: { sport: 'soccer', league: 'ita.1' },
+  bundesliga: { sport: 'soccer', league: 'ger.1' },
   nationschamp: { sport: 'rugby', league: '17567', core: true },
   // Drop-in site-API leagues sharing existing logic: WNBA uses the generic
   // scoreboard lastPlay (like NBA); EPL/La Liga reuse the soccer keyEvents path.

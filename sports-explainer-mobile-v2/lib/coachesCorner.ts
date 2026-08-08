@@ -34,12 +34,10 @@ export type CCPieceId =
   | "pace-the-chase" | "bowl-or-change";                                       // cricket
 
 // Formations + read-the-play are soccer-only by construction.
-const SOCCER_KEYS: Sport[] = ["soccer", "epl", "laliga", "worldcup"];
-function isSoccer(sport: Sport): boolean { return SOCCER_KEYS.includes(sport); }
+import { isSoccer, isRugby } from "./leagueGroups";
 
 // Rugby ships under several competition keys; all of them get the rugby pieces.
-const RUGBY_KEYS: Sport[] = ["rugby", "mlr", "nationscup", "sixnations", "nationschamp"];
-function isRugby(sport: Sport): boolean { return RUGBY_KEYS.includes(sport); }
+
 
 // Which pieces does this sport have, at this level?
 // (level matters for Make the Call — a sport with no scenarios at this level shouldn't list it.

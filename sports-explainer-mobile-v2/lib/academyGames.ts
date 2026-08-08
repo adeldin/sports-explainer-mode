@@ -64,7 +64,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // and a future sport WITHOUT a glossary correctly won't surface this game.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'tennis', 'golf', 'cricket',
     ],
   },
   {
@@ -78,7 +78,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // league keys map to their category's bank, mirroring Match Up's allow-list.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'tennis', 'golf', 'cricket',
     ],
   },
   {
@@ -91,7 +91,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // golf are individual sports with no crests, so they never surface this game.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'cricket',
     ],
   },
   {
@@ -103,7 +103,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // Same live team pool as Crest Rush — same team-sport-only scoping.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'cricket',
     ],
   },
   {
@@ -116,7 +116,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // and golf have no league tables, so they never surface this game.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'cricket',
     ],
   },
   // Signal Decoder is WITHHELD from the Academy for this release — the referee art
@@ -135,7 +135,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // is included because the lib maps it to the (identical) NBA signal bank.
     supportedSports: [
       'mlb', 'nfl', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup',
       'rugby', 'mlr', 'cricket',
     ],
   },
@@ -150,7 +150,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // All 10 categories: each has a painted surface in FieldEngine.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'tennis', 'golf', 'cricket',
     ],
   },
   {
@@ -164,7 +164,7 @@ export const ACADEMY_GAMES: AcademyGame[] = [
     // drop offline). It composes the other games, so it lists every category.
     supportedSports: [
       'mlb', 'nfl', 'rugby', 'mlr', 'nba', 'wnba', 'nhl',
-      'soccer', 'epl', 'laliga', 'worldcup', 'tennis', 'golf', 'cricket',
+      'soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup', 'tennis', 'golf', 'cricket',
     ],
   },
 ];

@@ -19,7 +19,7 @@ export const ACADEMY_CATEGORIES: AcademyCategory[] = [
   { key: 'nba', label: 'NBA', emoji: '🏀', sportKeys: ['nba'] },
   { key: 'wnba', label: 'WNBA', emoji: '🏀', sportKeys: ['wnba'] },
   { key: 'nhl', label: 'NHL', emoji: '🏒', sportKeys: ['nhl'] },
-  { key: 'soccer', label: 'Soccer', emoji: '⚽', sportKeys: ['soccer', 'epl', 'laliga', 'worldcup'] },
+  { key: 'soccer', label: 'Soccer', emoji: '⚽', sportKeys: ['soccer', 'epl', 'laliga', 'seriea', 'bundesliga', 'worldcup'] },
   { key: 'rugby', label: 'Rugby', emoji: '🏉', sportKeys: ['rugby', 'mlr'] },
   { key: 'tennis', label: 'Tennis', emoji: '🎾', sportKeys: ['tennis'] },
   { key: 'golf', label: 'Golf', emoji: '⛳', sportKeys: ['golf'] },

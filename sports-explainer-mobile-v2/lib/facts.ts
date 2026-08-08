@@ -5,6 +5,18 @@ import { Sport } from './api';
 // localization before launch alongside the tennis/golf/cricket FAQ sets.
 
 // Rugby (URC) content, shared by the ESPN rugby leagues that reuse it (filter-only sixnations/nationschamp).
+// Generic soccer facts, shared by the leagues without their own bank
+// (Serie A / Bundesliga) — same aliasing pattern as RUGBY_FACTS.
+const SOCCER_FACTS: string[] = [
+    "Soccer is played by over 250 million players in more than 200 countries.",
+    "The fastest goal ever scored in professional soccer was after 2.8 seconds.",
+    "A soccer player runs approximately 7 miles per game.",
+    "The FIFA World Cup final is the most watched single sporting event on Earth.",
+    "Brazil is the only country to have played in every FIFA World Cup.",
+    "The first World Cup was held in Uruguay in 1930.",
+    "A regulation soccer ball has 32 panels — 20 hexagons and 12 pentagons."
+];
+
 const RUGBY_FACTS: string[] = [
   "Rugby was invented in 1823 when William Webb Ellis picked up a soccer ball and ran with it.",
   "The Rugby World Cup trophy is named the Webb Ellis Cup.",
@@ -52,15 +64,9 @@ const FACTS: Record<Sport, string[]> = {
     "NHL referees skate approximately 4-5 miles per game.",
     "The goalie mask was not widely used until 1959."
   ],
-  soccer: [
-    "Soccer is played by over 250 million players in more than 200 countries.",
-    "The fastest goal ever scored in professional soccer was after 2.8 seconds.",
-    "A soccer player runs approximately 7 miles per game.",
-    "The FIFA World Cup final is the most watched single sporting event on Earth.",
-    "Brazil is the only country to have played in every FIFA World Cup.",
-    "The first World Cup was held in Uruguay in 1930.",
-    "A regulation soccer ball has 32 panels — 20 hexagons and 12 pentagons."
-  ],
+  soccer: SOCCER_FACTS,
+  seriea: SOCCER_FACTS,
+  bundesliga: SOCCER_FACTS,
   worldcup: [
     "The FIFA World Cup trophy weighs 6.175 kg and is made of 18-carat gold.",
     "Brazil has won the most World Cups — 5 times.",
@@ -73,6 +79,7 @@ const FACTS: Record<Sport, string[]> = {
   rugby: RUGBY_FACTS,
   sixnations: RUGBY_FACTS,
   nationschamp: RUGBY_FACTS,
+  superrugby: RUGBY_FACTS,
   mlr: [
     "Major League Rugby was founded in 2018 — one of the newest professional leagues in the USA.",
     "MLR is the first Division 1 professional rugby union league in the United States.",
@@ -157,6 +164,40 @@ export type QuizQuestion = {
 };
 
 // Rugby (URC) quiz, shared by the ESPN rugby leagues that reuse it (filter-only sixnations/nationschamp).
+// Generic soccer quiz, shared by the leagues without their own bank
+// (Serie A / Bundesliga) — same aliasing pattern as RUGBY_QUIZ.
+const SOCCER_QUIZ: QuizQuestion[] = [
+    { q: "What year did MLS play its first season?", options: ["1990","1993","1996","2000"], answer: 2, explanation: "Major League Soccer kicked off its first season in 1996.", difficulty: "beginner" },
+    { q: "Which famous Argentine player joined Inter Miami in 2023?", options: ["Cristiano Ronaldo","Neymar","Lionel Messi","Karim Benzema"], answer: 2, explanation: "Lionel Messi signed with Inter Miami in 2023.", difficulty: "beginner" },
+    { q: "What is the 'Supporters' Shield'?", options: ["Award for top goal scorer","Trophy for the best regular-season record","A fan attendance award","The playoff trophy"], answer: 1, explanation: "The Supporters' Shield goes to the MLS team with the best regular-season record.", difficulty: "beginner" },
+    { q: "How long is a standard soccer match?", options: ["80 minutes","90 minutes","100 minutes","120 minutes"], answer: 1, explanation: "A match is 90 minutes, split into two 45-minute halves, plus stoppage time.", difficulty: "beginner" },
+    { q: "Which MLS club has won the most MLS Cups?", options: ["New England Revolution","LA Galaxy","D.C. United","Seattle Sounders"], answer: 1, explanation: "LA Galaxy has won five MLS Cup championships.", difficulty: "intermediate" },
+    { q: "What is the 'Designated Player' rule?", options: ["Limits foreign players","Lets clubs sign players whose salary exceeds the budget cap","Requires homegrown players","A salary floor rule"], answer: 1, explanation: "The Designated Player rule lets teams sign up to three players whose salaries exceed the cap.", difficulty: "intermediate" },
+    { q: "Who is MLS's all-time leading scorer?", options: ["David Villa","Landon Donovan","Chris Wondolowski","Josef Martinez"], answer: 2, explanation: "Chris Wondolowski scored 171 career goals, the MLS record.", difficulty: "intermediate" },
+    { q: "What is an 'offside' in soccer?", options: ["Being behind the last defender when the ball is played","Being ahead of the second-to-last defender when the ball is played to you","Touching the ball with your hands","Entering the penalty box early"], answer: 1, explanation: "You're offside if you're nearer the goal than the second-to-last defender when a teammate plays you the ball.", difficulty: "intermediate" },
+    { q: "What is 'gegenpressing'?", options: ["A deep defensive block","Immediately pressing to win the ball back right after losing it","A slow possession style","A long-ball strategy"], answer: 1, explanation: "Gegenpressing means counter-pressing instantly after losing the ball, before the opponent can organize.", difficulty: "expert" },
+    { q: "How does MLS's single-entity structure differ from European leagues?", options: ["Player contracts are owned by the league, and there's no promotion/relegation","Teams have no salary cap","Clubs are fully independent","It uses a draft only"], answer: 0, explanation: "MLS operates as a single entity — the league owns contracts — and has no promotion or relegation.", difficulty: "expert" },
+    { q: "What is the maximum number of Designated Players an MLS team can have?", options: ["2","3","4","5"], answer: 1, explanation: "Teams are allowed a maximum of three Designated Players.", difficulty: "expert" },
+    { q: "What do soccer players mostly use to move the ball?", options: ["Their feet","Their hands","Their elbows","Their helmets"], answer: 0, explanation: "Soccer is a feet-first game, like giving the ball tiny kicks on a walk.", difficulty: "kid" },
+    { q: "What is the main goal in a soccer game?", options: ["Score more goals than the other team","Hold the ball the longest","Sit on the grass the most","Kick the ball the highest"], answer: 0, explanation: "Both teams race to a bigger number on the scoreboard.", difficulty: "kid" },
+    { q: "What kind of ball is used in soccer?", options: ["A round soccer ball","A square stone","A tiny marble","A paper plane"], answer: 0, explanation: "It's a round, bouncy ball that rolls easily on the grass.", difficulty: "kid" },
+    { q: "How does a team score a goal?", options: ["By kicking the ball into the net","By catching the ball in a glove","By bouncing it into a hoop","By throwing it over a fence"], answer: 0, explanation: "A goal is like getting the ball into its special home.", difficulty: "kid" },
+    { q: "Who tries to stop the ball from going into the net?", options: ["The goalkeeper","The mascot","The snack seller","The announcer"], answer: 0, explanation: "The goalkeeper is like the castle guard protecting the goal.", difficulty: "kid" },
+    { q: "Who is the only player usually allowed to use their hands during play?", options: ["The goalkeeper","The striker","The referee","The coach"], answer: 0, explanation: "The goalkeeper can use their hands near the goal, like a special guard in a giant game of keep-away.", difficulty: "kid" },
+    { q: "What do soccer players wear on their feet to grip the grass?", options: ["Cleats","Ice skates","Flip-flops","Rain boots"], answer: 0, explanation: "Cleats have little grips underneath, like tiny teeth for the grass.", difficulty: "kid" },
+    { q: "What do players wear on their shins to protect their legs?", options: ["Shin guards","Knee pillows","Arm bands","Snow socks"], answer: 0, explanation: "Shin guards are like little shields for the front of your legs.", difficulty: "kid" },
+    { q: "What is it called when a player taps the ball along while moving?", options: ["Dribbling","Sleeping","Balancing","Jumping"], answer: 0, explanation: "Dribbling keeps the ball close with little taps, like guiding a puppy on a leash.", difficulty: "kid" },
+    { q: "What happens when a player passes the ball?", options: ["They send it to a teammate","They hide it in their shirt","They throw it into the crowd","They give it to the referee"], answer: 0, explanation: "Passing is like sharing a toy so the team can play together.", difficulty: "kid" },
+    { q: "What is the big rectangle with a net called?", options: ["The goal","The basket","The dugout","The rink"], answer: 0, explanation: "The goal is the big target players aim for when they shoot.", difficulty: "kid" },
+    { q: "What is it called when a player kicks the ball toward the goal?", options: ["A shot","A nap","A slide","A picnic"], answer: 0, explanation: "A shot is a try to score, like aiming for a target at recess.", difficulty: "kid" },
+    { q: "What does the referee do?", options: ["Helps make sure everyone follows the rules","Plays music for the players","Paints the ball","Counts the clouds"], answer: 0, explanation: "The referee is like a fair playground helper for the game.", difficulty: "kid" },
+    { q: "What does the team without the ball try to do?", options: ["Win the ball back","Give the other team cupcakes","Move the goal away","Sit in the grass"], answer: 0, explanation: "Trying to win the ball back is like a friendly game of tag.", difficulty: "kid" },
+    { q: "How many players are on the field for one team in regular soccer?", options: ["Eleven","Three","Twenty","Seven"], answer: 0, explanation: "Eleven players per team, like a whole class split into two big groups.", difficulty: "kid" },
+    { q: "What is the big grassy area where soccer is played called?", options: ["A field or pitch","A swimming lane","A skating rink","A classroom"], answer: 0, explanation: "Soccer is played on a big grass field, like a giant backyard for running and kicking.", difficulty: "kid" },
+    { q: "How far can a strong kick send the ball?", options: ["Across a big part of the field","Only one tiny step","Straight into the clouds","Under the grass"], answer: 0, explanation: "A powerful kick can make the ball zoom like it has wings.", difficulty: "kid" },
+    { q: "About how long does a normal soccer game last?", options: ["About 90 minutes, in two halves","Only five minutes total","All day with no breaks","Exactly ten minutes"], answer: 0, explanation: "A regular game is about 90 minutes — like two cartoon episodes back to back.", difficulty: "kid" },
+];
+
 const RUGBY_QUIZ: QuizQuestion[] = [
   { q: "How many players are on the field per team in rugby union?", options: ["13","14","15","16"], answer: 2, explanation: "Each rugby union team fields 15 players.", difficulty: "beginner" },
   { q: "How many points is a try worth in rugby union?", options: ["3","4","5","6"], answer: 2, explanation: "A try is worth 5 points.", difficulty: "beginner" },
@@ -471,37 +512,9 @@ export const QUIZ: Record<Sport, QuizQuestion[]> = {
     { q: "What is a 'technical foul'?", options: ["A penalty for unsportsmanlike conduct, not contact","A foul on a shooter","A loose-ball foul","A defensive three-seconds call"], answer: 0, explanation: "A technical foul is assessed for conduct violations (arguing, taunting, etc.) rather than physical contact, giving the other team a free throw.", difficulty: "intermediate" },
     { q: "What does 'parity' describe in a league like the WNBA?", options: ["Competitive balance, where many teams can contend","A scoring record","Equal player salaries","A tie game"], answer: 0, explanation: "Parity means the talent is spread so that many teams have a realistic chance to win, making for unpredictable seasons.", difficulty: "intermediate" },
   ],
-  soccer: [
-    { q: "What year did MLS play its first season?", options: ["1990","1993","1996","2000"], answer: 2, explanation: "Major League Soccer kicked off its first season in 1996.", difficulty: "beginner" },
-    { q: "Which famous Argentine player joined Inter Miami in 2023?", options: ["Cristiano Ronaldo","Neymar","Lionel Messi","Karim Benzema"], answer: 2, explanation: "Lionel Messi signed with Inter Miami in 2023.", difficulty: "beginner" },
-    { q: "What is the 'Supporters' Shield'?", options: ["Award for top goal scorer","Trophy for the best regular-season record","A fan attendance award","The playoff trophy"], answer: 1, explanation: "The Supporters' Shield goes to the MLS team with the best regular-season record.", difficulty: "beginner" },
-    { q: "How long is a standard soccer match?", options: ["80 minutes","90 minutes","100 minutes","120 minutes"], answer: 1, explanation: "A match is 90 minutes, split into two 45-minute halves, plus stoppage time.", difficulty: "beginner" },
-    { q: "Which MLS club has won the most MLS Cups?", options: ["New England Revolution","LA Galaxy","D.C. United","Seattle Sounders"], answer: 1, explanation: "LA Galaxy has won five MLS Cup championships.", difficulty: "intermediate" },
-    { q: "What is the 'Designated Player' rule?", options: ["Limits foreign players","Lets clubs sign players whose salary exceeds the budget cap","Requires homegrown players","A salary floor rule"], answer: 1, explanation: "The Designated Player rule lets teams sign up to three players whose salaries exceed the cap.", difficulty: "intermediate" },
-    { q: "Who is MLS's all-time leading scorer?", options: ["David Villa","Landon Donovan","Chris Wondolowski","Josef Martinez"], answer: 2, explanation: "Chris Wondolowski scored 171 career goals, the MLS record.", difficulty: "intermediate" },
-    { q: "What is an 'offside' in soccer?", options: ["Being behind the last defender when the ball is played","Being ahead of the second-to-last defender when the ball is played to you","Touching the ball with your hands","Entering the penalty box early"], answer: 1, explanation: "You're offside if you're nearer the goal than the second-to-last defender when a teammate plays you the ball.", difficulty: "intermediate" },
-    { q: "What is 'gegenpressing'?", options: ["A deep defensive block","Immediately pressing to win the ball back right after losing it","A slow possession style","A long-ball strategy"], answer: 1, explanation: "Gegenpressing means counter-pressing instantly after losing the ball, before the opponent can organize.", difficulty: "expert" },
-    { q: "How does MLS's single-entity structure differ from European leagues?", options: ["Player contracts are owned by the league, and there's no promotion/relegation","Teams have no salary cap","Clubs are fully independent","It uses a draft only"], answer: 0, explanation: "MLS operates as a single entity — the league owns contracts — and has no promotion or relegation.", difficulty: "expert" },
-    { q: "What is the maximum number of Designated Players an MLS team can have?", options: ["2","3","4","5"], answer: 1, explanation: "Teams are allowed a maximum of three Designated Players.", difficulty: "expert" },
-    { q: "What do soccer players mostly use to move the ball?", options: ["Their feet","Their hands","Their elbows","Their helmets"], answer: 0, explanation: "Soccer is a feet-first game, like giving the ball tiny kicks on a walk.", difficulty: "kid" },
-    { q: "What is the main goal in a soccer game?", options: ["Score more goals than the other team","Hold the ball the longest","Sit on the grass the most","Kick the ball the highest"], answer: 0, explanation: "Both teams race to a bigger number on the scoreboard.", difficulty: "kid" },
-    { q: "What kind of ball is used in soccer?", options: ["A round soccer ball","A square stone","A tiny marble","A paper plane"], answer: 0, explanation: "It's a round, bouncy ball that rolls easily on the grass.", difficulty: "kid" },
-    { q: "How does a team score a goal?", options: ["By kicking the ball into the net","By catching the ball in a glove","By bouncing it into a hoop","By throwing it over a fence"], answer: 0, explanation: "A goal is like getting the ball into its special home.", difficulty: "kid" },
-    { q: "Who tries to stop the ball from going into the net?", options: ["The goalkeeper","The mascot","The snack seller","The announcer"], answer: 0, explanation: "The goalkeeper is like the castle guard protecting the goal.", difficulty: "kid" },
-    { q: "Who is the only player usually allowed to use their hands during play?", options: ["The goalkeeper","The striker","The referee","The coach"], answer: 0, explanation: "The goalkeeper can use their hands near the goal, like a special guard in a giant game of keep-away.", difficulty: "kid" },
-    { q: "What do soccer players wear on their feet to grip the grass?", options: ["Cleats","Ice skates","Flip-flops","Rain boots"], answer: 0, explanation: "Cleats have little grips underneath, like tiny teeth for the grass.", difficulty: "kid" },
-    { q: "What do players wear on their shins to protect their legs?", options: ["Shin guards","Knee pillows","Arm bands","Snow socks"], answer: 0, explanation: "Shin guards are like little shields for the front of your legs.", difficulty: "kid" },
-    { q: "What is it called when a player taps the ball along while moving?", options: ["Dribbling","Sleeping","Balancing","Jumping"], answer: 0, explanation: "Dribbling keeps the ball close with little taps, like guiding a puppy on a leash.", difficulty: "kid" },
-    { q: "What happens when a player passes the ball?", options: ["They send it to a teammate","They hide it in their shirt","They throw it into the crowd","They give it to the referee"], answer: 0, explanation: "Passing is like sharing a toy so the team can play together.", difficulty: "kid" },
-    { q: "What is the big rectangle with a net called?", options: ["The goal","The basket","The dugout","The rink"], answer: 0, explanation: "The goal is the big target players aim for when they shoot.", difficulty: "kid" },
-    { q: "What is it called when a player kicks the ball toward the goal?", options: ["A shot","A nap","A slide","A picnic"], answer: 0, explanation: "A shot is a try to score, like aiming for a target at recess.", difficulty: "kid" },
-    { q: "What does the referee do?", options: ["Helps make sure everyone follows the rules","Plays music for the players","Paints the ball","Counts the clouds"], answer: 0, explanation: "The referee is like a fair playground helper for the game.", difficulty: "kid" },
-    { q: "What does the team without the ball try to do?", options: ["Win the ball back","Give the other team cupcakes","Move the goal away","Sit in the grass"], answer: 0, explanation: "Trying to win the ball back is like a friendly game of tag.", difficulty: "kid" },
-    { q: "How many players are on the field for one team in regular soccer?", options: ["Eleven","Three","Twenty","Seven"], answer: 0, explanation: "Eleven players per team, like a whole class split into two big groups.", difficulty: "kid" },
-    { q: "What is the big grassy area where soccer is played called?", options: ["A field or pitch","A swimming lane","A skating rink","A classroom"], answer: 0, explanation: "Soccer is played on a big grass field, like a giant backyard for running and kicking.", difficulty: "kid" },
-    { q: "How far can a strong kick send the ball?", options: ["Across a big part of the field","Only one tiny step","Straight into the clouds","Under the grass"], answer: 0, explanation: "A powerful kick can make the ball zoom like it has wings.", difficulty: "kid" },
-    { q: "About how long does a normal soccer game last?", options: ["About 90 minutes, in two halves","Only five minutes total","All day with no breaks","Exactly ten minutes"], answer: 0, explanation: "A regular game is about 90 minutes — like two cartoon episodes back to back.", difficulty: "kid" },
-  ],
+  soccer: SOCCER_QUIZ,
+  seriea: SOCCER_QUIZ,
+  bundesliga: SOCCER_QUIZ,
   worldcup: [
     { q: "How often is the FIFA World Cup held?", options: ["Every 2 years","Every 3 years","Every 4 years","Every 5 years"], answer: 2, explanation: "The World Cup is held every four years.", difficulty: "beginner" },
     { q: "Which country has won the most FIFA World Cups?", options: ["Germany","Argentina","Italy","Brazil"], answer: 3, explanation: "Brazil has won a record five World Cups.", difficulty: "beginner" },
@@ -532,6 +545,7 @@ export const QUIZ: Record<Sport, QuizQuestion[]> = {
   rugby: RUGBY_QUIZ,
   sixnations: RUGBY_QUIZ,
   nationschamp: RUGBY_QUIZ,
+  superrugby: RUGBY_QUIZ,
   mlr: [
     { q: "What does MLR stand for?", options: ["Major League Rugby","Major League Rugby Americas","Modern League Rugby","Major League Rugby Union"], answer: 0, explanation: "MLR is Major League Rugby, the top professional rugby union league in the United States.", difficulty: "beginner" },
     { q: "In what year was Major League Rugby founded?", options: ["2014","2016","2018","2020"], answer: 2, explanation: "Major League Rugby was founded in 2018.", difficulty: "beginner" },

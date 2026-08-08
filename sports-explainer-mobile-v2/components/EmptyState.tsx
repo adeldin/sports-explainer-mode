@@ -18,7 +18,8 @@ interface Props {
 
 const SPORT_EMOJI: Record<string, string> = {
   mlb: '⚾', nfl: '🏈', nba: '🏀', nhl: '🏒', soccer: '⚽', worldcup: '🌍', rugby: '🏉',
-  wnba: '🏀', epl: '⚽', laliga: '⚽', mlr: '🏉', nationscup: '🏉', tennis: '🎾', golf: '⛳', cricket: '🏏',
+  wnba: '🏀', epl: '⚽', laliga: '⚽', seriea: '⚽', bundesliga: '⚽', mlr: '🏉', nationscup: '🏉', superrugby: '🏉',
+  sixnations: '🏉', nationschamp: '🏉', tennis: '🎾', golf: '⛳', cricket: '🏏',
 };
 
 export default function EmptyState({ sport, reason, language, seasonEnded, onFindNextGame }: Props) {
@@ -38,7 +39,8 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
   const names: Record<string, string> = {
     mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
     soccer: S.spSoccer, worldcup: S.spWorldCup, rugby: S.spRugby,
-    wnba: S.spWnba, epl: S.spPremierLeague, laliga: S.spLaLiga, mlr: S.spMlr, nationscup: S.spNationsCup,
+    wnba: S.spWnba, epl: S.spPremierLeague, laliga: S.spLaLiga, seriea: S.spSerieA, bundesliga: S.spBundesliga,
+    mlr: S.spMlr, nationscup: S.spNationsCup, superrugby: S.spSuperRugby,
     tennis: S.spTennis, golf: S.spGolf, cricket: S.spCricket,
   };
   const sportName = names[sport] || sport.toUpperCase();

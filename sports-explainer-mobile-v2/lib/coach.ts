@@ -44,7 +44,7 @@ export interface CoachSituation {
 }
 
 // Soccer league keys whose coach state carries a pulse (not the football/baseball situation fields).
-const SOCCER_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
+import { isSoccer } from './leagueGroups';
 
 export interface CoachFull { strategicRead: string; whatItSetsUp: string }
 
@@ -52,7 +52,7 @@ export interface CoachFull { strategicRead: string; whatItSetsUp: string }
 // per-sport fields needed to coach, NOT a hardcoded sport allowlist. Insufficient → coming-soon.
 export function hasSufficientState(sport: string, s: CoachSituation | null): boolean {
   if (!s) return false;
-  if (SOCCER_KEYS.includes(sport)) return !!s.pulse;   // soccer (Gate B): a computed pulse is enough
+  if (isSoccer(sport)) return !!s.pulse;   // soccer (Gate B): a computed pulse is enough
   if (sport === 'nationscup') return !!s.rugbyPulse;   // rugby: structured Zyla stats present
   if (sport === 'nfl') return typeof s.down === 'number' && s.down > 0;
   if (sport === 'mlb') return typeof s.balls === 'number' && typeof s.outs === 'number';

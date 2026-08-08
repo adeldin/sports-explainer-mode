@@ -8,6 +8,10 @@ import { useTheme, Theme } from '../lib/theme';
 import type { Sport } from '../lib/api';
 import { findUpcomingGames, groupByDay, UpcomingGame, UPCOMING_HORIZON_DAYS } from '../lib/upcomingGames';
 import { loadStarred, starGame, unstarGame, MAX_ALERTS } from '../lib/gameAlerts';
+import {
+  loadFollowedTeams, followTeam, unfollowTeam, isFollowed,
+  FollowedTeam, MAX_TEAMS, FIXTURES_PER_TEAM,
+} from '../lib/teamAlerts';
 
 // Next Game Finder — the replacement for the "no games today" dead end.
 //
@@ -28,20 +32,74 @@ export default function NextGameFinder({
   const [games, setGames] = useState<UpcomingGame[]>([]);
   const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [followed, setFollowed] = useState<FollowedTeam[]>([]);
+  const [showTeams, setShowTeams] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [found, starred] = await Promise.all([findUpcomingGames(sport), loadStarred()]);
+      const [found, starred, teams] = await Promise.all([
+        findUpcomingGames(sport), loadStarred(), loadFollowedTeams(),
+      ]);
       if (cancelled) return;
       setGames(found);
       setStarredIds(new Set(starred.map(s => s.id)));
+      setFollowed(teams);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [visible, sport]);
+
+  // The distinct teams appearing in this list — derived, so following costs no extra fetch. Only
+  // teams whose ESPN id came through are offered: an abbreviation alone can't key an alert safely.
+  const teamsInList = useMemo(() => {
+    const seen = new Map<string, FollowedTeam>();
+    for (const g of games) {
+      for (const [id, name, abbr] of [
+        [g.homeId, g.homeName ?? g.homeTeam, g.homeTeam],
+        [g.awayId, g.awayName ?? g.awayTeam, g.awayTeam],
+      ] as [string | undefined, string, string][]) {
+        if (!id) continue;
+        const key = `${g.sport}:${id}`;
+        if (!seen.has(key)) seen.set(key, { teamId: id, sport: g.sport, name, abbr });
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [games]);
+
+  const toggleTeam = useCallback(async (team: FollowedTeam) => {
+    const key = `team:${team.sport}:${team.teamId}`;
+    if (busyId) return;
+    setBusyId(key);
+    await Haptics.selectionAsync();
+    try {
+      if (isFollowed(followed, team.sport, team.teamId)) {
+        await unfollowTeam(team.sport, team.teamId);
+        setFollowed(prev => prev.filter(t => !(t.sport === team.sport && t.teamId === team.teamId)));
+        return;
+      }
+      const res = await followTeam(team);
+      if (res.ok) {
+        setFollowed(prev => [...prev, team]);
+        return;
+      }
+      if (res.reason === 'full') {
+        Alert.alert('Following a lot of teams',
+          `You can follow up to ${MAX_TEAMS} teams. Unfollow one to make room.`);
+      } else if (res.reason === 'permission') {
+        Alert.alert('Notifications are off',
+          'SportsWise needs notification permission to tell you when your team plays. Turn it on in Settings → Notifications → SportsWise.');
+      } else if (res.reason === 'unsupported') {
+        setFollowed(prev => [...prev, team]);
+        Alert.alert('Saved, but no alert here',
+          "This team is saved. Alerts only fire on a real device with the installed app — not in Expo Go or a simulator.");
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }, [busyId, followed]);
 
   const toggle = useCallback(async (g: UpcomingGame) => {
     if (busyId) return;
@@ -122,6 +180,47 @@ export default function NextGameFinder({
             <Text style={styles.hint}>
               Star a game and we'll send you a notification the moment it starts.
             </Text>
+
+            {/* Follow a TEAM — a standing rule rather than a one-off. Collapsed by default so the
+                answer to "when's the next game" stays the first thing on screen. */}
+            {teamsInList.length > 0 && (
+              <View style={styles.teamsBlock}>
+                <TouchableOpacity
+                  style={styles.teamsHeader}
+                  onPress={() => { Haptics.selectionAsync(); setShowTeams(v => !v); }}
+                  activeOpacity={0.8}>
+                  <Text style={styles.teamsTitle}>
+                    Follow a team{followed.length ? ` · ${followed.length} followed` : ''}
+                  </Text>
+                  <Text style={styles.teamsChevron}>{showTeams ? '▾' : '▸'}</Text>
+                </TouchableOpacity>
+                {showTeams && (
+                  <>
+                    <Text style={styles.teamsBlurb}>
+                      We'll alert you for their next {FIXTURES_PER_TEAM} games, and keep it topped up
+                      as new fixtures are scheduled.
+                    </Text>
+                    {teamsInList.map(t => {
+                      const on = isFollowed(followed, t.sport, t.teamId);
+                      const key = `team:${t.sport}:${t.teamId}`;
+                      return (
+                        <TouchableOpacity
+                          key={key}
+                          style={[styles.row, on && styles.rowOn]}
+                          onPress={() => toggleTeam(t)}
+                          activeOpacity={0.8}
+                          disabled={busyId === key}>
+                          <Text style={styles.teamName} numberOfLines={1}>{t.name}</Text>
+                          {busyId === key
+                            ? <ActivityIndicator color={theme.textSecondary} />
+                            : <Text style={[styles.star, on && styles.starOn]}>{on ? '🔔' : '🔕'}</Text>}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </>
+                )}
+              </View>
+            )}
             {grouped.map(section => (
               <View key={section.day} style={styles.section}>
                 <Text style={styles.dayLabel}>{section.label}</Text>
@@ -194,4 +293,16 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   meta: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600' },
   star: { fontSize: 22, color: t.textSecondary },
   starOn: { color: t.accent },
+
+  // Follow-a-team block.
+  teamsBlock: { gap: 6, marginBottom: 6 },
+  teamsHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: t.explanationBg, borderRadius: 10, borderWidth: 1, borderColor: t.border,
+    paddingHorizontal: 14, paddingVertical: 11,
+  },
+  teamsTitle: { color: t.textPrimary, fontSize: 14, fontWeight: '800' },
+  teamsChevron: { color: t.textSecondaryOnDark, fontSize: 14, fontWeight: '800' },
+  teamsBlurb: { color: t.textSecondaryOnDark, fontSize: 12, lineHeight: 17, marginBottom: 2 },
+  teamName: { flex: 1, color: t.textPrimary, fontSize: 14.5, fontWeight: '700' },
 });

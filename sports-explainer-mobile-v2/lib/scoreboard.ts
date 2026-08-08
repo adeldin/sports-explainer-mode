@@ -76,6 +76,10 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   wnba: { espnSport: 'basketball', league: 'wnba' },
   epl: { espnSport: 'soccer', league: 'eng.1' },
   laliga: { espnSport: 'soccer', league: 'esp.1' },
+  // Serie A + Bundesliga — same ESPN site-API shape as EPL/La Liga (verified: two competitors with
+  // logos, summary with boxscore teams). No new provider, no key.
+  seriea: { espnSport: 'soccer', league: 'ita.1' },
+  bundesliga: { espnSport: 'soccer', league: 'ger.1' },
   mlr: { espnSport: 'rugby', league: '289262', core: true },
   // World Rugby Nations Cup (internal key 'nationscup', comp_id 726) — Zyla-sourced, NOT on ESPN.
   // The provider:'zyla' branch in fetchScoreboard diverts to fetchZylaBoard before the ESPN path.
@@ -83,6 +87,11 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   // Filter-only ESPN rugby leagues (NO top-level tile) — folded into the Rugby board via the league
   // filter in a later gate. Same Core-API two-step fetch as URC/MLR (espnSport 'rugby').
   sixnations: { espnSport: 'rugby', league: '180659', core: true },
+  // Super Rugby Pacific (Australia / New Zealand / Pacific Islands), season Feb–June — the half of
+  // the calendar URC and the Six Nations leave empty. The league identifier is ESPN's SLUG (242041),
+  // NOT its numeric league id (8326): the numeric id returns zero events from the core events
+  // endpoint. Same convention as every other rugby key here — 270557 and 289262 are slugs too.
+  superrugby: { espnSport: 'rugby', league: '242041', core: true },
   nationschamp: { espnSport: 'rugby', league: '17567', core: true },
   // Learn Mode sports — tennis/golf fetch tournament context.
   tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
@@ -569,6 +578,7 @@ export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'nationscup', label: 'Nations Cup' },
   { sportKey: 'sixnations', label: 'Six Nations' },
   { sportKey: 'nationschamp', label: 'Nations Championship' },
+  { sportKey: 'superrugby', label: 'Super Rugby' },
 ];
 
 export async function fetchRugbyBoard(
@@ -605,6 +615,8 @@ export const SOCCER_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'soccer', label: 'MLS' },
   { sportKey: 'epl', label: 'Premier League' },
   { sportKey: 'laliga', label: 'La Liga' },
+  { sportKey: 'seriea', label: 'Serie A' },
+  { sportKey: 'bundesliga', label: 'Bundesliga' },
   { sportKey: 'worldcup', label: 'World Cup' },
 ];
 

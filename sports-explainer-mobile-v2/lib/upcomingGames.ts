@@ -28,6 +28,12 @@ export interface UpcomingGame {
   awayTeam: string;
   startTime: number;      // epoch ms — the whole point of the record
   leagueLabel?: string;   // "Premier League" etc, for merged tiles where the tile name isn't enough
+  // ESPN team ids + full names. Carried so a user can follow a TEAM from this list: an abbreviation
+  // is not a safe key (they collide across leagues), and the id is already in the response.
+  homeId?: string;
+  awayId?: string;
+  homeName?: string;
+  awayName?: string;
 }
 
 // How far ahead to look. Long enough to cross a normal off-week or an international break, short
@@ -84,6 +90,10 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
         awayTeam: nameOf(away),
         startTime,
         leagueLabel: label,
+        homeId: home?.team?.id ? String(home.team.id) : undefined,
+        awayId: away?.team?.id ? String(away.team.id) : undefined,
+        homeName: home?.team?.displayName || undefined,
+        awayName: away?.team?.displayName || undefined,
       });
     }
     return out;
