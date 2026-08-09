@@ -40,7 +40,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
     mlb: S.spBaseball, nfl: S.spFootball, nba: S.spBasketball, nhl: S.spHockey,
     soccer: S.spSoccer, worldcup: S.spWorldCup, rugby: S.spRugby,
     wnba: S.spWnba, epl: S.spPremierLeague, laliga: S.spLaLiga, seriea: S.spSerieA, bundesliga: S.spBundesliga,
-    mlr: S.spMlr, nationscup: S.spNationsCup, superrugby: S.spSuperRugby,
+    mlr: S.spMlr, nationscup: S.spRugbySport, superrugby: S.spSuperRugby,
     tennis: S.spTennis, golf: S.spGolf, cricket: S.spCricket,
   };
   const sportName = names[sport] || sport.toUpperCase();
