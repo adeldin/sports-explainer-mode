@@ -8,6 +8,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { Language, Sport } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORTS, SPORT_FULL_NAME } from '../lib/sports';
+import AppIcon from './AppIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -148,7 +149,7 @@ export default function Onboarding({ language, onComplete }: Props) {
               key={s.key}
               style={[styles.sportTile, selectedSport === s.key && styles.sportTileActive]}
               onPress={() => setSelectedSport(s.key)}>
-              <Text style={styles.sportEmoji}>{s.emoji}</Text>
+              <AppIcon emoji={s.emoji} size={36} style={styles.sportEmoji} />
               <Text style={[styles.sportLabel, selectedSport === s.key && styles.sportLabelActive]}>
                 {s.label}
               </Text>

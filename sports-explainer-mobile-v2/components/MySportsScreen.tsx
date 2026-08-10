@@ -5,6 +5,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { useAppState } from '../lib/appState';
 import { UI_STRINGS } from '../lib/strings';
 import { SPORTS, orderSports, type SportTab } from '../lib/sports';
+import AppIcon from './AppIcon';
 
 // Shared state comes from AppStateProvider; the only prop is the navigation hook
 // (the stack owns the back action).
@@ -69,7 +70,7 @@ export default function MySportsScreen({ navigation }: Props) {
             const isLast = i === order.length - 1;
             return (
               <View key={key} style={styles.row}>
-                <Text style={styles.emoji}>{s.emoji}</Text>
+                <AppIcon emoji={s.emoji} size={20} style={styles.emoji} />
                 <Text style={[styles.name, !vis && styles.nameHidden]} numberOfLines={1} ellipsizeMode="tail">{s.label}</Text>
                 <View style={styles.arrows}>
                   <TouchableOpacity onPress={() => move(i, -1)} disabled={isFirst} style={styles.arrowBtn}>

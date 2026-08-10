@@ -57,6 +57,7 @@ import EscapeOrHeroGame from '../components/academy/EscapeOrHeroGame';
 import PaceTheChaseGame from '../components/academy/PaceTheChaseGame';
 import BowlOrChangeGame from '../components/academy/BowlOrChangeGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
+import AppIcon from '../components/AppIcon';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
 // icon/title + the Component), so the id is just a local label; `as any` at the call site keeps it off
@@ -290,7 +291,7 @@ export default function CoachesCornerScreen() {
             <View style={styles.pieceGrid}>
               {pieces.map(p => (
                 <TouchableOpacity key={p} style={styles.pieceTile} activeOpacity={0.8} onPress={() => setActivePiece(p)}>
-                  <Text style={styles.pieceIcon}>{PIECE_META[p].icon}</Text>
+                  <AppIcon emoji={PIECE_META[p].icon} size={28} style={styles.pieceIcon} />
                   <Text style={styles.pieceTitle} numberOfLines={1}>{PIECE_META[p].title}</Text>
                 </TouchableOpacity>
               ))}

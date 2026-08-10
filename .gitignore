@@ -54,6 +54,16 @@ sports-explainer-v1.zip
 *.mp4
 .rapidapi.env
 
+# ── Exceptions to the blanket *.png rule above ───────────────────────────────────────────────
+# Bundled app ARTWORK is a committed build INPUT, not a build output. It must be in git for two
+# reasons: Metro resolves these paths at build time (a missing file breaks the build), and git
+# history is the documented way to roll an icon back to a previous version — see the revert ladder
+# in sports-explainer-mobile-v2/lib/iconAssets.ts. Without these negations the art would be
+# invisible to git and "revert the icon I don't like" would be impossible.
+!sports-explainer-mobile-v2/assets/icons/*.png
+!sports-explainer-mobile-v2/assets/characters/*.png
+!sports-explainer-mobile-v2/assets/coach/*.png
+
 # design spikes (Coach's Corner visual workbench — lives on desk, not in repo)
 coaches-corner-spikes/
 

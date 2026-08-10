@@ -1,6 +1,7 @@
 import { ScrollView, TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useMemo } from 'react';
 import { useTheme, Theme } from '../lib/theme';
+import AppIcon from './AppIcon';
 
 // Shared presentational sport/category strip — extracted from the byte-identical inline pickers in
 // AcademyScreen + LiveScreen (and reused by Coach's Corner). Knows nothing about sports: it takes
@@ -36,7 +37,7 @@ export default function SportStrip({
               onPress={() => { if (!isDisabled) onSelect(it.key); }}
               activeOpacity={isDisabled ? 1 : 0.2}
               accessibilityState={{ disabled: isDisabled }}>
-              <Text style={styles.sportEmoji}>{it.emoji}</Text>
+              <AppIcon emoji={it.emoji} size={20} style={styles.sportEmoji} />
               <Text style={[styles.sportLabel, active && styles.sportLabelActive]} numberOfLines={1}>{it.label}</Text>
             </TouchableOpacity>
           );
