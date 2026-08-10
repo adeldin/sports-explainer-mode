@@ -24,6 +24,7 @@ import DidYouKnow from '../components/DidYouKnow';
 import RankCard from '../components/RankCard';
 import GameHost from '../components/academy/GameHost';
 import SportStrip from '../components/SportStrip';
+import AppIcon from '../components/AppIcon';
 
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
@@ -217,7 +218,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
                   onPress={() => openGame(visibleGames[0].id)}>
                   <Text style={styles.heroKicker}>FEATURED</Text>
                   <View style={styles.heroRow}>
-                    <Text style={styles.heroIcon}>{visibleGames[0].icon}</Text>
+                    <AppIcon emoji={visibleGames[0].icon} size={34} style={styles.heroIcon} />
                     <View style={styles.heroTextCol}>
                       <Text style={styles.heroTitle}>{visibleGames[0].title}</Text>
                       <Text style={styles.heroBlurb}>{visibleGames[0].blurb}</Text>
@@ -238,7 +239,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
                     style={styles.gameTile}
                     activeOpacity={0.8}
                     onPress={() => openGame(g.id)}>
-                    <Text style={styles.gameTileIcon}>{g.icon}</Text>
+                    <AppIcon emoji={g.icon} size={28} style={styles.gameTileIcon} />
                     <Text style={styles.gameTileTitle} numberOfLines={1}>{g.title}</Text>
                   </TouchableOpacity>
                 ))}

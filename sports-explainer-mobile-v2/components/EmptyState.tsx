@@ -4,6 +4,7 @@ import { useTheme, Theme } from '../lib/theme';
 import { Language } from '../lib/api';
 import { UI_STRINGS } from '../lib/strings';
 import { MONTHS, SEASON_WINDOWS, isOffSeason } from '../lib/sports';
+import AppIcon from './AppIcon';
 
 interface Props {
   sport: string;
@@ -68,7 +69,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
       : S.offSeasonSub;
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{emoji}</Text>
+        <AppIcon emoji={emoji} size={56} style={styles.emoji} />
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{seasonSub}</Text>
         {findBtn}
@@ -80,7 +81,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
   if (reason === 'no-games' && sport === 'worldcup') {
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{emoji}</Text>
+        <AppIcon emoji={emoji} size={56} style={styles.emoji} />
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{S.worldCupRuns}</Text>
         {findBtn}
@@ -101,7 +102,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
   if (reason === 'no-games' && (sport === 'tennis' || sport === 'golf')) {
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{emoji}</Text>
+        <AppIcon emoji={emoji} size={56} style={styles.emoji} />
         <Text style={styles.title}>{S.noTournaments}</Text>
         <Text style={styles.subtitle}>{S.noTournamentsSub}</Text>
       </View>
@@ -115,7 +116,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
       : S.seasonRuns.replace('{start}', MONTHS[w.start - 1]).replace('{end}', MONTHS[w.end - 1]);
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>{emoji}</Text>
+        <AppIcon emoji={emoji} size={56} style={styles.emoji} />
         <Text style={styles.title}>{S.seasonTitle.replace('{sport}', sportName)}</Text>
         <Text style={styles.subtitle}>{seasonSub}</Text>
         {findBtn}
@@ -126,7 +127,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
   // no-games
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>{emoji}</Text>
+      <AppIcon emoji={emoji} size={56} style={styles.emoji} />
       <Text style={styles.title}>{S.noGames.replace('{sport}', sportName)}</Text>
       <Text style={styles.subtitle}>{S.pullRefresh}</Text>
       {findBtn}

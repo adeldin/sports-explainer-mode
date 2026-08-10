@@ -1,0 +1,218 @@
+{
+  "football": {
+    "emoji": "🏈",
+    "promptHash": "4c77603cf2a2",
+    "stripped": true,
+    "bytes": 603132
+  },
+  "basketball": {
+    "emoji": "🏀",
+    "promptHash": "421afbc81e64",
+    "stripped": true,
+    "bytes": 682138
+  },
+  "soccer": {
+    "emoji": "⚽",
+    "promptHash": "9e6d6ec77b9f",
+    "stripped": true,
+    "bytes": 240306
+  },
+  "baseball": {
+    "emoji": "⚾",
+    "promptHash": "817404cfa0b7",
+    "stripped": true,
+    "bytes": 266566
+  },
+  "rugby": {
+    "emoji": "🏉",
+    "promptHash": "b88bc48eea3a",
+    "stripped": true,
+    "bytes": 345734
+  },
+  "hockey": {
+    "emoji": "🏒",
+    "promptHash": "b45b567563fa",
+    "stripped": true,
+    "bytes": 295144
+  },
+  "tennis": {
+    "emoji": "🎾",
+    "promptHash": "47d2c665cbf2",
+    "stripped": true,
+    "bytes": 612678
+  },
+  "golf": {
+    "emoji": "⛳",
+    "promptHash": "432d443fb66e",
+    "stripped": true,
+    "bytes": 289076
+  },
+  "cricket": {
+    "emoji": "🏏",
+    "promptHash": "6c744850b29b",
+    "stripped": true,
+    "bytes": 360826
+  },
+  "handball": {
+    "emoji": "🤾",
+    "promptHash": "8961af65b02f",
+    "stripped": true,
+    "bytes": 300408
+  },
+  "target": {
+    "emoji": "🎯",
+    "promptHash": "69ade2b6d1b5",
+    "stripped": true,
+    "bytes": 632284
+  },
+  "stopwatch": {
+    "emoji": "⏱️",
+    "promptHash": "a6029f4e5363",
+    "stripped": true,
+    "bytes": 393474
+  },
+  "shield": {
+    "emoji": "🛡️",
+    "promptHash": "0a440fe4bffc",
+    "stripped": true,
+    "bytes": 496948
+  },
+  "clipboard": {
+    "emoji": "📋",
+    "promptHash": "5d115166af54",
+    "stripped": true,
+    "bytes": 288708
+  },
+  "flag": {
+    "emoji": "🚩",
+    "promptHash": "ecba0fdd5c40",
+    "stripped": true,
+    "bytes": 436112
+  },
+  "brain": {
+    "emoji": "🧠",
+    "promptHash": "a5134399127a",
+    "stripped": true,
+    "bytes": 706708
+  },
+  "speak": {
+    "emoji": "🗣️",
+    "promptHash": "9ea79cfa549d",
+    "stripped": true,
+    "bytes": 469494
+  },
+  "glove": {
+    "emoji": "🧤",
+    "promptHash": "541d9ad57a57",
+    "stripped": true,
+    "bytes": 791904
+  },
+  "cap": {
+    "emoji": "🧢",
+    "promptHash": "0da770acae06",
+    "stripped": true,
+    "bytes": 538252
+  },
+  "runner": {
+    "emoji": "🏃",
+    "promptHash": "903bab9c0ead",
+    "stripped": true,
+    "bytes": 338886
+  },
+  "scales": {
+    "emoji": "⚖️",
+    "promptHash": "bc9b4f3f82ec",
+    "stripped": true,
+    "bytes": 315968
+  },
+  "ruler": {
+    "emoji": "📏",
+    "promptHash": "4062d917df30",
+    "stripped": true,
+    "bytes": 317138
+  },
+  "pin": {
+    "emoji": "📍",
+    "promptHash": "add9334cc0ac",
+    "stripped": true,
+    "bytes": 407486
+  },
+  "numbers": {
+    "emoji": "🔢",
+    "promptHash": "4df185a150ce",
+    "stripped": true,
+    "bytes": 626428
+  },
+  "swap": {
+    "emoji": "🔄",
+    "promptHash": "4468ee7cfb47",
+    "stripped": true,
+    "bytes": 461914
+  },
+  "tv": {
+    "emoji": "📺",
+    "promptHash": "a3b917c3ce3d",
+    "stripped": true,
+    "bytes": 456396
+  },
+  "bolt": {
+    "emoji": "⚡",
+    "promptHash": "37ebebf791a6",
+    "stripped": true,
+    "bytes": 266508
+  },
+  "impact": {
+    "emoji": "💥",
+    "promptHash": "c6441ecd74c8",
+    "stripped": true,
+    "bytes": 516492
+  },
+  "alert": {
+    "emoji": "🚨",
+    "promptHash": "a4c9f2f5fda9",
+    "stripped": true,
+    "bytes": 529440
+  },
+  "wave": {
+    "emoji": "👋",
+    "promptHash": "f83848f83c1e",
+    "stripped": true,
+    "bytes": 371148
+  },
+  "map": {
+    "emoji": "🗺️",
+    "promptHash": "fd9abb687064",
+    "stripped": true,
+    "bytes": 717188
+  },
+  "mic": {
+    "emoji": "🎙️",
+    "promptHash": "9e8995126eed",
+    "stripped": true,
+    "bytes": 349826
+  },
+  "puzzle": {
+    "emoji": "🧩",
+    "promptHash": "5d3097ddfe74",
+    "stripped": true,
+    "bytes": 475714
+  },
+  "palette": {
+    "emoji": "🎨",
+    "promptHash": "875ff80db2b4",
+    "stripped": true,
+    "bytes": 563754
+  },
+  "arena": {
+    "emoji": "🎪",
+    "promptHash": "9423c1d0cbad",
+    "stripped": true,
+    "bytes": 641522
+  },
+  "tree": {
+    "emoji": "🌲",
+    "promptHash": "ea0757db1516",
+    "stripped": true,
+    "bytes": 334126
+  }
+}
