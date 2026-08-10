@@ -25,7 +25,7 @@ import type { ImageSourcePropType } from 'react-native';
  */
 
 /** Master switch. false → the app renders emoji exactly as it did before this system existed. */
-export const USE_IMAGE_ICONS = true;
+export const USE_IMAGE_ICONS = false;
 
 /** Per-icon opt-out. Anything listed here falls back to its emoji even if art exists. */
 export const DISABLED_ICONS = new Set<string>([
