@@ -210,11 +210,33 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
   // leagues, which state) are selected here and the render below stays generic. A third merged
   // tile only needs a branch here.
-  const leagueFilter = sport === 'nationscup'
+  const leagueFilterAll = sport === 'nationscup'
     ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague }
     : sport === 'soccer'
     ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague }
     : null;
+
+  // Offer only the leagues that ACTUALLY HAVE GAMES on this board, plus All.
+  //
+  // The static list was both a dead end and a space problem: seven leagues plus All wrapped to
+  // three rows of chrome above the scores, and tapping a quiet one (MLS in August) produced "No
+  // MLS games right now" — a filter whose only outcome was an empty screen. Deriving the row from
+  // the board makes an empty result unreachable AND collapses the row to a line or two on a normal
+  // day. Below two leagues there is nothing to filter, so the row disappears entirely.
+  const leagueFilter = useMemo(() => {
+    if (!leagueFilterAll) return null;
+    const present = new Set(games.map(g => g.sport));
+    const leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
+    if (leagues.length < 2) return null;
+    return { ...leagueFilterAll, leagues };
+  }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport]);
+
+  // If the selected league drops off the board — switch days, or a slate finishes — fall back to
+  // All rather than leaving a filter pinned to something that is no longer offered.
+  useEffect(() => {
+    if (!leagueFilterAll || leagueFilterAll.value === 'all') return;
+    if (!games.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
+  }, [games, leagueFilterAll?.value]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
@@ -374,6 +396,14 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Defaults to never-cancelled so the refresh callers below behave as before.
   const handleFetch = useCallback(async (isCancelled: () => boolean = () => false, isRefresh = false) => {
     if (!selectedGameId) return;
+    // LIVE ONLY — enforced HERE rather than only at the call site, because two callers bypass the
+    // effect that used to be the single gate: the 60s auto-refresh interval and pull-to-refresh.
+    // Either one, fired while a SCHEDULED game was selected, asked the backend to explain a match
+    // that had not kicked off — and the model duly produced a confident narrative about a play that
+    // never happened ("Arsenal likely altered their shape… producing the key play", on a fixture 11
+    // days away). For an app whose entire promise is not inventing things, that is the worst
+    // possible bug, so the guard belongs at the choke point where every path must pass.
+    if (!isLive) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const data = await fetchExplanation(selectedSport, level, selectedGameId, language);
@@ -413,7 +443,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setRefreshing(false);
       // (cap state handled above — see the recordExplanation gate)
     }
-  }, [sport, selectedSport, level, selectedGameId, language, caps.recordExplanation]);
+  }, [sport, selectedSport, level, selectedGameId, language, isLive, caps.recordExplanation]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -1353,7 +1383,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 {renderAskBox(S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]))}
               </View>
             </View>
-          ) : !loading ? <EmptyState sport={sport} reason="select-game" language={language} /> : null}
+          ) : !loading && displayGames.length > 0
+            ? <EmptyState sport={sport} reason="select-game" language={language} />
+            : null}
 
           {/* Common Questions — per-sport FAQ. Secondary/educational, so it lives at
               the bottom; collapsed by default. */}

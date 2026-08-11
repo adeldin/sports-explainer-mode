@@ -50,10 +50,12 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
   const effectiveReason = detectedOffSeason ? 'off-season' : reason;
 
   if (effectiveReason === 'select-game') {
+    // No icon here on purpose. This state means "games are listed above, tap one" — it is a
+    // POINTER, not an event. The old 📡 was the generic fallback glyph, read as a broken-image
+    // placeholder on a dark screen, and sat visually off-centre against the text beneath it.
     return (
       <View style={styles.container}>
-        <Text style={styles.emoji}>📡</Text>
-        <Text style={styles.title}>{S.selectGame}</Text>
+        <Text style={styles.selectPrompt}>{S.selectGame}</Text>
       </View>
     );
   }
@@ -138,6 +140,7 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
 const makeStyles = (t: Theme) => StyleSheet.create({
   container: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32, gap: 12 },
   emoji: { fontSize: 56, marginBottom: 8 },
+  selectPrompt: { color: t.textSecondaryOnDark, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   title: { color: t.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   subtitle: { color: t.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   badge: { marginTop: 16, backgroundColor: t.warnBg, borderWidth: 1, borderColor: t.warn, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
