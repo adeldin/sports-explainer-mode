@@ -186,9 +186,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // future cricket league filter (Gate 11 pills) slots into, mirroring rugbyLeague below.
       out = sameDay(out);
     } else if (sport === 'soccer') {
-      // Merged Soccer tile: same client-filter model as rugby — `games` holds every league's board,
-      // the chip row narrows what's displayed. 'all' shows the combined board.
+      // Merged Soccer tile: full-board client-filter model (same as cricket). The league chips
+      // narrow leagues, sameDay narrows to a tapped strip day — the board itself never shrinks,
+      // which is what keeps the date strip complete while you hop between days.
       if (soccerLeague !== 'all') out = out.filter(g => g.sport === soccerLeague);
+      out = sameDay(out);
     } else if (sport === 'nationscup') {
       if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
       out = sameDay(out);
@@ -225,18 +227,33 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // day. Below two leagues there is nothing to filter, so the row disappears entirely.
   const leagueFilter = useMemo(() => {
     if (!leagueFilterAll) return null;
-    const present = new Set(games.map(g => g.sport));
+    // Chips reflect the DAY being viewed, not the whole board — now that the board holds every
+    // upcoming matchday, a whole-board chip row would offer leagues with nothing on the tapped
+    // day, recreating the one-tap dead end this row just stopped being.
+    const day = selectedDate ? toLocalDayString(selectedDate) : null;
+    const dayGames = day
+      ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
+      : games;
+    const present = new Set(dayGames.map(g => g.sport));
     const leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
     if (leagues.length < 2) return null;
     return { ...leagueFilterAll, leagues };
-  }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport]);
+  }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport, selectedDate]);
 
   // If the selected league drops off the board — switch days, or a slate finishes — fall back to
   // All rather than leaving a filter pinned to something that is no longer offered.
   useEffect(() => {
     if (!leagueFilterAll || leagueFilterAll.value === 'all') return;
-    if (!games.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
-  }, [games, leagueFilterAll?.value]);
+    // Day-aware, matching the chip row: a league can have games on the BOARD but none on the
+    // tapped DAY, and its chip is hidden for that day — leaving the selection pinned to it would
+    // filter the day to empty with no visible chip to un-tap. Falling back to All keeps the
+    // selection inside whatever the row is actually offering.
+    const day = selectedDate ? toLocalDayString(selectedDate) : null;
+    const pool = day
+      ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
+      : games;
+    if (!pool.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
+  }, [games, leagueFilterAll?.value, selectedDate]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
@@ -364,8 +381,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         // The 'soccer' tile is the combined Soccer board (MLS + EPL + La Liga + World Cup), each
         // game keeping its own .sport. fetchScoreboard('soccer') still means MLS alone and is what
         // the per-league fan-out inside fetchSoccerBoard calls, so there is no recursion here.
+        // Soccer deliberately does NOT forward the selected date. The date strip is DERIVED from
+        // this board's startTimes, so a server-side day fetch shrank the board to one day and the
+        // strip collapsed to [Today, that day] — the other future dates vanished until you went
+        // back to Today. Cricket's model is the fix: always fetch the full board, filter by day
+        // client-side in displayGames, and the strip stays mounted across date taps.
         : sport === 'soccer'
-        ? await fetchSoccerBoard(isCancelled, selectedDate ?? undefined)
+        ? await fetchSoccerBoard(isCancelled)
         : await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
