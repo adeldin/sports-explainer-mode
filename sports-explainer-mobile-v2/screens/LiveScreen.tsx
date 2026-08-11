@@ -736,6 +736,27 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     handleFetch(() => cancelled);
     return () => { cancelled = true; };
   }, [selectedGameId, level, language, isLive]);
+
+  // Buying Pro must lift the cap cards NOW, not at the next context change. The flags above only
+  // reset inside the effect, whose deps deliberately exclude isPro — so after an in-view purchase
+  // the explain card stayed capped until the 60s poll rescued it (never, with auto-refresh off),
+  // and the Q&A block had no rescue at all: asks are user-initiated, so "out of questions" simply
+  // stayed on screen after the user had paid to remove it. A paying user watching nothing change
+  // is the worst first minute a subscription can have.
+  //
+  // A dedicated effect rather than adding isPro to the main deps: the main effect clears the
+  // play's Q&A thread on every run, and wiping the user's answers as a side effect of PAYING would
+  // be exactly the wrong thank-you. This lifts the flags, refetches the explanation if the game is
+  // live, and touches nothing else. (The recap path already handles the flip via its own deps.)
+  useEffect(() => {
+    if (!caps.isPro) return;
+    if (!explainBlocked && !qaBlocked) return;
+    setExplainBlocked(false);
+    setQaBlocked(false);
+    if (selectedGameId && isLive) handleFetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires only on the isPro flip; the
+    // flags/ids are read at flip time on purpose, not tracked.
+  }, [caps.isPro]);
   // Live-tennis detail (RapidAPI live overlay) + situational read (Gate-3). Self-contained / ADDITIVE:
   // independent of the PlayCard/handleFetch path (tennis stays learnMode → no caps, no PlayCard). When
   // a match is selected, lazy-fetch THAT match enriched (server/currentGame/timeline in ESPN
