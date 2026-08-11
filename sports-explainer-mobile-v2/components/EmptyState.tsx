@@ -138,7 +138,9 @@ export default function EmptyState({ sport, reason, language, seasonEnded, onFin
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  container: { alignItems: 'center', marginTop: 60, paddingHorizontal: 32, gap: 12 },
+  // marginBottom separates this block from whatever follows it — on dead-sport screens that's the
+  // Watch Next card, and the Find CTA was sitting directly on top of it, reading as one element.
+  container: { alignItems: 'center', marginTop: 60, marginBottom: 24, paddingHorizontal: 32, gap: 12 },
   emoji: { fontSize: 56, marginBottom: 8 },
   selectPrompt: { color: t.textSecondaryOnDark, fontSize: 15, fontWeight: '700', textAlign: 'center' },
   title: { color: t.textPrimary, fontSize: 18, fontWeight: '800', textAlign: 'center' },
