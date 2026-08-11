@@ -83,6 +83,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [rugbyLeague, setRugbyLeague] = useState<string>('all'); // merged Rugby tile league filter ('all' | game.sport)
   const [soccerLeague, setSoccerLeague] = useState<string>('all'); // merged Soccer tile league filter ('all' | game.sport)
   const [finderOpen, setFinderOpen] = useState(false);             // Next Game Finder modal
+  const [onlyMyTeams, setOnlyMyTeams] = useState(false);           // cross-sport board filter
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
 
   const [result, setResult] = useState<ExplanationResponse | null>(null);
@@ -169,39 +170,90 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Merged Rugby tile league filter: 'all' → the full merged board; a league key → just that league's
   // games (each keeps its own .sport). No-op (returns raw `games`) for every non-rugby sport.
   const displayGames = useMemo(() => {
-    // Cricket: the fetch always returns the FULL board (rugby's client-filter model), so the date
-    // filter lives HERE — `games` never shrinks, the date strip stays mounted, and an empty date
-    // can't trip learnMode's empty-board clause (Gate 12 Bug 2). This is also the exact branch a
-    // future cricket league filter (Gate 11 pills) slots into, mirroring rugbyLeague below.
-    if (sport === 'cricket') {
-      if (!selectedDate) return games;
-      const day = toLocalDayString(selectedDate);
-      return games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
-    }
-    // Merged Soccer tile: same client-filter model as rugby — `games` holds every league's board,
-    // the chip row narrows what's displayed. 'all' shows the combined board.
-    if (sport === 'soccer') {
-      if (soccerLeague === 'all') return games;
-      return games.filter(g => g.sport === soccerLeague);
-    }
-    if (sport !== 'nationscup') return games;
     let out = games;
-    if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
-    if (selectedDate) {
+    const sameDay = (list: Game[]) => {
+      if (!selectedDate) return list;
       const day = toLocalDayString(selectedDate);
-      out = out.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
+      return list.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day);
+    };
+
+    // Per-sport narrowing. These USED to early-return; they're branches now so the cross-sport
+    // filter below can apply to every sport instead of only the last one.
+    if (sport === 'cricket') {
+      // Cricket: the fetch always returns the FULL board (rugby's client-filter model), so the date
+      // filter lives HERE — `games` never shrinks, the date strip stays mounted, and an empty date
+      // can't trip learnMode's empty-board clause (Gate 12 Bug 2). This is also the exact branch a
+      // future cricket league filter (Gate 11 pills) slots into, mirroring rugbyLeague below.
+      out = sameDay(out);
+    } else if (sport === 'soccer') {
+      // Merged Soccer tile: full-board client-filter model (same as cricket). The league chips
+      // narrow leagues, sameDay narrows to a tapped strip day — the board itself never shrinks,
+      // which is what keeps the date strip complete while you hop between days.
+      if (soccerLeague !== 'all') out = out.filter(g => g.sport === soccerLeague);
+      out = sameDay(out);
+    } else if (sport === 'nationscup') {
+      if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
+      out = sameDay(out);
+    }
+
+    // Cross-sport: "Only my teams", driven by the favourites the user has already starred on game
+    // cards. Guarded on favorites.length so an empty list can never blank the board — a filter that
+    // silently hides everything reads as the app being broken.
+    //
+    // NOTE this matches on the DISPLAY abbreviation, which is what `favorite_teams` stores. That is
+    // safe within one board but not globally unique across leagues, so if team filtering ever grows
+    // teeth it wants {sport, teamId} the way followed_teams already does.
+    if (onlyMyTeams && favorites.length) {
+      out = out.filter(g => favorites.includes(g.homeTeam) || favorites.includes(g.awayTeam));
     }
     return out;
-  }, [games, sport, rugbyLeague, soccerLeague, selectedDate]);
+  }, [games, sport, rugbyLeague, soccerLeague, selectedDate, onlyMyTeams, favorites]);
   // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
   // leagues, which state) are selected here and the render below stays generic. A third merged
   // tile only needs a branch here.
-  const leagueFilter = sport === 'nationscup'
+  const leagueFilterAll = sport === 'nationscup'
     ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague }
     : sport === 'soccer'
     ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague }
     : null;
+
+  // Offer only the leagues that ACTUALLY HAVE GAMES on this board, plus All.
+  //
+  // The static list was both a dead end and a space problem: seven leagues plus All wrapped to
+  // three rows of chrome above the scores, and tapping a quiet one (MLS in August) produced "No
+  // MLS games right now" — a filter whose only outcome was an empty screen. Deriving the row from
+  // the board makes an empty result unreachable AND collapses the row to a line or two on a normal
+  // day. Below two leagues there is nothing to filter, so the row disappears entirely.
+  const leagueFilter = useMemo(() => {
+    if (!leagueFilterAll) return null;
+    // Chips reflect the DAY being viewed, not the whole board — now that the board holds every
+    // upcoming matchday, a whole-board chip row would offer leagues with nothing on the tapped
+    // day, recreating the one-tap dead end this row just stopped being.
+    const day = selectedDate ? toLocalDayString(selectedDate) : null;
+    const dayGames = day
+      ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
+      : games;
+    const present = new Set(dayGames.map(g => g.sport));
+    const leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
+    if (leagues.length < 2) return null;
+    return { ...leagueFilterAll, leagues };
+  }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport, selectedDate]);
+
+  // If the selected league drops off the board — switch days, or a slate finishes — fall back to
+  // All rather than leaving a filter pinned to something that is no longer offered.
+  useEffect(() => {
+    if (!leagueFilterAll || leagueFilterAll.value === 'all') return;
+    // Day-aware, matching the chip row: a league can have games on the BOARD but none on the
+    // tapped DAY, and its chip is hidden for that day — leaving the selection pinned to it would
+    // filter the day to empty with no visible chip to un-tap. Falling back to All keeps the
+    // selection inside whatever the row is actually offering.
+    const day = selectedDate ? toLocalDayString(selectedDate) : null;
+    const pool = day
+      ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
+      : games;
+    if (!pool.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
+  }, [games, leagueFilterAll?.value, selectedDate]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
   // GAME-LEVEL sport: the SELECTED game's own league key (rugby/mlr/nationscup/…), so explain/recap/
@@ -329,8 +381,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         // The 'soccer' tile is the combined Soccer board (MLS + EPL + La Liga + World Cup), each
         // game keeping its own .sport. fetchScoreboard('soccer') still means MLS alone and is what
         // the per-league fan-out inside fetchSoccerBoard calls, so there is no recursion here.
+        // Soccer deliberately does NOT forward the selected date. The date strip is DERIVED from
+        // this board's startTimes, so a server-side day fetch shrank the board to one day and the
+        // strip collapsed to [Today, that day] — the other future dates vanished until you went
+        // back to Today. Cricket's model is the fix: always fetch the full board, filter by day
+        // client-side in displayGames, and the strip stays mounted across date taps.
         : sport === 'soccer'
-        ? await fetchSoccerBoard(isCancelled, selectedDate ?? undefined)
+        ? await fetchSoccerBoard(isCancelled)
         : await fetchScoreboard(sport, isCancelled, selectedDate ?? undefined);
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
@@ -361,6 +418,14 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Defaults to never-cancelled so the refresh callers below behave as before.
   const handleFetch = useCallback(async (isCancelled: () => boolean = () => false, isRefresh = false) => {
     if (!selectedGameId) return;
+    // LIVE ONLY — enforced HERE rather than only at the call site, because two callers bypass the
+    // effect that used to be the single gate: the 60s auto-refresh interval and pull-to-refresh.
+    // Either one, fired while a SCHEDULED game was selected, asked the backend to explain a match
+    // that had not kicked off — and the model duly produced a confident narrative about a play that
+    // never happened ("Arsenal likely altered their shape… producing the key play", on a fixture 11
+    // days away). For an app whose entire promise is not inventing things, that is the worst
+    // possible bug, so the guard belongs at the choke point where every path must pass.
+    if (!isLive) return;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const data = await fetchExplanation(selectedSport, level, selectedGameId, language);
@@ -400,7 +465,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setRefreshing(false);
       // (cap state handled above — see the recordExplanation gate)
     }
-  }, [sport, selectedSport, level, selectedGameId, language, caps.recordExplanation]);
+  }, [sport, selectedSport, level, selectedGameId, language, isLive, caps.recordExplanation]);
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
@@ -602,7 +667,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // filter narrows past the current pick (or the league is empty), re-select the first live-preferred
   // visible game, or clear. A no-op on single-league tiles (displayGames === games).
   useEffect(() => {
-    if (sport !== 'nationscup' && sport !== 'soccer') return;
+    // Runs for EVERY sport now: "Only my teams" can filter the selected game off any board, not
+    // just a merged tile. Still inert when nothing narrows the list, since the guard below exits
+    // as soon as the selection is present.
     if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) return;
     const live = displayGames.find(g => g.isLive);
     setSelectedGameId(displayGames.length ? (live?.id ?? displayGames[0].id) : null);
@@ -894,7 +961,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               row is a stable map of what the tile covers; selecting an empty league shows a "no
               games" message below rather than silently showing the combined board. */}
           {leagueFilter && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tFilterRow}>
+            /* WRAPS rather than scrolls sideways. Both merged tiles now carry 8 chips (7 leagues +
+               All), which overflows a phone width — so the old horizontal ScrollView hid half the
+               leagues behind a gesture most people never make. Serie A and the Bundesliga were
+               invisible on arrival. Wrapping costs one extra line and keeps the row doing its real
+               job: showing, at a glance, what this tile actually covers. */
+            <View style={styles.tFilterWrap}>
               {[{ key: 'all', label: S.tennisFilterAll }, ...leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
                 <TouchableOpacity
                   key={opt.key}
@@ -906,7 +978,24 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
+          )}
+
+          {/* "Only my teams" — one toggle, not a team picker. It reads the favourites already
+              starred on game cards, so there's no second list to curate and no 130-club checklist.
+              Hidden entirely when nothing is favourited: a control that can only ever blank the
+              board is worse than no control. */}
+          {favorites.length > 0 && games.length > 0 && (
+            <View style={styles.myTeamsRow}>
+              <TouchableOpacity
+                onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(v => !v); }}
+                style={[styles.myTeamsChip, onlyMyTeams && styles.tFilterChipActive]}
+                activeOpacity={0.8}>
+                <Text style={[styles.tFilterChipText, onlyMyTeams && styles.tFilterChipTextActive]}>
+                  {onlyMyTeams ? '★' : '☆'}  Only my teams
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Game Strip */}
@@ -945,6 +1034,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   />
                 )}
               />
+            </View>
+          ) : onlyMyTeams && games.length > 0 ? (
+            // Emptiness caused by the TEAM filter, not by the schedule. Say which, and offer the
+            // way out — otherwise this reads as "no games today" while a full slate sits behind
+            // a toggle the user may have forgotten is on.
+            <View style={styles.rugbyEmptyLeague}>
+              <Text style={styles.rugbyEmptyLeagueText}>None of your teams are playing here.</Text>
+              <TouchableOpacity onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(false); }} activeOpacity={0.8}>
+                <Text style={styles.showAllLink}>Show all games →</Text>
+              </TouchableOpacity>
             </View>
           ) : leagueFilter && leagueFilter.value !== 'all' ? (
             // Merged tile, a specific league selected with no games in-window → "no games".
@@ -1306,7 +1405,9 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 {renderAskBox(S.askLearnPlaceholder.replace('{sport}', S[SPORT_FULL_NAME[sport]]))}
               </View>
             </View>
-          ) : !loading ? <EmptyState sport={sport} reason="select-game" language={language} /> : null}
+          ) : !loading && displayGames.length > 0
+            ? <EmptyState sport={sport} reason="select-game" language={language} />
+            : null}
 
           {/* Common Questions — per-sport FAQ. Secondary/educational, so it lives at
               the bottom; collapsed by default. */}
@@ -1472,6 +1573,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 
   // Live-tennis (single-scroll page): inline filter row + a bounded internally-scrolling match-list card.
   tFilterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  tFilterWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  myTeamsRow: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8 },
+  showAllLink: { color: t.accent, fontSize: 13, fontWeight: '800', marginTop: 8 },
+  myTeamsChip: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: t.surface, borderWidth: 1, borderColor: t.border,
+  },
   tFilterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   tFilterChipActive: { backgroundColor: t.accent, borderColor: t.accent },
   tFilterChipText: { color: t.textSecondary, fontSize: 13, fontWeight: '700' },

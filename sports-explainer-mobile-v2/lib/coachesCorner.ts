@@ -11,6 +11,7 @@ export type CCPieceId =
   | "make-the-call" | "formations" | "read-the-play" | "box-count" | "onside-or-off"
   | "wheres-the-play" | "find-the-open-man"
   | "coach-speak"                                        // NFL terminology explorer (no scoring)
+  | "stat-geek"                                          // cross-sport analytics glossary (no scoring)
   // — v1.5 field modules, ported from the Coach's Corner spikes —
   | "fourth-down-call"                                   // NFL
   | "count-leverage" | "steal-or-stay"                   // MLB
@@ -58,6 +59,10 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "nfl") pieces.push("fourth-down-call");
   // Coach Speak — a glossary, not a scenario. Tier-independent like the other explorers.
   if (sport === "nfl") pieces.push("coach-speak");
+  // Stat Geek — ONE piece registered under every sport it covers, which piecesForSport already
+  // expresses (make-the-call has always been shared this way). The entries carry their own sport,
+  // so the browser opens pre-filtered to whichever tile you came from.
+  if (sport === "mlb" || sport === "nfl" || sport === "nba") pieces.push("stat-geek");
   if (sport === "mlb") pieces.push("count-leverage", "steal-or-stay");
   if (isSoccer(sport)) pieces.push("press-trigger", "counter-or-keep");
   if (isRugby(sport)) pieces.push("posts-corner-or-scrum");

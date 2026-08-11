@@ -34,6 +34,10 @@ export interface UpcomingGame {
   awayId?: string;
   homeName?: string;
   awayName?: string;
+  // ESPN team logo URLs, where the feed carries them (site-API sports and backend boards; the
+  // core-API forward probe has none without per-team resolves, so rows degrade to text there).
+  homeLogo?: string;
+  awayLogo?: string;
 }
 
 // How far ahead to look. Long enough to cross a normal off-week or an international break, short
@@ -62,6 +66,8 @@ function toUpcoming(g: Game, label?: string): UpcomingGame | null {
     awayTeam: g.awayTeam,
     startTime: g.startTime,
     leagueLabel: label,
+    homeLogo: g.homeLogo,
+    awayLogo: g.awayLogo,
   };
 }
 
@@ -94,15 +100,33 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
         awayId: away?.team?.id ? String(away.team.id) : undefined,
         homeName: home?.team?.displayName || undefined,
         awayName: away?.team?.displayName || undefined,
+        homeLogo: home?.team?.logo || undefined,
+        awayLogo: away?.team?.logo || undefined,
       });
     }
     return out;
   };
 
   try {
-    const start = compact(new Date(now));
-    const end = compact(new Date(now + UPCOMING_HORIZON_DAYS * DAY_MS));
-    const ranged = parse(await (await fetch(`${base}?dates=${start}-${end}`)).json());
+    // NFL gets the FULL season, not the default 45 days: its schedule is published in its entirety
+    // and starring a Week 15 game in August is a reasonable thing to want. 200 days from an August
+    // open reaches past the Super Bowl. Other sports keep the short horizon — their far schedules
+    // are enormous (an MLB season is ~2400 games) and mostly unpublished detail.
+    const horizonDays = sportKey === 'nfl' ? 200 : UPCOMING_HORIZON_DAYS;
+    // CHUNKED, not one call: ESPN silently truncates large range responses (measured — a 14-day MLB
+    // range dropped a game only 3 days old), so a season-long range would come back with holes.
+    // ~25-day slices stay comfortably under the cap; fetched in parallel, deduped on the seams.
+    const CHUNK_DAYS = 25;
+    const chunks: [number, number][] = [];
+    for (let d = 0; d < horizonDays; d += CHUNK_DAYS) chunks.push([d, Math.min(d + CHUNK_DAYS, horizonDays)]);
+    const parts = await Promise.all(chunks.map(async ([a, b]) => {
+      try {
+        const q = `?dates=${compact(new Date(now + a * DAY_MS))}-${compact(new Date(now + b * DAY_MS))}`;
+        return parse(await (await fetch(base + q)).json());
+      } catch { return [] as UpcomingGame[]; }
+    }));
+    const seen = new Set<string>();
+    const ranged = parts.flat().filter(g => !seen.has(g.id) && (seen.add(g.id), true));
     if (ranged.length > 0) return ranged;
 
     // Nothing inside the horizon. Deep off-season: the next fixture can be further out than any
@@ -117,17 +141,53 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
   }
 }
 
-// Core-API and backend-served leagues: no range query exists, so take the board they do give and
-// keep what hasn't started. Narrower reach than the ESPN path by nature, not by choice.
-async function fromBoard(sportKey: Sport, label: string | undefined, now: number): Promise<UpcomingGame[]> {
+// Core-API leagues (rugby) only reach −90d..+14d through fetchScoreboard — a live-board window,
+// not a schedule. Between seasons that is ALWAYS empty even when next season's fixtures are
+// published: URC's opener sat ~6 weeks out in August, so "Find the next game" found nothing for
+// the entire rugby tile. This probe asks the core events endpoint directly across a long forward
+// range and resolves just enough refs to list the first fixtures. Team names come from the event's
+// own "Home vs Away" name — resolving two more refs per game for logos isn't worth the requests.
+async function fromCoreForward(sportKey: Sport, label: string | undefined, now: number): Promise<UpcomingGame[]> {
+  const cfg = SPORT_CONFIG[sportKey];
+  if (!cfg?.core || !cfg.espnSport || !cfg.league) return [];
   try {
-    const games = await fetchScoreboard(sportKey);
-    return games
-      .map(g => toUpcoming(g, label))
-      .filter((g): g is UpcomingGame => !!g && g.startTime > now);
+    const url = `https://sports.core.api.espn.com/v2/sports/${cfg.espnSport}/leagues/${cfg.league}/events` +
+      `?dates=${compact(new Date(now))}-${compact(new Date(now + 270 * DAY_MS))}&limit=20`;
+    const data = await (await fetch(url)).json();
+    const items: any[] = (data?.items || []).slice(0, 8);
+    const out: UpcomingGame[] = [];
+    for (const it of items) {
+      try {
+        // Core $refs come back as cleartext http:// — iOS ATS blocks that, so upgrade first.
+        const ev = await (await fetch(String(it.$ref).replace(/^http:\/\//i, 'https://'))).json();
+        const t = ev?.date ? Date.parse(ev.date) : NaN;
+        if (!Number.isFinite(t) || t <= now) continue;
+        const [home, away] = String(ev?.name || '').split(' vs ');
+        if (!home || !away) continue;
+        out.push({ id: String(ev.id), sport: sportKey, homeTeam: home, awayTeam: away, startTime: t, leagueLabel: label });
+      } catch { /* one bad ref shouldn't sink the league */ }
+    }
+    return out;
   } catch {
     return [];
   }
+}
+
+// Core-API and backend-served leagues: no range query exists, so take the board they do give and
+// keep what hasn't started. Narrower reach than the ESPN path by nature, not by choice.
+async function fromBoard(sportKey: Sport, label: string | undefined, now: number): Promise<UpcomingGame[]> {
+  let upcoming: UpcomingGame[] = [];
+  try {
+    const games = await fetchScoreboard(sportKey);
+    upcoming = games
+      .map(g => toUpcoming(g, label))
+      .filter((g): g is UpcomingGame => !!g && g.startTime > now);
+  } catch { /* board unavailable — the probe below is still worth a shot */ }
+  if (upcoming.length) return upcoming;
+  // Empty (or failed) board + core league → the live window can't see far enough. The probe sits
+  // OUTSIDE the try above on purpose: when it was inside, any board failure skipped it silently,
+  // and "0 games" is indistinguishable from "didn't look".
+  return fromCoreForward(sportKey, label, now);
 }
 
 /** Upcoming games for ONE sport (fanning out across member leagues for merged tiles). */

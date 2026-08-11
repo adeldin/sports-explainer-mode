@@ -231,7 +231,9 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
             {/* ── Game library: a grid of tiles, rendered from the registry ── */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>GAMES</Text>
+              {/* Named for the SELECTED sport: every game tile looks identical across sports, so without
+                  this the sport switch produced no visible change anywhere on the screen. */}
+              <Text style={styles.sectionLabel}>{category.emoji} {category.label.toUpperCase()} GAMES</Text>
               <View style={styles.gameGrid}>
                 {visibleGames.map(g => (
                   <TouchableOpacity

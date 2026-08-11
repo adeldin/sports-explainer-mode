@@ -16,6 +16,8 @@ import RankCard from '../components/RankCard';
 import StrategyTipCard from '../components/StrategyTipCard';
 import FormationBrowser from '../components/FormationBrowser';
 import CoachSpeakBrowser from '../components/CoachSpeakBrowser';
+import StatGeekBrowser from '../components/coachesCorner/StatGeekBrowser';
+import { SPORT_KEY_TO_STAT_SPORT, type StatGeekSport } from '../lib/statGeek';
 import MakeTheCallGame from '../components/academy/MakeTheCallGame';
 import FormationQuizGame from '../components/academy/FormationQuizGame';
 import BoxCountGame from '../components/academy/BoxCountGame';
@@ -110,10 +112,13 @@ const PIECE_GAME = {
 // bypasses PIECE_GAME/GameHost entirely (see the mount below). Deliberately a separate table from
 // PIECE_GAME rather than a flag on it, because the two have genuinely different shapes: a game takes
 // AcademyGameProps and owns a verdict, an explorer takes nothing and owns a scroll view.
-type ExplorerPieceId = 'formations' | 'coach-speak';
-const EXPLORER_PIECE: Record<ExplorerPieceId, { title: string; icon: string; Component: React.ComponentType }> = {
+type ExplorerPieceId = 'formations' | 'coach-speak' | 'stat-geek';
+// Component takes ONE optional prop so Stat Geek can open pre-filtered to the tile you came from.
+// Formations and Coach Speak ignore it — a prop-less component is still assignable here.
+const EXPLORER_PIECE: Record<ExplorerPieceId, { title: string; icon: string; Component: React.ComponentType<{ initialSport?: StatGeekSport }> }> = {
   'formations':   { title: 'Formations', icon: '🗺️', Component: FormationBrowser },
   'coach-speak':  { title: 'Coach Speak', icon: '🗣️', Component: CoachSpeakBrowser },
+  'stat-geek':    { title: 'Stat Geek', icon: '🤓', Component: StatGeekBrowser },
 };
 // A type predicate, not an `in` check inline: this is what lets TS narrow activePiece to the
 // GAME-backed ids after the explorer branch returns, so PIECE_GAME[...] stays fully typed and a
@@ -124,6 +129,7 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'make-the-call': { icon: '📋', title: 'Make the Call' },
   'formations':    { icon: '🗺️', title: 'Formations' },
   'coach-speak':   { icon: '🗣️', title: 'Coach Speak' },
+  'stat-geek':     { icon: '🤓', title: 'Stat Geek' },
   'read-the-play': { icon: '🎯', title: 'Read the Play' },
   'box-count':     { icon: '🏈', title: 'Box Count' },
   'onside-or-off': { icon: '🚩', title: 'Onside or Off?' },
@@ -220,7 +226,7 @@ export default function CoachesCornerScreen() {
               <Text style={styles.topTitle} numberOfLines={1}>{explorer.icon} {explorer.title}</Text>
               <View style={styles.backBtn} />
             </View>
-            <Explorer />
+            <Explorer initialSport={SPORT_KEY_TO_STAT_SPORT[activeSport]} />
           </SafeAreaView>
         </Animated.View>
       );

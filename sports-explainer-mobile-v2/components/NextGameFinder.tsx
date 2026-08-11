@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  View, Text, Modal, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet,
+  View, Text, Modal, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
 import type { Sport } from '../lib/api';
+import { SPORTS } from '../lib/sports';
 import { findUpcomingGames, groupByDay, UpcomingGame, UPCOMING_HORIZON_DAYS } from '../lib/upcomingGames';
 import { loadStarred, starGame, unstarGame, MAX_ALERTS } from '../lib/gameAlerts';
 import {
@@ -141,7 +142,9 @@ export default function NextGameFinder({
   }, [busyId, starredIds]);
 
   const grouped = useMemo(() => groupByDay(games), [games]);
-  const sportLabel = sport.toUpperCase();
+  // The TILE's display label, never the internal key: 'nationscup' is the Rugby tile, and the old
+  // sport.toUpperCase() printed "NATIONSCUP" into fan-facing copy.
+  const sportLabel = SPORTS.find(t => t.key === sport)?.label ?? sport.toUpperCase();
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -235,9 +238,15 @@ export default function NextGameFinder({
                       activeOpacity={0.8}
                       disabled={busyId === g.id}>
                       <View style={styles.rowMain}>
-                        <Text style={styles.matchup} numberOfLines={1}>
-                          {g.awayTeam} <Text style={styles.at}>at</Text> {g.homeTeam}
-                        </Text>
+                        {/* Crest → name, both sides. Logos come from the feed where it carries them;
+                            a missing one just collapses (core-rugby rows are text-only). */}
+                        <View style={styles.matchupRow}>
+                          {!!g.awayLogo && <Image source={{ uri: g.awayLogo }} style={styles.teamLogo} />}
+                          <Text style={styles.matchup}>{g.awayTeam}</Text>
+                          <Text style={styles.at}>at</Text>
+                          {!!g.homeLogo && <Image source={{ uri: g.homeLogo }} style={styles.teamLogo} />}
+                          <Text style={styles.matchup}>{g.homeTeam}</Text>
+                        </View>
                         <Text style={styles.meta}>
                           {time}{g.leagueLabel ? ` · ${g.leagueLabel}` : ''}
                         </Text>
@@ -288,6 +297,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   rowOn: { borderColor: t.accent },
   rowMain: { flex: 1, gap: 2 },
+  matchupRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  teamLogo: { width: 20, height: 20, resizeMode: 'contain' },
   matchup: { color: t.textPrimary, fontSize: 15, fontWeight: '800' },
   at: { color: t.textSecondaryOnDark, fontWeight: '600' },
   meta: { color: t.textSecondaryOnDark, fontSize: 12, fontWeight: '600' },
