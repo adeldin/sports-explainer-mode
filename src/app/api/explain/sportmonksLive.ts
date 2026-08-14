@@ -158,12 +158,24 @@ export async function getSmUpcoming(daysAhead = 45): Promise<Game[]> {
     });
     // Soonest first, and bounded: a full Big Bash season dump is a list, not an answer.
     future.sort((a, b) => Date.parse(str(a?.starting_at)) - Date.parse(str(b?.starting_at)));
+    const slice = future.slice(0, 40);
+
+    // Resolve team names by UNIQUE ID, all at once, BEFORE building rows.
+    // The live board awaits a pair per fixture, which is fine for a handful of same-day games but
+    // wrong here: 40 fixtures resolved that way is 40 sequential round-trips on a cold cache —
+    // seconds of latency added to every /api/cricket call. These leagues have ~8-20 distinct teams
+    // between them, so resolving the unique set in parallel is both far faster and far fewer calls,
+    // and every later lookup is an L1 hit.
+    const ids = Array.from(new Set(
+      slice.flatMap((f) => [Number(f?.localteam_id), Number(f?.visitorteam_id)]).filter(Number.isFinite),
+    ));
+    const names = new Map<number, string>();
+    await Promise.all(ids.map(async (id) => { names.set(id, await teamName(id)); }));
+
     const games: Game[] = [];
-    for (const f of future.slice(0, 40)) {
-      const [home, away] = await Promise.all([
-        teamName(Number(f?.localteam_id)),
-        teamName(Number(f?.visitorteam_id)),
-      ]);
+    for (const f of slice) {
+      const home = names.get(Number(f?.localteam_id)) || '';
+      const away = names.get(Number(f?.visitorteam_id)) || '';
       const ms = Date.parse(str(f?.starting_at));
       const homeFlag = cricketFlag(home);
       const awayFlag = cricketFlag(away);
