@@ -1,5 +1,15 @@
 # Feature Ideas & Roadmap
 
+> ⚠️ **The ROADMAP sections of this file are HISTORICAL (superseded 2026-08-10).**
+> Nearly everything tiered below has shipped — Tier 1: 5/5, Tier 2: 4/6, and Tier 3 essentially in
+> full — but the ✅ marks were never kept current, so the tiers no longer describe reality.
+> **For what to build next, read `BACKLOG_2026-08.md`.**
+>
+> This file remains the authority on VISION and REASONING: the pedagogy pillar (Academy = Duolingo,
+> Coach's Corner = Khan Academy), the "don't become a scoreboard" guardrail, the per-sport data-upgrade
+> framework, and the `[Topic]Wise` platform thesis. Those sections are not superseded.
+
+
 > **🚀 MILESTONE — 2026-06-21: SportsWise submitted to the App Store (in review).**
 > v1.0 launched FREE (build 11): four-level explanations, ~14 sports, Academy (579-question
 > quiz + facts + FAQs), local quiz-reminder notification, English + Spanish. Freemium is the
