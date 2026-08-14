@@ -71,7 +71,18 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   nba: { espnSport: 'basketball', league: 'nba' },
   nfl: { espnSport: 'football', league: 'nfl' },
   soccer: { espnSport: 'soccer', league: 'usa.1' },
-  worldcup: { espnSport: 'soccer', league: 'fifa.world' },
+  // World Cup — PARKED until 2030, not deleted. The 2026 tournament ended 2026-07-19; probed
+  // 2026-08-13, fifa.world returns 104 PAST events and 0 future ones across a 400-day lookahead.
+  // learnMode:true is what actually switches it off: fetchScoreboard returns [] for learnMode
+  // sports, which closes all three fetch paths at once (the soccer board, gatherWatchCandidates,
+  // and findUpcomingGames) instead of needing a guard in each.
+  //
+  // The KEY, the espn config, and all the World Cup content (facts, quizzes, FAQs, Academy
+  // coverage, SOCCER_KEYS membership) deliberately stay. Two reasons: isSoccer('worldcup') must
+  // keep returning true or a game starred back in July misroutes to the wrong Coach's Corner, and
+  // the content is evergreen — Brazil still has five titles. Re-enabling in 2030 is removing
+  // learnMode here and restoring the SOCCER_LEAGUES row.
+  worldcup: { espnSport: 'soccer', league: 'fifa.world', learnMode: true },
   rugby: { espnSport: 'rugby', league: '270557', core: true },
   wnba: { espnSport: 'basketball', league: 'wnba' },
   epl: { espnSport: 'soccer', league: 'eng.1' },
@@ -617,7 +628,7 @@ export const SOCCER_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'laliga', label: 'La Liga' },
   { sportKey: 'seriea', label: 'Serie A' },
   { sportKey: 'bundesliga', label: 'Bundesliga' },
-  { sportKey: 'worldcup', label: 'World Cup' },
+  // { sportKey: 'worldcup', label: 'World Cup' },  ← restore for the 2030 tournament (see SPORT_CONFIG)
 ];
 
 export async function fetchSoccerBoard(

@@ -66,6 +66,44 @@ and promote the common ones into the FAQ. Needs a datastore and a privacy stance
 
 ---
 
+## 📅 Tournament calendar — staying ahead of the next big one
+
+The World Cup went dead in the app a month before anyone noticed, because nothing watches the
+calendar. This section is that watch. **All fixture counts below were probed against ESPN on
+2026-08-13** — they are what the feed actually carries today, not what the tournament schedule says.
+
+**Parked: FIFA World Cup.** The 2026 tournament ended 2026-07-19. `fifa.world` carries 104 past
+events and **zero** forward across a 400-day lookahead. Switched off via `learnMode:true` in
+`SPORT_CONFIG` and commented out of `SOCCER_LEAGUES`; key and content retained. **Re-enable: spring
+2030.**
+
+**Ready to build NOW — European Champions Cup + Challenge Cup (rugby).** ESPN already publishes
+**48 and 36 forward fixtures** respectively, both starting **2026-10-13** — about eight weeks out.
+These are core-API slugs (`271937`, `272073`), which is the exact pipeline URC and Six Nations
+already use, so each is a `SPORT_CONFIG` line plus a `RUGBY_LEAGUES` row. This is the cheapest
+real coverage gain on the board right now.
+
+**Best-positioned major — Rugby World Cup 2027.** Slug `164205`, and **ESPN already carries 36
+fixtures**, first window opening 2027-08-09. Worth flagging that this is the tournament this app is
+most ready for: the Coach's Corner rugby modules were reviewed by an actual rugby coach, so the
+teaching content is validated ahead of the event rather than scrambled together during it. Build
+alongside the Champions Cup work, since it is the same one-line pipeline.
+
+**Blocked on a draw, not on us — UEFA Champions League 2026-27.** `uefa.champions` is a live, rich
+endpoint (189 past events) with **zero forward fixtures**, because the league-phase draw hasn't
+happened yet. Nothing to build against until it does. **Re-probe in early September 2026** — if
+fixtures have appeared, this is the single biggest soccer competition the app doesn't carry.
+
+**Not in the feed yet — 2027 Women's World Cup** (`fifa.wwc`: 0 past, 0 forward) and **Women's
+Rugby World Cup** (`289237`: 0 forward). Both are real events; ESPN simply hasn't populated them.
+Re-probe alongside the Champions League check.
+
+**Standing habit.** Before each release, re-run the forward-fixture probe over every configured
+league. A competition that quietly drops to zero forward events is either finished or has changed
+its league code, and both cases look identical from inside the app: an empty board.
+
+---
+
 ## 🔌 Data-capped — not buildable, don't re-recon
 
 **Live play-by-play for rugby and cricket.** Confirmed repeatedly: ESPN has no PBP feed for either,
