@@ -141,6 +141,65 @@ export async function getSmLiveBoard(date?: string): Promise<Game[]> {
 }
 
 // ── One live fixture with balls — the normalizer's input. null on anything unhealthy. ─────────
+// Upcoming fixtures — the answer to "is that really the last game?", which the board could not
+// give. getSmLiveBoard filters the season fixture lists down to a single DAY, discarding the
+// future fixtures those lists already contain — so the app's cricket calendar ended at the last
+// played match and the Next Game Finder had nothing to find. Same leagues, same L1 caches, zero
+// additional upstream calls: this just stops throwing the future away.
+export async function getSmUpcoming(daysAhead = 45): Promise<Game[]> {
+  if (!SM_LIVE() || !TOKEN()) return [];
+  try {
+    const now = Date.now();
+    const horizon = now + daysAhead * 86_400_000;
+    const lists = await Promise.all(LEAGUE_IDS.map((id) => leagueFixtures(id)));
+    const future = lists.flat().filter((f) => {
+      const t = Date.parse(str(f?.starting_at));
+      return Number.isFinite(t) && t > now && t <= horizon;
+    });
+    // Soonest first, and bounded: a full Big Bash season dump is a list, not an answer.
+    future.sort((a, b) => Date.parse(str(a?.starting_at)) - Date.parse(str(b?.starting_at)));
+    const slice = future.slice(0, 40);
+
+    // Resolve team names by UNIQUE ID, all at once, BEFORE building rows.
+    // The live board awaits a pair per fixture, which is fine for a handful of same-day games but
+    // wrong here: 40 fixtures resolved that way is 40 sequential round-trips on a cold cache —
+    // seconds of latency added to every /api/cricket call. These leagues have ~8-20 distinct teams
+    // between them, so resolving the unique set in parallel is both far faster and far fewer calls,
+    // and every later lookup is an L1 hit.
+    const ids = Array.from(new Set(
+      slice.flatMap((f) => [Number(f?.localteam_id), Number(f?.visitorteam_id)]).filter(Number.isFinite),
+    ));
+    const names = new Map<number, string>();
+    await Promise.all(ids.map(async (id) => { names.set(id, await teamName(id)); }));
+
+    const games: Game[] = [];
+    for (const f of slice) {
+      const home = names.get(Number(f?.localteam_id)) || '';
+      const away = names.get(Number(f?.visitorteam_id)) || '';
+      const ms = Date.parse(str(f?.starting_at));
+      const homeFlag = cricketFlag(home);
+      const awayFlag = cricketFlag(away);
+      games.push({
+        id: `${SM_ID_PREFIX}${f?.id}`,
+        homeTeam: home,
+        awayTeam: away,
+        ...(homeFlag ? { homeFlag } : {}),
+        ...(awayFlag ? { awayFlag } : {}),
+        homeScore: '',
+        awayScore: '',
+        status: 'Scheduled',
+        isLive: false,
+        sport: 'cricket',
+        state: 'pre',
+        ...(Number.isFinite(ms) ? { startTime: ms } : {}),
+      });
+    }
+    return games;
+  } catch {
+    return []; // best-effort, like everything else in this file
+  }
+}
+
 export async function getSmFixture(fixtureId: string): Promise<any | null> {
   if (!SM_LIVE() || !TOKEN()) return null;
   if (!/^\d+$/.test(fixtureId)) return null;

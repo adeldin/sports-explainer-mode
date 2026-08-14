@@ -15,6 +15,7 @@ import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import { isSoccer } from '../lib/leagueGroups';
 import NextGameFinder from '../components/NextGameFinder';
+import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
@@ -75,8 +76,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
+  const [nextGolf, setNextGolf] = useState<NextGolfEvent | null>(null);      // "Up Next" under a FINAL board
   const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // ESPN live singles list (liveFormat:'tennis')
   const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match espnId (null → first live)
+  const [tennisEvent, setTennisEvent] = useState<string>('all');             // tournament filter ('all' | event name)
   const [tennisDetail, setTennisDetail] = useState<TennisLiveMatch | null>(null); // selected match enriched w/ RapidAPI live overlay
   const [tennisRead, setTennisRead] = useState<ExplanationResponse | null>(null); // Gate-3 situational explanation
   const [tennisFilter, setTennisFilter] = useState<'all' | 'mens' | 'womens'>('all'); // category filter (All/Men's/Women's)
@@ -265,12 +268,28 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // today when null). Kept as local day-strings so they match the strip cells + the fetch filter.
   const todayDay = toLocalDayString(new Date());
   const selectedDay = selectedDate ? toLocalDayString(selectedDate) : todayDay;
-  // Category filter (All / Men's / Women's). filteredMatches preserves the rank-sort order.
+  // Category filter (All / Men's / Women's) + tournament filter, both preserving rank-sort order.
   const filteredMatches = useMemo(() => tennisMatches.filter(m =>
-    tennisFilter === 'all' ? true
+    (tennisFilter === 'all' ? true
       : tennisFilter === 'mens' ? m.category === "Men's Singles"
-        : m.category === "Women's Singles"
-  ), [tennisMatches, tennisFilter]);
+        : m.category === "Women's Singles")
+    && (tennisEvent === 'all' || m.event === tennisEvent)
+  ), [tennisMatches, tennisFilter, tennisEvent]);
+
+  // The tournaments present in the current feed. Two ATP events genuinely run at once (National
+  // Bank Open + Cincinnati Open, 2026-08-10) and the flat list gave no way to tell which match
+  // belonged to which — the exact complaint this answers. One event (the common case) → no chips.
+  const tennisEvents = useMemo(() => {
+    const seen: string[] = [];
+    for (const m of tennisMatches) if (m.event && !seen.includes(m.event)) seen.push(m.event);
+    return seen;
+  }, [tennisMatches]);
+
+  // If the selected tournament vanishes from the feed (it ends between polls), fall back to All
+  // rather than leaving the list pinned to a chip that no longer renders.
+  useEffect(() => {
+    if (tennisEvent !== 'all' && !tennisEvents.includes(tennisEvent)) setTennisEvent('all');
+  }, [tennisEvents, tennisEvent]);
   // Live-tennis selection: explicit pick by espnId IF it's in the filtered set, else the first filtered
   // match (so switching filter never leaves a detail card for a now-hidden match). Drives TennisLiveCard
   // + the detail/explanation fetch. Null when the filtered set is empty.
@@ -354,6 +373,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         const board = await fetchLeaderboard();
         if (isCancelled()) return;
         setLeaderboard(board);
+        // A FINISHED board raises exactly one question — "when's the next one?" — so answer it.
+        // Two cheap ESPN calls, only made in the final state; a live board never pays them.
+        if (board && !board.isLive) {
+          const nx = await fetchNextGolfEvent();
+          if (isCancelled()) return;
+          setNextGolf(nx);
+        } else {
+          setNextGolf(null);
+        }
       }
       // liveFormat:'tennis' — fetch live matches from /api/tennis-live. Best-effort: fetchTennisLive
       // returns { matches: [] } on any failure OR when the backend TENNIS_LIVE flag is off, so the
@@ -1081,6 +1109,24 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             // match-list card, (3) the selected match's TennisLiveCard in NORMAL flow (page scroll
             // handles it — NOT independently scrollable).
             <>
+              {/* Tournament filter — its OWN wrapped row, only when two or more events are live at
+                  once (National Bank Open + Cincinnati was the motivating day). Sits above the
+                  category row; the common single-tournament case renders nothing. */}
+              {tennisEvents.length >= 2 && (
+                <View style={styles.tFilterWrap}>
+                  {[{ key: 'all', label: S.tennisFilterAll }, ...tennisEvents.map(e => ({ key: e, label: e }))].map(opt => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={async () => { await Haptics.selectionAsync(); setTennisEvent(opt.key); }}
+                      style={[styles.tFilterChip, tennisEvent === opt.key && styles.tFilterChipActive]}
+                      activeOpacity={0.8}>
+                      <Text style={[styles.tFilterChipText, tennisEvent === opt.key && styles.tFilterChipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
               {/* Filter row — All / Men's / Women's (inline; scrolls with the page) */}
               <View style={styles.tFilterRow}>
                 {(['all', 'mens', 'womens'] as const).map(f => (
@@ -1103,7 +1149,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   {filteredMatches.map((item) => {
                     const sel = selectedTennisMatch?.espnId === item.espnId;
                     const lastIdx = item.sets.length - 1;
-                    const caption = [item.round, item.court].filter(Boolean).join(' · ');
+                    // Lead the caption with the tournament whenever the list spans more than one —
+                    // "Cincinnati Open · Round 2 · Court 3" answers the question the flat list couldn't.
+                    const caption = [tennisEvents.length >= 2 && tennisEvent === 'all' ? item.event : null, item.round, item.court]
+                      .filter(Boolean).join(' · ');
                     // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
                     const server = sel ? tennisDetail?.live?.server : undefined;
                     const renderSide = (side: 'home' | 'away') => (
@@ -1170,7 +1219,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               )}
             </>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
-            <GolfLeaderboard board={leaderboard} />
+            <GolfLeaderboard board={leaderboard} nextEvent={nextGolf} />
           ) : learnMode && learnContext ? (
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>

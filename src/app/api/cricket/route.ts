@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Game } from '../explain/zylaProvider';
 import { normalizeCricsheet } from '../explain/cricsheetProvider';
 import { normalizeSportmonks } from '../explain/sportmonksProvider';
-import { getSmLiveBoard, getSmFixture, SM_ID_PREFIX } from '../explain/sportmonksLive';
+import { getSmLiveBoard, getSmFixture, getSmUpcoming, SM_ID_PREFIX } from '../explain/sportmonksLive';
 import { cricketFlag } from '../explain/cricketFlags';
 import type { CricketMatch } from '../explain/cricketTypes';
 import { CRICKET_INDEX, CRICKET_RAW, type CricketIndexEntry } from './matches.generated';
@@ -120,8 +120,21 @@ export async function GET(request: NextRequest) {
   // richer (toss/officials/real powerplays), and keys the explain path we validated. Because the
   // id spaces differ, the dedupe keys on TEAMS+DATE equality, order-insensitive.
   const liveGames = await getSmLiveBoard(date ?? undefined);
+  // Upcoming fixtures ride the same response. Client-side this is free: the board-derived date
+  // strip grows future days automatically, and the Next Game Finder's cricket path starts finding
+  // — no app change, no new endpoint, no build. Skipped when a specific ?date= was asked for,
+  // since that contract is "that day's games", not "that day plus the future".
+  const upcoming = date ? [] : await getSmUpcoming();
+  // Same archival-wins dedupe as before, extended one tier: archival beats live, and both beat an
+  // upcoming entry for the same real match (a fixture that has started is no longer "upcoming").
   const seen = new Set(archival.map((g) => dedupeKey(g)));
-  const merged = [...archival, ...liveGames.filter((g) => !seen.has(dedupeKey(g)))];
+  const liveKept = liveGames.filter((g) => !seen.has(dedupeKey(g)));
+  for (const g of liveKept) seen.add(dedupeKey(g));
+  const merged = [
+    ...archival,
+    ...liveKept,
+    ...upcoming.filter((g) => !seen.has(dedupeKey(g))),
+  ];
   return NextResponse.json({ matches: merged }, { headers: corsHeaders });
 }
 
