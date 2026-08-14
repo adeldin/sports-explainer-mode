@@ -23,6 +23,10 @@ export interface EspnTennisMatch {
   home: string; away: string;             // competitor with homeAway==='home'/'away' → athlete.displayName
   homeFlag?: string; awayFlag?: string;   // athlete.flag.href (full https PNG url; omitted if absent)
   homeFlagAlt?: string; awayFlagAlt?: string; // athlete.flag.alt (country name, e.g. "USA")
+  // The TOURNAMENT the match belongs to. Added because two ATP events can run simultaneously
+  // (National Bank Open + Cincinnati Open, 2026-08-10) and a flat list gave the user no way to
+  // tell which was which. Sponsor tails are stripped for display ("X presented by Y" → "X").
+  event?: string;
   homeSeed?: number; awaySeed?: number;   // curatedRank.current — OMITTED when the key is absent (unseeded)
   sets: { home: number; away: number }[]; // home vs away linescores[].value zipped by set index
   round?: string;            // competition.round.displayName ("Round 1")
@@ -131,6 +135,10 @@ function parseBoard(json: any): EspnTennisMatch[] {
   const out: EspnTennisMatch[] = [];
   const events: any[] = Array.isArray(json?.events) ? json.events : [];
   for (const ev of events) {
+    // The event name lives on the EVENT node, two levels above the matches — capture it here and
+    // stamp every match. Sponsor tail stripped: chips and card lines need "Cincinnati Open", not
+    // "Cincinnati Open presented by …".
+    const eventName = asStr(ev?.shortName || ev?.name).replace(/\s+presented by .*$/i, '').trim() || undefined;
     const groupings: any[] = Array.isArray(ev?.groupings) ? ev.groupings : [];
     for (const g of groupings) {
       const comps: any[] = Array.isArray(g?.competitions) ? g.competitions : [];
@@ -138,7 +146,7 @@ function parseBoard(json: any): EspnTennisMatch[] {
         if (comp?.status?.type?.state !== 'in') continue;
         if (!isSinglesCategory(asStr(comp?.type?.text))) continue;
         const m = parseCompetition(comp);
-        if (m) out.push(m);
+        if (m) out.push(eventName ? { ...m, event: eventName } : m);
       }
     }
   }

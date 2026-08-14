@@ -113,6 +113,7 @@ export interface TennisLiveMatch {
   round?: string;                         // "Round 1"
   court?: string;                         // "No. 2 Court"
   statusDetail?: string;                  // "3rd Set"
+  event?: string;                         // tournament name ("Cincinnati Open") — two can run at once
   isLive: boolean;
   sortRank?: number;                      // min seed of whichever exist (seeded-first sort)
   live?: TennisLiveOverlay | null;        // only on the ?match= response
