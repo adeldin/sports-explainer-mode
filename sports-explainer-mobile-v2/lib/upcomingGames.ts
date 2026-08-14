@@ -107,18 +107,13 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
     return out;
   };
 
-  try {
-    // NFL gets the FULL season, not the default 45 days: its schedule is published in its entirety
-    // and starring a Week 15 game in August is a reasonable thing to want. 200 days from an August
-    // open reaches past the Super Bowl. Other sports keep the short horizon — their far schedules
-    // are enormous (an MLB season is ~2400 games) and mostly unpublished detail.
-    const horizonDays = sportKey === 'nfl' ? 200 : UPCOMING_HORIZON_DAYS;
-    // CHUNKED, not one call: ESPN silently truncates large range responses (measured — a 14-day MLB
-    // range dropped a game only 3 days old), so a season-long range would come back with holes.
-    // ~25-day slices stay comfortably under the cap; fetched in parallel, deduped on the seams.
-    const CHUNK_DAYS = 25;
+  // CHUNKED, not one call: ESPN silently truncates large range responses (measured — a 14-day MLB
+  // range dropped a game only 3 days old), so a season-long range would come back with holes.
+  // ~25-day slices stay comfortably under the cap; fetched in parallel, deduped on the seams.
+  const CHUNK_DAYS = 25;
+  const windowUpcoming = async (days: number): Promise<UpcomingGame[]> => {
     const chunks: [number, number][] = [];
-    for (let d = 0; d < horizonDays; d += CHUNK_DAYS) chunks.push([d, Math.min(d + CHUNK_DAYS, horizonDays)]);
+    for (let d = 0; d < days; d += CHUNK_DAYS) chunks.push([d, Math.min(d + CHUNK_DAYS, days)]);
     const parts = await Promise.all(chunks.map(async ([a, b]) => {
       try {
         const q = `?dates=${compact(new Date(now + a * DAY_MS))}-${compact(new Date(now + b * DAY_MS))}`;
@@ -126,7 +121,28 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
       } catch { return [] as UpcomingGame[]; }
     }));
     const seen = new Set<string>();
-    const ranged = parts.flat().filter(g => !seen.has(g.id) && (seen.add(g.id), true));
+    return parts.flat().filter(g => !seen.has(g.id) && (seen.add(g.id), true));
+  };
+
+  try {
+    // NFL gets the FULL season outright: its schedule is published in its entirety and starring a
+    // Week 15 game in August is a reasonable thing to want. 200 days from an August open reaches
+    // past the Super Bowl.
+    //
+    // Everything else WIDENS ADAPTIVELY instead of using a hand-tuned per-sport constant, because
+    // whether 45 days is generous or starving depends on WHERE IN ITS SEASON a sport is, not on
+    // which sport it is. Measured 2026-08-13: MLB had 191 fixtures inside 45 days and the NBA had
+    // ZERO (its next game was 51 days out) — the same sport would flip to saturated in November.
+    // A table of per-sport numbers would be wrong half the year; a rule that reacts to emptiness
+    // is right all year. The wider passes only run when the narrow one comes up short, so dense
+    // sports never pay for them.
+    const MIN_USEFUL = 8;
+    const ladder = sportKey === 'nfl' ? [200] : [UPCOMING_HORIZON_DAYS, 120, 200];
+    let ranged: UpcomingGame[] = [];
+    for (const days of ladder) {
+      ranged = await windowUpcoming(days);
+      if (ranged.length >= MIN_USEFUL) break;
+    }
     if (ranged.length > 0) return ranged;
 
     // Nothing inside the horizon. Deep off-season: the next fixture can be further out than any

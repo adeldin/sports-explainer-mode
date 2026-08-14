@@ -79,7 +79,9 @@ feeds don't carry it.
 
 **Cricket fixtures beyond the trial leagues.** `getSmUpcoming()` now surfaces future fixtures, but
 only for the three trial leagues (T20I / Big Bash / CSA T20). The €29 Major plan carries 26 —
-widen `LEAGUE_IDS` in `sportmonksLive.ts` when the subscription lands.
+widen `LEAGUE_IDS` in `sportmonksLive.ts` when the subscription lands. Note the *horizon* half of
+this was NOT a subscription problem and is now fixed: the window was 45 days, cricket had 3
+fixtures inside it and 62 just beyond, so the trial leagues looked emptier than they are.
 
 ---
 

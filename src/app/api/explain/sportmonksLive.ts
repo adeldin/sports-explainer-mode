@@ -146,7 +146,10 @@ export async function getSmLiveBoard(date?: string): Promise<Game[]> {
 // future fixtures those lists already contain — so the app's cricket calendar ended at the last
 // played match and the Next Game Finder had nothing to find. Same leagues, same L1 caches, zero
 // additional upstream calls: this just stops throwing the future away.
-export async function getSmUpcoming(daysAhead = 45): Promise<Game[]> {
+// 120 days, not 45: cricket is SPARSE and SEASONAL. Measured 2026-08-13, a 45-day window held
+// exactly 3 fixtures while 62 more sat just beyond it, including the entire Big Bash from Dec 12 —
+// so the calendar looked empty because of this constant, not because of the sport.
+export async function getSmUpcoming(daysAhead = 120): Promise<Game[]> {
   if (!SM_LIVE() || !TOKEN()) return [];
   try {
     const now = Date.now();
