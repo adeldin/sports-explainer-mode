@@ -24,7 +24,7 @@ export interface WatchCandidate {
 // keys are league-level. Without this, La Liga would rank as discovery after EPL.
 export const LEAGUE_TO_SPORT: Partial<Record<Sport, string>> = {
   epl: 'soccer', laliga: 'soccer', soccer: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', nationscup: 'rugby', superrugby: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', nationscup: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
   nba: 'basketball', wnba: 'basketball',
   // mlb, nhl, nfl, tennis, golf, cricket → each its own parent (fallback to the key).
 };
@@ -33,7 +33,7 @@ export const parentSport = (s: Sport): string => LEAGUE_TO_SPORT[s] ?? s;
 // Stable ordering for the final deterministic tiebreak (mirrors the SPORTS list).
 export const SPORT_ORDER: Sport[] = [
   'mlb', 'nhl', 'nba', 'wnba', 'nfl', 'soccer', 'worldcup',
-  'epl', 'laliga', 'seriea', 'bundesliga', 'rugby', 'mlr', 'superrugby', 'tennis', 'golf', 'cricket',
+  'epl', 'laliga', 'seriea', 'bundesliga', 'rugby', 'mlr', 'superrugby', 'championscup', 'challengecup', 'tennis', 'golf', 'cricket',
 ];
 
 // How far forward an "upcoming" game counts as recommendable. A few hours keeps the

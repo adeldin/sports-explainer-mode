@@ -131,7 +131,7 @@ const LEAGUE_SOURCES: Record<StandingsSport, { path: string; label: string }[]> 
 const KEY_TO_STANDINGS_SPORT: Partial<Record<Sport, StandingsSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
   cricket: 'cricket',
 };
 

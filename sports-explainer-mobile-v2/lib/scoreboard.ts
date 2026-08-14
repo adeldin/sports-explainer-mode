@@ -104,6 +104,12 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   // endpoint. Same convention as every other rugby key here — 270557 and 289262 are slugs too.
   superrugby: { espnSport: 'rugby', league: '242041', core: true },
   nationschamp: { espnSport: 'rugby', league: '17567', core: true },
+  // European club rugby, Oct–May — the two-tier knockout that runs ALONGSIDE the URC/Premiership
+  // league season, so it fills the same calendar rather than extending it. Champions Cup is the
+  // top tier, Challenge Cup the second. Slugs, like every rugby key here. Verified 2026-08-14:
+  // 48 and 36 forward fixtures from 2026-10-13, with resolved team names, logos and venues.
+  championscup: { espnSport: 'rugby', league: '271937', core: true },
+  challengecup: { espnSport: 'rugby', league: '272073', core: true },
   // Learn Mode sports — tennis/golf fetch tournament context.
   tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
   golf: { espnSport: 'golf', league: 'pga', learnMode: true, liveFormat: 'leaderboard' },
@@ -590,6 +596,8 @@ export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'sixnations', label: 'Six Nations' },
   { sportKey: 'nationschamp', label: 'Nations Championship' },
   { sportKey: 'superrugby', label: 'Super Rugby' },
+  { sportKey: 'championscup', label: 'Champions Cup' },
+  { sportKey: 'challengecup', label: 'Challenge Cup' },
 ];
 
 export async function fetchRugbyBoard(

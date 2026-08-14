@@ -80,6 +80,8 @@ const FACTS: Record<Sport, string[]> = {
   sixnations: RUGBY_FACTS,
   nationschamp: RUGBY_FACTS,
   superrugby: RUGBY_FACTS,
+  championscup: RUGBY_FACTS,
+  challengecup: RUGBY_FACTS,
   mlr: [
     "Major League Rugby was founded in 2018 — one of the newest professional leagues in the USA.",
     "MLR is the first Division 1 professional rugby union league in the United States.",
@@ -546,6 +548,8 @@ export const QUIZ: Record<Sport, QuizQuestion[]> = {
   sixnations: RUGBY_QUIZ,
   nationschamp: RUGBY_QUIZ,
   superrugby: RUGBY_QUIZ,
+  championscup: RUGBY_QUIZ,
+  challengecup: RUGBY_QUIZ,
   mlr: [
     { q: "What does MLR stand for?", options: ["Major League Rugby","Major League Rugby Americas","Modern League Rugby","Major League Rugby Union"], answer: 0, explanation: "MLR is Major League Rugby, the top professional rugby union league in the United States.", difficulty: "beginner" },
     { q: "In what year was Major League Rugby founded?", options: ["2014","2016","2018","2020"], answer: 2, explanation: "Major League Rugby was founded in 2018.", difficulty: "beginner" },

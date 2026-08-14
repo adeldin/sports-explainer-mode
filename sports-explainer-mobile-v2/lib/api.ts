@@ -7,7 +7,7 @@ export type { VisionMode, VisionGameContext, VisionResponse };
 export type { CoachSituation, CoachFull };
 export type { MatchEvent };
 
-export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'seriea' | 'bundesliga' | 'mlr' | 'tennis' | 'golf' | 'cricket' | 'nationscup' | 'sixnations' | 'nationschamp' | 'superrugby';
+export type Sport = 'nfl' | 'nba' | 'mlb' | 'nhl' | 'soccer' | 'worldcup' | 'rugby' | 'wnba' | 'epl' | 'laliga' | 'seriea' | 'bundesliga' | 'mlr' | 'tennis' | 'golf' | 'cricket' | 'nationscup' | 'sixnations' | 'nationschamp' | 'superrugby' | 'championscup' | 'challengecup';
 export type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
 export type Language = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja' | 'zh' | 'ko' | 'it' | 'ar';
 

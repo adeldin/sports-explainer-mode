@@ -76,7 +76,7 @@ export const ZONE_TAP: Record<ZoneSport, ZoneScenario[]> = {
 const KEY_TO_ZONE_SPORT: Partial<Record<Sport, ZoneSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
   tennis: 'tennis', golf: 'golf', cricket: 'cricket',
 };
 

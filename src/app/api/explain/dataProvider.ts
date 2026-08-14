@@ -82,6 +82,8 @@ const ESPN_CONFIG: Record<string, EspnCfg> = {
   rugby: { sport: 'rugby', league: '270557', core: true },
   mlr: { sport: 'rugby', league: '289262', core: true },
   superrugby: { sport: 'rugby', league: '242041', core: true },
+  championscup: { sport: 'rugby', league: '271937', core: true },
+  challengecup: { sport: 'rugby', league: '272073', core: true },
   tennis: { sport: 'tennis', league: 'atp', learnMode: true },
   golf: { sport: 'golf', league: 'pga', learnMode: true },
 };

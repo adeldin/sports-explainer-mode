@@ -105,7 +105,7 @@ export const SIGNAL_DECODER: Record<SignalSport, SignalScenario[]> = {
 const KEY_TO_SIGNAL_SPORT: Partial<Record<Sport, SignalSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'nba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
   cricket: 'cricket',
 };
 
