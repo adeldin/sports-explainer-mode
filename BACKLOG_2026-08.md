@@ -77,14 +77,13 @@ events and **zero** forward across a 400-day lookahead. Switched off via `learnM
 `SPORT_CONFIG` and commented out of `SOCCER_LEAGUES`; key and content retained. **Re-enable: spring
 2030.**
 
-**Ready to build NOW — European Champions Cup + Challenge Cup (rugby).** ESPN already publishes
-**48 and 36 forward fixtures** respectively, both starting **2026-10-13** — about eight weeks out.
-These are core-API slugs (`271937`, `272073`), which is the exact pipeline URC and Six Nations
-already use, so each is a `SPORT_CONFIG` line plus a `RUGBY_LEAGUES` row. This is the cheapest
-real coverage gain on the board right now.
+**SHIPPED 2026-08-14 — European Champions Cup + Challenge Cup (rugby).** Slugs `271937` / `272073`,
+48 and 36 forward fixtures from 2026-10-13, resolved teams + logos + venues. Wired through all 13
+per-key maps plus both backend league tables. Rides in 1.8.
 
-**Best-positioned major — Rugby World Cup 2027.** Slug `164205`, and **ESPN already carries 36
-fixtures**, first window opening 2027-08-09. Worth flagging that this is the tournament this app is
+**Best-positioned major — Rugby World Cup 2027.** Slug `164205`, and **ESPN already carries all 36
+pool fixtures**, verified to the day: **2027-10-01 to November**, in Australia, with teams already
+resolved (Australia v Hong Kong at Optus Stadium, France v USA at Marvel Stadium). Worth flagging that this is the tournament this app is
 most ready for: the Coach's Corner rugby modules were reviewed by an actual rugby coach, so the
 teaching content is validated ahead of the event rather than scrambled together during it. Build
 alongside the Champions Cup work, since it is the same one-line pipeline.
@@ -98,9 +97,16 @@ fixtures have appeared, this is the single biggest soccer competition the app do
 Rugby World Cup** (`289237`: 0 forward). Both are real events; ESPN simply hasn't populated them.
 Re-probe alongside the Champions League check.
 
-**Standing habit.** Before each release, re-run the forward-fixture probe over every configured
-league. A competition that quietly drops to zero forward events is either finished or has changed
-its league code, and both cases look identical from inside the app: an empty board.
+**Standing habit — now automated.** `npm run radar` (`scripts/fixture-radar.mjs`) enumerates all
+354 leagues ESPN publishes across 17 sports, counts forward fixtures for each, and diffs that
+against `SPORT_CONFIG` parsed straight from the source. It reports BROKEN (configured, no data
+either direction — exits non-zero), DORMANT (between seasons, informational), FUTURE EVENTS
+(unclaimed, first fixture >90 days out — the tournament-shaped class that ambushes you) and
+ALREADY RUNNING. Keyless, so it runs anywhere with no secrets.
+
+First real run, 2026-08-14: 0 broken, 3 dormant (Six Nations / Super Rugby / MLR, all Feb starts),
+and it surfaced the **AFC Asian Cup — 51 fixtures from around 2026-12-12**, which nobody had
+noticed. Blind spot: ESPN only, so Sportmonks cricket and Zyla Nations Cup still need human eyes.
 
 ---
 
