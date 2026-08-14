@@ -15,6 +15,7 @@ import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import { isSoccer } from '../lib/leagueGroups';
 import NextGameFinder from '../components/NextGameFinder';
+import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
@@ -75,6 +76,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [sport, setSport] = useState<Sport>(initialSport);
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
+  const [nextGolf, setNextGolf] = useState<NextGolfEvent | null>(null);      // "Up Next" under a FINAL board
   const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // ESPN live singles list (liveFormat:'tennis')
   const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match espnId (null → first live)
   const [tennisEvent, setTennisEvent] = useState<string>('all');             // tournament filter ('all' | event name)
@@ -371,6 +373,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         const board = await fetchLeaderboard();
         if (isCancelled()) return;
         setLeaderboard(board);
+        // A FINISHED board raises exactly one question — "when's the next one?" — so answer it.
+        // Two cheap ESPN calls, only made in the final state; a live board never pays them.
+        if (board && !board.isLive) {
+          const nx = await fetchNextGolfEvent();
+          if (isCancelled()) return;
+          setNextGolf(nx);
+        } else {
+          setNextGolf(null);
+        }
       }
       // liveFormat:'tennis' — fetch live matches from /api/tennis-live. Best-effort: fetchTennisLive
       // returns { matches: [] } on any failure OR when the backend TENNIS_LIVE flag is off, so the
@@ -1208,7 +1219,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               )}
             </>
           ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
-            <GolfLeaderboard board={leaderboard} />
+            <GolfLeaderboard board={leaderboard} nextEvent={nextGolf} />
           ) : learnMode && learnContext ? (
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>

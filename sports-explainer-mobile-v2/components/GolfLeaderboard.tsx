@@ -22,17 +22,34 @@ const isUnderPar = (s: string): boolean => typeof s === 'string' && s.trim().sta
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmtFinalDate = (ms: number): string => { const d = new Date(ms); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
 
-const COLLAPSED_COUNT = 15;
+// Live: top 15 — the race is the content. FINAL: top 10 — it's a result now, the podium is the
+// story, and the space below belongs to "what's next".
+const COLLAPSED_LIVE = 15;
+const COLLAPSED_FINAL = 10;
 
-export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
+import type { NextGolfEvent } from '../lib/golfNext';
+
+const daysUntil = (ms: number): string => {
+  const d = Math.ceil((ms - Date.now()) / 86_400_000);
+  if (d <= 0) return 'Today';
+  if (d === 1) return 'Tomorrow';
+  return `In ${d} days`;
+};
+const fmtRange = (a: number, b?: number): string => {
+  const f = (ms: number) => { const d = new Date(ms); return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+  return b ? `${f(a)} – ${f(b)}` : f(a);
+};
+
+export default function GolfLeaderboard({ board, nextEvent }: { board: Leaderboard; nextEvent?: NextGolfEvent | null }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // Weather-app north star: glanceable by default (top 15), deep on demand. Still .map() — no nested
   // scroll (this lives inside LiveScreen's parent ScrollView).
   const [expanded, setExpanded] = useState(false);
-  const canToggle = board.rows.length > COLLAPSED_COUNT;
-  const visibleRows = expanded ? board.rows : board.rows.slice(0, COLLAPSED_COUNT);
+  const collapsedCount = board.isLive ? COLLAPSED_LIVE : COLLAPSED_FINAL;
+  const canToggle = board.rows.length > collapsedCount;
+  const visibleRows = expanded ? board.rows : board.rows.slice(0, collapsedCount);
 
   // Teaching layer (Build 3): tap a column header or the leader's cell → reveal that concept at the
   // user's difficulty level, reusing the app's inline glossaryDefBox pattern (no modal). A missed
@@ -123,6 +140,24 @@ export default function GolfLeaderboard({ board }: { board: Leaderboard }) {
           </Text>
         </Pressable>
       )}
+
+      {/* UP NEXT — only under a FINISHED board, which is exactly when "when's the next one?" is
+          the question the screen should be answering instead of just displaying a result. */}
+      {!board.isLive && nextEvent && (
+        <View style={styles.nextCard}>
+          <Text style={styles.nextEyebrow}>⛳ UP NEXT</Text>
+          <Text style={styles.nextName}>{nextEvent.name}</Text>
+          <Text style={styles.nextWhen}>
+            {daysUntil(nextEvent.startTime)} · {fmtRange(nextEvent.startTime, nextEvent.endTime)}
+          </Text>
+          {(nextEvent.courseName || nextEvent.location) && (
+            <Text style={styles.nextWhere}>
+              📍 {[nextEvent.courseName, nextEvent.location].filter(Boolean).join(' · ')}
+            </Text>
+          )}
+          {!!nextEvent.purse && <Text style={styles.nextPurse}>💰 {nextEvent.purse} purse</Text>}
+        </View>
+      )}
     </View>
   );
 }
@@ -174,4 +209,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   toggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border },
   togglePressed: { backgroundColor: t.surfaceAlt },          // visible press state (reuses a token)
   toggleText: { color: t.accentText, fontSize: 13, fontWeight: '700' },
+  // Up Next card — the finished board's second act.
+  nextCard: { marginTop: 12, borderTopWidth: 1, borderTopColor: t.border, paddingTop: 12, gap: 4 },
+  nextEyebrow: { color: t.textSecondaryOnDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  nextName: { color: t.textPrimary, fontSize: 17, fontWeight: '900' },
+  nextWhen: { color: t.accent, fontSize: 13.5, fontWeight: '800' },
+  nextWhere: { color: t.textSecondaryOnDark, fontSize: 12.5, fontWeight: '600' },
+  nextPurse: { color: t.textSecondaryOnDark, fontSize: 12.5, fontWeight: '600' },
 });
