@@ -14,6 +14,7 @@ import * as Sharing from 'expo-sharing';
 import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import { isSoccer } from '../lib/leagueGroups';
+import { CFB_CONFERENCE_OPTIONS, CBB_CONFERENCE_OPTIONS } from '../lib/collegeConferences';
 import NextGameFinder from '../components/NextGameFinder';
 import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
 import ShareCard from '../components/ShareCard';
@@ -68,6 +69,9 @@ interface LiveScreenProps {
   navigation: { navigate: (name: string, params?: { sport?: Sport }) => void };
 }
 
+// Most filter chips to show at once, before the row costs more screen than the scores it sits above.
+const MAX_FILTER_CHIPS = 10;
+
 export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
   // --- Shared state (owned by AppStateProvider) ---
   const { language, level, autoRefresh, favorites, setFavorites, orderedSports, sportVisibility } = useAppState();
@@ -85,6 +89,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [tennisFilter, setTennisFilter] = useState<'all' | 'mens' | 'womens'>('all'); // category filter (All/Men's/Women's)
   const [rugbyLeague, setRugbyLeague] = useState<string>('all'); // merged Rugby tile league filter ('all' | game.sport)
   const [soccerLeague, setSoccerLeague] = useState<string>('all'); // merged Soccer tile league filter ('all' | game.sport)
+  const [collegeConf, setCollegeConf] = useState<string>('all');  // college conference filter ('all' | ESPN conference id)
   const [finderOpen, setFinderOpen] = useState(false);             // Next Game Finder modal
   const [onlyMyTeams, setOnlyMyTeams] = useState(false);           // cross-sport board filter
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
@@ -197,6 +202,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     } else if (sport === 'nationscup') {
       if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
       out = sameDay(out);
+    } else if (sport === 'cfb' || sport === 'cbb') {
+      // College narrows by CONFERENCE, not league — the tile is one league, but a September Saturday
+      // is 68 games. Matching on EITHER side is deliberate: non-conference games are the marquee ones
+      // (an SEC team hosting an out-of-conference opponent), and a home-only match would hide half of
+      // them from the conference their fans actually follow.
+      if (collegeConf !== 'all') {
+        out = out.filter(g => g.homeConferenceId === collegeConf || g.awayConferenceId === collegeConf);
+      }
+      // Safe either way: ESPN returns a whole WEEK for the bare college-football board and a single
+      // day for a dated one, so this is a no-op when the fetch already scoped the day.
+      out = sameDay(out);
     }
 
     // Cross-sport: "Only my teams", driven by the favourites the user has already starred on game
@@ -210,15 +226,29 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       out = out.filter(g => favorites.includes(g.homeTeam) || favorites.includes(g.awayTeam));
     }
     return out;
-  }, [games, sport, rugbyLeague, soccerLeague, selectedDate, onlyMyTeams, favorites]);
+  }, [games, sport, rugbyLeague, soccerLeague, collegeConf, selectedDate, onlyMyTeams, favorites]);
   // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
   // leagues, which state) are selected here and the render below stays generic. A third merged
   // tile only needs a branch here.
-  const leagueFilterAll = sport === 'nationscup'
-    ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague }
+  //
+  // `keysOf` is what let college reuse this wholesale. Soccer and Rugby discriminate on the game's
+  // LEAGUE key; college discriminates on CONFERENCE, and a game belongs to two of them. Returning a
+  // LIST of keys per game covers both cases, so the derivation, the empty-state and the fallback
+  // effect below are shared rather than forked.
+  const leagueFilterAll: {
+    leagues: { sportKey: string; label: string }[];
+    value: string;
+    set: (v: string) => void;
+    keysOf: (g: Game) => string[];
+  } | null = sport === 'nationscup'
+    ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague, keysOf: g => [g.sport] }
     : sport === 'soccer'
-    ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague }
+    ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague, keysOf: g => [g.sport] }
+    : sport === 'cfb' || sport === 'cbb'
+    ? { leagues: sport === 'cfb' ? CFB_CONFERENCE_OPTIONS : CBB_CONFERENCE_OPTIONS,
+        value: collegeConf, set: setCollegeConf,
+        keysOf: g => [g.homeConferenceId, g.awayConferenceId].filter((x): x is string => !!x) }
     : null;
 
   // Offer only the leagues that ACTUALLY HAVE GAMES on this board, plus All.
@@ -237,9 +267,23 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const dayGames = day
       ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
       : games;
-    const present = new Set(dayGames.map(g => g.sport));
-    const leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
+    const present = new Set(dayGames.flatMap(leagueFilterAll.keysOf));
+    let leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
     if (leagues.length < 2) return null;
+    // CAP the row. Deriving from the board fixed soccer, where six leagues collapse to two or three
+    // on a given day — but college broke that assumption: a September Saturday has games in 22
+    // different conferences, which is four or five rows of chips sitting on top of the scores.
+    // Keeping the busiest few is the useful subset (SEC 13 games, Big Ten 10, ACC 7 on the measured
+    // Saturday); the long tail is conferences with one fixture, which nobody opens a filter to find.
+    // Games in a dropped conference stay visible under All — this narrows the row, never the board.
+    // No-op for soccer and rugby, which never reach the cap.
+    if (leagues.length > MAX_FILTER_CHIPS) {
+      const count = new Map<string, number>();
+      for (const g of dayGames) for (const k of leagueFilterAll.keysOf(g)) count.set(k, (count.get(k) ?? 0) + 1);
+      leagues = [...leagues]
+        .sort((a, b) => (count.get(b.sportKey) ?? 0) - (count.get(a.sportKey) ?? 0))
+        .slice(0, MAX_FILTER_CHIPS);
+    }
     return { ...leagueFilterAll, leagues };
   }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport, selectedDate]);
 
@@ -255,7 +299,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const pool = day
       ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
       : games;
-    if (!pool.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
+    if (!pool.some(g => leagueFilterAll.keysOf(g).includes(leagueFilterAll.value))) leagueFilterAll.set('all');
   }, [games, leagueFilterAll?.value, selectedDate]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;

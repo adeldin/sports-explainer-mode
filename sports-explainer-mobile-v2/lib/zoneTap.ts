@@ -77,6 +77,10 @@ const KEY_TO_ZONE_SPORT: Partial<Record<Sport, ZoneSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
   rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
+  // College reuses the pro banks DELIBERATELY: this module is static authored content, and a college
+  // box score, football field and referee signal set are the same as the NFL's. Nothing is fetched,
+  // so nothing can be mislabelled.
+  cfb: 'nfl', cbb: 'nba',
   tennis: 'tennis', golf: 'golf', cricket: 'cricket',
 };
 

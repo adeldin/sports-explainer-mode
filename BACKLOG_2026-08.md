@@ -77,6 +77,30 @@ events and **zero** forward across a 400-day lookahead. Switched off via `learnM
 `SPORT_CONFIG` and commented out of `SOCCER_LEAGUES`; key and content retained. **Re-enable: spring
 2030.**
 
+**SHIPPED 2026-08-14 — College football + men's college basketball** (`cfb`, `cbb`). Ordinary
+site-API leagues, but two things made this more than a config line:
+
+- **Volume.** A September Saturday is 68 FBS games. The merged-tile league filter was generalized
+  with a `keysOf` selector so college narrows by CONFERENCE instead of league key — matching on
+  EITHER side, since non-conference games are the marquee ones. Measured: 68 → SEC 13, Big Ten 10,
+  ACC 7, with zero games falling outside the conference map. The chip row is capped at 10 (busiest
+  first) because 22 conferences play on a Saturday and the row would have been five rows of chrome.
+- **The off-season guard would have blanked NCAAF entirely.** CFB's opener is 15 days out and the
+  guard cuts at 14, so the tile would have shipped empty a fortnight before the season. Fixed with a
+  slate exception (≥20 games within 30 days), verified to change behaviour for CFB *only* — NBA,
+  NHL, college basketball and every in-season sport blank or show exactly as before.
+
+Conference ids are PER-SPORT and do not match across them (8 = SEC in football, Big 12 in
+basketball), hence two maps in `lib/collegeConferences.ts`. AP rank is parsed with ESPN's 99 =
+unranked normalized away; confirmed populating in-season (19–22 ranked sides on a real Saturday).
+
+Deliberately deferred, not forgotten:
+- **Women's college basketball** — 543 fixtures, still showing as unclaimed on the radar. Same
+  one-line pipeline whenever wanted.
+- **Academy crest + standings games** don't surface for college. Those two maps drive FETCHED pools,
+  so pointing college at the pro key would serve NFL logos under a College Football heading. A real
+  college pool is a design problem (134 FBS teams), not a config line.
+
 **SHIPPED 2026-08-14 — European Champions Cup + Challenge Cup (rugby).** Slugs `271937` / `272073`,
 48 and 36 forward fixtures from 2026-10-13, resolved teams + logos + venues. Wired through all 13
 per-key maps plus both backend league tables. Rides in 1.8.
