@@ -15,6 +15,7 @@ import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import { isSoccer } from '../lib/leagueGroups';
 import { CFB_CONFERENCE_OPTIONS, CBB_CONFERENCE_OPTIONS } from '../lib/collegeConferences';
+import FilterBar from '../components/FilterSheet';
 import NextGameFinder from '../components/NextGameFinder';
 import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
 import ShareCard from '../components/ShareCard';
@@ -68,9 +69,6 @@ interface LiveScreenProps {
   initialSport: Sport;
   navigation: { navigate: (name: string, params?: { sport?: Sport }) => void };
 }
-
-// Most filter chips to show at once, before the row costs more screen than the scores it sits above.
-const MAX_FILTER_CHIPS = 10;
 
 export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
   // --- Shared state (owned by AppStateProvider) ---
@@ -227,6 +225,25 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     }
     return out;
   }, [games, sport, rugbyLeague, soccerLeague, collegeConf, selectedDate, onlyMyTeams, favorites]);
+  // Every team on the current board, for the filter sheet's search field. Keyed by the DISPLAY
+  // ABBREVIATION because that is what `favorite_teams` stores and what toggleFavorite expects —
+  // the same known limitation flagged on the favourites path (not globally unique across leagues,
+  // fine within one board). Full display names are what people actually type, so those are the
+  // searchable label: "notre" has to find the Fighting Irish, not require guessing "ND".
+  const boardTeams = useMemo(() => {
+    const seen = new Map<string, { key: string; label: string; logo?: string }>();
+    for (const g of games) {
+      for (const side of [
+        { abbr: g.homeTeam, full: g.homeTeamFull, logo: g.homeLogo },
+        { abbr: g.awayTeam, full: g.awayTeamFull, logo: g.awayLogo },
+      ]) {
+        if (!side.abbr || seen.has(side.abbr)) continue;
+        seen.set(side.abbr, { key: side.abbr, label: side.full || side.abbr, logo: side.logo });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [games]);
+
   // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
   // leagues, which state) are selected here and the render below stays generic. A third merged
@@ -237,7 +254,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // LIST of keys per game covers both cases, so the derivation, the empty-state and the fallback
   // effect below are shared rather than forked.
   const leagueFilterAll: {
-    leagues: { sportKey: string; label: string }[];
+    leagues: { sportKey: string; label: string; count?: number }[];
     value: string;
     set: (v: string) => void;
     keysOf: (g: Game) => string[];
@@ -270,20 +287,15 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const present = new Set(dayGames.flatMap(leagueFilterAll.keysOf));
     let leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
     if (leagues.length < 2) return null;
-    // CAP the row. Deriving from the board fixed soccer, where six leagues collapse to two or three
-    // on a given day — but college broke that assumption: a September Saturday has games in 22
-    // different conferences, which is four or five rows of chips sitting on top of the scores.
-    // Keeping the busiest few is the useful subset (SEC 13 games, Big Ten 10, ACC 7 on the measured
-    // Saturday); the long tail is conferences with one fixture, which nobody opens a filter to find.
-    // Games in a dropped conference stay visible under All — this narrows the row, never the board.
-    // No-op for soccer and rugby, which never reach the cap.
-    if (leagues.length > MAX_FILTER_CHIPS) {
-      const count = new Map<string, number>();
-      for (const g of dayGames) for (const k of leagueFilterAll.keysOf(g)) count.set(k, (count.get(k) ?? 0) + 1);
-      leagues = [...leagues]
-        .sort((a, b) => (count.get(b.sportKey) ?? 0) - (count.get(a.sportKey) ?? 0))
-        .slice(0, MAX_FILTER_CHIPS);
-    }
+    // COUNTS, and no cap. The chip row had to be truncated to ten because 22 wrapped conferences
+    // buried the scores; a scrolling sheet has no height problem, so every option is offered again
+    // and ordered by how much is actually behind it. The count is the useful signal a chip never
+    // had room for — "SEC 13 games" tells you whether the tap is worth making.
+    const count = new Map<string, number>();
+    for (const g of dayGames) for (const k of leagueFilterAll.keysOf(g)) count.set(k, (count.get(k) ?? 0) + 1);
+    leagues = [...leagues]
+      .map(l => ({ ...l, count: count.get(l.sportKey) ?? 0 }))
+      .sort((a, b) => b.count - a.count);
     return { ...leagueFilterAll, leagues };
   }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport, selectedDate]);
 
@@ -354,6 +366,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Watch Next: the gameId we've already gathered a recommendation for (so a 60s
   // refresh of a final game doesn't re-gather), + a bumpable request token so a
   // superseded gather (user switched games/sports) writes nothing.
+  // A game id chosen for a sport whose board hasn't loaded yet. Held across the switch so the
+  // reconciler can tell "not loaded" from "filtered away". Cleared the moment it lands, or dropped
+  // if the loaded board genuinely doesn't contain it.
+  const pendingSelectRef = useRef<string | null>(null);
   const watchNextForGameRef = useRef<string | null>(null);
   const watchNextReqRef = useRef(0);
   // Live Q&A: monotonic id source (no Date.now()/random), + the play identity of the
@@ -560,6 +576,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const openWatchNext = (rec: WatchCandidate) => {
     setWatchNext(null);
     if (rec.sport !== sport) {
+      // Record the intent BEFORE switching. handleSportChange clears `games`, and the selection
+      // reconciler below treats "selected game not on the board" as "it was filtered away" and
+      // replaces it with the board's default. Across a sport switch the board is merely EMPTY, not
+      // filtered — which is how tapping a Live Now card for JAX @ NO landed on LAR @ KC instead.
+      pendingSelectRef.current = rec.gameId;
       handleSportChange(rec.sport); // async; fire-and-forget — state updates queue
     } else {
       Haptics.selectionAsync();
@@ -742,10 +763,21 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // Runs for EVERY sport now: "Only my teams" can filter the selected game off any board, not
     // just a merged tile. Still inert when nothing narrows the list, since the guard below exits
     // as soon as the selection is present.
-    if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) return;
+    if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) {
+      pendingSelectRef.current = null; // the pick landed
+      return;
+    }
+    // A cross-sport pick is in flight. Until the new board has actually FETCHED, "absent" means
+    // "not loaded yet" — overriding here is what silently redirected Watch Next taps to whatever
+    // game happened to be first. Once the board is in, an absent pick is genuinely gone (finished,
+    // or filtered off), so drop the intent and fall through to the normal default.
+    if (pendingSelectRef.current) {
+      if (!gamesFetched) return;
+      pendingSelectRef.current = null;
+    }
     const live = displayGames.find(g => g.isLive);
     setSelectedGameId(displayGames.length ? (live?.id ?? displayGames[0].id) : null);
-  }, [displayGames, sport, selectedGameId]);
+  }, [displayGames, sport, selectedGameId, gamesFetched]);
 
   // Date strip: compute the current sport's event-model game-days (prev/today/next, gap-skipping).
   // Per-sport (recomputed on switch); head-to-head site sports only. Today is always injected as
@@ -1053,32 +1085,43 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           {/* Merged-tile league filter (Rugby, Soccer). ALL leagues shown even when empty, so the
               row is a stable map of what the tile covers; selecting an empty league shows a "no
               games" message below rather than silently showing the combined board. */}
+          {/* ONE filter control, not a chip row. See components/FilterSheet.tsx for why: a chip
+              row's height scales with the number of options, so it worked at three leagues and
+              collapsed at 22 conferences. The bar is one row regardless, and the sheet it opens is
+              the only place with room for a search field — which is what makes "when does Notre
+              Dame play" answerable at all. Team search narrows to whoever is on THIS board; the
+              cross-sport version lives in the Next Games finder. */}
           {leagueFilter && (
-            /* WRAPS rather than scrolls sideways. Both merged tiles now carry 8 chips (7 leagues +
-               All), which overflows a phone width — so the old horizontal ScrollView hid half the
-               leagues behind a gesture most people never make. Serie A and the Bundesliga were
-               invisible on arrival. Wrapping costs one extra line and keeps the row doing its real
-               job: showing, at a glance, what this tile actually covers. */
-            <View style={styles.tFilterWrap}>
-              {[{ key: 'all', label: S.tennisFilterAll }, ...leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
+            <FilterBar
+              title={sport === 'cfb' || sport === 'cbb' ? 'Conference' : 'League'}
+              allLabel={S.tennisFilterAll}
+              value={leagueFilter.value}
+              options={leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label, count: l.count }))}
+              onChange={(k) => leagueFilter.set(k)}
+              searchPlaceholder={sport === 'cfb' || sport === 'cbb' ? 'Search conferences or teams' : 'Search leagues or teams'}
+              teams={boardTeams}
+              onSelectTeam={(name) => { setOnlyMyTeams(false); toggleFavorite(name); }}
+              teamsTitle="Follow a team"
+              rightSlot={favorites.length > 0 && games.length > 0 ? (
                 <TouchableOpacity
-                  key={opt.key}
-                  onPress={async () => { await Haptics.selectionAsync(); leagueFilter.set(opt.key); }}
-                  style={[styles.tFilterChip, leagueFilter.value === opt.key && styles.tFilterChipActive]}
+                  onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(v => !v); }}
+                  style={[styles.myTeamsChip, onlyMyTeams && styles.tFilterChipActive]}
                   activeOpacity={0.8}>
-                  <Text style={[styles.tFilterChipText, leagueFilter.value === opt.key && styles.tFilterChipTextActive]}>
-                    {opt.label}
+                  <Text style={[styles.tFilterChipText, onlyMyTeams && styles.tFilterChipTextActive]}>
+                    {onlyMyTeams ? '★' : '☆'}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              ) : undefined}
+            />
           )}
 
           {/* "Only my teams" — one toggle, not a team picker. It reads the favourites already
               starred on game cards, so there's no second list to curate and no 130-club checklist.
               Hidden entirely when nothing is favourited: a control that can only ever blank the
-              board is worse than no control. */}
-          {favorites.length > 0 && games.length > 0 && (
+              board is worse than no control.
+              STANDALONE ONLY when there's no filter bar to live inside. On merged/college tiles the
+              same toggle rides in the bar's right slot, so rendering it here too would double it. */}
+          {!leagueFilter && favorites.length > 0 && games.length > 0 && (
             <View style={styles.myTeamsRow}>
               <TouchableOpacity
                 onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(v => !v); }}
@@ -1195,7 +1238,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                     const lastIdx = item.sets.length - 1;
                     // Lead the caption with the tournament whenever the list spans more than one —
                     // "Cincinnati Open · Round 2 · Court 3" answers the question the flat list couldn't.
-                    const caption = [tennisEvents.length >= 2 && tennisEvent === 'all' ? item.event : null, item.round, item.court]
+                    // The event name is ALWAYS shown, not only when it's filterable. It used to be
+                    // gated on there being 2+ tournaments, on the reasoning that a single-tournament
+                    // board makes it redundant — which had it exactly backwards: with one tournament
+                    // there is no filter row either, so nothing on screen said which tournament this
+                    // was. "Round 2 · Court 3" of WHAT. The feed carries it; show it.
+                    const caption = [item.event, item.round, item.court]
                       .filter(Boolean).join(' · ');
                     // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
                     const server = sel ? tennisDetail?.live?.server : undefined;

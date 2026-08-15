@@ -7,6 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { useTheme, Theme } from '../lib/theme';
 import type { Sport } from '../lib/api';
 import { SPORTS } from '../lib/sports';
+import FilterBar from './FilterSheet';
+import { SOCCER_LEAGUES, RUGBY_LEAGUES } from '../lib/scoreboard';
+import { CFB_CONFERENCE_OPTIONS, CBB_CONFERENCE_OPTIONS } from '../lib/collegeConferences';
 import { findUpcomingGames, groupByDay, UpcomingGame, UPCOMING_HORIZON_DAYS } from '../lib/upcomingGames';
 import { loadStarred, starGame, unstarGame, MAX_ALERTS } from '../lib/gameAlerts';
 import {
@@ -35,6 +38,8 @@ export default function NextGameFinder({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [followed, setFollowed] = useState<FollowedTeam[]>([]);
   const [showTeams, setShowTeams] = useState(false);
+  const [facetKey, setFacetKey] = useState<string>('all');  // league / conference narrowing
+  const [teamKey, setTeamKey] = useState<string | null>(null); // one team, chosen by search
 
   useEffect(() => {
     if (!visible) return;
@@ -141,7 +146,62 @@ export default function NextGameFinder({
     }
   }, [busyId, starredIds]);
 
-  const grouped = useMemo(() => groupByDay(games), [games]);
+  // NARROWING — the finder listed every fixture the horizon could reach, which is 48 games for
+  // rugby and several hundred for college football. A flat chronological wall answers "what's next"
+  // but not "when does Notre Dame play", which is the question people actually arrive with.
+  //
+  // Same control as the live board, same reasoning (see components/FilterSheet.tsx): one bar, and a
+  // sheet with search. The axis differs by sport — college narrows by CONFERENCE, merged tiles by
+  // LEAGUE, and single-league sports get no bar at all since there'd be one option.
+  const facet = useMemo(() => {
+    if (sport === 'cfb' || sport === 'cbb') {
+      const opts = sport === 'cfb' ? CFB_CONFERENCE_OPTIONS : CBB_CONFERENCE_OPTIONS;
+      return { title: 'Conference', options: opts,
+               keysOf: (g: UpcomingGame) => [g.homeConferenceId, g.awayConferenceId].filter((x): x is string => !!x) };
+    }
+    if (sport === 'soccer' || sport === 'nationscup') {
+      const opts = (sport === 'soccer' ? SOCCER_LEAGUES : RUGBY_LEAGUES).map(l => ({ sportKey: l.sportKey as string, label: l.label }));
+      return { title: 'League', options: opts, keysOf: (g: UpcomingGame) => [g.sport as string] };
+    }
+    return null;
+  }, [sport]);
+
+  // Offer only what's actually in the results, with counts — an option that filters to nothing is a
+  // dead end, and the count tells you whether the tap is worth making.
+  const facetOptions = useMemo(() => {
+    if (!facet) return [];
+    const count = new Map<string, number>();
+    for (const g of games) for (const k of facet.keysOf(g)) count.set(k, (count.get(k) ?? 0) + 1);
+    return facet.options
+      .filter(o => count.has(o.sportKey))
+      .map(o => ({ key: o.sportKey, label: o.label, count: count.get(o.sportKey) ?? 0 }))
+      .sort((a, b) => b.count - a.count);
+  }, [facet, games]);
+
+  // Every team with a fixture ahead of it. Full names are the searchable label because that's what
+  // people type — "notre" must reach the Fighting Irish without anyone guessing an abbreviation.
+  const searchTeams = useMemo(() => {
+    const seen = new Map<string, { key: string; label: string; logo?: string; sublabel?: string }>();
+    for (const g of games) {
+      for (const side of [
+        { name: g.homeName || g.homeTeam, logo: g.homeLogo },
+        { name: g.awayName || g.awayTeam, logo: g.awayLogo },
+      ]) {
+        if (!side.name || seen.has(side.name)) continue;
+        seen.set(side.name, { key: side.name, label: side.name, logo: side.logo, sublabel: g.leagueLabel });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [games]);
+
+  const visibleGames = useMemo(() => {
+    let out = games;
+    if (teamKey) out = out.filter(g => (g.homeName || g.homeTeam) === teamKey || (g.awayName || g.awayTeam) === teamKey);
+    else if (facet && facetKey !== 'all') out = out.filter(g => facet.keysOf(g).includes(facetKey));
+    return out;
+  }, [games, facet, facetKey, teamKey]);
+
+  const grouped = useMemo(() => groupByDay(visibleGames), [visibleGames]);
   // The TILE's display label, never the internal key: 'nationscup' is the Rugby tile, and the old
   // sport.toUpperCase() printed "NATIONSCUP" into fan-facing copy.
   const sportLabel = SPORTS.find(t => t.key === sport)?.label ?? sport.toUpperCase();
@@ -157,7 +217,7 @@ export default function NextGameFinder({
             <Text style={styles.sub}>
               {loading
                 ? 'Looking…'
-                : `${games.length} ${games.length === 1 ? 'game' : 'games'} coming up`}
+                : `${visibleGames.length} ${visibleGames.length === 1 ? 'game' : 'games'} coming up`}
             </Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.closeBtn} activeOpacity={0.7}>
@@ -180,9 +240,31 @@ export default function NextGameFinder({
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.list}>
-            <Text style={styles.hint}>
-              Star a game and we'll send you a notification the moment it starts.
-            </Text>
+            {(facetOptions.length > 1 || searchTeams.length > 0) && (
+              <FilterBar
+                title={facet?.title ?? 'Team'}
+                allLabel="All"
+                valueLabel={teamKey ?? undefined}
+                value={teamKey ? '__team' : facetKey}
+                options={facetOptions}
+                onChange={(k) => { setTeamKey(null); setFacetKey(k); }}
+                teams={searchTeams}
+                teamsTitle="Jump to a team"
+                onSelectTeam={(name) => { setFacetKey('all'); setTeamKey(name); }}
+                searchPlaceholder="Search teams, leagues, conferences"
+                marginBottom={12}
+              />
+            )}
+            {visibleGames.length === 0 ? (
+              <Text style={styles.hint}>
+                No upcoming games match that filter. Tap the bar above and choose All to see
+                everything again.
+              </Text>
+            ) : (
+              <Text style={styles.hint}>
+                Star a game and we'll send you a notification the moment it starts.
+              </Text>
+            )}
 
             {/* Follow a TEAM — a standing rule rather than a one-off. Collapsed by default so the
                 answer to "when's the next game" stays the first thing on screen. */}

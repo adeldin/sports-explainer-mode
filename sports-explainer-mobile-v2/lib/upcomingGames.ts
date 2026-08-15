@@ -38,6 +38,10 @@ export interface UpcomingGame {
   // core-API forward probe has none without per-team resolves, so rows degrade to text there).
   homeLogo?: string;
   awayLogo?: string;
+  // College conference ids per side, so the finder can offer the same conference filter the live
+  // board does. Absent for every non-college sport (and for the core-API/backend paths).
+  homeConferenceId?: string;
+  awayConferenceId?: string;
 }
 
 // How far ahead to look. Long enough to cross a normal off-week or an international break, short
@@ -102,6 +106,8 @@ async function fromEspnRange(sportKey: Sport, label: string | undefined, now: nu
         awayName: away?.team?.displayName || undefined,
         homeLogo: home?.team?.logo || undefined,
         awayLogo: away?.team?.logo || undefined,
+        homeConferenceId: home?.team?.conferenceId != null ? String(home.team.conferenceId) : undefined,
+        awayConferenceId: away?.team?.conferenceId != null ? String(away.team.conferenceId) : undefined,
       });
     }
     return out;
