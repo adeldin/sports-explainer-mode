@@ -18,6 +18,7 @@ import { CFB_CONFERENCE_OPTIONS, CBB_CONFERENCE_OPTIONS } from '../lib/collegeCo
 import FilterBar from '../components/FilterSheet';
 import NextGameFinder from '../components/NextGameFinder';
 import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
+import { fetchGolfSeason, fetchGolfEventBoard, fetchGolfEventDetails, GolfEvent } from '../lib/golfSchedule';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
@@ -70,6 +71,8 @@ interface LiveScreenProps {
   navigation: { navigate: (name: string, params?: { sport?: Sport }) => void };
 }
 
+const GOLF_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
   // --- Shared state (owned by AppStateProvider) ---
   const { language, level, autoRefresh, favorites, setFavorites, orderedSports, sportVisibility } = useAppState();
@@ -79,6 +82,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
   const [nextGolf, setNextGolf] = useState<NextGolfEvent | null>(null);      // "Up Next" under a FINAL board
+  // Golf tournament navigation. `golfEventId` null = whatever the live/most-recent board is (the
+  // old, only behaviour); non-null = the user picked a specific tournament to look at.
+  const [golfSeason, setGolfSeason] = useState<GolfEvent[]>([]);
+  const [golfEventId, setGolfEventId] = useState<string | null>(null);
+  const [pickedGolfBoard, setPickedGolfBoard] = useState<Leaderboard | null>(null);
+  const [pickedGolfPreview, setPickedGolfPreview] = useState<NextGolfEvent | null>(null);
   const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // ESPN live singles list (liveFormat:'tennis')
   const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match espnId (null → first live)
   const [tennisEvent, setTennisEvent] = useState<string>('all');             // tournament filter ('all' | event name)
@@ -243,6 +252,37 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     }
     return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
   }, [games]);
+
+  // The season list, fetched once per visit to the Golf tab. Cheap (a handful of ranged calls) and
+  // it never changes mid-session, so there's no refresh path.
+  useEffect(() => {
+    if (sport !== 'golf') { setGolfEventId(null); setPickedGolfBoard(null); setPickedGolfPreview(null); return; }
+    let cancelled = false;
+    (async () => {
+      const season = await fetchGolfSeason();
+      if (!cancelled) setGolfSeason(season);
+    })();
+    return () => { cancelled = true; };
+  }, [sport]);
+
+  // Load whichever tournament was picked. A finished or in-progress event yields a board; a future
+  // one has no competitors yet, so it falls back to a details preview (course, location, purse) —
+  // which is the honest answer to "what's the next one" rather than an empty leaderboard.
+  useEffect(() => {
+    if (sport !== 'golf' || !golfEventId) { setPickedGolfBoard(null); setPickedGolfPreview(null); return; }
+    const ev = golfSeason.find(e => e.id === golfEventId);
+    if (!ev) return;
+    let cancelled = false;
+    (async () => {
+      const board = await fetchGolfEventBoard(ev);
+      if (cancelled) return;
+      setPickedGolfBoard(board);
+      if (board) { setPickedGolfPreview(null); return; }
+      const d = await fetchGolfEventDetails(ev.id);
+      if (!cancelled) setPickedGolfPreview({ name: ev.name, startTime: ev.start, endTime: ev.end, ...d });
+    })();
+    return () => { cancelled = true; };
+  }, [sport, golfEventId, golfSeason]);
 
   // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
@@ -1109,6 +1149,27 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
             />
           )}
 
+          {/* Golf tournament picker — the SAME bar every other sport uses, pointed at the season.
+              Golf had no way to look anywhere but at the live-or-most-recent board, which made the
+              tab answer "what's on now" and nothing else. A tournament is a named week-long event
+              people remember, so the list is searchable: typing "masters" beats scrolling 49 rows.
+              Dates ride in the hint column where team sports show a game count. */}
+          {sport === 'golf' && golfSeason.length > 1 && (
+            <FilterBar
+              title="Tournament"
+              allLabel={leaderboard?.isLive ? 'Playing now' : 'Most recent'}
+              value={golfEventId ?? 'all'}
+              options={golfSeason.map(e => ({
+                key: e.id,
+                label: e.name,
+                hint: `${GOLF_MONTHS[new Date(e.start).getMonth()]} ${new Date(e.start).getDate()}`
+                  + (e.state === 'in' ? ' · live' : ''),
+              }))}
+              onChange={(k) => setGolfEventId(k === 'all' ? null : k)}
+              searchPlaceholder="Search tournaments"
+            />
+          )}
+
           {/* "Only my teams" — one toggle, not a team picker. It reads the favourites already
               starred on game cards, so there's no second list to curate and no 130-club checklist.
               Hidden entirely when nothing is favourited: a control that can only ever blank the
@@ -1304,8 +1365,33 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 />
               )}
             </>
-          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
-            <GolfLeaderboard board={leaderboard} nextEvent={nextGolf} />
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && (pickedGolfBoard || (!golfEventId && leaderboard)) ? (
+            // A picked tournament wins over the live board; with nothing picked this is exactly the
+            // old behaviour. `nextEvent` is suppressed while looking at the past — an "Up Next" card
+            // under a leaderboard from March is a non-sequitur.
+            <GolfLeaderboard
+              board={(pickedGolfBoard ?? leaderboard)!}
+              nextEvent={golfEventId ? null : nextGolf}
+            />
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && pickedGolfPreview ? (
+            // A future tournament: no field yet, so show what IS known rather than an empty board.
+            <View style={styles.tournamentCard}>
+              <Text style={styles.tournamentText}>🏌️ {pickedGolfPreview.name}</Text>
+              <Text style={styles.golfPreviewLine}>
+                {new Date(pickedGolfPreview.startTime).toLocaleDateString(undefined,
+                  { weekday: 'short', month: 'short', day: 'numeric' })}
+                {pickedGolfPreview.endTime
+                  ? ` – ${new Date(pickedGolfPreview.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                  : ''}
+              </Text>
+              {!!pickedGolfPreview.courseName && (
+                <Text style={styles.golfPreviewLine}>📍 {pickedGolfPreview.courseName}
+                  {pickedGolfPreview.location ? ` · ${pickedGolfPreview.location}` : ''}</Text>
+              )}
+              {!!pickedGolfPreview.purse && (
+                <Text style={styles.golfPreviewLine}>💰 {pickedGolfPreview.purse}</Text>
+              )}
+            </View>
           ) : learnMode && learnContext ? (
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>
@@ -1725,6 +1811,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   learnBadgeText: { color: t.onAccent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  golfPreviewLine: { color: t.textSecondaryOnDark, fontSize: 14, fontWeight: '600', marginTop: 6, textAlign: 'center' },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
 
   // Live-tennis (single-scroll page): inline filter row + a bounded internally-scrolling match-list card.

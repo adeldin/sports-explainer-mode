@@ -28,6 +28,7 @@ export interface FilterOption {
   key: string;
   label: string;
   count?: number;   // games behind this option on the day being viewed; drives the right-hand hint
+  hint?: string;    // free-text right-hand hint, used INSTEAD of count (golf shows dates, not counts)
 }
 
 export interface FilterTeamOption {
@@ -209,9 +210,11 @@ export default function FilterBar({
                 <Text style={[styles.rowLabel, value === o.key && styles.rowLabelActive]} numberOfLines={1}>
                   {o.label}
                 </Text>
-                {o.count != null && (
-                  <Text style={styles.rowHint}>{o.count} {o.count === 1 ? 'game' : 'games'}</Text>
-                )}
+                {o.hint != null
+                  ? <Text style={styles.rowHint}>{o.hint}</Text>
+                  : o.count != null
+                  ? <Text style={styles.rowHint}>{o.count} {o.count === 1 ? 'game' : 'games'}</Text>
+                  : null}
               </TouchableOpacity>
             ))}
 
