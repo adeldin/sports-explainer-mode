@@ -47,6 +47,9 @@ export default function FilterBar({
   teamsTitle = 'Teams',
   onSelectTeam,
   valueLabel,
+  toggleRow,
+  starredKeys,
+  onToggleStar,
   searchPlaceholder,
   rightSlot,
   marginBottom = 10,
@@ -64,6 +67,14 @@ export default function FilterBar({
   // has nothing to tick. Without this the bar and the sheet's "All" row were forced to share one
   // label, which made the row that CLEARS the filter read as the filter itself.
   valueLabel?: string;
+  // A boolean that belongs on the same axis as the list but isn't one of the options — "Only my
+  // teams". It used to sit beside the bar as a bare ★, which read as decoration: a star with no
+  // team next to it doesn't say what it stars. In the sheet it gets a label and a place.
+  toggleRow?: { label: string; value: boolean; onChange: (v: boolean) => void };
+  // Favouriting from the search results. A star means something HERE, because it's attached to the
+  // team it acts on.
+  starredKeys?: Set<string>;
+  onToggleStar?: (key: string) => void;
   searchPlaceholder?: string;
   rightSlot?: React.ReactNode;      // e.g. the "Only my teams" toggle, kept on the same row
   marginBottom?: number;
@@ -103,8 +114,13 @@ export default function FilterBar({
         {rightSlot}
       </View>
 
-      <Modal visible={open} animationType="slide" transparent={false} onRequestClose={close}>
-        <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
+      {/* pageSheet, NOT a bare full-screen Modal. react-native-safe-area-context's SafeAreaView gets
+          no insets inside a plain Modal — it's a separate root view — so the title rendered under
+          the status-bar clock and Done under the battery, which is what made the sheet impossible
+          to dismiss. pageSheet is inset by iOS itself and adds swipe-down-to-close as a second way
+          out. Same presentation NextGameFinder already uses. */}
+      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+        <SafeAreaView style={styles.sheet} edges={['bottom']}>
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{title}</Text>
             <TouchableOpacity onPress={close} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -133,24 +149,44 @@ export default function FilterBar({
             {shownTeams.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>{teamsTitle.toUpperCase()}</Text>
-                {shownTeams.map(t => (
-                  <TouchableOpacity
+                {shownTeams.map(t => {
+                  const RowWrap: any = onSelectTeam ? TouchableOpacity : View;
+                  return (
+                  <RowWrap
                     key={t.key}
                     style={styles.row}
                     activeOpacity={0.8}
-                    onPress={async () => { await Haptics.selectionAsync(); onSelectTeam?.(t.key); close(); }}>
+                    {...(onSelectTeam ? { onPress: async () => { await Haptics.selectionAsync(); onSelectTeam(t.key); close(); } } : {})}>
                     {t.logo
                       ? <Image source={{ uri: t.logo }} style={styles.rowLogo} />
                       : <View style={styles.rowLogo} />}
                     <Text style={styles.rowLabel} numberOfLines={1}>{t.label}</Text>
                     {!!t.sublabel && <Text style={styles.rowHint}>{t.sublabel}</Text>}
-                  </TouchableOpacity>
-                ))}
+                    {onToggleStar && (
+                      <TouchableOpacity
+                        onPress={async () => { await Haptics.selectionAsync(); onToggleStar(t.key); }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                        <Text style={styles.rowStar}>{starredKeys?.has(t.key) ? '★' : '☆'}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </RowWrap>
+                  );
+                })}
               </>
             )}
 
             {(shownTeams.length > 0 || q) && shownOptions.length > 0 && (
               <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
+            )}
+
+            {!q && toggleRow && (
+              <TouchableOpacity
+                style={styles.row}
+                activeOpacity={0.8}
+                onPress={async () => { await Haptics.selectionAsync(); toggleRow.onChange(!toggleRow.value); }}>
+                <Text style={styles.rowTick}>{toggleRow.value ? '★' : '☆'}</Text>
+                <Text style={[styles.rowLabel, toggleRow.value && styles.rowLabelActive]}>{toggleRow.label}</Text>
+              </TouchableOpacity>
             )}
 
             {!q && (
@@ -233,5 +269,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rowLabel: { color: t.textPrimary, fontSize: 16, fontWeight: '600', flex: 1 },
   rowLabelActive: { color: t.accent, fontWeight: '800' },
   rowHint: { color: t.textMuted, fontSize: 13, fontWeight: '600' },
+  rowStar: { color: t.accent, fontSize: 20, fontWeight: '700', paddingLeft: 6 },
   empty: { color: t.textMuted, fontSize: 15, textAlign: 'center', paddingVertical: 30 },
 });

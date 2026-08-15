@@ -1100,18 +1100,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               onChange={(k) => leagueFilter.set(k)}
               searchPlaceholder={sport === 'cfb' || sport === 'cbb' ? 'Search conferences or teams' : 'Search leagues or teams'}
               teams={boardTeams}
-              onSelectTeam={(name) => { setOnlyMyTeams(false); toggleFavorite(name); }}
               teamsTitle="Follow a team"
-              rightSlot={favorites.length > 0 && games.length > 0 ? (
-                <TouchableOpacity
-                  onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(v => !v); }}
-                  style={[styles.myTeamsChip, onlyMyTeams && styles.tFilterChipActive]}
-                  activeOpacity={0.8}>
-                  <Text style={[styles.tFilterChipText, onlyMyTeams && styles.tFilterChipTextActive]}>
-                    {onlyMyTeams ? '★' : '☆'}
-                  </Text>
-                </TouchableOpacity>
-              ) : undefined}
+              starredKeys={new Set(favorites)}
+              onToggleStar={toggleFavorite}
+              toggleRow={favorites.length > 0 && games.length > 0
+                ? { label: 'Only my teams', value: onlyMyTeams, onChange: setOnlyMyTeams }
+                : undefined}
             />
           )}
 
