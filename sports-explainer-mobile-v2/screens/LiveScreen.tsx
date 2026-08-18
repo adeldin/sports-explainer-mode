@@ -14,8 +14,11 @@ import * as Sharing from 'expo-sharing';
 import GameCard from '../components/GameCard';
 import EmptyState from '../components/EmptyState';
 import { isSoccer } from '../lib/leagueGroups';
+import { CFB_CONFERENCE_OPTIONS, CBB_CONFERENCE_OPTIONS } from '../lib/collegeConferences';
+import FilterBar from '../components/FilterSheet';
 import NextGameFinder from '../components/NextGameFinder';
 import { fetchNextGolfEvent, NextGolfEvent } from '../lib/golfNext';
+import { fetchGolfSeason, fetchGolfEventBoard, fetchGolfEventDetails, GolfEvent } from '../lib/golfSchedule';
 import ShareCard from '../components/ShareCard';
 import PastPlays from '../components/PastPlays';
 import WatchNextCard from '../components/WatchNextCard';
@@ -68,6 +71,8 @@ interface LiveScreenProps {
   navigation: { navigate: (name: string, params?: { sport?: Sport }) => void };
 }
 
+const GOLF_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 export default function LiveScreen({ initialSport, navigation }: LiveScreenProps) {
   // --- Shared state (owned by AppStateProvider) ---
   const { language, level, autoRefresh, favorites, setFavorites, orderedSports, sportVisibility } = useAppState();
@@ -77,6 +82,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [learnContext, setLearnContext] = useState<string | null>(null); // tennis/golf tournament info
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null); // golf live leaderboard (liveFormat sports)
   const [nextGolf, setNextGolf] = useState<NextGolfEvent | null>(null);      // "Up Next" under a FINAL board
+  // Golf tournament navigation. `golfEventId` null = whatever the live/most-recent board is (the
+  // old, only behaviour); non-null = the user picked a specific tournament to look at.
+  const [golfSeason, setGolfSeason] = useState<GolfEvent[]>([]);
+  const [golfEventId, setGolfEventId] = useState<string | null>(null);
+  const [pickedGolfBoard, setPickedGolfBoard] = useState<Leaderboard | null>(null);
+  const [pickedGolfPreview, setPickedGolfPreview] = useState<NextGolfEvent | null>(null);
   const [tennisMatches, setTennisMatches] = useState<TennisLiveMatch[]>([]); // ESPN live singles list (liveFormat:'tennis')
   const [tennisSel, setTennisSel] = useState<string | null>(null);           // selected match espnId (null → first live)
   const [tennisEvent, setTennisEvent] = useState<string>('all');             // tournament filter ('all' | event name)
@@ -85,6 +96,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const [tennisFilter, setTennisFilter] = useState<'all' | 'mens' | 'womens'>('all'); // category filter (All/Men's/Women's)
   const [rugbyLeague, setRugbyLeague] = useState<string>('all'); // merged Rugby tile league filter ('all' | game.sport)
   const [soccerLeague, setSoccerLeague] = useState<string>('all'); // merged Soccer tile league filter ('all' | game.sport)
+  const [collegeConf, setCollegeConf] = useState<string>('all');  // college conference filter ('all' | ESPN conference id)
   const [finderOpen, setFinderOpen] = useState(false);             // Next Game Finder modal
   const [onlyMyTeams, setOnlyMyTeams] = useState(false);           // cross-sport board filter
   const [gamesFetched, setGamesFetched] = useState(false); // true once a live-sport fetch completes
@@ -197,6 +209,17 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     } else if (sport === 'nationscup') {
       if (rugbyLeague !== 'all') out = out.filter(g => g.sport === rugbyLeague);
       out = sameDay(out);
+    } else if (sport === 'cfb' || sport === 'cbb') {
+      // College narrows by CONFERENCE, not league — the tile is one league, but a September Saturday
+      // is 68 games. Matching on EITHER side is deliberate: non-conference games are the marquee ones
+      // (an SEC team hosting an out-of-conference opponent), and a home-only match would hide half of
+      // them from the conference their fans actually follow.
+      if (collegeConf !== 'all') {
+        out = out.filter(g => g.homeConferenceId === collegeConf || g.awayConferenceId === collegeConf);
+      }
+      // Safe either way: ESPN returns a whole WEEK for the bare college-football board and a single
+      // day for a dated one, so this is a no-op when the fetch already scoped the day.
+      out = sameDay(out);
     }
 
     // Cross-sport: "Only my teams", driven by the favourites the user has already starred on game
@@ -210,15 +233,79 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       out = out.filter(g => favorites.includes(g.homeTeam) || favorites.includes(g.awayTeam));
     }
     return out;
-  }, [games, sport, rugbyLeague, soccerLeague, selectedDate, onlyMyTeams, favorites]);
+  }, [games, sport, rugbyLeague, soccerLeague, collegeConf, selectedDate, onlyMyTeams, favorites]);
+  // Every team on the current board, for the filter sheet's search field. Keyed by the DISPLAY
+  // ABBREVIATION because that is what `favorite_teams` stores and what toggleFavorite expects —
+  // the same known limitation flagged on the favourites path (not globally unique across leagues,
+  // fine within one board). Full display names are what people actually type, so those are the
+  // searchable label: "notre" has to find the Fighting Irish, not require guessing "ND".
+  const boardTeams = useMemo(() => {
+    const seen = new Map<string, { key: string; label: string; logo?: string }>();
+    for (const g of games) {
+      for (const side of [
+        { abbr: g.homeTeam, full: g.homeTeamFull, logo: g.homeLogo },
+        { abbr: g.awayTeam, full: g.awayTeamFull, logo: g.awayLogo },
+      ]) {
+        if (!side.abbr || seen.has(side.abbr)) continue;
+        seen.set(side.abbr, { key: side.abbr, label: side.full || side.abbr, logo: side.logo });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [games]);
+
+  // The season list, fetched once per visit to the Golf tab. Cheap (a handful of ranged calls) and
+  // it never changes mid-session, so there's no refresh path.
+  useEffect(() => {
+    if (sport !== 'golf') { setGolfEventId(null); setPickedGolfBoard(null); setPickedGolfPreview(null); return; }
+    let cancelled = false;
+    (async () => {
+      const season = await fetchGolfSeason();
+      if (!cancelled) setGolfSeason(season);
+    })();
+    return () => { cancelled = true; };
+  }, [sport]);
+
+  // Load whichever tournament was picked. A finished or in-progress event yields a board; a future
+  // one has no competitors yet, so it falls back to a details preview (course, location, purse) —
+  // which is the honest answer to "what's the next one" rather than an empty leaderboard.
+  useEffect(() => {
+    if (sport !== 'golf' || !golfEventId) { setPickedGolfBoard(null); setPickedGolfPreview(null); return; }
+    const ev = golfSeason.find(e => e.id === golfEventId);
+    if (!ev) return;
+    let cancelled = false;
+    (async () => {
+      const board = await fetchGolfEventBoard(ev);
+      if (cancelled) return;
+      setPickedGolfBoard(board);
+      if (board) { setPickedGolfPreview(null); return; }
+      const d = await fetchGolfEventDetails(ev.id);
+      if (!cancelled) setPickedGolfPreview({ name: ev.name, startTime: ev.start, endTime: ev.end, ...d });
+    })();
+    return () => { cancelled = true; };
+  }, [sport, golfEventId, golfSeason]);
+
   // Merged-tile league filter. Rugby and Soccer both fold several leagues under one tile, and the
   // chip row / empty-league message are identical for both — so the tile-specific bits (which
   // leagues, which state) are selected here and the render below stays generic. A third merged
   // tile only needs a branch here.
-  const leagueFilterAll = sport === 'nationscup'
-    ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague }
+  //
+  // `keysOf` is what let college reuse this wholesale. Soccer and Rugby discriminate on the game's
+  // LEAGUE key; college discriminates on CONFERENCE, and a game belongs to two of them. Returning a
+  // LIST of keys per game covers both cases, so the derivation, the empty-state and the fallback
+  // effect below are shared rather than forked.
+  const leagueFilterAll: {
+    leagues: { sportKey: string; label: string; count?: number }[];
+    value: string;
+    set: (v: string) => void;
+    keysOf: (g: Game) => string[];
+  } | null = sport === 'nationscup'
+    ? { leagues: RUGBY_LEAGUES, value: rugbyLeague, set: setRugbyLeague, keysOf: g => [g.sport] }
     : sport === 'soccer'
-    ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague }
+    ? { leagues: SOCCER_LEAGUES, value: soccerLeague, set: setSoccerLeague, keysOf: g => [g.sport] }
+    : sport === 'cfb' || sport === 'cbb'
+    ? { leagues: sport === 'cfb' ? CFB_CONFERENCE_OPTIONS : CBB_CONFERENCE_OPTIONS,
+        value: collegeConf, set: setCollegeConf,
+        keysOf: g => [g.homeConferenceId, g.awayConferenceId].filter((x): x is string => !!x) }
     : null;
 
   // Offer only the leagues that ACTUALLY HAVE GAMES on this board, plus All.
@@ -237,9 +324,18 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const dayGames = day
       ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
       : games;
-    const present = new Set(dayGames.map(g => g.sport));
-    const leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
+    const present = new Set(dayGames.flatMap(leagueFilterAll.keysOf));
+    let leagues = leagueFilterAll.leagues.filter(l => present.has(l.sportKey));
     if (leagues.length < 2) return null;
+    // COUNTS, and no cap. The chip row had to be truncated to ten because 22 wrapped conferences
+    // buried the scores; a scrolling sheet has no height problem, so every option is offered again
+    // and ordered by how much is actually behind it. The count is the useful signal a chip never
+    // had room for — "SEC 13 games" tells you whether the tap is worth making.
+    const count = new Map<string, number>();
+    for (const g of dayGames) for (const k of leagueFilterAll.keysOf(g)) count.set(k, (count.get(k) ?? 0) + 1);
+    leagues = [...leagues]
+      .map(l => ({ ...l, count: count.get(l.sportKey) ?? 0 }))
+      .sort((a, b) => b.count - a.count);
     return { ...leagueFilterAll, leagues };
   }, [leagueFilterAll?.value, leagueFilterAll?.leagues, games, sport, selectedDate]);
 
@@ -255,7 +351,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     const pool = day
       ? games.filter(g => g.startTime && toLocalDayString(new Date(g.startTime)) === day)
       : games;
-    if (!pool.some(g => g.sport === leagueFilterAll.value)) leagueFilterAll.set('all');
+    if (!pool.some(g => leagueFilterAll.keysOf(g).includes(leagueFilterAll.value))) leagueFilterAll.set('all');
   }, [games, leagueFilterAll?.value, selectedDate]);
   const selectedGame = displayGames.find(g => g.id === selectedGameId);
   const selectedGameState = selectedGame?.state;
@@ -310,6 +406,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // Watch Next: the gameId we've already gathered a recommendation for (so a 60s
   // refresh of a final game doesn't re-gather), + a bumpable request token so a
   // superseded gather (user switched games/sports) writes nothing.
+  // A game id chosen for a sport whose board hasn't loaded yet. Held across the switch so the
+  // reconciler can tell "not loaded" from "filtered away". Cleared the moment it lands, or dropped
+  // if the loaded board genuinely doesn't contain it.
+  const pendingSelectRef = useRef<string | null>(null);
   const watchNextForGameRef = useRef<string | null>(null);
   const watchNextReqRef = useRef(0);
   // Live Q&A: monotonic id source (no Date.now()/random), + the play identity of the
@@ -516,6 +616,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const openWatchNext = (rec: WatchCandidate) => {
     setWatchNext(null);
     if (rec.sport !== sport) {
+      // Record the intent BEFORE switching. handleSportChange clears `games`, and the selection
+      // reconciler below treats "selected game not on the board" as "it was filtered away" and
+      // replaces it with the board's default. Across a sport switch the board is merely EMPTY, not
+      // filtered — which is how tapping a Live Now card for JAX @ NO landed on LAR @ KC instead.
+      pendingSelectRef.current = rec.gameId;
       handleSportChange(rec.sport); // async; fire-and-forget — state updates queue
     } else {
       Haptics.selectionAsync();
@@ -698,10 +803,21 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // Runs for EVERY sport now: "Only my teams" can filter the selected game off any board, not
     // just a merged tile. Still inert when nothing narrows the list, since the guard below exits
     // as soon as the selection is present.
-    if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) return;
+    if (selectedGameId && displayGames.some(g => g.id === selectedGameId)) {
+      pendingSelectRef.current = null; // the pick landed
+      return;
+    }
+    // A cross-sport pick is in flight. Until the new board has actually FETCHED, "absent" means
+    // "not loaded yet" — overriding here is what silently redirected Watch Next taps to whatever
+    // game happened to be first. Once the board is in, an absent pick is genuinely gone (finished,
+    // or filtered off), so drop the intent and fall through to the normal default.
+    if (pendingSelectRef.current) {
+      if (!gamesFetched) return;
+      pendingSelectRef.current = null;
+    }
     const live = displayGames.find(g => g.isLive);
     setSelectedGameId(displayGames.length ? (live?.id ?? displayGames[0].id) : null);
-  }, [displayGames, sport, selectedGameId]);
+  }, [displayGames, sport, selectedGameId, gamesFetched]);
 
   // Date strip: compute the current sport's event-model game-days (prev/today/next, gap-skipping).
   // Per-sport (recomputed on switch); head-to-head site sports only. Today is always injected as
@@ -1009,32 +1125,58 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
           {/* Merged-tile league filter (Rugby, Soccer). ALL leagues shown even when empty, so the
               row is a stable map of what the tile covers; selecting an empty league shows a "no
               games" message below rather than silently showing the combined board. */}
+          {/* ONE filter control, not a chip row. See components/FilterSheet.tsx for why: a chip
+              row's height scales with the number of options, so it worked at three leagues and
+              collapsed at 22 conferences. The bar is one row regardless, and the sheet it opens is
+              the only place with room for a search field — which is what makes "when does Notre
+              Dame play" answerable at all. Team search narrows to whoever is on THIS board; the
+              cross-sport version lives in the Next Games finder. */}
           {leagueFilter && (
-            /* WRAPS rather than scrolls sideways. Both merged tiles now carry 8 chips (7 leagues +
-               All), which overflows a phone width — so the old horizontal ScrollView hid half the
-               leagues behind a gesture most people never make. Serie A and the Bundesliga were
-               invisible on arrival. Wrapping costs one extra line and keeps the row doing its real
-               job: showing, at a glance, what this tile actually covers. */
-            <View style={styles.tFilterWrap}>
-              {[{ key: 'all', label: S.tennisFilterAll }, ...leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label }))].map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  onPress={async () => { await Haptics.selectionAsync(); leagueFilter.set(opt.key); }}
-                  style={[styles.tFilterChip, leagueFilter.value === opt.key && styles.tFilterChipActive]}
-                  activeOpacity={0.8}>
-                  <Text style={[styles.tFilterChipText, leagueFilter.value === opt.key && styles.tFilterChipTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <FilterBar
+              title={sport === 'cfb' || sport === 'cbb' ? 'Conference' : 'League'}
+              allLabel={S.tennisFilterAll}
+              value={leagueFilter.value}
+              options={leagueFilter.leagues.map(l => ({ key: l.sportKey as string, label: l.label, count: l.count }))}
+              onChange={(k) => leagueFilter.set(k)}
+              searchPlaceholder={sport === 'cfb' || sport === 'cbb' ? 'Search conferences or teams' : 'Search leagues or teams'}
+              teams={boardTeams}
+              teamsTitle="Follow a team"
+              starredKeys={new Set(favorites)}
+              onToggleStar={toggleFavorite}
+              toggleRow={favorites.length > 0 && games.length > 0
+                ? { label: 'Only my teams', value: onlyMyTeams, onChange: setOnlyMyTeams }
+                : undefined}
+            />
+          )}
+
+          {/* Golf tournament picker — the SAME bar every other sport uses, pointed at the season.
+              Golf had no way to look anywhere but at the live-or-most-recent board, which made the
+              tab answer "what's on now" and nothing else. A tournament is a named week-long event
+              people remember, so the list is searchable: typing "masters" beats scrolling 49 rows.
+              Dates ride in the hint column where team sports show a game count. */}
+          {sport === 'golf' && golfSeason.length > 1 && (
+            <FilterBar
+              title="Tournament"
+              allLabel={leaderboard?.isLive ? 'Playing now' : 'Most recent'}
+              value={golfEventId ?? 'all'}
+              options={golfSeason.map(e => ({
+                key: e.id,
+                label: e.name,
+                hint: `${GOLF_MONTHS[new Date(e.start).getMonth()]} ${new Date(e.start).getDate()}`
+                  + (e.state === 'in' ? ' · live' : ''),
+              }))}
+              onChange={(k) => setGolfEventId(k === 'all' ? null : k)}
+              searchPlaceholder="Search tournaments"
+            />
           )}
 
           {/* "Only my teams" — one toggle, not a team picker. It reads the favourites already
               starred on game cards, so there's no second list to curate and no 130-club checklist.
               Hidden entirely when nothing is favourited: a control that can only ever blank the
-              board is worse than no control. */}
-          {favorites.length > 0 && games.length > 0 && (
+              board is worse than no control.
+              STANDALONE ONLY when there's no filter bar to live inside. On merged/college tiles the
+              same toggle rides in the bar's right slot, so rendering it here too would double it. */}
+          {!leagueFilter && favorites.length > 0 && games.length > 0 && (
             <View style={styles.myTeamsRow}>
               <TouchableOpacity
                 onPress={async () => { await Haptics.selectionAsync(); setOnlyMyTeams(v => !v); }}
@@ -1151,7 +1293,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                     const lastIdx = item.sets.length - 1;
                     // Lead the caption with the tournament whenever the list spans more than one —
                     // "Cincinnati Open · Round 2 · Court 3" answers the question the flat list couldn't.
-                    const caption = [tennisEvents.length >= 2 && tennisEvent === 'all' ? item.event : null, item.round, item.court]
+                    // The event name is ALWAYS shown, not only when it's filterable. It used to be
+                    // gated on there being 2+ tournaments, on the reasoning that a single-tournament
+                    // board makes it redundant — which had it exactly backwards: with one tournament
+                    // there is no filter row either, so nothing on screen said which tournament this
+                    // was. "Round 2 · Court 3" of WHAT. The feed carries it; show it.
+                    const caption = [item.event, item.round, item.court]
                       .filter(Boolean).join(' · ');
                     // serve only known for the SELECTED match (its overlay is in tennisDetail.live)
                     const server = sel ? tennisDetail?.live?.server : undefined;
@@ -1218,8 +1365,33 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 />
               )}
             </>
-          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && leaderboard ? (
-            <GolfLeaderboard board={leaderboard} nextEvent={nextGolf} />
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && (pickedGolfBoard || (!golfEventId && leaderboard)) ? (
+            // A picked tournament wins over the live board; with nothing picked this is exactly the
+            // old behaviour. `nextEvent` is suppressed while looking at the past — an "Up Next" card
+            // under a leaderboard from March is a non-sequitur.
+            <GolfLeaderboard
+              board={(pickedGolfBoard ?? leaderboard)!}
+              nextEvent={golfEventId ? null : nextGolf}
+            />
+          ) : SPORT_CONFIG[sport]?.liveFormat === 'leaderboard' && pickedGolfPreview ? (
+            // A future tournament: no field yet, so show what IS known rather than an empty board.
+            <View style={styles.tournamentCard}>
+              <Text style={styles.tournamentText}>🏌️ {pickedGolfPreview.name}</Text>
+              <Text style={styles.golfPreviewLine}>
+                {new Date(pickedGolfPreview.startTime).toLocaleDateString(undefined,
+                  { weekday: 'short', month: 'short', day: 'numeric' })}
+                {pickedGolfPreview.endTime
+                  ? ` – ${new Date(pickedGolfPreview.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                  : ''}
+              </Text>
+              {!!pickedGolfPreview.courseName && (
+                <Text style={styles.golfPreviewLine}>📍 {pickedGolfPreview.courseName}
+                  {pickedGolfPreview.location ? ` · ${pickedGolfPreview.location}` : ''}</Text>
+              )}
+              {!!pickedGolfPreview.purse && (
+                <Text style={styles.golfPreviewLine}>💰 {pickedGolfPreview.purse}</Text>
+              )}
+            </View>
           ) : learnMode && learnContext ? (
             <View style={styles.tournamentCard}>
               <Text style={styles.tournamentText}>🏆 {learnContext}</Text>
@@ -1639,6 +1811,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   learnBadgeText: { color: t.onAccent, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   learnExplainer: { color: t.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 12 },
   tournamentCard: { marginHorizontal: 16, marginBottom: 10, padding: 16, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  golfPreviewLine: { color: t.textSecondaryOnDark, fontSize: 14, fontWeight: '600', marginTop: 6, textAlign: 'center' },
   tournamentText: { color: t.textPrimary, fontSize: 15, fontWeight: '700' },
 
   // Live-tennis (single-scroll page): inline filter row + a bounded internally-scrolling match-list card.

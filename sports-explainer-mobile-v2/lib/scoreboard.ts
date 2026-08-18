@@ -52,6 +52,16 @@ export interface Game {
   // flag-art source is a backend values-only swap. Unset for every non-cricket sport. ---
   homeFlag?: string;
   awayFlag?: string;
+  // --- ADDITIVE (college): ESPN group id per SIDE, not per game. Non-conference matchups are the
+  // norm in college — an SEC team hosting an FCS opponent has two different ids — so the conference
+  // filter matches EITHER side. A single per-game field would drop exactly the marquee out-of-
+  // conference games people most want to find. Unset for every non-college sport. ---
+  homeConferenceId?: string;
+  awayConferenceId?: string;
+  // AP/coaches poll position where the feed carries one. ESPN encodes UNRANKED as 99, which would
+  // render as a "#99" badge if passed through naively, so 99 is normalized to undefined here.
+  homeRank?: number;
+  awayRank?: number;
   sport: string;
 }
 
@@ -70,8 +80,25 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   nhl: { espnSport: 'hockey', league: 'nhl' },
   nba: { espnSport: 'basketball', league: 'nba' },
   nfl: { espnSport: 'football', league: 'nfl' },
+  // College football and men's college basketball. Ordinary site-API leagues — same shape as NFL/NBA
+  // (two competitors, logos, venue, broadcasts), plus two fields the pro leagues don't carry:
+  // team.conferenceId and curatedRank. Both are load-bearing here: measured 2026-08-14, a single
+  // September Saturday is 68 FBS games, so the conference chip row is what makes the board usable.
+  cfb: { espnSport: 'football', league: 'college-football' },
+  cbb: { espnSport: 'basketball', league: 'mens-college-basketball' },
   soccer: { espnSport: 'soccer', league: 'usa.1' },
-  worldcup: { espnSport: 'soccer', league: 'fifa.world' },
+  // World Cup — PARKED until 2030, not deleted. The 2026 tournament ended 2026-07-19; probed
+  // 2026-08-13, fifa.world returns 104 PAST events and 0 future ones across a 400-day lookahead.
+  // learnMode:true is what actually switches it off: fetchScoreboard returns [] for learnMode
+  // sports, which closes all three fetch paths at once (the soccer board, gatherWatchCandidates,
+  // and findUpcomingGames) instead of needing a guard in each.
+  //
+  // The KEY, the espn config, and all the World Cup content (facts, quizzes, FAQs, Academy
+  // coverage, SOCCER_KEYS membership) deliberately stay. Two reasons: isSoccer('worldcup') must
+  // keep returning true or a game starred back in July misroutes to the wrong Coach's Corner, and
+  // the content is evergreen — Brazil still has five titles. Re-enabling in 2030 is removing
+  // learnMode here and restoring the SOCCER_LEAGUES row.
+  worldcup: { espnSport: 'soccer', league: 'fifa.world', learnMode: true },
   rugby: { espnSport: 'rugby', league: '270557', core: true },
   wnba: { espnSport: 'basketball', league: 'wnba' },
   epl: { espnSport: 'soccer', league: 'eng.1' },
@@ -93,6 +120,12 @@ export const SPORT_CONFIG: Record<Sport, SportCfg> = {
   // endpoint. Same convention as every other rugby key here — 270557 and 289262 are slugs too.
   superrugby: { espnSport: 'rugby', league: '242041', core: true },
   nationschamp: { espnSport: 'rugby', league: '17567', core: true },
+  // European club rugby, Oct–May — the two-tier knockout that runs ALONGSIDE the URC/Premiership
+  // league season, so it fills the same calendar rather than extending it. Champions Cup is the
+  // top tier, Challenge Cup the second. Slugs, like every rugby key here. Verified 2026-08-14:
+  // 48 and 36 forward fixtures from 2026-10-13, with resolved team names, logos and venues.
+  championscup: { espnSport: 'rugby', league: '271937', core: true },
+  challengecup: { espnSport: 'rugby', league: '272073', core: true },
   // Learn Mode sports — tennis/golf fetch tournament context.
   tennis: { espnSport: 'tennis', league: 'atp', learnMode: true, liveFormat: 'tennis' },
   golf: { espnSport: 'golf', league: 'pga', learnMode: true, liveFormat: 'leaderboard' },
@@ -224,6 +257,13 @@ export async function fetchScoreboard(
     const uniq = Array.from(new Set(names));
     return uniq.length ? uniq : undefined;
   };
+  // ESPN uses 99 for "unranked" rather than omitting the field — pass it through and every college
+  // team gets a #99 badge.
+  const rankOf = (c: any): number | undefined => {
+    const r = c?.curatedRank?.current ?? c?.rank;
+    const n = typeof r === 'number' ? r : Number(r);
+    return Number.isFinite(n) && n > 0 && n < 99 ? n : undefined;
+  };
   const toGame = (e: any): Game => {
     const comp = e.competitions?.[0];
     const home = comp?.competitors?.find((c: any) => c.homeAway === 'home');
@@ -260,6 +300,10 @@ export async function fetchScoreboard(
             temperature: typeof e.weather.temperature === 'number' ? e.weather.temperature : undefined }
         : undefined,
       stage: prettyStage(e?.season?.slug),
+      homeConferenceId: home?.team?.conferenceId != null ? String(home.team.conferenceId) : undefined,
+      awayConferenceId: away?.team?.conferenceId != null ? String(away.team.conferenceId) : undefined,
+      homeRank: rankOf(home),
+      awayRank: rankOf(away),
       sport,
     };
   };
@@ -429,7 +473,27 @@ export async function fetchScoreboard(
       const HORIZON_MS = 14 * 24 * 60 * 60 * 1000;
       const hasNearTerm = parsed.some(g =>
         g.isLive || g.startTime == null || g.startTime - now <= HORIZON_MS);
-      if (!hasNearTerm && parsed.length > 0) {
+
+      // SLATE EXCEPTION — the case the horizon alone gets wrong.
+      //
+      // The guard above is aimed at a STRAGGLER: the single NBA game in October, the seven NHL games
+      // in September. College football breaks that shape. Measured 2026-08-14, its bare board is 99
+      // games running Aug 29 – Sep 7: an entire opening week, whose first kickoff lands 15 days out
+      // and misses the fortnight horizon by one day. Blanking that sends someone who taps NCAAF to
+      // an empty board a fortnight before the season — the exact failure this guard's own predecessor
+      // (the calendar gate) was deleted for causing.
+      //
+      // A full slate is not a straggler, so size is the discriminator, bounded by a wider horizon so
+      // it can't resurrect a genuinely distant season. Checked against every sport's real August
+      // board: NBA (1 game, 50 days) and NHL (7 games, 36 days) still blank exactly as before,
+      // college BASKETBALL still blanks (34 games but 80 days out — that season really is far away),
+      // and college football now shows its Week 1 slate.
+      const SLATE_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
+      const SLATE_MIN_GAMES = 20;
+      const hasImminentSlate = parsed.length >= SLATE_MIN_GAMES && parsed.some(g =>
+        g.startTime != null && g.startTime - now <= SLATE_HORIZON_MS);
+
+      if (!hasNearTerm && !hasImminentSlate && parsed.length > 0) {
         parsed = [];
       }
     }
@@ -579,6 +643,8 @@ export const RUGBY_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'sixnations', label: 'Six Nations' },
   { sportKey: 'nationschamp', label: 'Nations Championship' },
   { sportKey: 'superrugby', label: 'Super Rugby' },
+  { sportKey: 'championscup', label: 'Champions Cup' },
+  { sportKey: 'challengecup', label: 'Challenge Cup' },
 ];
 
 export async function fetchRugbyBoard(
@@ -617,7 +683,7 @@ export const SOCCER_LEAGUES: { sportKey: Sport; label: string }[] = [
   { sportKey: 'laliga', label: 'La Liga' },
   { sportKey: 'seriea', label: 'Serie A' },
   { sportKey: 'bundesliga', label: 'Bundesliga' },
-  { sportKey: 'worldcup', label: 'World Cup' },
+  // { sportKey: 'worldcup', label: 'World Cup' },  ← restore for the 2030 tournament (see SPORT_CONFIG)
 ];
 
 export async function fetchSoccerBoard(

@@ -12,6 +12,10 @@ export const SPORTS: SportTab[] = [
   { key: 'nba', emoji: '🏀', label: 'NBA' },
   { key: 'wnba', emoji: '🏀', label: 'WNBA' },
   { key: 'nfl', emoji: '🏈', label: 'NFL' },
+  // College. Placed next to the pro league of the same sport rather than at the end of the grid —
+  // someone who taps NFL is the most likely person to want NCAAF, and vice versa.
+  { key: 'cfb', emoji: '🏈', label: 'NCAAF' },
+  { key: 'cbb', emoji: '🏀', label: 'NCAAB' },
   // One combined Soccer tile (key 'soccer') folds MLS + Premier League + La Liga + Serie A +
   // Bundesliga + World Cup via fetchSoccerBoard and the league filter — the same shape as the
   // Rugby tile below. Those league keys stay valid Sport KEYS (SOCCER_LEAGUES + game.sport route
@@ -39,6 +43,8 @@ export const SPORT_FULL_NAME: Record<Sport, keyof UIStrings> = {
   tennis: 'spTennis', golf: 'spGolf', cricket: 'spCricket', nationscup: 'spRugbySport',
   sixnations: 'spSixNations', nationschamp: 'spNationsChamp',
   seriea: 'spSerieA', bundesliga: 'spBundesliga', superrugby: 'spSuperRugby',
+  championscup: 'spChampionsCup', challengecup: 'spChallengeCup',
+  cfb: 'spCollegeFootball', cbb: 'spCollegeBasketball',
 };
 
 // Reorder SPORTS by a user's saved key order (from AsyncStorage). Keeps saved

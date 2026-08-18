@@ -23,7 +23,7 @@ export const SOCCER_KEYS: Sport[] = ['soccer', 'epl', 'laliga', 'seriea', 'bunde
 // Rugby union. 'nationscup' doubles as the umbrella tile key and the Nations Cup league key.
 // Super Rugby Pacific is the southern-hemisphere club competition (Feb–June), which is the half of
 // the calendar URC and the Six Nations don't cover.
-export const RUGBY_KEYS: Sport[] = ['rugby', 'mlr', 'nationscup', 'sixnations', 'nationschamp', 'superrugby'];
+export const RUGBY_KEYS: Sport[] = ['rugby', 'mlr', 'nationscup', 'sixnations', 'nationschamp', 'superrugby', 'championscup', 'challengecup'];
 
 export const isSoccer = (sport: string): boolean => (SOCCER_KEYS as string[]).includes(sport);
 export const isRugby = (sport: string): boolean => (RUGBY_KEYS as string[]).includes(sport);

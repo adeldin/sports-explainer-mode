@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "radar": "node scripts/fixture-radar.mjs --days 500"
   },
   "dependencies": {
     "babel-preset-expo": "~54.0.10",

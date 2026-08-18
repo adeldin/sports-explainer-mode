@@ -176,6 +176,13 @@ const espnConfig: Record<string, EspnCfg> = {
   // Filter-only ESPN rugby leagues (no top-level tile): same Core-API two-step fetch as URC/MLR.
   sixnations: { sport: 'rugby', league: '180659', core: true },
   superrugby: { sport: 'rugby', league: '242041', core: true },
+  // College — ordinary site-API leagues, same shape as NFL/NBA. Explain/recap/coach route by
+  // game.sport, so these must exist here or a tapped college game answers with nothing.
+  cfb: { sport: 'football', league: 'college-football' },
+  cbb: { sport: 'basketball', league: 'mens-college-basketball' },
+  // European club rugby (Oct–May), top and second tier. Same Core-API two-step as URC/MLR.
+  championscup: { sport: 'rugby', league: '271937', core: true },
+  challengecup: { sport: 'rugby', league: '272073', core: true },
   seriea: { sport: 'soccer', league: 'ita.1' },
   bundesliga: { sport: 'soccer', league: 'ger.1' },
   nationschamp: { sport: 'rugby', league: '17567', core: true },

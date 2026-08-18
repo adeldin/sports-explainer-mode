@@ -12,7 +12,17 @@
 //   LLM_FALLBACK_PROVIDER=gemini, GEMINI_MODEL=gemini-2.5-flash.
 import Groq from 'groq-sdk';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// LAZY, not module-scope. The Groq SDK constructor THROWS on an empty key, and `next build`
+// evaluates this module during its "collecting page data" step — which turned a runtime concern
+// into a hard BUILD failure. Every Preview deployment on this repo failed for four days because
+// GROQ_API_KEY is scoped to Production only; a markdown-only commit couldn't deploy either, which
+// is how you can tell it was never about the code being deployed.
+//
+// Constructing on first CALL means a missing key fails exactly one request, in the one place that
+// needs it, with the route's existing catch — instead of taking down the build for every endpoint
+// in the app. A build must never require a secret.
+let _groq: Groq | null = null;
+const getGroq = (): Groq => (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY }));
 
 const FALLBACK = (process.env.LLM_FALLBACK_PROVIDER || 'none').toLowerCase();
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -28,7 +38,7 @@ export interface LLMCompletion {
 // Drop-in for groq.chat.completions.create(). Same params in, same shape out.
 export async function createChatCompletion(params: any): Promise<LLMCompletion> {
   try {
-    const c = await groq.chat.completions.create(params);
+    const c = await getGroq().chat.completions.create(params);
     console.log('[llm] provider=groq');
     return c as unknown as LLMCompletion;
   } catch (e) {

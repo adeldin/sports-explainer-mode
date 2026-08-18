@@ -830,6 +830,38 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
     label: allEn(`Common Rugby Questions`),
     questions: BASE_FAQS.rugby.questions,
   },
+  cfb: {
+    label: allEn(`Common College Football Questions`),
+    questions: [
+      allEn(`How is college football different from the NFL?`),
+      allEn(`How does college football overtime work?`),
+      allEn(`What is targeting, and why is it an ejection?`),
+      allEn(`How does the 12-team College Football Playoff work?`),
+      allEn(`What's the difference between FBS and FCS?`),
+      allEn(`Why do the rankings matter so much?`),
+      allEn(`What is the Heisman Trophy?`),
+    ],
+  },
+  cbb: {
+    label: allEn(`Common College Basketball Questions`),
+    questions: [
+      allEn(`How is college basketball different from the NBA?`),
+      allEn(`Why are there halves instead of quarters?`),
+      allEn(`How does March Madness work?`),
+      allEn(`What do the seeds in the bracket mean?`),
+      allEn(`What is the 'bonus' and how do free throws work?`),
+      allEn(`Why do college teams play zone defense so often?`),
+      allEn(`What is Selection Sunday?`),
+    ],
+  },
+  championscup: {
+    label: allEn(`Common Rugby Questions`),
+    questions: BASE_FAQS.rugby.questions,
+  },
+  challengecup: {
+    label: allEn(`Common Rugby Questions`),
+    questions: BASE_FAQS.rugby.questions,
+  },
   tennis: {
     label: allEn(`Common Tennis Questions`),
     questions: [

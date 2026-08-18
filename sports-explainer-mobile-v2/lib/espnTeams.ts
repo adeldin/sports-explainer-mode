@@ -65,7 +65,11 @@ const LEAGUE_SOURCES: Record<Exclude<CrestSport, 'cricket'>, { path: string; lab
 const KEY_TO_CREST_SPORT: Partial<Record<Sport, CrestSport>> = {
   mlb: 'mlb', nfl: 'nfl', nba: 'nba', wnba: 'wnba', nhl: 'nhl',
   soccer: 'soccer', epl: 'soccer', laliga: 'soccer', worldcup: 'soccer',
-  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby',
+  rugby: 'rugby', mlr: 'rugby', nationscup: 'rugby', sixnations: 'rugby', nationschamp: 'rugby', superrugby: 'rugby', championscup: 'rugby', challengecup: 'rugby',
+  // cfb/cbb are deliberately OMITTED. This map drives a FETCHED pool, so pointing college at the pro
+  // key would serve NFL/NBA crests under a College Football heading. A partial map is honest here —
+  // the Academy game simply doesn't surface for college. Revisit if a real college pool is authored
+  // (134 FBS teams makes a crest-recognition game a different design problem, not a config line).
   cricket: 'cricket',
 };
 

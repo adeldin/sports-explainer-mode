@@ -66,6 +66,74 @@ and promote the common ones into the FAQ. Needs a datastore and a privacy stance
 
 ---
 
+## 📅 Tournament calendar — staying ahead of the next big one
+
+The World Cup went dead in the app a month before anyone noticed, because nothing watches the
+calendar. This section is that watch. **All fixture counts below were probed against ESPN on
+2026-08-13** — they are what the feed actually carries today, not what the tournament schedule says.
+
+**Parked: FIFA World Cup.** The 2026 tournament ended 2026-07-19. `fifa.world` carries 104 past
+events and **zero** forward across a 400-day lookahead. Switched off via `learnMode:true` in
+`SPORT_CONFIG` and commented out of `SOCCER_LEAGUES`; key and content retained. **Re-enable: spring
+2030.**
+
+**SHIPPED 2026-08-14 — College football + men's college basketball** (`cfb`, `cbb`). Ordinary
+site-API leagues, but two things made this more than a config line:
+
+- **Volume.** A September Saturday is 68 FBS games. The merged-tile league filter was generalized
+  with a `keysOf` selector so college narrows by CONFERENCE instead of league key — matching on
+  EITHER side, since non-conference games are the marquee ones. Measured: 68 → SEC 13, Big Ten 10,
+  ACC 7, with zero games falling outside the conference map. The chip row is capped at 10 (busiest
+  first) because 22 conferences play on a Saturday and the row would have been five rows of chrome.
+- **The off-season guard would have blanked NCAAF entirely.** CFB's opener is 15 days out and the
+  guard cuts at 14, so the tile would have shipped empty a fortnight before the season. Fixed with a
+  slate exception (≥20 games within 30 days), verified to change behaviour for CFB *only* — NBA,
+  NHL, college basketball and every in-season sport blank or show exactly as before.
+
+Conference ids are PER-SPORT and do not match across them (8 = SEC in football, Big 12 in
+basketball), hence two maps in `lib/collegeConferences.ts`. AP rank is parsed with ESPN's 99 =
+unranked normalized away; confirmed populating in-season (19–22 ranked sides on a real Saturday).
+
+Deliberately deferred, not forgotten:
+- **Women's college basketball** — 543 fixtures, still showing as unclaimed on the radar. Same
+  one-line pipeline whenever wanted.
+- **Academy crest + standings games** don't surface for college. Those two maps drive FETCHED pools,
+  so pointing college at the pro key would serve NFL logos under a College Football heading. A real
+  college pool is a design problem (134 FBS teams), not a config line.
+
+**SHIPPED 2026-08-14 — European Champions Cup + Challenge Cup (rugby).** Slugs `271937` / `272073`,
+48 and 36 forward fixtures from 2026-10-13, resolved teams + logos + venues. Wired through all 13
+per-key maps plus both backend league tables. Rides in 1.8.
+
+**Best-positioned major — Rugby World Cup 2027.** Slug `164205`, and **ESPN already carries all 36
+pool fixtures**, verified to the day: **2027-10-01 to November**, in Australia, with teams already
+resolved (Australia v Hong Kong at Optus Stadium, France v USA at Marvel Stadium). Worth flagging that this is the tournament this app is
+most ready for: the Coach's Corner rugby modules were reviewed by an actual rugby coach, so the
+teaching content is validated ahead of the event rather than scrambled together during it. Build
+alongside the Champions Cup work, since it is the same one-line pipeline.
+
+**Blocked on a draw, not on us — UEFA Champions League 2026-27.** `uefa.champions` is a live, rich
+endpoint (189 past events) with **zero forward fixtures**, because the league-phase draw hasn't
+happened yet. Nothing to build against until it does. **Re-probe in early September 2026** — if
+fixtures have appeared, this is the single biggest soccer competition the app doesn't carry.
+
+**Not in the feed yet — 2027 Women's World Cup** (`fifa.wwc`: 0 past, 0 forward) and **Women's
+Rugby World Cup** (`289237`: 0 forward). Both are real events; ESPN simply hasn't populated them.
+Re-probe alongside the Champions League check.
+
+**Standing habit — now automated.** `npm run radar` (`scripts/fixture-radar.mjs`) enumerates all
+354 leagues ESPN publishes across 17 sports, counts forward fixtures for each, and diffs that
+against `SPORT_CONFIG` parsed straight from the source. It reports BROKEN (configured, no data
+either direction — exits non-zero), DORMANT (between seasons, informational), FUTURE EVENTS
+(unclaimed, first fixture >90 days out — the tournament-shaped class that ambushes you) and
+ALREADY RUNNING. Keyless, so it runs anywhere with no secrets.
+
+First real run, 2026-08-14: 0 broken, 3 dormant (Six Nations / Super Rugby / MLR, all Feb starts),
+and it surfaced the **AFC Asian Cup — 51 fixtures from around 2026-12-12**, which nobody had
+noticed. Blind spot: ESPN only, so Sportmonks cricket and Zyla Nations Cup still need human eyes.
+
+---
+
 ## 🔌 Data-capped — not buildable, don't re-recon
 
 **Live play-by-play for rugby and cricket.** Confirmed repeatedly: ESPN has no PBP feed for either,
@@ -79,7 +147,9 @@ feeds don't carry it.
 
 **Cricket fixtures beyond the trial leagues.** `getSmUpcoming()` now surfaces future fixtures, but
 only for the three trial leagues (T20I / Big Bash / CSA T20). The €29 Major plan carries 26 —
-widen `LEAGUE_IDS` in `sportmonksLive.ts` when the subscription lands.
+widen `LEAGUE_IDS` in `sportmonksLive.ts` when the subscription lands. Note the *horizon* half of
+this was NOT a subscription problem and is now fixed: the window was 45 days, cricket had 3
+fixtures inside it and 62 just beyond, so the trial leagues looked emptier than they are.
 
 ---
 
