@@ -254,4 +254,4 @@ grows, check consumption before assuming headroom.
 | Coach's Corner authoring bar | `COACHES_CORNER_AUTHORING_STANDARD.md` |
 | Landscape port conventions | `COACHES_CORNER_LANDSCAPE_PORT_STANDARD.md` |
 | Icon pipeline + revert ladder | `sports-explainer-mobile-v2/assets/icons/README.md` |
-| Release history | `SPORTSWISE_v1.5_RELEASE.md` |
+| Release history | `SPORTSWISE_v1.5_RELEASE.md` — 1.7 (build 38) READY_FOR_SALE 2026-08-17; 1.8 unreleased, carrying filters/college/golf/NBA horizon |
