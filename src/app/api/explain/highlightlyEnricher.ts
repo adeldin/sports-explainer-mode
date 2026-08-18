@@ -4,7 +4,12 @@
 //
 // Direct Highlightly: base https://soccer.highlightly.net, single `X-RapidAPI-Key` header (no host
 // header). Key is server-side only (HIGHLIGHTLY_API_KEY in Vercel) — never in the app, never
-// committed. BASIC tier = 100 req/day → PROTOTYPE ONLY; a live match polled every 60s needs PRO.
+// committed.
+//
+// QUOTA: 7,500 requests, read from x-ratelimit-requests-limit on 2026-08-17. This line previously
+// read "BASIC tier = 100 req/day → PROTOTYPE ONLY", which was true when written and badly wrong by
+// the time anyone acted on it — it nearly justified cancelling a working subscription. Trust the
+// response headers over this comment; they are measured, this is remembered.
 //
 // import type — keeps this a type-only import so there's no runtime cycle with dataProvider
 // (dataProvider imports this module's VALUE for the registry).
@@ -13,10 +18,26 @@ import type { NormalizedGameData, MatchEvent } from './dataProvider';
 const BASE = process.env.HIGHLIGHTLY_BASE || 'https://soccer.highlightly.net';
 const KEY = process.env.HIGHLIGHTLY_API_KEY;
 
-// sport key → Highlightly leagueId. World Cup 2026 = 1635 (confirmed). epl/laliga/mls IDs added
-// once confirmed; an unmapped sport → no enrichment → ESPN base only (graceful).
+// sport key → Highlightly leagueId.
+//
+// All five club leagues CONFIRMED against the live /leagues endpoint on 2026-08-17 — the ids are
+// country-scoped and collide by name (a "Premier League" search returns 34 of them: England, Wales,
+// Belarus, Egypt…), so each was matched on country rather than name alone.
+//
+// These sat unmapped for months while the subscription was paid, which meant the enricher was
+// enriching NOTHING once the World Cup ended on 2026-07-19 — every soccer explanation silently took
+// the `!leagueId` early return. Mapping them is what turns the Match Timeline on for the club
+// seasons now starting.
+//
+// Safe regardless of subscription state: if the key lapses the `!KEY` guard returns {} and soccer
+// degrades to the ESPN base, exactly as it behaves today.
 const LEAGUE: Record<string, number> = {
-  worldcup: 1635,
+  worldcup: 1635,      // dormant until 2030 (tournament parked — see SPORT_CONFIG)
+  epl: 33973,          // England
+  laliga: 119924,      // Spain
+  soccer: 216087,      // MLS (the 'soccer' key doubles as the MLS league key)
+  seriea: 115669,      // Italy
+  bundesliga: 67162,   // Germany
 };
 
 // Minimal caches (no framework): the gameId→matchId reconciliation is stable (no TTL); match
