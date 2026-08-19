@@ -191,6 +191,61 @@ than a defect — but they show none of the eight-sport expansion, Stat Geek, or
 
 ---
 
+## 💳 Data sources & paid subscriptions
+
+Written down because nothing recorded it, and that cost real money: a **CricketData.org**
+subscription auto-renewed for months against **28 lifetime API hits and zero integration**. It was
+never referenced in this repo's entire git history and had no API key in `.env.local`, `.rapidapi.env`
+or Vercel — so nothing could have called it even if code had tried. The name is one letter of
+plausibility away from **cricsheet.org**, which is the source we actually use. Cancelled 2026-08-17.
+
+| Source | Powers | Cost | Notes |
+|---|---|---|---|
+| **cricsheet.org** | Cricket archival (toss, officials, powerplays) | Free (ODC-BY) | Downloaded by `scripts/ingest-cricsheet.mjs`, **committed** as `matches.generated.ts` — no request-time call |
+| **cricket.sportmonks.com** | Cricket live boards + upcoming fixtures | Paid | `SPORTMONKS_TOKEN`, gated by `CRICKET_SM_LIVE`. 2,000/hr cap. Trial leagues `[3, 5, 10]` |
+| **ESPN** (site + core API) | Almost everything: all team sports, tennis, golf | Free, keyless | No account, no quota |
+| **Zyla** | World Rugby Nations Cup only | Paid | `ZYLA_API_KEY` — not on ESPN |
+| **Highlightly** | Soccer Match Timeline (goals/cards/subs) | Paid, **expires 2026-08-24** | See below |
+| **Groq / Gemini** | Explanations | Paid | Groq primary, Gemini fallback |
+| **RevenueCat** | Pro entitlement | Paid | |
+
+Cricket precedence, since two sources overlap: **archival wins**. When the same match exists in
+both, the Cricsheet entry is served and the Sportmonks twin dropped — deduped on teams+date because
+the id spaces differ. Cricsheet is free, richer, and keys the validated explain path.
+
+**Highlightly — RENEW, and now actually wired (corrected 2026-08-17).** An earlier draft of this
+section said to let it lapse, on the strength of a code comment reading *"BASIC tier = 100 req/day →
+PROTOTYPE ONLY"*. That comment was stale. Measured against the live API: the quota is **7,500
+requests**, seventy-five times what the comment claimed. Reading a comment as current fact is how
+that mistake happened; the headers settled it in one call.
+
+The reason it looked worthless is separate and real: its league map held **only** `worldcup: 1635`,
+and the World Cup ended 2026-07-19 — so the enricher had been enriching nothing at all, taking the
+`!leagueId` early return on every soccer explanation while the subscription was paid.
+
+Now mapped for all five club leagues, ids confirmed against `/leagues` on 2026-08-17 (they are
+country-scoped and collide by name — a "Premier League" search returns 34, from England to Ethiopia):
+
+| Key | Highlightly id | Country |
+|---|---|---|
+| `epl` | 33973 | England |
+| `laliga` | 119924 | Spain |
+| `soccer` (MLS) | 216087 | USA |
+| `seriea` | 115669 | Italy |
+| `bundesliga` | 67162 | Germany |
+
+Match detail carries `events`, `statistics`, `venue`, `referee`, `forecast`, `predictions` — so the
+Match Timeline (buildable item 6) now has live data behind it for the club seasons just starting.
+
+**Watch the quota.** Five mapped leagues is a much larger surface than one dormant tournament. The
+enricher caches match detail for 60s, but that cache is per serverless instance, so real-world hit
+rate will be below ideal. A continuously-watched two-hour match costs roughly 120 upstream calls.
+Failure is graceful (`{}` → ESPN base), so overrun degrades rather than breaks — but if soccer usage
+grows, check consumption before assuming headroom.
+
+---
+
+
 ## 📌 Reference — where things live
 
 | Thing | File |
@@ -199,4 +254,4 @@ than a defect — but they show none of the eight-sport expansion, Stat Geek, or
 | Coach's Corner authoring bar | `COACHES_CORNER_AUTHORING_STANDARD.md` |
 | Landscape port conventions | `COACHES_CORNER_LANDSCAPE_PORT_STANDARD.md` |
 | Icon pipeline + revert ladder | `sports-explainer-mobile-v2/assets/icons/README.md` |
-| Release history | `SPORTSWISE_v1.5_RELEASE.md` |
+| Release history | `SPORTSWISE_v1.5_RELEASE.md` — 1.7 (build 38) READY_FOR_SALE 2026-08-17; 1.8 unreleased, carrying filters/college/golf/NBA horizon |

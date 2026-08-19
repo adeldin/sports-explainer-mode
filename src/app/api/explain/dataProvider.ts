@@ -64,6 +64,8 @@ const enrichers: Partial<Record<string, Enricher>> = {
   soccer: highlightlyEnricher,
   epl: highlightlyEnricher,
   laliga: highlightlyEnricher,
+  seriea: highlightlyEnricher,
+  bundesliga: highlightlyEnricher,
   mlb: gumboEnricher,
 };
 
