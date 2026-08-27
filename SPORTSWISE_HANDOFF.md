@@ -1,7 +1,9 @@
 # SportsWise — Project Handoff & Orientation
 *Regenerated 2026-06-30 from the repo (not from memory or prior docs). Where this and older handoffs disagree, this reflects **repo reality**. Supersedes the 2026-06-29 version (which listed tennis as a future v1.4 item — tennis SHIPPED in v1.3).*
 
-Read **§7 (Working model)**, **§4 (current state)**, and **§11 (principles)** first if you read nothing else.
+> **⚠️ UPDATE 2026-07-02:** A large build session on 2026-07-02 shipped significant work AFTER this doc's snapshot. **For everything post-2026-06-30 — recap enrichment, date strip, TuneInCard, WatchOn, GameContextCard, and the full v1.4 EAS build contents — read `SPORTSWISE_v1.4_MANIFEST_AND_HANDOFF.md`, which supersedes §4 below.** This doc remains accurate for the app's architecture, stack, sports config, working model, and principles (§§1-3, 5-11). Only §4 "current state" is now stale (see the manifest for current HEAD `708e6d4` and v1.4 contents).
+
+Read **§7 (Working model)**, **§4 (current state — now see the v1.4 manifest)**, and **§11 (principles)** first if you read nothing else.
 
 ---
 
@@ -55,7 +57,9 @@ Read **§7 (Working model)**, **§4 (current state)**, and **§11 (principles)**
 
 ## 4. CURRENT STATE (TL;DR)
 
-**Live on the App Store as v1.3** — the biggest release since launch. Since the last shipped build (1.2.0), v1.3 adds **live tennis, the Coach's Corner tab, the golf live leaderboard, soccer formation diagrams, the Worth Noting callout, the feedback button**, plus backend upgrades (**GUMBO** MLB pitch data, the **situation-not-player** tennis rework, and prompts tuned for **gpt-oss-120b**). The **situation cache is built but deliberately OFF**. Working tree is clean (all app/backend code committed at HEAD `0c969c5` on `main`); only untracked docs/artifacts remain at the repo root (§9, §10).
+> **⚠️ 2026-07-02: This section is superseded by `SPORTSWISE_v1.4_MANIFEST_AND_HANDOFF.md`.** Current HEAD is `708e6d4`. Since this snapshot, a large session shipped: **recap AP-story enrichment + date-awareness (backend, LIVE to all users now)** and **the date strip, TuneInCard pre-game card, WatchOn TV element, and GameContextCard (mobile — queued for the v1.4 EAS build)**. See the manifest for the full backend-live-vs-ships-in-binary split, "What's New" draft, locked decisions, and banked items. The paragraph below reflects the v1.3 snapshot only.
+
+**Live on the App Store as v1.3** — the biggest release since launch. Since the last shipped build (1.2.0), v1.3 adds **live tennis, the Coach's Corner tab, the golf live leaderboard, soccer formation diagrams, the Worth Noting callout, the feedback button**, plus backend upgrades (**GUMBO** MLB pitch data, the **situation-not-player** tennis rework, and prompts tuned for **gpt-oss-120b**). The **situation cache is built but deliberately OFF**. *(As of 2026-07-02: worthNoting was REMOVED — commit `3608e57` — after testing showed it didn't earn its place; and the cache work continued. See manifest.)*
 
 ---
 

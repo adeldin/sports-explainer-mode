@@ -66,6 +66,24 @@ and promote the common ones into the FAQ. Needs a datastore and a privacy stance
 
 ---
 
+## 🏉 Chicago Hounds (MLR) stadium partnership — possible 2027 season
+
+Anthony may promote SportsWise with the Chicago Hounds: a QR sign at the stadium entrance ("Need help
+understanding rugby? Download SportsWise"). Banked 2026-08-22 from a planning chat. Nothing is built;
+these are the prep items in the order they should land.
+
+| # | Item | Reality check (verified in code 2026-08-22) |
+|---|---|---|
+| 1 | **Rugby tile first for everyone by default** | `orderSports()` in `lib/sports.ts` returns canonical `SPORTS` when nothing is saved, so moving the `nationscup` tile to index 0 does it for every new install; users who reordered keep their order. One-line change, ship any time before the season. |
+| 2 | **Free month via QR** | Use App Store **Offer Codes** (one custom code, high redemption cap), *not* promo codes (100/quarter). Alternative: a 1-month **Introductory Offer** for all new subscribers — no code, QR just opens the listing. Either way RevenueCat must be configured to honor the offer. Decide exclusive-vs-universal when the deal is real; re-check Apple/RevenueCat mechanics then. |
+| 3 | **Live-explain latency** (selling point at a live game) | Measure before touching the model. Stages: Zyla ingest lag → app poll (`LiveScreen.tsx` auto-refresh is **60s**) → LLM (Groq, already the fast provider) → cellular. Explain route does **not** stream today — streaming is the biggest perceived-speed win and costs no quality. Smaller Groq model = faster but shallower; depth is the product, so model tuning is last. |
+| 4 | **3–5 more rugby Coach's Corners** | Author against `COACHES_CORNER_AUTHORING_STANDARD.md`. Candidate concepts: breakdown/ruck, lineout, scrum, offside lines, kicking tactics. Content session; crowdsource-across-AIs worked for Coach's Read. |
+| 5 | **Academy question banks full at all four levels** | Audit-and-fill per sport per level (Rookie/Beginner/Intermediate/Expert); rugby is newest and likely thinnest. Set a per-level target first. |
+| 6 | **Custom icons instead of emoji** | Recraft / GPT-image attempt was paid for and rejected — image-gen can't hold one style across a 15-icon set. Next attempt: SVG-as-code (one template, brand tokens, recolorable) or a designed icon library styled with brand colors. See also "Built but switched off" — the earlier icon pipeline failed contrast. |
+
+---
+
+
 ## 📅 Tournament calendar — staying ahead of the next big one
 
 The World Cup went dead in the app a month before anyone noticed, because nothing watches the
