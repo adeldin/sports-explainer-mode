@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, StatusBar, Dimensions,
+  View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, StatusBar, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { useTheme, Theme } from '../lib/theme';
 

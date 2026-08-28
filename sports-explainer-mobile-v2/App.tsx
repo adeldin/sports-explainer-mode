@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Dimensions, Platform, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -56,6 +56,25 @@ export default function App() {
   // Shared persisted state now lives in AppStateProvider. App only reads what the
   // launch gate / onboarding needs and drives the cinematic + notification plumbing.
   const { language, setLevel, notificationsEnabled, hydrated } = useAppState();
+
+  // ── Android orientation-change input-frame fix ──────────────────────────────
+  // When GameHost force-rotates via ScreenOrientation.lockAsync, Android rotates the
+  // window and the app renders the new orientation — but the window's TOUCH frame can
+  // stay stuck on the old orientation until the next window-level relayout. Symptom:
+  // in a landscape drill everything to the right of the old portrait width (the call
+  // buttons, the right of the field) is visible but dead to taps; on the way back to
+  // portrait the bottom of the screen (the tab bar) goes dead the same way. Verified
+  // on API 35 + 36 emulators: forcing any window relayout heals the frame instantly.
+  // Toggling the status bar's hidden flag is a window-attribute change that forces
+  // exactly that relayout, and under edge-to-edge it does not move the layout.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = Dimensions.addEventListener('change', () => {
+      StatusBar.setHidden(true);
+      setTimeout(() => StatusBar.setHidden(false), 80);
+    });
+    return () => sub.remove();
+  }, []);
 
   // --- Gate state (launch-only, not shared) ---
   const [isAnimationComplete, setAnimationComplete] = useState(false);
@@ -218,8 +237,10 @@ export default function App() {
             // (bottom-tabs supports it); sized to sit intentionally next to the single-line labels.
             tabBarLabel: ({ color }) => (
               <View style={{ alignItems: 'center', marginTop: -2 }}>
-                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Coach's</Text>
-                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Corner</Text>
+                {/* includeFontPadding is Android-only (no-op on iOS): without it Android adds
+                    ascent padding that clips the second line at this tight lineHeight. */}
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12, includeFontPadding: false }}>Coach's</Text>
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12, includeFontPadding: false }}>Corner</Text>
               </View>
             ),
           }}

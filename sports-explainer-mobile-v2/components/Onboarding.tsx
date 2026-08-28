@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
-  SafeAreaView, Dimensions, StatusBar, ScrollView,
+  View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, StatusBar, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, Theme } from '../lib/theme';
 import { Language, Sport } from '../lib/api';

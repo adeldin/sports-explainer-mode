@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, Share } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, ScrollView, Linking, Share, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as StoreReview from 'expo-store-review';
 import { scheduleQuizReminder, cancelQuizReminder } from '../lib/notifications';
@@ -73,24 +73,31 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* SportsWise Pro — Go Pro presents the RevenueCat drop-in paywall; Restore is
-              Apple-required. (Labels English for now — localization is a small follow-up.) */}
-          <Text style={styles.sectionLabel}>SportsWise Pro</Text>
-          {isPro ? (
-            <View style={styles.linkRow}>
-              <Text style={styles.linkLabel}>{isTrial ? '✨ Pro — free trial active' : '✨ Pro active'}</Text>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.linkRow} onPress={presentPaywall}>
-              <Text style={styles.linkLabel}>Go Pro — unlimited explanations & questions</Text>
-              <Text style={styles.linkChevron}>›</Text>
-            </TouchableOpacity>
+              Apple-required. (Labels English for now — localization is a small follow-up.)
+              iOS-only until RevenueCat has a Google Play app + goog_ SDK key: on Android the
+              paywall is a no-op (entitlement.tsx guards on RC_IOS_KEY + Platform.OS), and
+              Google rejects visible purchase UI that does nothing — so hide the section. */}
+          {Platform.OS === 'ios' && (
+            <>
+              <Text style={styles.sectionLabel}>SportsWise Pro</Text>
+              {isPro ? (
+                <View style={styles.linkRow}>
+                  <Text style={styles.linkLabel}>{isTrial ? '✨ Pro — free trial active' : '✨ Pro active'}</Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.linkRow} onPress={presentPaywall}>
+                  <Text style={styles.linkLabel}>Go Pro — unlimited explanations & questions</Text>
+                  <Text style={styles.linkChevron}>›</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={restorePurchases}>
+                <Text style={styles.linkLabel}>Restore Purchases</Text>
+                <Text style={styles.linkChevron}>›</Text>
+              </TouchableOpacity>
+            </>
           )}
-          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={restorePurchases}>
-            <Text style={styles.linkLabel}>Restore Purchases</Text>
-            <Text style={styles.linkChevron}>›</Text>
-          </TouchableOpacity>
 
-          <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{S.mySports}</Text>
+          <Text style={[styles.sectionLabel, Platform.OS === 'ios' && { marginTop: 30 }]}>{S.mySports}</Text>
           <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
             <Text style={styles.linkLabel}>{S.customizeSports}</Text>
             <Text style={styles.linkChevron}>›</Text>

@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, StatusBar, FlatList,
-  RefreshControl, Animated, Alert, Image,
-  TextInput, KeyboardAvoidingView, Keyboard, Platform,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar, FlatList, RefreshControl, Animated, Alert, Image, TextInput, KeyboardAvoidingView, Keyboard, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import ViewShot from 'react-native-view-shot';
