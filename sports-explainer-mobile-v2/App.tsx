@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, Dimensions, Platform, StatusBar } from 'react-native';
+import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -57,24 +57,11 @@ export default function App() {
   // launch gate / onboarding needs and drives the cinematic + notification plumbing.
   const { language, setLevel, notificationsEnabled, hydrated } = useAppState();
 
-  // ── Android orientation-change input-frame fix ──────────────────────────────
-  // When GameHost force-rotates via ScreenOrientation.lockAsync, Android rotates the
-  // window and the app renders the new orientation — but the window's TOUCH frame can
-  // stay stuck on the old orientation until the next window-level relayout. Symptom:
-  // in a landscape drill everything to the right of the old portrait width (the call
-  // buttons, the right of the field) is visible but dead to taps; on the way back to
-  // portrait the bottom of the screen (the tab bar) goes dead the same way. Verified
-  // on API 35 + 36 emulators: forcing any window relayout heals the frame instantly.
-  // Toggling the status bar's hidden flag is a window-attribute change that forces
-  // exactly that relayout, and under edge-to-edge it does not move the layout.
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const sub = Dimensions.addEventListener('change', () => {
-      StatusBar.setHidden(true);
-      setTimeout(() => StatusBar.setHidden(false), 80);
-    });
-    return () => sub.remove();
-  }, []);
+  // (An earlier "orientation-change input-frame fix" toggled StatusBar.setHidden here
+  // on every dimension change. It never worked: React Native refuses setHidden under
+  // edge-to-edge — logcat shows "Ignored status bar change" — and the dead-touch bug it
+  // targeted is actually a rotation-timing race, now fixed at the source in GameHost by
+  // deferring the orientation lock. See scheduleLock() there.)
 
   // --- Gate state (launch-only, not shared) ---
   const [isAnimationComplete, setAnimationComplete] = useState(false);

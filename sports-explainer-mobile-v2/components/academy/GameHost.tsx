@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -29,6 +29,27 @@ function requestLock(lock: ScreenOrientation.OrientationLock) {
   if (lastRequestedLock === lock) return;
   lastRequestedLock = lock;
   ScreenOrientation.lockAsync(lock).catch(() => { lastRequestedLock = null; });
+}
+
+// Android: locking orientation in the same frame as GameHost's mount/unmount churn
+// (tab-bar hide, navigator update, first layout) races WindowManager's rotation
+// handshake. When the app loses the race, Android leaves the activity in a
+// half-finished "fixed rotation": the picture rotates but the window's TOUCH frame
+// keeps the old orientation, so in a landscape drill everything right of the old
+// portrait width — the call buttons, the right half of the field — is visible but
+// dead to taps (and on the way back, the tab bar dies the same way). Reproduced
+// ~2-in-3 on API 35/36 emulators in release builds; dev-client builds mask it (their
+// overlay window forces the rotation to commit), which is how it once shipped with a
+// "verified" fix that didn't work. Deferring the lock until the churn has settled
+// won 6/6 trials where immediate locking died 2/3. One module-scope, last-wins
+// scheduler serves both directions: an exit's PORTRAIT restore must survive the
+// component unmounting, and a quick re-entry within the window must supersede it.
+const LOCK_SETTLE_MS = 400;
+let pendingLock: ReturnType<typeof setTimeout> | null = null;
+function scheduleLock(lock: ScreenOrientation.OrientationLock) {
+  if (Platform.OS !== 'android') { requestLock(lock); return; }
+  if (pendingLock) clearTimeout(pendingLock);
+  pendingLock = setTimeout(() => { pendingLock = null; requestLock(lock); }, LOCK_SETTLE_MS);
 }
 
 export default function GameHost({
@@ -65,10 +86,10 @@ export default function GameHost({
   useFocusEffect(
     useCallback(() => {
       if (!game.landscape) return;
-      requestLock(ScreenOrientation.OrientationLock.LANDSCAPE);
+      scheduleLock(ScreenOrientation.OrientationLock.LANDSCAPE);
       setImmersive(true);
       return () => {
-        requestLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        scheduleLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         setImmersive(false);
       };
     }, [game.landscape])
