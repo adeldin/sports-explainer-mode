@@ -6,7 +6,7 @@ import { scheduleQuizReminder, cancelQuizReminder } from '../lib/notifications';
 import { Level, Language } from '../lib/api';
 import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { useAppState } from '../lib/appState';
-import { useEntitlement, presentPaywall } from '../lib/entitlement';
+import { RC_CONFIGURED, useEntitlement, presentPaywall } from '../lib/entitlement';
 import { UI_STRINGS } from '../lib/strings';
 
 const APP_ID = '6781028656'; // SportsWise App Store ID (App Store Connect)
@@ -73,11 +73,11 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* SportsWise Pro — Go Pro presents the RevenueCat drop-in paywall; Restore is
-              Apple-required. (Labels English for now — localization is a small follow-up.)
-              iOS-only until RevenueCat has a Google Play app + goog_ SDK key: on Android the
-              paywall is a no-op (entitlement.tsx guards on RC_IOS_KEY + Platform.OS), and
-              Google rejects visible purchase UI that does nothing — so hide the section. */}
-          {Platform.OS === 'ios' && (
+              store-required. Shown only when this platform's RevenueCat key exists
+              (RC_CONFIGURED): visible purchase UI that does nothing is a store-review
+              rejection on both platforms. Android turns on by filling in
+              extra.revenueCatAndroidKey in app.json — no UI change needed here. */}
+          {RC_CONFIGURED && (
             <>
               <Text style={styles.sectionLabel}>SportsWise Pro</Text>
               {isPro ? (
@@ -97,7 +97,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
             </>
           )}
 
-          <Text style={[styles.sectionLabel, Platform.OS === 'ios' && { marginTop: 30 }]}>{S.mySports}</Text>
+          <Text style={[styles.sectionLabel, RC_CONFIGURED && { marginTop: 30 }]}>{S.mySports}</Text>
           <TouchableOpacity style={styles.linkRow} onPress={onOpenMySports}>
             <Text style={styles.linkLabel}>{S.customizeSports}</Text>
             <Text style={styles.linkChevron}>›</Text>
