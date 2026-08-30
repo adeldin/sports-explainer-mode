@@ -11,9 +11,9 @@ import { UI_STRINGS } from '../lib/strings';
 
 const APP_ID = '6781028656'; // SportsWise App Store ID (App Store Connect)
 const FEEDBACK_EMAIL = 'feedback@sportswise.app';
-const PRIVACY_URL = 'https://privacy.sportswise.app';
+const PRIVACY_URL = 'https://explainer-privacy.sportswise.app';
 const SHARE_MESSAGE =
-  'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sportswise.app';
+  'Check out SportsWise — it explains sports in real time at your level. Watch and ask why. Download: https://sports-explainer-mode.vercel.app';
 
 // Shared state comes from AppStateProvider; the only prop is the navigation hook
 // to push the My Sports editor (the stack owns that route).
