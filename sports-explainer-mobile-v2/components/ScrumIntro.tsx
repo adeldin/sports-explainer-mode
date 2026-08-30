@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, StatusBar, Dimensions,
+  View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, StatusBar, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
 import { useTheme, Theme } from '../lib/theme';
 
-const { width } = Dimensions.get('window');
-const IMAGE_SIZE = width - 48; // 24px container padding each side
+// Screen width comes from useWindowDimensions INSIDE the component: a module-scope
+// Dimensions.get('window') is captured once at bundle load, and on the New Arch that
+// early read can be wrong (seen: landscape-sized width on a portrait launch), which
+// blows up every size derived from it.
 
 interface Props {
   onComplete: () => void;
@@ -50,6 +52,8 @@ function Reveal({ delay, style, children }: { delay: number; style?: any; childr
 // landing line, and swaps the CTA to continue to setup. Styled to match Onboarding.
 export default function ScrumIntro({ onComplete }: Props) {
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const imageSize = width - 48; // 24px container padding each side
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [revealed, setRevealed] = useState(false);
 
@@ -82,7 +86,7 @@ export default function ScrumIntro({ onComplete }: Props) {
         <Text style={styles.opener}>Ever watched a game and had no idea what just happened?</Text>
 
         {/* Scrum image */}
-        <View style={styles.imageWrap}>
+        <View style={[styles.imageWrap, { width: imageSize, height: imageSize }]}>
           <Image source={require('../assets/onboarding-scrum.jpg')} style={styles.image} resizeMode="cover" />
         </View>
 
@@ -137,8 +141,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
 
   imageWrap: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: t.surface,

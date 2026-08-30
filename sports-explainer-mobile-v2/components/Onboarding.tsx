@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, StatusBar, ScrollView,
+  View, Text, Image, TouchableOpacity, StyleSheet, StatusBar, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,7 +10,8 @@ import { UI_STRINGS } from '../lib/strings';
 import { SPORTS, SPORT_FULL_NAME } from '../lib/sports';
 import AppIcon from './AppIcon';
 
-const { width } = Dimensions.get('window');
+// (window width now read reactively via useWindowDimensions inside the component —
+// module-scope Dimensions.get can return a wrong early value on the New Arch.)
 
 type Level = 'kid' | 'beginner' | 'intermediate' | 'expert';
 // Sport type + the SPORTS list come from the shared modules (lib/api, lib/sports).
@@ -32,6 +33,8 @@ export default function Onboarding({ language, onComplete }: Props) {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const tileWidth = (width - 60) / 2;
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const S = UI_STRINGS[language];
   const LVL: Record<Level, { label: string; sub: string }> = {
@@ -147,7 +150,7 @@ export default function Onboarding({ language, onComplete }: Props) {
           {SPORTS.map(s => (
             <TouchableOpacity
               key={s.key}
-              style={[styles.sportTile, selectedSport === s.key && styles.sportTileActive]}
+              style={[styles.sportTile, { width: tileWidth }, selectedSport === s.key && styles.sportTileActive]}
               onPress={() => setSelectedSport(s.key)}>
               <AppIcon emoji={s.emoji} size={36} style={styles.sportEmoji} />
               <Text style={[styles.sportLabel, selectedSport === s.key && styles.sportLabelActive]}>
@@ -224,7 +227,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // Sport Grid (scrollable — shows all sports, ~6–8 tiles before scrolling)
   sportScroll: { flex: 1, marginVertical: 4 },
   sportGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingVertical: 8, paddingBottom: 16 },
-  sportTile: { width: (width - 60) / 2, alignItems: 'center', padding: 18, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
+  sportTile: { alignItems: 'center', padding: 18, borderRadius: 16, backgroundColor: t.surface, borderWidth: 1, borderColor: t.border },
   sportTileActive: { backgroundColor: t.surfaceActive, borderColor: t.accent },
   sportEmoji: { fontSize: 36, marginBottom: 8 },
   sportLabel: { color: t.textPrimary, fontSize: 18, fontWeight: '800' },
