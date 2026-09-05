@@ -2,6 +2,8 @@
 
 **Purpose:** The bar a visual Coach's Corner scenario must clear *before* it's worth Anthony's review. Applies across all sports and all interaction types (binary judgment, tap-the-read, multi-step). Paste this into the build chat as an upfront constraint so scenarios are authored *to* this standard, not corrected against it after rendering.
 
+**Updated 2026-09-03 for the emulator era:** Claude now drives the iOS Simulator and the Android emulator on the Mac mini directly (render, tap, swipe, screenshot — see the `ios-simulator-driving` memory and `~/.local/bin/simclick`/`simdrag`). Anthony is no longer the render-verification loop. The old workflow — Anthony playing every build on his phone and ferrying screenshots back — is retired; his role is now exactly two gates, defined in "Verification workflow" below.
+
 **Why this exists:** Real review sessions kept surfacing the same underlying flaw four different ways — a wide pass that looked open, a correct answer with no defender contesting it, two options stacked so the answer was obvious. All one root cause: *the wrong answers weren't tempting, so there was no read to teach.* These rules make that flaw impossible to author in the first place, so expert review is spent on genuine tactical judgment, not coordinate nudges.
 
 ---
@@ -114,3 +116,24 @@ Everything above is about whether a scenario is *tactically sound* — the judgm
 13. Does this scenario feel like a sibling of the others in the set (pace, grammar, framing, voice)?
 
 If any answer is no, the scenario isn't ready for review yet.
+
+---
+
+## Verification workflow (emulator era)
+
+**Division of labor.** Claude verifies everything a machine can see or tap; Anthony judges only what requires his eye. Every screenshot Anthony used to take, Claude now takes; every tap Anthony used to test, Claude now performs via automation on both platforms.
+
+**Anthony's two gates — the only times a scenario reaches him:**
+
+1. **Text-claim gate (before anything is rendered).** The punisher declarations for every wrong option, as plain text. He validates the tactical claims in seconds. Unchanged from before — this remains the single biggest saver of his time.
+2. **Final look pass (once, at the end).** One curated screenshot set per scenario — the frozen scene, the reveal states, and any level where the visuals differ — captured by Claude from a real device target, presented together. He approves feel and tactical truth. No iterative rounds: if Claude isn't confident a set passes, it isn't ready to show him.
+
+**Claude's self-verification before that final pass (all mandatory):**
+
+- **Render on BOTH platforms** — iOS Simulator and Android emulator (Expo Go is free; no build credits needed for authoring). The two must look like the same app: safe-area imports from `react-native-safe-area-context` only, no module-scope `Dimensions.get` (use `useWindowDimensions`), per the android-cross-platform-rules memory.
+- **Tap every option by automation, on both platforms** — verify each tap target actually fires (whole-disc clickable), the verdict renders, retry/advance behaves per the interaction-type addendum. Seeing a button is not verification; tapping it is.
+- **Landscape games get the release-build tap test on Android** — the orientation-lock race (GameHost `scheduleLock`) is masked by dev builds and only shows in release-style builds, ~2-in-3. Any new landscape module must be tap-tested in a release build, multiple trials, before shipping. Never judge this by a frame dump or a single trial.
+- **Run the full pre-flight checklist against Claude's own screenshots** — stacked-option geometry (rule 3), text leaks (rule 9), runway legibility (rule 10), and set-consistency (rule 13) are all visible in captures; check them there, not in the code's intentions.
+- **Animation checks by capture sequence** — screenshot before/during/after the motion beat to confirm the constant-pace invariant and that the consequence (not just decoration) is visible.
+
+**Ship rule:** both stores together, always (ship-ios-and-android-together). New modules batch into the next dual-platform release; authoring and emulator verification are free and can happen anytime, but EAS builds wait for credit availability unless Anthony explicitly approves a paid build.
