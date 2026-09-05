@@ -29,6 +29,8 @@ export type CCPieceId =
   | "the-pinch"                                                       // golf
   | "set-the-trap"                                                    // cricket
   | "numbers-out-wide" | "draw-and-pass" | "how-many-in" | "wheres-the-line"   // rugby
+  | "jam-or-drift" | "commit-or-fan" | "exit-strategy"
+  | "one-more-phase" | "hold-short-side"                                       // rugby (2026-09 wave)
   | "pick-your-poison" | "two-for-one" | "foul-up-three"                       // NBA
   | "serve-plus-one" | "pass-or-lob"                                           // tennis
   | "escape-or-hero"                                                           // golf
@@ -78,7 +80,7 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "tennis") pieces.push("serve-target");
   if (sport === "golf") pieces.push("the-pinch");
   if (sport === "cricket") pieces.push("set-the-trap");
-  if (isRugby(sport)) pieces.push("numbers-out-wide", "draw-and-pass", "how-many-in", "wheres-the-line");
+  if (isRugby(sport)) pieces.push("numbers-out-wide", "draw-and-pass", "how-many-in", "wheres-the-line", "jam-or-drift", "commit-or-fan", "exit-strategy", "one-more-phase", "hold-short-side");
   if (sport === "nba") pieces.push("pick-your-poison", "two-for-one", "foul-up-three");
   if (sport === "tennis") pieces.push("serve-plus-one", "pass-or-lob");
   if (sport === "golf") pieces.push("escape-or-hero");

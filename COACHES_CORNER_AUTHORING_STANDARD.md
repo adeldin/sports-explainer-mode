@@ -126,6 +126,7 @@ If any answer is no, the scenario isn't ready for review yet.
 **Anthony's two gates — the only times a scenario reaches him:**
 
 1. **Text-claim gate (before anything is rendered).** The punisher declarations for every wrong option, as plain text. He validates the tactical claims in seconds. Unchanged from before — this remains the single biggest saver of his time.
+   **Sport-expertise variant:** when the sport is one Anthony doesn't know (rugby, cricket), he can only approve the *shape*, not the tactical truth. For those sports the pre-build tactical check is: (a) ground every option and punisher in the cited World Rugby/ICC laws, (b) run the candidate slate through a multi-AI adversarial critique (see the 2026-09-03 rugby round: 3 models, 3 of 6 candidates killed, 2 law errors caught). The authoritative human check then happens POST-build by a domain expert — for rugby, Anthony's Chicago Hounds contact reviews the built scenarios before they ship.
 2. **Final look pass (once, at the end).** One curated screenshot set per scenario — the frozen scene, the reveal states, and any level where the visuals differ — captured by Claude from a real device target, presented together. He approves feel and tactical truth. No iterative rounds: if Claude isn't confident a set passes, it isn't ready to show him.
 
 **Claude's self-verification before that final pass (all mandatory):**
