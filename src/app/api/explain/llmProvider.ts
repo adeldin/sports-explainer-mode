@@ -22,12 +22,12 @@ import Groq from 'groq-sdk';
 // needs it, with the route's existing catch — instead of taking down the build for every endpoint
 // in the app. A build must never require a secret.
 let _groq: Groq | null = null;
-// maxRetries: 0 whenever a fallback exists. The SDK's default (2 retries) HONORS Groq's retry-after
-// header for anything up to 60 s — so on a quota 429 a request could sit for up to a minute before we
-// even tried Gemini (observed 2026-09-13, NFL Week 1: 32 s explanations while Groq's daily token cap
-// was exhausted). With a fallback configured the right move on any Groq failure is to fail over NOW.
+// maxRetries: 0 whenever Gemini can take over. The SDK's default (2 retries) HONORS Groq's retry-after
+// header in full — on a quota 429 a request could sit for minutes before we tried the other provider
+// (observed 2026-09-13, NFL Week 1: 32-57 s explanations while Groq's daily token cap was exhausted).
+// With another provider available the right move on any Groq failure is to fail over NOW.
 const getGroq = (): Groq =>
-  (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: FALLBACK === 'gemini' ? 0 : 2 }));
+  (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: process.env.GEMINI_API_KEY ? 0 : 2 }));
 
 const FALLBACK = (process.env.LLM_FALLBACK_PROVIDER || 'none').toLowerCase();
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -40,19 +40,36 @@ export interface LLMCompletion {
   choices: Array<{ message?: { content?: string | null } }>;
 }
 
-// Drop-in for groq.chat.completions.create(). Same params in, same shape out.
+// Which provider goes FIRST. Default: Gemini whenever a Gemini key exists, Groq otherwise.
+// Decided 2026-09-13 (NFL Week 1 Sunday): Groq's free tier caps at 200K tokens/day PER MODEL and ran
+// dry at 2:45 PM with three game windows still to play; the Developer-tier upgrade has been
+// "temporarily unavailable" since August. Gemini 2.5 Flash with reasoning off answers in ~1.2-1.8 s
+// (Groq: ~1.5-2 s), is on a paid project with no daily cap, and costs ~$0.001 per explanation.
+// So: Gemini primary, Groq free tier as the fallback. Set LLM_PRIMARY=groq to flip back without a
+// code change.
+const PRIMARY = (process.env.LLM_PRIMARY || (GEMINI_KEY ? 'gemini' : 'groq')).toLowerCase();
+
+// Drop-in for groq.chat.completions.create(). Same params in, same shape out. Tries the primary
+// provider, then the other one on ANY failure (429 / 5xx / timeout / network / parse — broad trigger).
+// A provider that isn't configured (no key) is skipped, so a single-provider setup behaves as before.
 export async function createChatCompletion(params: any): Promise<LLMCompletion> {
-  try {
-    const c = await getGroq().chat.completions.create(params);
-    console.log('[llm] provider=groq');
-    return c as unknown as LLMCompletion;
-  } catch (e) {
-    const reason = (e as Error)?.message || String(e);
-    // No fallback configured → behave exactly as today (Groq-only): rethrow to the route's catch.
-    if (FALLBACK !== 'gemini' || !GEMINI_KEY) throw e;
-    console.warn(`[llm] Groq failed: ${reason} → provider=gemini-fallback`);
-    return geminiCompletion(params);
+  const order = PRIMARY === 'gemini' ? ['gemini', 'groq'] : ['groq', 'gemini'];
+  let lastErr: unknown = null;
+  for (const provider of order) {
+    if (provider === 'gemini' && (!GEMINI_KEY || (PRIMARY !== 'gemini' && FALLBACK !== 'gemini'))) continue;
+    if (provider === 'groq' && !process.env.GROQ_API_KEY) continue;
+    try {
+      const c = provider === 'gemini'
+        ? await geminiCompletion(params)
+        : ((await getGroq().chat.completions.create(params)) as unknown as LLMCompletion);
+      console.log(`[llm] provider=${provider}${provider !== order[0] ? '-fallback' : ''}`);
+      return c;
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[llm] ${provider} failed: ${(e as Error)?.message || String(e)}`);
+    }
   }
+  throw lastErr ?? new Error('No LLM provider configured');
 }
 
 // Gemini via its OpenAI-compatibility endpoint — same messages/temperature/response_format; only the
@@ -67,9 +84,9 @@ async function geminiCompletion(params: any): Promise<LLMCompletion> {
       ...(params.temperature != null ? { temperature: params.temperature } : {}),
       ...(params.response_format ? { response_format: params.response_format } : {}),
       ...(params.max_tokens ? { max_tokens: params.max_tokens } : {}),
-      // No "thinking" on the fallback: gemini-2.5-flash reasons by default, which took ~7 s per
-      // explanation vs ~1.8 s with reasoning off (measured 2026-09-13, same prompt). These are short
-      // grounded JSON teaching answers — the deliberation buys nothing and costs the user 5 s of spinner.
+      // No "thinking": gemini-2.5-flash reasons by default, which took ~5-7 s per explanation vs
+      // ~1.2-1.8 s with reasoning off (measured 2026-09-13, same prompt). These are short grounded JSON
+      // teaching answers — the deliberation buys nothing and costs the user seconds of spinner.
       reasoning_effort: 'none',
     }),
   });
