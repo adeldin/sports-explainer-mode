@@ -22,7 +22,12 @@ import Groq from 'groq-sdk';
 // needs it, with the route's existing catch — instead of taking down the build for every endpoint
 // in the app. A build must never require a secret.
 let _groq: Groq | null = null;
-const getGroq = (): Groq => (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY }));
+// maxRetries: 0 whenever a fallback exists. The SDK's default (2 retries) HONORS Groq's retry-after
+// header for anything up to 60 s — so on a quota 429 a request could sit for up to a minute before we
+// even tried Gemini (observed 2026-09-13, NFL Week 1: 32 s explanations while Groq's daily token cap
+// was exhausted). With a fallback configured the right move on any Groq failure is to fail over NOW.
+const getGroq = (): Groq =>
+  (_groq ??= new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: FALLBACK === 'gemini' ? 0 : 2 }));
 
 const FALLBACK = (process.env.LLM_FALLBACK_PROVIDER || 'none').toLowerCase();
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
@@ -62,6 +67,10 @@ async function geminiCompletion(params: any): Promise<LLMCompletion> {
       ...(params.temperature != null ? { temperature: params.temperature } : {}),
       ...(params.response_format ? { response_format: params.response_format } : {}),
       ...(params.max_tokens ? { max_tokens: params.max_tokens } : {}),
+      // No "thinking" on the fallback: gemini-2.5-flash reasons by default, which took ~7 s per
+      // explanation vs ~1.8 s with reasoning off (measured 2026-09-13, same prompt). These are short
+      // grounded JSON teaching answers — the deliberation buys nothing and costs the user 5 s of spinner.
+      reasoning_effort: 'none',
     }),
   });
   if (!res.ok) {
