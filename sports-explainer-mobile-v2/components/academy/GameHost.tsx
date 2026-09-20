@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, Dimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -44,13 +44,64 @@ function requestLock(lock: ScreenOrientation.OrientationLock) {
 // won 6/6 trials where immediate locking died 2/3. One module-scope, last-wins
 // scheduler serves both directions: an exit's PORTRAIT restore must survive the
 // component unmounting, and a quick re-entry within the window must supersede it.
+//
+// 2026-09-20: iOS was CARVED OUT of this deferral (`if (Platform.OS !== 'android') { requestLock(...) }`)
+// because the bug had only ever been seen on Android. A user on a 440pt-wide iPhone (Max/Plus class)
+// then reported the identical signature on iOS 1.9.0: the drill draws correctly in landscape, taps on
+// the field still work, and EVERY control right of roughly the old portrait width is dead — the Snap
+// button, the verdict buttons, Restart. It reproduces on none of our devices (small-Pro release build
+// and Max-class simulator both pass), which is exactly how the Android race behaved: ~2 trials in 3.
+// So the carve-out is removed and BOTH platforms now wait for the mount churn to settle before
+// locking. Deferring costs a 400ms later rotation and nothing else.
 const LOCK_SETTLE_MS = 400;
 let pendingLock: ReturnType<typeof setTimeout> | null = null;
 function scheduleLock(lock: ScreenOrientation.OrientationLock) {
-  if (Platform.OS !== 'android') { requestLock(lock); return; }
   if (pendingLock) clearTimeout(pendingLock);
   pendingLock = setTimeout(() => { pendingLock = null; requestLock(lock); }, LOCK_SETTLE_MS);
 }
+
+// ── TESTFLIGHT DIAGNOSTIC — set to false before any App Store submission ────────────────────────
+// Reports what the JS side believes about the screen, plus the coordinates of the last touch that
+// actually reached React Native. The touch probe is the load-bearing part: `onTouchStart` on the root
+// fires for taps anywhere in the subtree WITHOUT claiming the responder, so the drills keep working.
+// If a tester taps a dead button and "last tap" does not change, the touch never reached the app at
+// all — a native-level dead region. If it changes but the button does not fire, the hit area is wrong.
+// If it changes to coordinates far from where they tapped, the coordinate space is mismatched.
+export const SHOW_TOUCH_DIAGNOSTIC = true;
+
+function TouchDiagnostic({ lastTouch, hostW, hostH }: {
+  lastTouch: { x: number; y: number } | null; hostW: number; hostH: number;
+}) {
+  const insets = useSafeAreaInsets();
+  const [orient, setOrient] = useState<string>('?');
+  useEffect(() => {
+    let alive = true;
+    const read = () => ScreenOrientation.getOrientationAsync()
+      .then(o => { if (alive) setOrient(String(o)); }).catch(() => {});
+    read();
+    const t = setInterval(read, 1000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  const win = Dimensions.get('window');
+  const scr = Dimensions.get('screen');
+  const r = (n: number) => Math.round(n);
+  return (
+    <View pointerEvents="none" style={diagStyles.box}>
+      <Text style={diagStyles.line}>win {r(win.width)}x{r(win.height)}   screen {r(scr.width)}x{r(scr.height)}</Text>
+      <Text style={diagStyles.line}>host {r(hostW)}x{r(hostH)}   insets {r(insets.top)}/{r(insets.right)}/{r(insets.bottom)}/{r(insets.left)}</Text>
+      <Text style={diagStyles.line}>orientation {orient}   iOS {String(Platform.Version)}</Text>
+      <Text style={diagStyles.lineBig}>LAST TAP  {lastTouch ? `${r(lastTouch.x)} , ${r(lastTouch.y)}` : 'none yet'}</Text>
+    </View>
+  );
+}
+
+const diagStyles = StyleSheet.create({
+  // Bottom-LEFT on purpose: the reported dead zone is the right-hand side, so the readout has to sit
+  // somewhere the reporter can definitely see. pointerEvents none — it must never eat a tap.
+  box: { position: 'absolute', left: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, maxWidth: 320 },
+  line: { color: '#d8e2f0', fontSize: 9.5, fontVariant: ['tabular-nums'] },
+  lineBig: { color: '#ffd166', fontSize: 12, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] },
+});
 
 export default function GameHost({
   game, sportKeys, categoryEmoji, onBack, backLabel = 'Academy',
@@ -78,6 +129,11 @@ export default function GameHost({
   // portrait on its own" mid-module. (It was misdiagnosed once before as an accidental tap
   // on the camouflaged tab bar; hiding the bar is what introduced the setOptions call that
   // closes the loop.) Refs give the callback fresh values without making it unstable.
+  // Diagnostic state. Only ever written while SHOW_TOUCH_DIAGNOSTIC is on, so a production build
+  // does no extra work: the handlers below are `undefined` and React attaches nothing.
+  const [lastTouch, setLastTouch] = useState<{ x: number; y: number } | null>(null);
+  const [host, setHost] = useState({ w: 0, h: 0 });
+
   const navRef = useRef(navigation);
   navRef.current = navigation;
   const themeRef = useRef(theme);
@@ -96,7 +152,12 @@ export default function GameHost({
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView
+      style={styles.safe}
+      edges={['top']}
+      onLayout={SHOW_TOUCH_DIAGNOSTIC ? e => setHost({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}
+      // Observes touches without claiming the responder, so every drill keeps behaving normally.
+      onTouchStart={SHOW_TOUCH_DIAGNOSTIC ? e => setLastTouch({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }) : undefined}>
       <StatusBar barStyle={theme.statusBar} />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={10} activeOpacity={0.7}>
@@ -109,6 +170,7 @@ export default function GameHost({
       <GameErrorBoundary title={game.title}>
         <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
       </GameErrorBoundary>
+      {SHOW_TOUCH_DIAGNOSTIC && <TouchDiagnostic lastTouch={lastTouch} hostW={host.w} hostH={host.h} />}
     </SafeAreaView>
   );
 }
