@@ -6,7 +6,10 @@ during the next release, at the `create-version` step in `SPORTSWISE_v1.9_RELEAS
 
 ---
 
-## QUEUED — apply at the next iOS release (written 2026-09-19, not yet live)
+## SUBMITTED with 1.9.1 on 2026-09-20 — awaiting App Review (written 2026-09-19)
+
+Applied to App Store Connect version **1.9.1** (build 41) via the API and verified stored: keywords
+100/100, subtitle on the WAITING_FOR_REVIEW appInfo. Goes live when Apple approves the build.
 
 **Subtitle** (30 char limit) — replaces `Any game, explained your way`
 
