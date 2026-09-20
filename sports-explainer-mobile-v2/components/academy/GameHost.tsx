@@ -60,14 +60,18 @@ function scheduleLock(lock: ScreenOrientation.OrientationLock) {
   pendingLock = setTimeout(() => { pendingLock = null; requestLock(lock); }, LOCK_SETTLE_MS);
 }
 
-// ── TESTFLIGHT DIAGNOSTIC — set to false before any App Store submission ────────────────────────
+// ── HIDDEN TOUCH DIAGNOSTIC — safe to ship; invisible unless deliberately summoned ──────────────
+// Revealed by LONG-PRESSING the drill title for ~1s, and hidden again the same way. Off by default,
+// which means a normal user never sees it AND never pays for it: the observer handlers below are
+// `undefined` while it is off, so React attaches nothing and no re-render happens per touch.
+// It ships in the App Store build on purpose — we cannot reproduce this bug on any device we own, so
+// the only way to read a failing phone is to let its owner summon the numbers and send a screenshot.
 // Reports what the JS side believes about the screen, plus the coordinates of the last touch that
 // actually reached React Native. The touch probe is the load-bearing part: `onTouchStart` on the root
 // fires for taps anywhere in the subtree WITHOUT claiming the responder, so the drills keep working.
 // If a tester taps a dead button and "last tap" does not change, the touch never reached the app at
 // all — a native-level dead region. If it changes but the button does not fire, the hit area is wrong.
 // If it changes to coordinates far from where they tapped, the coordinate space is mismatched.
-export const SHOW_TOUCH_DIAGNOSTIC = true;
 
 function TouchDiagnostic({ lastTouch, hostW, hostH }: {
   lastTouch: { x: number; y: number } | null; hostW: number; hostH: number;
@@ -131,6 +135,7 @@ export default function GameHost({
   // closes the loop.) Refs give the callback fresh values without making it unstable.
   // Diagnostic state. Only ever written while SHOW_TOUCH_DIAGNOSTIC is on, so a production build
   // does no extra work: the handlers below are `undefined` and React attaches nothing.
+  const [showDiag, setShowDiag] = useState(false);
   const [lastTouch, setLastTouch] = useState<{ x: number; y: number } | null>(null);
   const [host, setHost] = useState({ w: 0, h: 0 });
 
@@ -155,22 +160,30 @@ export default function GameHost({
     <SafeAreaView
       style={styles.safe}
       edges={['top']}
-      onLayout={SHOW_TOUCH_DIAGNOSTIC ? e => setHost({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}
+      onLayout={showDiag ? e => setHost({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}
       // Observes touches without claiming the responder, so every drill keeps behaving normally.
-      onTouchStart={SHOW_TOUCH_DIAGNOSTIC ? e => setLastTouch({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }) : undefined}>
+      onTouchStart={showDiag ? e => setLastTouch({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }) : undefined}>
       <StatusBar barStyle={theme.statusBar} />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={10} activeOpacity={0.7}>
           <Text style={styles.backText}>‹ {backLabel}</Text>
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{game.icon} {game.title}</Text>
+        {/* Long-press the title to summon the touch diagnostic. activeOpacity 1 so there is no
+            visual hint that the title is pressable at all. */}
+        <TouchableOpacity
+          style={styles.titleWrap}
+          activeOpacity={1}
+          delayLongPress={900}
+          onLongPress={() => { setShowDiag(v => !v); setLastTouch(null); }}>
+          <Text style={styles.title} numberOfLines={1}>{game.icon} {game.title}</Text>
+        </TouchableOpacity>
         {/* Spacer to keep the title visually centered against the back button. */}
         <View style={styles.backBtn} />
       </View>
       <GameErrorBoundary title={game.title}>
         <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
       </GameErrorBoundary>
-      {SHOW_TOUCH_DIAGNOSTIC && <TouchDiagnostic lastTouch={lastTouch} hostW={host.w} hostH={host.h} />}
+      {showDiag && <TouchDiagnostic lastTouch={lastTouch} hostW={host.w} hostH={host.h} />}
     </SafeAreaView>
   );
 }
@@ -180,5 +193,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
   backBtn: { minWidth: 92 },
   backText: { color: t.accentText, fontSize: 16, fontWeight: '800' },
-  title: { color: t.textPrimary, fontSize: 16, fontWeight: '900', flex: 1, textAlign: 'center' },
+  titleWrap: { flex: 1 },
+  title: { color: t.textPrimary, fontSize: 16, fontWeight: '900', textAlign: 'center' },
 });
