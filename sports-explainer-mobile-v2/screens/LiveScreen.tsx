@@ -1532,7 +1532,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 />
               )}
 
-              {(sport === 'mlb' || sport === 'nhl' || sport === 'nba' || sport === 'wnba' || sport === 'cricket') && selectedGameId && (
+              {(sport === 'mlb' || sport === 'nfl' || sport === 'nhl' || sport === 'nba' || sport === 'wnba' || sport === 'cricket') && selectedGameId && (
                 <PastPlays
                   key={`${sport}-${selectedGameId}-${language}-${level}`}
                   sport={sport}

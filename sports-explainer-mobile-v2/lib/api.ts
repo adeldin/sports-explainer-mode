@@ -177,6 +177,7 @@ export async function fetchFeedback(payload: FeedbackPayload): Promise<void> {
 // Sports whose ESPN summary endpoint exposes a play-by-play `plays[]` array.
 const SUMMARY_PATHS: Partial<Record<Sport, string>> = {
   mlb: 'baseball/mlb',
+  nfl: 'football/nfl',
   nhl: 'hockey/nhl',
   nba: 'basketball/nba',
   wnba: 'basketball/wnba',
@@ -264,6 +265,19 @@ async function fetchCricketPlays(gameId: string): Promise<Play[]> {
   }
 }
 
+// Sports whose plays are read the football way: quarter + clock + down and distance.
+const GRIDIRON: ReadonlySet<string> = new Set(['nfl']);
+const DOWN_ORDINAL: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
+
+// "3rd & 7" from a football play's starting state. '' for kickoffs, extra points and anything
+// without a live down, which is correct — those have no down to show.
+function downDistance(p: any): string {
+  const st = p?.start || {};
+  if (typeof st.down !== 'number' || st.down < 1) return '';
+  const d = DOWN_ORDINAL[st.down] || `${st.down}th`;
+  return typeof st.distance === 'number' ? `${d} & ${st.distance}` : d;
+}
+
 export async function fetchPlays(sport: Sport, gameId: string): Promise<Play[]> {
   if (sport === 'cricket') return fetchCricketPlays(gameId);
   const path = SUMMARY_PATHS[sport];
@@ -271,20 +285,36 @@ export async function fetchPlays(sport: Sport, gameId: string): Promise<Play[]> 
   const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${gameId}`);
   if (!res.ok) return [];
   const data = await res.json();
-  const raw: any[] = Array.isArray(data?.plays) ? data.plays : [];
+  // ESPN files FOOTBALL play-by-play under `drives`, not the flat `plays` array every other sport
+  // uses — which is the only reason football never had a tappable play history. Flatten it here so
+  // the rest of this function stays shape-agnostic. Chronological order is preserved (drives are in
+  // order, and so are the plays inside each), because the reverse at the end depends on it.
+  const raw: any[] = Array.isArray(data?.plays) && data.plays.length
+    ? data.plays
+    : [
+        ...((data?.drives?.previous || []) as any[]).flatMap((d: any) => (d?.plays || []) as any[]),
+        ...((data?.drives?.current?.plays || []) as any[]),
+      ];
 
   const plays: Play[] = [];
   for (const p of raw) {
     const text: string = p?.text || '';
-    // Skip period markers ("Top of the 1st inning", "Start of 1st Period", "Game End").
-    if (!text || /inning|^start of|^end of|game end/i.test(text)) continue;
+    // Skip period markers ("Top of the 1st inning", "Start of 1st Period", "Game End"). Football
+    // adds its own ("END QUARTER 1", "END GAME") plus the two-minute warning, a clock stoppage
+    // rather than a play — none of them carry a lesson worth tapping.
+    if (!text || /inning|^start of|^end of|game end|^end (quarter|game)|two-minute warning/i.test(text)) continue;
     const per = p.period || {};
     const clock = p.clock?.displayValue;
-    const period = [
-      sport === 'mlb' && per.type ? per.type : null,
-      per.displayValue || (per.number ? `Period ${per.number}` : null),
-      sport !== 'mlb' && clock ? clock : null,
-    ].filter(Boolean).join(' ');
+    // Football reads as "Q3 7:21 · 3rd & 4". The down and distance is the whole point: it is what
+    // separates a routine four-yard gain from a drive-saving one.
+    const period = GRIDIRON.has(sport)
+      ? [per.number ? `Q${per.number}${clock ? ` ${clock}` : ''}` : (clock || ''), downDistance(p)]
+          .filter(Boolean).join(' · ')
+      : [
+          sport === 'mlb' && per.type ? per.type : null,
+          per.displayValue || (per.number ? `Period ${per.number}` : null),
+          sport !== 'mlb' && clock ? clock : null,
+        ].filter(Boolean).join(' ');
     plays.push({ id: String(p.id ?? plays.length), text, period, scoring: !!p.scoringPlay });
   }
   // Most recent first, capped — the UI shows 30 with a "Load more" up to this cap.

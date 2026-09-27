@@ -1,4 +1,4 @@
-import { ScrollView, TouchableOpacity, View, Text, StyleSheet, Dimensions } from 'react-native';
+import { ScrollView, TouchableOpacity, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useMemo, useRef, useEffect } from 'react';
 import { useTheme, Theme } from '../lib/theme';
 
@@ -24,17 +24,22 @@ export default function DateStrip({ days, selectedDay, todayDay, onSelect, margi
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const scrollRef = useRef<ScrollView>(null);
+  // useWindowDimensions, NOT Dimensions.get('window'): the imperative read goes stale. Caught on a
+  // simulator running this very build, where it reported 956x440 (landscape) while the screen was
+  // genuinely 440x956 — the hook was right and the getter was wrong. A stale width here scrolls the
+  // strip to the wrong offset, so the selected date is not centred. Same class of bug already fixed
+  // in Onboarding.tsx and ScrumIntro.tsx; this was the last caller left.
+  const { width: viewport } = useWindowDimensions();
 
   // Center the selected (or today) cell when the strip mounts or the day set changes. Fixed cell
   // width makes the offset exact; a 0ms defer lets layout settle before scrolling.
   useEffect(() => {
     const idx = days.indexOf(selectedDay);
     if (idx < 0) return;
-    const viewport = Dimensions.get('window').width;
     const x = Math.max(0, idx * (CELL_W + GAP) - (viewport - CELL_W) / 2);
     const t = setTimeout(() => scrollRef.current?.scrollTo({ x, animated: false }), 0);
     return () => clearTimeout(t);
-  }, [days, selectedDay]);
+  }, [days, selectedDay, viewport]);
 
   const parse = (day: string) => {
     const [y, m, d] = day.split('-').map(Number);
