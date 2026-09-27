@@ -69,3 +69,7 @@ coaches-corner-spikes/
 
 # build artifact zips
 *.zip
+
+# Google Play service account key (secret — never commit)
+google-play-key.json
+**/google-play-key.json

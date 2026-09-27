@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform, Dimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -31,6 +31,82 @@ function requestLock(lock: ScreenOrientation.OrientationLock) {
   ScreenOrientation.lockAsync(lock).catch(() => { lastRequestedLock = null; });
 }
 
+// Android: locking orientation in the same frame as GameHost's mount/unmount churn
+// (tab-bar hide, navigator update, first layout) races WindowManager's rotation
+// handshake. When the app loses the race, Android leaves the activity in a
+// half-finished "fixed rotation": the picture rotates but the window's TOUCH frame
+// keeps the old orientation, so in a landscape drill everything right of the old
+// portrait width — the call buttons, the right half of the field — is visible but
+// dead to taps (and on the way back, the tab bar dies the same way). Reproduced
+// ~2-in-3 on API 35/36 emulators in release builds; dev-client builds mask it (their
+// overlay window forces the rotation to commit), which is how it once shipped with a
+// "verified" fix that didn't work. Deferring the lock until the churn has settled
+// won 6/6 trials where immediate locking died 2/3. One module-scope, last-wins
+// scheduler serves both directions: an exit's PORTRAIT restore must survive the
+// component unmounting, and a quick re-entry within the window must supersede it.
+//
+// 2026-09-20: iOS was CARVED OUT of this deferral (`if (Platform.OS !== 'android') { requestLock(...) }`)
+// because the bug had only ever been seen on Android. A user on a 440pt-wide iPhone (Max/Plus class)
+// then reported the identical signature on iOS 1.9.0: the drill draws correctly in landscape, taps on
+// the field still work, and EVERY control right of roughly the old portrait width is dead — the Snap
+// button, the verdict buttons, Restart. It reproduces on none of our devices (small-Pro release build
+// and Max-class simulator both pass), which is exactly how the Android race behaved: ~2 trials in 3.
+// So the carve-out is removed and BOTH platforms now wait for the mount churn to settle before
+// locking. Deferring costs a 400ms later rotation and nothing else.
+const LOCK_SETTLE_MS = 400;
+let pendingLock: ReturnType<typeof setTimeout> | null = null;
+function scheduleLock(lock: ScreenOrientation.OrientationLock) {
+  if (pendingLock) clearTimeout(pendingLock);
+  pendingLock = setTimeout(() => { pendingLock = null; requestLock(lock); }, LOCK_SETTLE_MS);
+}
+
+// ── HIDDEN TOUCH DIAGNOSTIC — safe to ship; invisible unless deliberately summoned ──────────────
+// Revealed by LONG-PRESSING the drill title for ~1s, and hidden again the same way. Off by default,
+// which means a normal user never sees it AND never pays for it: the observer handlers below are
+// `undefined` while it is off, so React attaches nothing and no re-render happens per touch.
+// It ships in the App Store build on purpose — we cannot reproduce this bug on any device we own, so
+// the only way to read a failing phone is to let its owner summon the numbers and send a screenshot.
+// Reports what the JS side believes about the screen, plus the coordinates of the last touch that
+// actually reached React Native. The touch probe is the load-bearing part: `onTouchStart` on the root
+// fires for taps anywhere in the subtree WITHOUT claiming the responder, so the drills keep working.
+// If a tester taps a dead button and "last tap" does not change, the touch never reached the app at
+// all — a native-level dead region. If it changes but the button does not fire, the hit area is wrong.
+// If it changes to coordinates far from where they tapped, the coordinate space is mismatched.
+
+function TouchDiagnostic({ lastTouch, hostW, hostH }: {
+  lastTouch: { x: number; y: number } | null; hostW: number; hostH: number;
+}) {
+  const insets = useSafeAreaInsets();
+  const [orient, setOrient] = useState<string>('?');
+  useEffect(() => {
+    let alive = true;
+    const read = () => ScreenOrientation.getOrientationAsync()
+      .then(o => { if (alive) setOrient(String(o)); }).catch(() => {});
+    read();
+    const t = setInterval(read, 1000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  const win = Dimensions.get('window');
+  const scr = Dimensions.get('screen');
+  const r = (n: number) => Math.round(n);
+  return (
+    <View pointerEvents="none" style={diagStyles.box}>
+      <Text style={diagStyles.line}>win {r(win.width)}x{r(win.height)}   screen {r(scr.width)}x{r(scr.height)}</Text>
+      <Text style={diagStyles.line}>host {r(hostW)}x{r(hostH)}   insets {r(insets.top)}/{r(insets.right)}/{r(insets.bottom)}/{r(insets.left)}</Text>
+      <Text style={diagStyles.line}>orientation {orient}   iOS {String(Platform.Version)}</Text>
+      <Text style={diagStyles.lineBig}>LAST TAP  {lastTouch ? `${r(lastTouch.x)} , ${r(lastTouch.y)}` : 'none yet'}</Text>
+    </View>
+  );
+}
+
+const diagStyles = StyleSheet.create({
+  // Bottom-LEFT on purpose: the reported dead zone is the right-hand side, so the readout has to sit
+  // somewhere the reporter can definitely see. pointerEvents none — it must never eat a tap.
+  box: { position: 'absolute', left: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.78)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, maxWidth: 320 },
+  line: { color: '#d8e2f0', fontSize: 9.5, fontVariant: ['tabular-nums'] },
+  lineBig: { color: '#ffd166', fontSize: 12, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] },
+});
+
 export default function GameHost({
   game, sportKeys, categoryEmoji, onBack, backLabel = 'Academy',
 }: { game: AcademyGame; sportKeys: Sport[]; categoryEmoji?: string; onBack: () => void; backLabel?: string }) {
@@ -57,6 +133,12 @@ export default function GameHost({
   // portrait on its own" mid-module. (It was misdiagnosed once before as an accidental tap
   // on the camouflaged tab bar; hiding the bar is what introduced the setOptions call that
   // closes the loop.) Refs give the callback fresh values without making it unstable.
+  // Diagnostic state. Only ever written while SHOW_TOUCH_DIAGNOSTIC is on, so a production build
+  // does no extra work: the handlers below are `undefined` and React attaches nothing.
+  const [showDiag, setShowDiag] = useState(false);
+  const [lastTouch, setLastTouch] = useState<{ x: number; y: number } | null>(null);
+  const [host, setHost] = useState({ w: 0, h: 0 });
+
   const navRef = useRef(navigation);
   navRef.current = navigation;
   const themeRef = useRef(theme);
@@ -65,29 +147,43 @@ export default function GameHost({
   useFocusEffect(
     useCallback(() => {
       if (!game.landscape) return;
-      requestLock(ScreenOrientation.OrientationLock.LANDSCAPE);
+      scheduleLock(ScreenOrientation.OrientationLock.LANDSCAPE);
       setImmersive(true);
       return () => {
-        requestLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        scheduleLock(ScreenOrientation.OrientationLock.PORTRAIT_UP);
         setImmersive(false);
       };
     }, [game.landscape])
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView
+      style={styles.safe}
+      edges={['top']}
+      onLayout={showDiag ? e => setHost({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }) : undefined}
+      // Observes touches without claiming the responder, so every drill keeps behaving normally.
+      onTouchStart={showDiag ? e => setLastTouch({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY }) : undefined}>
       <StatusBar barStyle={theme.statusBar} />
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={10} activeOpacity={0.7}>
           <Text style={styles.backText}>‹ {backLabel}</Text>
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{game.icon} {game.title}</Text>
+        {/* Long-press the title to summon the touch diagnostic. activeOpacity 1 so there is no
+            visual hint that the title is pressable at all. */}
+        <TouchableOpacity
+          style={styles.titleWrap}
+          activeOpacity={1}
+          delayLongPress={900}
+          onLongPress={() => { setShowDiag(v => !v); setLastTouch(null); }}>
+          <Text style={styles.title} numberOfLines={1}>{game.icon} {game.title}</Text>
+        </TouchableOpacity>
         {/* Spacer to keep the title visually centered against the back button. */}
         <View style={styles.backBtn} />
       </View>
       <GameErrorBoundary title={game.title}>
         <Game sportKeys={sportKeys} categoryEmoji={categoryEmoji} />
       </GameErrorBoundary>
+      {showDiag && <TouchDiagnostic lastTouch={lastTouch} hostW={host.w} hostH={host.h} />}
     </SafeAreaView>
   );
 }
@@ -97,5 +193,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
   backBtn: { minWidth: 92 },
   backText: { color: t.accentText, fontSize: 16, fontWeight: '800' },
-  title: { color: t.textPrimary, fontSize: 16, fontWeight: '900', flex: 1, textAlign: 'center' },
+  titleWrap: { flex: 1 },
+  title: { color: t.textPrimary, fontSize: 16, fontWeight: '900', textAlign: 'center' },
 });

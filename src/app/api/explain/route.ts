@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeImage } from './visionProvider';
+import { getNhlContextLine } from './nhlContext';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
 import { getNationsCupMatch } from './zylaProvider';
@@ -289,6 +290,9 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   let play = 'A key play just happened';
   let gameContext = 'Live game in progress';
   let homeTeam = '', awayTeam = '';
+  // Date + team abbreviations, captured for sports whose enricher needs to find the same game in
+  // another provider's schedule (NHL today). Undefined everywhere else → callers unaffected.
+  let espnMeta: { date: string; home: string; away: string } | undefined;
 
   const cfg = espnConfig[sport];
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
@@ -379,6 +383,8 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
         awayTeam = teamName(comp, 'away');
         play = comp?.situation?.lastPlay?.text || comp?.lastPlay?.text || play;
         gameContext = `${awayTeam} vs ${homeTeam} — ${game.status?.type?.shortDetail || ''}`;
+        const abbr = (side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.abbreviation || '');
+        if (game.date && abbr('home') && abbr('away')) espnMeta = { date: String(game.date), home: abbr('home'), away: abbr('away') };
 
         // MLB deep dive for play-by-play text.
         if (sport === 'mlb' && game.id && !skipPlayLookup) {
@@ -411,7 +417,7 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
     console.error('Data fetch error:', e);
   }
 
-  return { play, gameContext, homeTeam, awayTeam };
+  return { play, gameContext, homeTeam, awayTeam, espnMeta };
 }
 
 // Post-Game Recap (premium #1) — gather the FINAL-game facts the recap is allowed to use.
@@ -428,6 +434,52 @@ type RecapData = {
 };
 
 const SOCCER_RECAP_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
+
+// ── Fallback fact sources ────────────────────────────────────────────────────────────────────────
+// ESPN does not populate `leaders` or `scoringPlays` for every sport. MLB is the case that exposed
+// it: on the baseball summary `leaders` is literally null and `scoringPlays` is absent, so a
+// baseball recap got ZERO facts and leaned entirely on whether the AP article had been filed yet.
+// When it had not, the model correctly reported that it had nothing — which is how a real final
+// (Marlins 1 - Cubs 2, 2026-09-24) rendered as "no detailed play or stat data available" while
+// three scoring plays and both pitching lines sat one field away in the SAME response.
+//
+// Both helpers are ADDITIVE and only run when the primary bucket came back empty, so every sport
+// that already had leaders/scoringPlays is byte-identical to before. Neither invents anything: each
+// reads text ESPN wrote.
+function scoringPlaysFromPlayByPlay(sum: any): string[] {
+  const out: string[] = [];
+  for (const p of (sum?.plays || [])) {
+    if (!p?.scoringPlay || !p?.text) continue;
+    const per = p.period || {};
+    const half = [per.type, per.number].filter(Boolean).join(' ').trim();  // e.g. "Bottom 5"
+    out.push(half ? `${half}: ${String(p.text)}` : String(p.text));
+  }
+  return out;
+}
+
+// One line per team's STARTING pitcher, read from the boxscore's per-player tables. Labels are
+// positional (`labels` + a parallel `stats` array), so values are looked up by label name rather
+// than by index — ESPN reorders these between sports and seasons.
+function pitchingLinesFromBoxscore(sum: any): string[] {
+  const out: string[] = [];
+  for (const team of (sum?.boxscore?.players || [])) {
+    const abbr = team?.team?.abbreviation || team?.team?.displayName || '';
+    for (const grp of (team?.statistics || [])) {
+      if (grp?.type !== 'pitching') continue;
+      const labels: string[] = Array.isArray(grp?.labels) ? grp.labels : [];
+      const a = (grp?.athletes || [])[0];
+      const name = a?.athlete?.displayName;
+      if (!name || !Array.isArray(a?.stats)) break;
+      const val = (k: string) => { const i = labels.indexOf(k); return i >= 0 ? a.stats[i] : undefined; };
+      const bits = (['IP', 'H', 'R', 'BB', 'K'] as const)
+        .map(k => { const v = val(k); return v ? `${v} ${k}` : ''; })
+        .filter(Boolean);
+      if (bits.length) out.push(`${name}${abbr ? ` (${abbr})` : ''}: ${bits.join(', ')}`);
+      break;
+    }
+  }
+  return out;
+}
 
 // Soccer-only: pull the EXACT goal tally (from keyEvents) + real boxscore team stats out of the SAME
 // summary response fetchRecapData already fetches. Never fabricates: a goal tally is only shown when
@@ -625,6 +677,9 @@ async function fetchRecapData(sport: string, gameId?: string): Promise<RecapData
         const rest = dedup([...leaderFacts, ...scoringFacts]).filter(f => !priority.includes(f));
         out.summaryFacts = [...priority, ...rest].slice(0, 16);
       } else {
+        // Fill from the play-by-play / boxscore ONLY when ESPN left the primary buckets empty.
+        if (scoringFacts.length === 0) scoringFacts.push(...scoringPlaysFromPlayByPlay(sum));
+        if (leaderFacts.length === 0) leaderFacts.push(...pitchingLinesFromBoxscore(sum));
         out.summaryFacts.push(...leaderFacts, ...scoringFacts);
       }
     }
@@ -670,8 +725,8 @@ function buildRecapPrompt(data: RecapData, sport: string, level: string, languag
   //     to before. Sports without an article regress nowhere.
   const hasArticle = !!data.articleLede;
   const cardinalRule = hasArticle
-    ? `CARDINAL RULE — GROUND IN THE AP RECAP. The Official AP recap in the DATA below IS authoritative source narrative — use the significance, turning points, and standout performances it describes. Do NOT add anything beyond what the AP recap + stats support, and CRITICALLY do NOT reproduce the AP recap's wording — rewrite it in your own plain, ${level}-appropriate language. Never invent plays, players, scores, or stats the AP recap and data don't contain. If a field isn't supported by the AP recap or the stats, return an EMPTY STRING "". Explain any jargon in plain terms.`
-    : `CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms.`;
+    ? `CARDINAL RULE — GROUND IN THE AP RECAP. The Official AP recap in the DATA below IS authoritative source narrative — use the significance, turning points, and standout performances it describes. Do NOT add anything beyond what the AP recap + stats support, and CRITICALLY do NOT reproduce the AP recap's wording — rewrite it in your own plain, ${level}-appropriate language. Never invent plays, players, scores, or stats the AP recap and data don't contain. If a field isn't supported by the AP recap or the stats, return an EMPTY STRING "". Explain any jargon in plain terms. NAMES AS WRITTEN — reproduce every player, team and place name EXACTLY as it appears in the data. Do NOT add a first name, nickname, position, handedness or jersey number the data does not contain: a play line that reads \"Suzuki homered to center\" must stay \"Suzuki\", never \"Ryosuke Suzuki\" or \"right-fielder Suzuki\". Guessing the rest of a real athlete's name is a factual error, not a stylistic flourish.`
+    : `CARDINAL RULE — NEVER FABRICATE. Recap ONLY what the DATA below supports. If the data does not clearly show a turning point, a standout performer, or the significance, return an EMPTY STRING "" for that field. Never invent plays, players, scores, stats, or narrative. A short honest recap is correct; a confident made-up one is a failure. Leading with the most significant fact means ORDERING the real facts by importance — it NEVER means adding importance, records, or drama the data doesn't contain. Explain any jargon in plain terms. NAMES AS WRITTEN — reproduce every player, team and place name EXACTLY as it appears in the data. Do NOT add a first name, nickname, position, handedness or jersey number the data does not contain: a play line that reads \"Suzuki homered to center\" must stay \"Suzuki\", never \"Ryosuke Suzuki\" or \"right-fielder Suzuki\". Guessing the rest of a real athlete's name is a factual error, not a stylistic flourish.`;
   const system = `You are a sports broadcaster writing a post-game recap for a ${level}-level viewer (someone newer to ${sport}).${langLine}
 ${cardinalRule}${goalRule}`;
   const facts = data.summaryFacts.length ? data.summaryFacts.map(f => `- ${f}`).join('\n') : '(no detailed play/stat data available for this game)';
@@ -753,7 +808,7 @@ function buildPitchLine(seq: PitchEvent[]): string {
   return parts.length ? `Last pitch: ${parts.join(', ')}` : '';
 }
 
-export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false, pitchLine = ''): string {
+export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false, pitchLine = '', hockeyLine = ''): string {
   const target = lessonTargets[level] || lessonTargets['beginner'];
 
   // Generic-teaching addendum — appended ONLY for the cacheable path (forCache). A cached situation
@@ -778,12 +833,23 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
   // The delivery data gives batter/bowler/outcome (+ dismissal kind) but NOTHING about how the ball
   // was bowled or hit, so the model invents line/length and shot type (Gate 1.5: ~4-5 of 16 outputs).
   // Redirect to where the teaching actually lives rather than merely forbidding.
+  // Hockey grounding, mirroring the cricket clause and the MLB pitch conditional. ESPN's hockey play
+  // text is a bare sentence ("X faceoff won against Y") with no zone and no location, and the model
+  // was filling that vacuum with invented technique and an invented zone — the same failure measured
+  // in cricket. Two modes: with real league data present, say it is quotable and cap it there; with
+  // none, forbid the details outright and redirect to what CAN be taught.
+  const hockeyGrounding = sport !== 'nhl'
+    ? ''
+    : hockeyLine
+      ? ` HOCKEY GROUNDING: the "Play context" line is real league data straight from the NHL — the zone, strength and rink coordinates in it are quotable, and WHERE on the ice and AT WHAT STRENGTH a play happened is usually the most teachable thing about it, so use them when they matter. Do NOT go beyond it: no invented faceoff technique ("tied up the stick", "won it with his skates", "pivoted"), no shot type or screen that is not stated, and nothing about where the puck went next.`
+      : ` HOCKEY GROUNDING: the data gives WHO did WHAT, the period and clock — and nothing else. It does NOT tell you the zone, the location on the ice, or HOW the play was executed. Do NOT name the zone (no "defensive zone faceoff") and do NOT invent technique (no "tied up the stick", "won it back with his skates", "pivoted to a waiting defenseman"), shot type, or what happened next. Teach from what IS known — what this event type is for, what the score and clock make it worth, what it typically sets up.`;
+
   const cricketGrounding = sport === 'cricket'
     ? ` CRICKET GROUNDING: the data gives the batter, bowler, and outcome — and on a wicket, who is out and the dismissal kind. It does NOT tell you how the ball was bowled or how it was hit. Do NOT invent the delivery's line or length (no "fuller ball", "short", "yorker", "wide line"), the shot played (no "lofted drive", "mistimed pull", "cut"), or any dismissal mechanics beyond the stated kind. Teach from the match situation — the phase, the required rate, the batter's form, what the outcome means for the game.`
     : '';
 
   return `Sport: ${sport.toUpperCase()}
-Game situation: ${gameContext}
+Game situation: ${gameContext}${hockeyLine ? `\n${hockeyLine}` : ''}
 Play data: "${play}"${pitchLine ? `\n${pitchLine}` : ''}
 
 STEP 1 — Choose the lesson (reason silently; do NOT put this reasoning in the output):
@@ -810,7 +876,7 @@ Rules for JSON flags:
 - "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
 - If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
 
-CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${genericRule}`;
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${hockeyGrounding}${genericRule}`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
@@ -1155,13 +1221,13 @@ export function applyExpertNuclearOption(parsed: any, level: string): any {
 // apply the expert guard. Shared by POST and the local lesson-test harness so the
 // harness exercises the EXACT prompts/flow (not a copy).
 export async function explainPlay(
-  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false, pitchLine = '',
+  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false, pitchLine = '', hockeyLine = '',
 ): Promise<any> {
   const completion = await createChatCompletion({
     model: GROQ_MODEL,
     messages: [
       { role: 'system', content: buildSystemPrompt(sport, level, language) },
-      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache, pitchLine) },
+      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache, pitchLine, hockeyLine) },
     ],
     temperature: level === 'expert' ? 0.2 : 0.6,
     response_format: { type: 'json_object' },
@@ -1521,6 +1587,7 @@ export async function POST(req: NextRequest) {
     let play: string, gameContext: string, homeTeam: string, awayTeam: string;
     let eKey: string | null = null;   // situation-cache key — set ONLY for cacheable English soccer requests
     let pitchLine = '';               // one "Last pitch:" line — set ONLY for enriched MLB (real pitchSequence)
+    let hockeyLine = '';              // one "Play context:" line — set ONLY for NHL, from the league's own feed
     if (enriched) {
       homeTeam = enriched.homeTeam;
       awayTeam = enriched.awayTeam;
@@ -1548,6 +1615,16 @@ export async function POST(req: NextRequest) {
       const fetched = await fetchGameData(sport, gameId, !!playText, playKey);
       play = playText || fetched.play;
       ({ gameContext, homeTeam, awayTeam } = fetched);
+      // NHL: ESPN's play sentence carries no zone or location, which is precisely the gap the model
+      // was filling by guessing. Ask the league's own feed for the real thing. Best-effort and
+      // time-boxed — '' on any failure, and the prompt then FORBIDS those details instead.
+      const espnMeta = ('espnMeta' in fetched) ? fetched.espnMeta : undefined;
+      // LIVE plays only. With an explicit playText the user tapped a specific past play, and the
+      // same two players can face off many times in a game — "most recent match" would then label the
+      // wrong one. No enrichment for past plays; the prompt falls back to forbidding those details.
+      if (sport === 'nhl' && gameId && espnMeta && !playText) {
+        hockeyLine = await getNhlContextLine(String(gameId), espnMeta, play);
+      }
     }
 
     // ── FREE-TIER DAILY EXPLANATION CAP — ENFORCED ───────────────────────────────────────────
@@ -1587,16 +1664,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── EXACT-PLAY CACHE — every sport the situation cache above does not already cover ─────────
+    // Different IN KIND from the soccer situation cache. That one keys on a BUCKETED situation
+    // ("red card, ~70', leading side") and is therefore replayed across DIFFERENT matches, which is
+    // exactly why its prompt has to strip out player, team and city names. This one keys on the
+    // EXACT play text inside ONE game, so a hit can only ever be the same play of the same game.
+    // That means the cached words may keep every name and detail — forCache stays `!!eKey`, i.e.
+    // false here, so the generic-teaching addendum is NOT applied.
+    //
+    // Two different strikeouts carry two different ESPN play strings and therefore occupy two
+    // different entries: a called third strike can never borrow a swinging strikeout's words, and a
+    // play from one game can never surface in another, because gameId is inside the key.
+    //
+    // It exists for LOAD, not for cost. LiveScreen re-asks every 60s for as long as the app is open,
+    // so N people watching one game cost N calls a minute for an identical play. Keyed this way the
+    // hit rate on a busy game approaches 100% with no loss of specificity — the very first viewer
+    // pays for the model call and everyone else replays their answer.
+    //
+    // playKeyFor is the SERVER's existing definition of play identity (it already decides what counts
+    // as "the same play" for the free-tier dedup), so the cache and the meter agree by construction.
+    const exactPlayKey = (!eKey && cacheIsEnabled() && gameId && play && play !== 'A key play just happened')
+      ? explainKey({ sport, level, lang: language, sig: `play:${playKeyFor(String(gameId), play)}` })
+      : null;
+    const cacheKey = eKey ?? exactPlayKey;
+
     // Situation-cache HIT: replay the cached TEACHING CORE merged with LIVE values (playType/teams/
     // gameContext/events from THIS request — never the cached moment's). Returns BEFORE the Promise.all,
     // skipping BOTH Groq calls. Miss / corrupt / non-English / null-sig → fall through to the live path.
-    if (eKey) {
-      const cached = await cacheGet(eKey);
+    if (cacheKey) {
+      const cached = await cacheGet(cacheKey);
       if (cached) {
         try {
           const t = JSON.parse(cached);
           if (t && typeof t.simple === 'string') {
-            cacheLog('[cache] explain HIT', eKey);
+            cacheLog('[cache] explain HIT', cacheKey);
             return NextResponse.json({
               simple: t.simple,
               whyItMatters: t.whyItMatters ?? '',
@@ -1614,7 +1715,7 @@ export async function POST(req: NextRequest) {
           // corrupted value → fall through to a normal live call (treat as miss)
         }
       }
-      cacheLog('[cache] explain MISS', eKey);
+      cacheLog('[cache] explain MISS', cacheKey);
     }
 
     // Run the explanation and the play-text translation concurrently (the
@@ -1622,20 +1723,20 @@ export async function POST(req: NextRequest) {
     // explainPlay builds the leveled prompts, calls the model, and applies the
     // expert guard (shared with the lesson-test harness).
     const [parsed, translatedPlay] = await Promise.all([
-      explainPlay(play, gameContext, sport, level, language, !!eKey, pitchLine),
+      explainPlay(play, gameContext, sport, level, language, !!eKey, pitchLine, hockeyLine),
       translatePlayText(play, language),
     ]);
 
     // Cache ONLY the teaching core (the situation-dependent fields) under the sig key — never the
     // moment-specific playType/gameContext/events. 6h TTL per §2e. Best-effort (cacheSet swallows errors).
-    if (eKey && typeof parsed.simple === 'string' && parsed.simple) {
-      await cacheSet(eKey, JSON.stringify({
+    if (cacheKey && typeof parsed.simple === 'string' && parsed.simple) {
+      await cacheSet(cacheKey, JSON.stringify({
         simple: parsed.simple,
         whyItMatters: parsed.whyItMatters || '',
         ruleDetail: parsed.ruleDetail || '',
         showRule: parsed.showRule ?? (level !== 'expert'),
         complexity: parsed.complexity || 'low',
-      }), 21600);
+      }), eKey ? 21600 : 10800);
     }
 
     return NextResponse.json({

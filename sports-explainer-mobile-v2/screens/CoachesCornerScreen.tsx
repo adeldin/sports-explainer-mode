@@ -58,6 +58,11 @@ import PassOrLobGame from '../components/academy/PassOrLobGame';
 import EscapeOrHeroGame from '../components/academy/EscapeOrHeroGame';
 import PaceTheChaseGame from '../components/academy/PaceTheChaseGame';
 import BowlOrChangeGame from '../components/academy/BowlOrChangeGame';
+import JamOrDriftGame from '../components/academy/JamOrDriftGame';
+import CommitOrFanGame from '../components/academy/CommitOrFanGame';
+import ExitStrategyGame from '../components/academy/ExitStrategyGame';
+import OneMorePhaseGame from '../components/academy/OneMorePhaseGame';
+import HoldShortSideGame from '../components/academy/HoldShortSideGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 import AppIcon from '../components/AppIcon';
 
@@ -106,6 +111,12 @@ const PIECE_GAME = {
   'escape-or-hero': { id: 'cc-escape-or-hero', title: 'Escape or Hero?', icon: '🌲', blurb: 'Gap width vs shot width — the 9-of-10 rule', Component: EscapeOrHeroGame, landscape: true },
   'pace-the-chase': { id: 'cc-pace-the-chase', title: 'Pace the Chase', icon: '🏏', blurb: 'Balls or wickets — which one is scarce?', Component: PaceTheChaseGame, landscape: true },
   'bowl-or-change': { id: 'cc-bowl-or-change', title: 'Bowl or Change?', icon: '🏏', blurb: 'Figures are the past; geometry is the next over', Component: BowlOrChangeGame, landscape: true },
+  // — 2026-09 rugby wave —
+  'jam-or-drift': { id: 'cc-jam-or-drift', title: 'Jam or Drift?', icon: '🏉', blurb: 'Two on one — trade grass for time', Component: JamOrDriftGame, landscape: true },
+  'commit-or-fan': { id: 'cc-commit-or-fan', title: 'Commit or Fan?', icon: '💥', blurb: 'The steal is a race — count the metres', Component: CommitOrFanGame, landscape: true },
+  'exit-strategy': { id: 'cc-exit-strategy', title: 'Exit Strategy', icon: '🥾', blurb: "Pinned in your 22 — the 9's three doors", Component: ExitStrategyGame, landscape: true },
+  'one-more-phase': { id: 'cc-one-more-phase', title: 'One More Phase?', icon: '🎯', blurb: 'Fix their 13, then cash the edge', Component: OneMorePhaseGame, landscape: true },
+  'hold-short-side': { id: 'cc-hold-short-side', title: 'Hold the Short Side?', icon: '🚧', blurb: 'Why the quiet strip needs a guard', Component: HoldShortSideGame, landscape: true },
 } as const;
 
 // Explorer pieces — browse-only, portrait, no scoring. Keyed by piece id; anything listed here
@@ -167,6 +178,11 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'escape-or-hero': { icon: '🌲', title: 'Escape or Hero?' },
   'pace-the-chase': { icon: '🏏', title: 'Pace the Chase' },
   'bowl-or-change': { icon: '🏏', title: 'Bowl or Change?' },
+  'jam-or-drift': { icon: '🏉', title: 'Jam or Drift?' },
+  'commit-or-fan': { icon: '💥', title: 'Commit or Fan?' },
+  'exit-strategy': { icon: '🥾', title: 'Exit Strategy' },
+  'one-more-phase': { icon: '🎯', title: 'One More Phase?' },
+  'hold-short-side': { icon: '🚧', title: 'Hold the Short Side?' },
 };
 
 export default function CoachesCornerScreen() {

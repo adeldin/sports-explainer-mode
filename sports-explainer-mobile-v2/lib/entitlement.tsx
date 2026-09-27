@@ -15,13 +15,22 @@ import {
 // useCaps); adding anything later is "wrap in an isPro check," never an entitlement rebuild.
 
 const RC_ENTITLEMENT = 'pro';
-// iOS public SDK key (safe to ship). Absent in dev/Expo Go without keys → we skip
-// configure entirely and run as a free user; nothing crashes.
-const RC_IOS_KEY: string | undefined = (Constants.expoConfig?.extra as any)?.revenueCatIosKey || undefined;
+// Public SDK keys (safe to ship), one per store. Absent in dev/Expo Go without keys —
+// or on a platform whose store isn't wired up yet — we skip configure entirely and run
+// as a free user; nothing crashes. Android goes live by filling in
+// extra.revenueCatAndroidKey (the goog_ key) in app.json; no other code change needed.
+const RC_KEY: string | undefined = Platform.select({
+  ios: (Constants.expoConfig?.extra as any)?.revenueCatIosKey,
+  android: (Constants.expoConfig?.extra as any)?.revenueCatAndroidKey,
+}) || undefined;
 
 // DEV-ONLY override: flip to true to exercise Pro-gated features (caps off, full recap, vision)
 // on a dev build WITHOUT a real purchase. NO effect in production (__DEV__ is false). Off by default.
 const DEV_FORCE_PRO = false;
+
+// True when this platform's store is wired up (an SDK key is present). UI that sells or
+// restores purchases should gate on this, not on Platform.OS — stores go live per-key.
+export const RC_CONFIGURED = !!RC_KEY;
 
 // Derive { isPro, isTrial } from a RevenueCat CustomerInfo. isPro true while the `pro`
 // entitlement is active (INCLUDING the trial); isTrial true only during the trial period.
@@ -54,13 +63,13 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Dev / Expo Go without a key, or any non-iOS: no RevenueCat — run as free, never crash.
-    if (!RC_IOS_KEY || Platform.OS !== 'ios') {
+    if (!RC_KEY) {
       setLoading(false);
       return;
     }
     let mounted = true;
     try {
-      Purchases.configure({ apiKey: RC_IOS_KEY });
+      Purchases.configure({ apiKey: RC_KEY });
     } catch (e) {
       console.warn('RevenueCat configure failed:', e);
       setLoading(false);
@@ -80,13 +89,13 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
   }, [apply]);
 
   const restorePurchases = useCallback(async () => {
-    if (!RC_IOS_KEY || Platform.OS !== 'ios') return;
+    if (!RC_KEY) return;
     try { apply(await Purchases.restorePurchases()); }
     catch (e) { console.warn('RevenueCat restore failed:', e); }
   }, [apply]);
 
   const refresh = useCallback(async () => {
-    if (!RC_IOS_KEY || Platform.OS !== 'ios') return;
+    if (!RC_KEY) return;
     try { apply(await Purchases.getCustomerInfo()); }
     catch (e) { console.warn('RevenueCat refresh failed:', e); }
   }, [apply]);
@@ -108,7 +117,7 @@ export function useEntitlement(): EntitlementValue {
 // auto-renew + terms/privacy disclosure all configured in the RC dashboard, not here).
 // Dev-safe: no-op (logs) when RevenueCat isn't configured or the native UI is unavailable.
 export async function presentPaywall(): Promise<void> {
-  if (!RC_IOS_KEY || Platform.OS !== 'ios') {
+  if (!RC_KEY) {
     console.log('[paywall] RevenueCat not configured — paywall is a no-op in this build.');
     return;
   }

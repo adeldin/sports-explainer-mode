@@ -57,6 +57,12 @@ export default function App() {
   // launch gate / onboarding needs and drives the cinematic + notification plumbing.
   const { language, setLevel, notificationsEnabled, hydrated } = useAppState();
 
+  // (An earlier "orientation-change input-frame fix" toggled StatusBar.setHidden here
+  // on every dimension change. It never worked: React Native refuses setHidden under
+  // edge-to-edge — logcat shows "Ignored status bar change" — and the dead-touch bug it
+  // targeted is actually a rotation-timing race, now fixed at the source in GameHost by
+  // deferring the orientation lock. See scheduleLock() there.)
+
   // --- Gate state (launch-only, not shared) ---
   const [isAnimationComplete, setAnimationComplete] = useState(false);
   const [seenCinematic, setSeenCinematic] = useState(false);
@@ -218,8 +224,10 @@ export default function App() {
             // (bottom-tabs supports it); sized to sit intentionally next to the single-line labels.
             tabBarLabel: ({ color }) => (
               <View style={{ alignItems: 'center', marginTop: -2 }}>
-                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Coach's</Text>
-                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12 }}>Corner</Text>
+                {/* includeFontPadding is Android-only (no-op on iOS): without it Android adds
+                    ascent padding that clips the second line at this tight lineHeight. */}
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12, includeFontPadding: false }}>Coach's</Text>
+                <Text style={{ color, fontSize: 10, fontWeight: '600', lineHeight: 12, includeFontPadding: false }}>Corner</Text>
               </View>
             ),
           }}
