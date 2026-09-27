@@ -844,6 +844,15 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
       ? ` HOCKEY GROUNDING: the "Play context" line is real league data straight from the NHL — the zone, strength and rink coordinates in it are quotable, and WHERE on the ice and AT WHAT STRENGTH a play happened is usually the most teachable thing about it, so use them when they matter. Do NOT go beyond it: no invented faceoff technique ("tied up the stick", "won it with his skates", "pivoted"), no shot type or screen that is not stated, and nothing about where the puck went next.`
       : ` HOCKEY GROUNDING: the data gives WHO did WHAT, the period and clock — and nothing else. It does NOT tell you the zone, the location on the ice, or HOW the play was executed. Do NOT name the zone (no "defensive zone faceoff") and do NOT invent technique (no "tied up the stick", "won it back with his skates", "pivoted to a waiting defenseman"), shot type, or what happened next. Teach from what IS known — what this event type is for, what the score and clock make it worth, what it typically sets up.`;
 
+  // Football grounding. ESPN's play text names the GAP a run went through using the same words as
+  // offensive-line positions, and the model read one as the other: "C.Skattebo left tackle to NYG 34"
+  // came back as "C.Skattebo, a left tackle, ran the ball forward" — Skattebo is a running back. To a
+  // football viewer that single clause discredits the whole explanation, which is exactly the audience
+  // this app is for.
+  const footballGrounding = (sport === 'nfl' || sport === 'cfb')
+    ? ` FOOTBALL GROUNDING: "left end", "left tackle", "left guard", "up the middle", "right guard", "right tackle" and "right end" name the GAP the runner went through — they are NOT the ball carrier's position. "C.Skattebo left tackle" means he ran through the left-tackle gap; it does not make him a left tackle. Likewise "short left", "deep middle" and the rest describe WHERE the ball was thrown, not the receiver's role, and "(Shotgun)" / "(No Huddle)" describe formation or tempo. The data contains NO player positions, so never state or imply one. Teach the down and distance, the field position, and what the gain or loss sets up.`
+    : '';
+
   const cricketGrounding = sport === 'cricket'
     ? ` CRICKET GROUNDING: the data gives the batter, bowler, and outcome — and on a wicket, who is out and the dismissal kind. It does NOT tell you how the ball was bowled or how it was hit. Do NOT invent the delivery's line or length (no "fuller ball", "short", "yorker", "wide line"), the shot played (no "lofted drive", "mistimed pull", "cut"), or any dismissal mechanics beyond the stated kind. Teach from the match situation — the phase, the required rate, the batter's form, what the outcome means for the game.`
     : '';
@@ -876,7 +885,7 @@ Rules for JSON flags:
 - "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
 - If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
 
-CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${hockeyGrounding}${genericRule}`;
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${hockeyGrounding}${footballGrounding}${genericRule}`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
