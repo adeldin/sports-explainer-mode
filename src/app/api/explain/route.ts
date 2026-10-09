@@ -293,6 +293,9 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
   // Date + team abbreviations, captured for sports whose enricher needs to find the same game in
   // another provider's schedule (NHL today). Undefined everywhere else → callers unaffected.
   let espnMeta: { date: string; home: string; away: string } | undefined;
+  // One line of REAL context pulled from data already in the response we just fetched. Basketball
+  // fills it today; see the assignment below for why.
+  let contextLine = '';
 
   const cfg = espnConfig[sport];
   if (!cfg) return { play, gameContext, homeTeam, awayTeam };
@@ -386,6 +389,25 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
         const abbr = (side: string) => String(comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.abbreviation || '');
         if (game.date && abbr('home') && abbr('away')) espnMeta = { date: String(game.date), home: abbr('home'), away: abbr('away') };
 
+        // BASKETBALL: the scoreboard's lastPlay already carries the official play TYPE and the TEAM,
+        // and both were being thrown away. The cost of discarding them was real: ESPN's text reads
+        // "Luka Garza misses 12-foot two point shot" while the type says "Turnaround Fade Away Jump
+        // Shot", and the text names no team at all — so the model was answering "the Celtics don't
+        // score" purely from its own memory of which roster Garza is on. It happened to be right.
+        // That is a guess presented as fact, the same failure as the invented hockey zone, and it
+        // will eventually land on a traded player or a rookie. Both fields are free: they are in the
+        // response this function already fetched, so no extra request.
+        if (BASKETBALL.has(sport)) {
+          const lp: any = comp?.situation?.lastPlay;
+          const typeText = String(lp?.type?.text || '').trim();
+          const teamId = lp?.team?.id;
+          const teamName = teamId
+            ? String(comp?.competitors?.find((c: any) => String(c?.team?.id) === String(teamId))?.team?.displayName || '')
+            : '';
+          const bits = [typeText, teamName && `${teamName} possession`].filter(Boolean);
+          if (bits.length) contextLine = `Play context (ESPN): ${bits.join(' · ')}.`;
+        }
+
         // MLB deep dive for play-by-play text.
         if (sport === 'mlb' && game.id && !skipPlayLookup) {
           const sumRes = await fetch(
@@ -417,7 +439,7 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
     console.error('Data fetch error:', e);
   }
 
-  return { play, gameContext, homeTeam, awayTeam, espnMeta };
+  return { play, gameContext, homeTeam, awayTeam, espnMeta, contextLine };
 }
 
 // Post-Game Recap (premium #1) — gather the FINAL-game facts the recap is allowed to use.
@@ -432,6 +454,10 @@ type RecapData = {
   // (golf/rugby) and on any error → graceful, matches the existing "thin → honest recap" path.
   articleHeadline: string; articleLede: string; articleLink: string;
 };
+
+const BASKETBALL: ReadonlySet<string> = new Set(['nba', 'wnba', 'cbb']);
+// Same membership, exported shape used by the prompt builder (which lives above fetchGameData).
+const BASKETBALL_PROMPT = BASKETBALL;
 
 const SOCCER_RECAP_KEYS = ['soccer', 'worldcup', 'epl', 'laliga'];
 
@@ -808,7 +834,7 @@ function buildPitchLine(seq: PitchEvent[]): string {
   return parts.length ? `Last pitch: ${parts.join(', ')}` : '';
 }
 
-export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false, pitchLine = '', hockeyLine = ''): string {
+export function buildUserPrompt(play: string, gameContext: string, sport: string, level: string, forCache = false, pitchLine = '', contextLine = ''): string {
   const target = lessonTargets[level] || lessonTargets['beginner'];
 
   // Generic-teaching addendum — appended ONLY for the cacheable path (forCache). A cached situation
@@ -840,7 +866,7 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
   // none, forbid the details outright and redirect to what CAN be taught.
   const hockeyGrounding = sport !== 'nhl'
     ? ''
-    : hockeyLine
+    : contextLine
       ? ` HOCKEY GROUNDING: the "Play context" line is real league data straight from the NHL — the zone, strength and rink coordinates in it are quotable, and WHERE on the ice and AT WHAT STRENGTH a play happened is usually the most teachable thing about it, so use them when they matter. Do NOT go beyond it: no invented faceoff technique ("tied up the stick", "won it with his skates", "pivoted"), no shot type or screen that is not stated, and nothing about where the puck went next.`
       : ` HOCKEY GROUNDING: the data gives WHO did WHAT, the period and clock — and nothing else. It does NOT tell you the zone, the location on the ice, or HOW the play was executed. Do NOT name the zone (no "defensive zone faceoff") and do NOT invent technique (no "tied up the stick", "won it back with his skates", "pivoted to a waiting defenseman"), shot type, or what happened next. Teach from what IS known — what this event type is for, what the score and clock make it worth, what it typically sets up.`;
 
@@ -853,12 +879,23 @@ export function buildUserPrompt(play: string, gameContext: string, sport: string
     ? ` FOOTBALL GROUNDING: "left end", "left tackle", "left guard", "up the middle", "right guard", "right tackle" and "right end" name the GAP the runner went through — they are NOT the ball carrier's position. "C.Skattebo left tackle" means he ran through the left-tackle gap; it does not make him a left tackle. Likewise "short left", "deep middle" and the rest describe WHERE the ball was thrown, not the receiver's role, and "(Shotgun)" / "(No Huddle)" describe formation or tempo. The data contains NO player positions, so never state or imply one. Teach the down and distance, the field position, and what the gain or loss sets up.`
     : '';
 
+  // Basketball grounding. ESPN's play text names a player but NOT his team, and the model filled
+  // that in from memory — "the Celtics don't score on this possession" for a line that reads only
+  // "Luka Garza misses 12-foot two point shot". It was right that time; it will not be on a traded
+  // player. The scoreboard carries the team and the official play type, so the fix is to hand both
+  // over and forbid guessing the rest.
+  const basketballGrounding = !BASKETBALL_PROMPT.has(sport)
+    ? ''
+    : contextLine
+      ? ` BASKETBALL GROUNDING: the "Play context" line is real ESPN data — the play type and the team in possession are quotable, and the play type is often more specific than the sentence (a "12-foot two point shot" may be recorded as a turnaround fadeaway). Do NOT go further: no invented defender, no screen or pick that is not stated, no spot on the floor beyond the distance given, and never a player's position.`
+      : ` BASKETBALL GROUNDING: the data names the player and the outcome and NOTHING else. CRITICAL: the game situation lists BOTH teams, but it does NOT say which of them this player plays for — so do not assign him to either. Write "his team", "the shooting team" or "the other side"; never "the Celtics lose that possession" when nothing states he is a Celtic. Rosters change and your memory of them is not data. Likewise do not give a player a position, invent a defender or a screen, or place the shot anywhere beyond a distance the text states. Teach from the score, the clock, and what this play type means for possession.`;
+
   const cricketGrounding = sport === 'cricket'
     ? ` CRICKET GROUNDING: the data gives the batter, bowler, and outcome — and on a wicket, who is out and the dismissal kind. It does NOT tell you how the ball was bowled or how it was hit. Do NOT invent the delivery's line or length (no "fuller ball", "short", "yorker", "wide line"), the shot played (no "lofted drive", "mistimed pull", "cut"), or any dismissal mechanics beyond the stated kind. Teach from the match situation — the phase, the required rate, the batter's form, what the outcome means for the game.`
     : '';
 
   return `Sport: ${sport.toUpperCase()}
-Game situation: ${gameContext}${hockeyLine ? `\n${hockeyLine}` : ''}
+Game situation: ${gameContext}${contextLine ? `\n${contextLine}` : ''}
 Play data: "${play}"${pitchLine ? `\n${pitchLine}` : ''}
 
 STEP 1 — Choose the lesson (reason silently; do NOT put this reasoning in the output):
@@ -885,7 +922,7 @@ Rules for JSON flags:
 - "complexity": "high" if the play is rare or very difficult to understand; "low" for routine plays.
 - If the play is routine/boring, keep the lesson modest and brief — do NOT invent significance or over-teach.
 
-CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${hockeyGrounding}${footballGrounding}${genericRule}`;
+CRITICAL GROUNDING RULE: Teach the lesson using ONLY facts present in the play data and game situation provided. Do NOT invent specifics that aren't stated — do not name ${forbiddenList} that isn't in the data. If you don't know the specific mechanism, teach the general principle WITHOUT inventing details (e.g. "pitchers often use a pitch like this to..." not "he threw a backdoor slider to the outside corner" when the pitch/location wasn't given). Hedging words like "likely" do NOT license inventing facts — an inference must follow from what's actually stated. Check the game situation before referencing runners/base-state. Better to be slightly more general and TRUE than specific and invented.${pitchPermission}${cricketGrounding}${hockeyGrounding}${footballGrounding}${basketballGrounding}${genericRule}`;
 }
 
 // Learn Mode prompt — no specific play; explain the sport / current context.
@@ -1230,13 +1267,13 @@ export function applyExpertNuclearOption(parsed: any, level: string): any {
 // apply the expert guard. Shared by POST and the local lesson-test harness so the
 // harness exercises the EXACT prompts/flow (not a copy).
 export async function explainPlay(
-  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false, pitchLine = '', hockeyLine = '',
+  play: string, gameContext: string, sport: string, level: string, language: string = 'en', forCache = false, pitchLine = '', contextLine = '',
 ): Promise<any> {
   const completion = await createChatCompletion({
     model: GROQ_MODEL,
     messages: [
       { role: 'system', content: buildSystemPrompt(sport, level, language) },
-      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache, pitchLine, hockeyLine) },
+      { role: 'user', content: buildUserPrompt(play, gameContext, sport, level, forCache, pitchLine, contextLine) },
     ],
     temperature: level === 'expert' ? 0.2 : 0.6,
     response_format: { type: 'json_object' },
@@ -1596,7 +1633,7 @@ export async function POST(req: NextRequest) {
     let play: string, gameContext: string, homeTeam: string, awayTeam: string;
     let eKey: string | null = null;   // situation-cache key — set ONLY for cacheable English soccer requests
     let pitchLine = '';               // one "Last pitch:" line — set ONLY for enriched MLB (real pitchSequence)
-    let hockeyLine = '';              // one "Play context:" line — set ONLY for NHL, from the league's own feed
+    let contextLine = '';             // one "Play context:" line — NHL (league feed) or basketball (scoreboard)
     if (enriched) {
       homeTeam = enriched.homeTeam;
       awayTeam = enriched.awayTeam;
@@ -1628,11 +1665,13 @@ export async function POST(req: NextRequest) {
       // was filling by guessing. Ask the league's own feed for the real thing. Best-effort and
       // time-boxed — '' on any failure, and the prompt then FORBIDS those details instead.
       const espnMeta = ('espnMeta' in fetched) ? fetched.espnMeta : undefined;
+      // Basketball's context needs no extra request — fetchGameData already read it off the scoreboard.
+      if (!playText && 'contextLine' in fetched && fetched.contextLine) contextLine = fetched.contextLine;
       // LIVE plays only. With an explicit playText the user tapped a specific past play, and the
       // same two players can face off many times in a game — "most recent match" would then label the
       // wrong one. No enrichment for past plays; the prompt falls back to forbidding those details.
       if (sport === 'nhl' && gameId && espnMeta && !playText) {
-        hockeyLine = await getNhlContextLine(String(gameId), espnMeta, play);
+        contextLine = await getNhlContextLine(String(gameId), espnMeta, play);
       }
     }
 
@@ -1732,7 +1771,7 @@ export async function POST(req: NextRequest) {
     // explainPlay builds the leveled prompts, calls the model, and applies the
     // expert guard (shared with the lesson-test harness).
     const [parsed, translatedPlay] = await Promise.all([
-      explainPlay(play, gameContext, sport, level, language, !!eKey, pitchLine, hockeyLine),
+      explainPlay(play, gameContext, sport, level, language, !!eKey, pitchLine, contextLine),
       translatePlayText(play, language),
     ]);
 

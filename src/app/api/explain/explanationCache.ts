@@ -17,7 +17,7 @@ import type { NormalizedGameData, MatchEvent } from './dataProvider';
 //   ASK_NS     — bump when the Q&A ('ask') prompt changes.
 //   EXPLAIN_NS — bump when the cached live-explain teaching prompt changes.
 export const ASK_NS = 'v1';        // unchanged — preserves the proven v1:ask:* keys
-export const EXPLAIN_NS = 'v3';    // v3: teaching prompt gained hockey + football grounding clauses.
+export const EXPLAIN_NS = 'v4';    // v3: teaching prompt gained hockey + football grounding clauses.
                                    // Bumping abandons v2 entries, which is the point — v2 answers were
                                    // cached from a prompt that let the model call a running back a
                                    // "left tackle", and those would otherwise linger for their full TTL.
