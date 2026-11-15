@@ -10,6 +10,7 @@ import { useAppState, RANK_EMOJI } from '../../lib/appState';
 import { useTheme, Theme } from '../../lib/theme';
 import { getGlossary, GlossaryEntry } from '../../lib/glossary';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
 
 const CORRECT = '#34C759';
 const WRONG = '#FF3B30';
@@ -203,6 +204,7 @@ export default function MatchGame({ sportKeys, categoryEmoji }: AcademyGameProps
   const pointsPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pointsPulse.value }] }));
 
   const roundComplete = !!round && cleared.length === round.size;
+  useEffect(() => { if (roundComplete) markHappyMoment('round-complete'); }, [roundComplete]);
 
   const modeFor = (col: Col, id: string): TileMode => {
     if (cleared.includes(id)) return 'cleared';
@@ -226,7 +228,7 @@ export default function MatchGame({ sportKeys, categoryEmoji }: AcademyGameProps
       flashPointsGain(MATCH_POINTS);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setWrong({ termId, labelId });
+      setWrong({ termId, labelId }); clearHappyMoment();
       setSelected(null);
       wrongTimer.current = setTimeout(() => setWrong(null), 520);
     }

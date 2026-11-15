@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
@@ -25,6 +25,7 @@ import RankCard from '../components/RankCard';
 import GameHost from '../components/academy/GameHost';
 import SportStrip from '../components/SportStrip';
 import AppIcon from '../components/AppIcon';
+import { askForReviewIfHappy } from '../lib/reviewPrompt';
 
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
@@ -59,6 +60,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   // Which game is open full-screen (null = the home). Local state, no nav stack.
   const [activeGameId, setActiveGameId] = useState<AcademyGameId | null>(null);
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
+  const activeGameRef = useRef(activeGameId); activeGameRef.current = activeGameId; // read by the rating ask after its wait
 
   // Tap the active Academy tab while inside a game → pop back to the Academy landing (standard
   // "tap active tab = go to root"). No-op when already on the landing; switching tabs is untouched.
@@ -165,7 +167,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   if (activeGame) {
     return (
       <Animated.View key={activeGame.id} style={styles.root} entering={SlideInRight.duration(220)}>
-        <GameHost game={activeGame} sportKeys={category.sportKeys} categoryEmoji={category.emoji} onBack={() => setActiveGameId(null)} />
+        <GameHost game={activeGame} sportKeys={category.sportKeys} categoryEmoji={category.emoji} onBack={() => { setActiveGameId(null); askForReviewIfHappy(() => navigation.isFocused() && activeGameRef.current === null); }} />
       </Animated.View>
     );
   }

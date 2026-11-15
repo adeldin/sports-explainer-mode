@@ -10,6 +10,7 @@ import { useTheme, Theme } from '../../lib/theme';
 import { scheduleQuizReminder } from '../../lib/notifications';
 import QuizCard from '../QuizCard';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
 
 // Phase 1 quiz scoring: base points per correct answer, scaled by difficulty.
 const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
@@ -55,6 +56,7 @@ export default function QuizGame({ sportKeys, categoryEmoji }: AcademyGameProps)
     const prev = prevCombo.current;
     prevCombo.current = combo;
     if (combo <= prev || combo === 0) return;
+    if (combo === 5) markHappyMoment('five-in-a-row');
 
     const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
     comboScale.value = withSequence(
@@ -209,7 +211,7 @@ export default function QuizGame({ sportKeys, categoryEmoji }: AcademyGameProps)
             setCombo(c => c + 1);
             onQuizAnswered();
           }}
-          onWrong={() => { setCombo(0); onQuizAnswered(); }}
+          onWrong={() => { setCombo(0); clearHappyMoment(); onQuizAnswered(); }}
         />
       </ScrollView>
     </View>

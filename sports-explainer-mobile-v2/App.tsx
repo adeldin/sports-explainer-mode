@@ -29,6 +29,7 @@ import LiveScreen from './screens/LiveScreen';
 import AcademyScreen from './screens/AcademyScreen';
 import CoachesCornerScreen from './screens/CoachesCornerScreen';
 import SettingsTab from './screens/SettingsTab';
+import { initReviewPrompt } from './lib/reviewPrompt';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
@@ -100,6 +101,7 @@ export default function App() {
       }
     }
     initGate();
+    initReviewPrompt();
   }, []);
 
   // Hide the native splash only once state AND fonts are ready, so the first

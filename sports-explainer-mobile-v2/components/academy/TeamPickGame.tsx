@@ -18,6 +18,7 @@ import {
 } from '../../lib/espnTeams';
 import { CrestHero, CrestChoice, KitSwatches } from '../../lib/crestKitArt';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
 
 // The shared engine behind Crest Rush (crest ↔ name) and Kit Clash (colors →
 // name) — the Academy's FIRST live-data games. The team pool comes from
@@ -171,7 +172,7 @@ export default function TeamPickGame({ sportKeys, categoryEmoji, variant }: Acad
     timerHandle.current = setTimeout(() => {
       if (judgedRef.current) return;
       setChosen(TIMED_OUT);
-      setCombo(0);
+      setCombo(0); clearHappyMoment();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       onAnswered();
     }, secs * 1000);
@@ -185,6 +186,7 @@ export default function TeamPickGame({ sportKeys, categoryEmoji, variant }: Acad
     const prev = prevCombo.current;
     prevCombo.current = combo;
     if (combo <= prev || combo === 0) return;
+    if (combo === 5) markHappyMoment('five-in-a-row');
 
     const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
     comboScale.value = withSequence(
@@ -289,7 +291,7 @@ export default function TeamPickGame({ sportKeys, categoryEmoji, variant }: Acad
       setCombo(c => c + 1);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setCombo(0);
+      setCombo(0); clearHappyMoment();
     }
     onAnswered();
   };
