@@ -1,4 +1,5 @@
 import { Sport } from './api';
+import { inWindow, localDateKey } from './seasonal';
 
 // Academy content banks — used by the Academy tab's "Did You Know" card and
 // "Quick Quiz". English-only for v1 (no translation layer yet); flag for native
@@ -86,7 +87,6 @@ const FACTS: Record<Sport, string[]> = {
     "A receiver needs only ONE foot inbounds for a catch in college — the NFL requires two.",
     "'Targeting' — a hit to the head or neck — carries an automatic ejection, not just a penalty.",
     "There are about 134 teams in the FBS, the top tier of college football.",
-    "The College Football Playoff expanded to 12 teams, so conference races now decide seeding.",
     "The hashmarks are far wider apart than in the NFL, which opens up one side of the field.",
     "The Heisman Trophy goes to the season's most outstanding player, voted on by media and past winners.",
   ],
@@ -176,6 +176,39 @@ const FACTS: Record<Sport, string[]> = {
 };
 
 export default FACTS;
+
+// Seasonal Did You Know facts (RND-30): shown only inside their date window
+// ('YYYY-MM-DD' from, first day shown; until, first day NOT shown) and put first so
+// the card opens on one. Sources and CLAIMs are in the RND-30 spec in Notion.
+export interface SeasonalFact {
+  sport: Sport;
+  from: string;
+  until: string;
+  text: string;
+}
+
+const NBA_CUP = { sport: 'nba' as Sport, from: '2026-10-30', until: '2026-12-12' };
+const CFP = { sport: 'cfb' as Sport, from: '2026-12-06', until: '2027-01-26' };
+
+export const SEASONAL_FACTS: SeasonalFact[] = [
+  { ...NBA_CUP, text: "On an NBA Cup Night, every NBA game being played is a Cup game." },
+  { ...NBA_CUP, text: "Only 8 of the 30 NBA teams reach the NBA Cup knockout rounds: the six group winners and two wild cards." },
+  { ...NBA_CUP, text: "The NBA Cup final is the only Cup game that does not count in the standings. Every other Cup game is also a regular-season game." },
+  { ...NBA_CUP, text: "The NBA Cup final is the only Cup game played away from an NBA team's home city. This season it is at Hinkle Fieldhouse in Indianapolis." },
+  { ...CFP, text: "First-round College Football Playoff games are played on campus, at the higher seed's home stadium." },
+  { ...CFP, text: "The College Football Playoff bracket is never reseeded. Once it is set on Selection Day, it stays the same all the way to the title game." },
+  { ...CFP, text: "The committee does not move teams around to avoid rematches, even if two teams played in the regular season or share a conference." },
+  { ...CFP, text: "The top seeds in the College Football Playoff get to pick which bowl hosts their quarterfinal." },
+  { ...CFP, text: "This is the last 12-team College Football Playoff. Starting with the 2027-28 season, the field grows to 24 teams." },
+];
+
+// Facts pooled across a category's league keys, with in-window seasonal facts first.
+// `pinned` is how many seasonal facts lead the list (0 outside every window).
+export function factsFor(sportKeys: Sport[], today: string = localDateKey()): { facts: string[]; pinned: number } {
+  const seasonal = SEASONAL_FACTS.filter(f => sportKeys.includes(f.sport) && inWindow(f, today)).map(f => f.text);
+  const normal = sportKeys.flatMap(k => FACTS[k] || []);
+  return { facts: [...seasonal, ...normal], pinned: seasonal.length };
+}
 
 export type QuizQuestion = {
   q: string;
