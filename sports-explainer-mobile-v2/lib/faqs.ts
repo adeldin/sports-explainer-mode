@@ -1,4 +1,5 @@
 import { Sport, Language } from './api';
+import { inWindow, localDateKey } from './seasonal';
 
 // Per-sport "Common Questions" — the "new to this sport, start here" entry point.
 // Pre-translated into all 10 languages so the entry-point text renders instantly,
@@ -899,3 +900,102 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
     ],
   },
 };
+
+// ---------------------------------------------------------------------------
+// Seasonal FAQ entries (RND-30): question plus a written, checked English answer,
+// shown only inside their date window and pinned to the top of that sport's list.
+// Sources and CLAIMs are in the RND-30 spec in Notion. Matched on the exact sport
+// key, so NBA Cup entries never reach the WNBA list (which reuses the NBA questions).
+export interface SeasonalFaq {
+  sport: Sport;          // 'nba' or 'cfb'; never added to the shared BASE_FAQS lists
+  from: string;          // 'YYYY-MM-DD', first day shown
+  until: string;         // 'YYYY-MM-DD', first day NOT shown
+  question: string;      // English
+  answer: string;        // English, checked text from the spec
+  existing?: boolean;    // true = question already in the list; only attach the answer
+}
+
+const NBA_CUP = { sport: 'nba' as Sport, from: '2026-10-30', until: '2026-12-12' };
+const CFP = { sport: 'cfb' as Sport, from: '2026-12-06', until: '2027-01-26' };
+
+export const SEASONAL_FAQS: SeasonalFaq[] = [
+  // NBA Cup (nba only, not WNBA)
+  {
+    ...NBA_CUP,
+    question: `What is the NBA Cup?`,
+    answer: `The Emirates NBA Cup is a tournament played inside the NBA regular season. All 30 teams are drawn into groups of five, and the best eight teams move on to single-elimination knockout games. The winner lifts the NBA Cup trophy, and players on the eight knockout teams share a prize pool that grows the further their team goes.`,
+  },
+  {
+    ...NBA_CUP,
+    question: `Which games count as NBA Cup games?`,
+    answer: `Group games are played on Cup Nights: Fridays from late October to late November, plus two extra nights in Thanksgiving week. Every NBA game played on a Cup Night is a Cup game. Each team plays the other four teams in its group once, two at home and two away.`,
+  },
+  {
+    ...NBA_CUP,
+    question: `How do teams get out of their NBA Cup group?`,
+    answer: `The six group winners go through, plus one wild card from each conference: the second-place team with the best record in group games. If teams are tied, the first tiebreaker is their head-to-head result, then point difference in group games.`,
+  },
+  {
+    ...NBA_CUP,
+    question: `Where are the NBA Cup knockout games played?`,
+    answer: `The quarterfinals and semifinals are played at the home arena of the higher-seeded team. This season's final is at Hinkle Fieldhouse in Indianapolis, the only Cup game played outside an NBA team's home city.`,
+  },
+  {
+    ...NBA_CUP,
+    question: `Do NBA Cup games count in the standings?`,
+    answer: `Yes. Every Cup game counts in the regular-season standings except the final. The final does not count toward team records or player stats, and every team still plays 82 regular-season games.`,
+  },
+  // College Football Playoff (cfb)
+  {
+    ...CFP,
+    existing: true,
+    question: `How does the 12-team College Football Playoff work?`,
+    answer: `Twelve teams make the field: five conference champions get automatic spots and the next seven highest-ranked teams fill the rest. The top four seeds skip the first round. Seeds 5 to 12 play first-round games on the higher seed's campus, the winners move on to bowl games for the quarterfinals and semifinals, and the last two teams meet in the national championship game.`,
+  },
+  {
+    ...CFP,
+    question: `Who gets an automatic bid to the College Football Playoff?`,
+    answer: `The champions of the ACC, Big Ten, Big 12 and SEC, plus the highest-ranked champion from the American, Conference USA, MAC, Mountain West, Pac-12 or Sun Belt. Notre Dame also gets an automatic spot if it is ranked in the top 12 on Selection Day. A champion ranked outside the top 12 still gets in, at the bottom of the seeding.`,
+  },
+  {
+    ...CFP,
+    question: `Which teams get a first-round bye?`,
+    answer: `The top four seeds. Seeds come straight from the selection committee's final rankings, so the four highest-ranked teams in the field skip the first round and go straight to the quarterfinals.`,
+  },
+  {
+    ...CFP,
+    question: `Who hosts the first round of the College Football Playoff?`,
+    answer: `The higher seed hosts at its own campus stadium: No. 5 hosts No. 12, No. 6 hosts No. 11, No. 7 hosts No. 10, and No. 8 hosts No. 9.`,
+  },
+  {
+    ...CFP,
+    question: `Which bowls are part of the College Football Playoff?`,
+    answer: `Six bowls take turns hosting the quarterfinals and semifinals: the Cotton, Fiesta, Orange, Peach, Rose and Sugar Bowls. This season the Fiesta, Cotton, Peach and Rose Bowls are the quarterfinals, and the Orange and Sugar Bowls are the semifinals. The top seeds get to choose which bowl they play in.`,
+  },
+  {
+    ...CFP,
+    question: `Where is the College Football Playoff title game?`,
+    answer: `This season's national championship game is at Allegiant Stadium in Las Vegas on Monday, January 25, 2027.`,
+  },
+];
+
+// The sport's FAQ with in-window seasonal questions first, then the normal list,
+// no duplicates. Outside every window this is exactly SPORT_FAQS[sport].
+export function faqsFor(sport: Sport, today: string = localDateKey()): SportFaq {
+  const base = SPORT_FAQS[sport];
+  const live = SEASONAL_FAQS.filter(f => f.sport === sport && inWindow(f, today));
+  if (live.length === 0) return base;
+  const pinnedEn = new Set(live.map(f => f.question));
+  const pinned = live.map(f => base.questions.find(q => q.en === f.question) ?? allEn(f.question));
+  return { label: base.label, questions: [...pinned, ...base.questions.filter(q => !pinnedEn.has(q.en))] };
+}
+
+// The written English answer for a question, if one is in its window today. Matches
+// the English question text or any translation of it in the sport's list.
+export function seasonalAnswer(questionEn: string, sport: Sport, today: string = localDateKey()): string | undefined {
+  const entry = SEASONAL_FAQS.find(f => f.sport === sport && inWindow(f, today) && f.question === questionEn);
+  if (entry) return entry.answer;
+  const q = SPORT_FAQS[sport]?.questions.find(x => Object.values(x).includes(questionEn));
+  if (!q || q.en === questionEn) return undefined;
+  return SEASONAL_FAQS.find(f => f.sport === sport && inWindow(f, today) && f.question === q.en)?.answer;
+}
