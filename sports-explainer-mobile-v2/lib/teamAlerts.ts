@@ -22,6 +22,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import type { Sport } from './api';
 import { SPORT_CONFIG } from './scoreboard';
+import { trackFeature } from './usage';
 
 const STORAGE_KEY = 'followed_teams';
 
@@ -115,6 +116,7 @@ export async function followTeam(
 ): Promise<{ ok: true; scheduled: number } | { ok: false; reason: 'full' | 'permission' | 'unsupported' }> {
   const current = await loadFollowedTeams();
   if (isFollowed(current, team.sport, team.teamId)) return { ok: true, scheduled: 0 };
+  trackFeature('alerts.follow-team');
   if (current.length >= MAX_TEAMS) return { ok: false, reason: 'full' };
 
   const next = [...current, team];

@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 
 import { Sport } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { factsFor } from '../lib/facts';
+import { trackFeature } from '../lib/usage';
 
 interface Props {
   sportKeys: Sport[]; // one or more league keys; facts are pooled across them
@@ -51,6 +52,7 @@ export default function DidYouKnow({ sportKeys }: Props) {
 
   const next = () => {
     if (facts.length <= 1) return;
+    trackFeature('academy.did-you-know-next');
     opacity.value = withTiming(0, { duration: 150 }, finished => {
       if (finished) runOnJS(swap)();
     });

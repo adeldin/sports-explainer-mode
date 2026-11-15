@@ -26,6 +26,7 @@ import GameHost from '../components/academy/GameHost';
 import SportStrip from '../components/SportStrip';
 import AppIcon from '../components/AppIcon';
 import { askForReviewIfHappy } from '../lib/reviewPrompt';
+import { trackFeature } from '../lib/usage';
 
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
@@ -114,6 +115,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   };
 
   const openGame = async (id: AcademyGameId) => {
+    trackFeature(`academy.${id}`);
     await Haptics.selectionAsync();
     setActiveGameId(id);
   };
@@ -123,6 +125,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const toggleFaq = async (question: string) => {
     await Haptics.selectionAsync();
     if (activeFaq === question) { setActiveFaq(null); return; }
+    trackFeature('academy.faq');
     setActiveFaq(question);
     if (faqAnswers[question]) return; // already cached
     // Seasonal entries carry a checked English answer: show it at once in English,
@@ -144,6 +147,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const handleAsk = async () => {
     const q = askText.trim();
     if (!q || asking) return;
+    trackFeature('academy.ask');
     Keyboard.dismiss();
     setAskText('');
     setAskedQ(q);

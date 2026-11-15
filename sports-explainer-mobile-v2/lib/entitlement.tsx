@@ -9,6 +9,7 @@ import {
   explanationKey, DAILY_FREE, QA_FREE_PER_GAME,
 } from './caps';
 import { blockReviewThisSession } from './reviewPrompt';
+import { trackFeature } from './usage';
 
 // Central entitlement gate. `isPro` is the ONE boolean every premium gate consults — the
 // two free-tier caps now, the 3 premium features later. Trial users are isPro: true.
@@ -123,6 +124,7 @@ export async function presentPaywall(): Promise<void> {
     console.log('[paywall] RevenueCat not configured — paywall is a no-op in this build.');
     return;
   }
+  trackFeature('paywall.shown');
   try {
     await RevenueCatUI.presentPaywall();
   } catch (e) {

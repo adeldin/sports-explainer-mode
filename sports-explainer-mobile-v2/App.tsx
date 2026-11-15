@@ -30,6 +30,7 @@ import AcademyScreen from './screens/AcademyScreen';
 import CoachesCornerScreen from './screens/CoachesCornerScreen';
 import SettingsTab from './screens/SettingsTab';
 import { initReviewPrompt } from './lib/reviewPrompt';
+import { trackFeature } from './lib/usage';
 
 // Prevent the native splash from hiding automatically
 SplashScreen.preventAutoHideAsync();
@@ -175,7 +176,7 @@ export default function App() {
   }
 
   if (!onboardingComplete) {
-    return <Onboarding language={language} onComplete={(l, s) => { setLevel(l); setInitialSport(s); setOnboardingComplete(true); }} />;
+    return <Onboarding language={language} onComplete={(l, s) => { trackFeature('onboarding.complete'); setLevel(l); setInitialSport(s); setOnboardingComplete(true); }} />;
   }
 
   // Match the navigation container's background to our theme so tab switches and
