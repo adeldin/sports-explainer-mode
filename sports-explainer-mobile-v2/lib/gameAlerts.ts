@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import type { UpcomingGame } from './upcomingGames';
+import { trackFeature } from './usage';
 
 const STORAGE_KEY = 'starred_games';
 export const MAX_ALERTS = 32;
@@ -70,6 +71,7 @@ export async function starGame(
 ): Promise<{ ok: true } | { ok: false; reason: 'permission' | 'full' | 'past' | 'unsupported' }> {
   const now = Date.now();
   if (game.startTime <= now) return { ok: false, reason: 'past' };
+  trackFeature('alerts.star-game');
 
   const current = await loadStarred(now);
   if (current.some(g => g.id === game.id)) return { ok: true }; // already starred — idempotent

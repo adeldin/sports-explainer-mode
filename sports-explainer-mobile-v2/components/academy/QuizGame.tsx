@@ -10,6 +10,7 @@ import { useTheme, Theme } from '../../lib/theme';
 import { scheduleQuizReminder } from '../../lib/notifications';
 import QuizCard from '../QuizCard';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { trackFeature } from '../../lib/usage';
 
 // Phase 1 quiz scoring: base points per correct answer, scaled by difficulty.
 const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
@@ -91,6 +92,7 @@ export default function QuizGame({ sportKeys, categoryEmoji }: AcademyGameProps)
     if (!activityRecorded.current) {
       activityRecorded.current = true;
       streakNow = recordQuizActivity(); // returns today's updated count
+      if (streakNow >= 2) trackFeature('streak.kept');
     }
     if (notificationsEnabled && !reminderArmed.current) {
       reminderArmed.current = true;

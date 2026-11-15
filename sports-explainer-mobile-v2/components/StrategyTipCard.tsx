@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 
 import { Sport } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
 import { tipsForSport } from '../lib/strategyTips';
+import { trackFeature } from '../lib/usage';
 
 interface Props {
   sport: Sport; // the selected Coach's Corner sport; tips pooled per logical sport
@@ -52,6 +53,7 @@ export default function StrategyTipCard({ sport }: Props) {
 
   const next = () => {
     if (tips.length <= 1) return;
+    trackFeature('cc.strategy-tip-next');
     opacity.value = withTiming(0, { duration: 150 }, finished => {
       if (finished) runOnJS(swap)();
     });

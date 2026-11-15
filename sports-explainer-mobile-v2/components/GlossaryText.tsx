@@ -3,6 +3,7 @@ import { Text, StyleProp, TextStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Sport, Language } from '../lib/api';
 import { segmentText } from '../lib/glossary/segment';
+import { trackFeature } from '../lib/usage';
 
 // Renders explanation text with curated glossary terms as subtly-tappable runs.
 // English-only: for any other language — and for sports with no glossary — it falls
@@ -39,7 +40,7 @@ export default function GlossaryText({
             key={i}
             style={styles.glossaryTerm}
             suppressHighlighting
-            onPress={() => { Haptics.selectionAsync(); onToggleTerm({ term: seg.term, def: seg.def }); }}
+            onPress={() => { trackFeature('live.glossary-term'); Haptics.selectionAsync(); onToggleTerm({ term: seg.term, def: seg.def }); }}
           >
             {seg.value}
           </Text>

@@ -8,6 +8,7 @@ import { useTheme, Theme, ThemeMode } from '../lib/theme';
 import { useAppState } from '../lib/appState';
 import { RC_CONFIGURED, useEntitlement, presentPaywall } from '../lib/entitlement';
 import { UI_STRINGS } from '../lib/strings';
+import { trackFeature } from '../lib/usage';
 
 const APP_ID = '6781028656'; // SportsWise App Store ID (App Store Connect)
 const FEEDBACK_EMAIL = 'feedback@sportswise.app';
@@ -57,6 +58,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
   // Rate: prefer the native in-app review sheet; fall back to the App Store
   // "write a review" deep link (modern apps.apple.com host).
   const handleRate = async () => {
+    trackFeature('settings.rate');
     if (await StoreReview.isAvailableAsync()) {
       await StoreReview.requestReview();
       return;
@@ -90,7 +92,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
                   <Text style={styles.linkChevron}>›</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={restorePurchases}>
+              <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => { trackFeature('settings.restore'); restorePurchases(); }}>
                 <Text style={styles.linkLabel}>Restore Purchases</Text>
                 <Text style={styles.linkChevron}>›</Text>
               </TouchableOpacity>
@@ -169,7 +171,7 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
                 setNotificationsEnabled(val);
                 // Off → cancel the daily reminder. On → (re)schedule (no-ops until
                 // permission is granted; a quiz will also reschedule it).
-                if (val) scheduleQuizReminder(); else cancelQuizReminder();
+                if (val) { trackFeature('settings.reminders-on'); scheduleQuizReminder(); } else cancelQuizReminder();
               }}
               trackColor={{ false: theme.borderStrong, true: theme.accent }}
               thumbColor="#fff"
@@ -181,11 +183,11 @@ export default function SettingsScreen({ onOpenMySports }: Props) {
             <Text style={styles.linkLabel}>⭐ {S.rateApp}</Text>
             <Text style={styles.linkChevron}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Share.share({ message: SHARE_MESSAGE }).catch(() => {})}>
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => { trackFeature('settings.share-app'); Share.share({ message: SHARE_MESSAGE }).catch(() => {}); }}>
             <Text style={styles.linkLabel}>↗ {S.shareApp}</Text>
             <Text style={styles.linkChevron}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => Linking.openURL(`mailto:${FEEDBACK_EMAIL}`).catch(() => {})}>
+          <TouchableOpacity style={[styles.linkRow, { marginTop: 8 }]} onPress={() => { trackFeature('settings.feedback-email'); Linking.openURL(`mailto:${FEEDBACK_EMAIL}`).catch(() => {}); }}>
             <Text style={styles.linkLabel}>✉️ {S.sendFeedback}</Text>
             <Text style={styles.linkChevron}>›</Text>
           </TouchableOpacity>

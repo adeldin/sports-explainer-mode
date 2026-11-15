@@ -21,6 +21,7 @@ import {
   BoardSummary, CrestFallback, TileResult, TIER_LABEL,
 } from './jeopardyTiles';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { trackFeature } from '../../lib/usage';
 
 // Sportswise Jeopardy — the Academy's capstone LESSON unit. A board of columns
 // (one per engine the sport supports — built by lib/jeopardy) × 5 value rows
@@ -154,6 +155,7 @@ export default function JeopardyGame({ sportKeys, categoryEmoji }: AcademyGamePr
     if (!activityRecorded.current) {
       activityRecorded.current = true;
       streakNow = recordQuizActivity(); // returns today's updated count
+      if (streakNow >= 2) trackFeature('streak.kept');
     }
     if (notificationsEnabled && !reminderArmed.current) {
       reminderArmed.current = true;

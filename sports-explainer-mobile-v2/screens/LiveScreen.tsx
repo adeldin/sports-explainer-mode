@@ -45,6 +45,7 @@ import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, RUGBY_LEAGUES, fe
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
+import { trackFeature } from '../lib/usage';
 
 // SPORTS now lives in ./lib/sports (shared with the onboarding picker).
 
@@ -595,6 +596,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
 
   const handleSportChange = async (s: Sport) => {
     if (s === sport) return;
+    trackFeature(`sport.${s}`);
     await Haptics.selectionAsync();
     setSport(s);
     setSelectedGameId(null);
@@ -612,6 +614,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   // ask answer) — so discovery can't reintroduce a stale-state bug. Same-sport just
   // reselects. Either way setSelectedGameId drives the explanation fetch.
   const openWatchNext = (rec: WatchCandidate) => {
+    trackFeature('live.watch-next');
     setWatchNext(null);
     if (rec.sport !== sport) {
       // Record the intent BEFORE switching. handleSportChange clears `games`, and the selection
@@ -672,6 +675,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   );
 
   const toggleFavorite = async (teamAbbr: string) => {
+    if (!favorites.includes(teamAbbr)) trackFeature('live.favorite-team');
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const newFavs = favorites.includes(teamAbbr)
       ? favorites.filter(f => f !== teamAbbr)
@@ -701,6 +705,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
 
   const handleShare = async () => {
     if (!result || shareData) return; // ignore taps while a capture is already in flight
+    trackFeature('live.share');
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     captureInProgress.current = false;
     setShareData({
@@ -743,6 +748,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       setQaBlocked(true);
       return;
     }
+    trackFeature(source === 'chip' ? 'live.chip' : 'live.ask');
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const id = ++qaIdRef.current;
     setAnswers(prev => [...prev, { id, question, answer: null, status: 'loading', source }]);
@@ -771,6 +777,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
   const toggleFaq = async (question: string) => {
     await Haptics.selectionAsync();
     if (activeFaq === question) { setActiveFaq(null); return; }
+    trackFeature('live.faq');
     setActiveFaq(question);
     if (faqAnswers[question]) return; // already cached
     setFaqLoading(true);
@@ -948,6 +955,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         const r = await fetchRecap(selectedSport, selectedGameId, level, language, caps.isPro);
         if (cancelled()) return;
         setRecap(r);
+        trackFeature('live.recap');
       } catch (e) {
         if (cancelled()) return;
         console.error('Recap fetch error:', e);
@@ -1075,7 +1083,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                 (locked preview for free, full flow for Pro). */}
             <TouchableOpacity
               style={styles.visionBtn}
-              onPress={() => { Haptics.selectionAsync(); setVisionOpen(true); }}
+              onPress={() => { trackFeature('live.vision'); Haptics.selectionAsync(); setVisionOpen(true); }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel={S.visionTitle}>
               <Text style={styles.visionBtnIcon}>📸</Text>
@@ -1402,7 +1410,7 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               seasonEnded={seasonEnded}
               // Fixture sports only. Tennis/golf/cricket run tournaments, so "the next game" isn't a
               // thing they have — EmptyState also guards this, but not offering it is the honest signal.
-              onFindNextGame={SPORT_CONFIG[sport]?.learnMode ? undefined : () => setFinderOpen(true)}
+              onFindNextGame={SPORT_CONFIG[sport]?.learnMode ? undefined : () => { trackFeature('live.next-game-finder'); setFinderOpen(true); }}
             />
           ) : null}
 
