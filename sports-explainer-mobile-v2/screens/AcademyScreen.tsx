@@ -60,7 +60,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   // Which game is open full-screen (null = the home). Local state, no nav stack.
   const [activeGameId, setActiveGameId] = useState<AcademyGameId | null>(null);
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
-  const activeGameRef = useRef(activeGameId); activeGameRef.current = activeGameId; // read by the rating ask after its wait
+  const activeGameRef = useRef(activeGameId); useEffect(() => { activeGameRef.current = activeGameId; }, [activeGameId]); // read by the rating ask after its wait
 
   // Tap the active Academy tab while inside a game → pop back to the Academy landing (standard
   // "tap active tab = go to root"). No-op when already on the landing; switching tabs is untouched.

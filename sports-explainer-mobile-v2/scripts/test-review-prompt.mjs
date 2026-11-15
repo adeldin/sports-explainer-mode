@@ -3,7 +3,7 @@
 import { decideReviewAsk, loadReviewRecord, REVIEW_MIN_GAP_DAYS } from '../lib/reviewDecision.ts';
 
 let pass = 0, fail = 0;
-const check = (name, cond) => { (cond ? pass++ : fail++); console.log(`  ${cond ? 'PASS' : 'FAIL'} - ${name}`); };
+const check = (name, cond) => { if (cond) pass++; else fail++; console.log(`  ${cond ? 'PASS' : 'FAIL'} - ${name}`); };
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 15, 12);
 const base = {

@@ -196,7 +196,7 @@ export default function CoachesCornerScreen() {
   const [selectedSport, setSelectedSport] = useState<Sport>(ccSports.find(s => s.enabled)?.key ?? 'soccer');
   const [activePiece, setActivePiece] = useState<CCPieceId | null>(null);
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
-  const activePieceRef = useRef(activePiece); activePieceRef.current = activePiece; // read by the rating ask after its wait
+  const activePieceRef = useRef(activePiece); useEffect(() => { activePieceRef.current = activePiece; }, [activePiece]); // read by the rating ask after its wait
 
   // Tap the active Coach's Corner tab while inside a piece → pop back to the landing screen (standard
   // "tap active tab = go to root"). No-op when already on the landing (state null), so a normal tab tap
