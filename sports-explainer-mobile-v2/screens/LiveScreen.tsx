@@ -39,7 +39,7 @@ import { useCaps, presentPaywall } from '../lib/entitlement';
 // Libs
 import { fetchExplanation, askQuestion, fetchRecap, fetchLeaderboard, fetchFeedback, fetchTennisLive, fetchTennisMatch, Sport, Level, Language, ExplanationResponse, Leaderboard, TennisLiveMatch } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
-import { SPORT_FAQS } from '../lib/faqs';
+import { faqsFor, seasonalAnswer } from '../lib/faqs';
 import { UI_STRINGS } from '../lib/strings';
 import { Game, SPORT_CONFIG, fetchScoreboard, fetchRugbyBoard, RUGBY_LEAGUES, fetchSoccerBoard, SOCCER_LEAGUES, discoverGameDays, toLocalDayString, fromLocalDayString } from '../lib/scoreboard';
 import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } from '../lib/watchNext';
@@ -773,9 +773,13 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     if (activeFaq === question) { setActiveFaq(null); return; }
     setActiveFaq(question);
     if (faqAnswers[question]) return; // already cached
+    // Seasonal entries carry a checked English answer: show it at once in English,
+    // or pass it as context so other languages translate facts instead of recalling them.
+    const written = seasonalAnswer(question, sport);
+    if (written && language === 'en') { setFaqAnswers(prev => ({ ...prev, [question]: written })); return; }
     setFaqLoading(true);
     try {
-      const answer = await askQuestion(question, sport, level, '', language);
+      const answer = await askQuestion(question, sport, level, written ?? '', language);
       setFaqAnswers(prev => ({ ...prev, [question]: answer }));
     } catch {
       setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
@@ -1653,12 +1657,12 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               the bottom; collapsed by default. */}
           <View style={styles.faqSection}>
             <TouchableOpacity style={styles.faqHeadingRow} onPress={() => setFaqSectionOpen(v => !v)} activeOpacity={0.7}>
-              <Text style={styles.faqHeading}>{SPORT_FAQS[sport].label[language]}</Text>
+              <Text style={styles.faqHeading}>{faqsFor(sport).label[language]}</Text>
               <Text style={styles.faqHeadingChevron}>{faqSectionOpen ? '▾' : '▸'}</Text>
             </TouchableOpacity>
             {faqSectionOpen && (
               <>
-                {(faqExpanded ? SPORT_FAQS[sport].questions : SPORT_FAQS[sport].questions.slice(0, 4)).map(q => {
+                {(faqExpanded ? faqsFor(sport).questions : faqsFor(sport).questions.slice(0, 4)).map(q => {
                   const text = q[language] || q.en;
                   return (
                     <View key={q.en} style={styles.faqItem}>
@@ -1676,10 +1680,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                     </View>
                   );
                 })}
-                {SPORT_FAQS[sport].questions.length > 4 && (
+                {faqsFor(sport).questions.length > 4 && (
                   <TouchableOpacity onPress={() => setFaqExpanded(v => !v)} style={styles.faqMoreBtn}>
                     <Text style={styles.faqMoreText}>
-                      {faqExpanded ? S.showLess : `${S.showMore} (${SPORT_FAQS[sport].questions.length - 4})`}
+                      {faqExpanded ? S.showLess : `${S.showMore} (${faqsFor(sport).questions.length - 4})`}
                     </Text>
                   </TouchableOpacity>
                 )}

@@ -15,7 +15,7 @@ import { askQuestion, Sport } from '../lib/api';
 import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
-import { SPORT_FAQS } from '../lib/faqs';
+import { faqsFor, seasonalAnswer } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
 import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
 import { AcademyGameId, getAcademyGame, gamesForSportKeys } from '../lib/academyGames';
@@ -123,9 +123,13 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
     if (activeFaq === question) { setActiveFaq(null); return; }
     setActiveFaq(question);
     if (faqAnswers[question]) return; // already cached
+    // Seasonal entries carry a checked English answer: show it at once in English,
+    // or pass it as context so other languages translate facts instead of recalling them.
+    const written = seasonalAnswer(question, primarySport);
+    if (written && language === 'en') { setFaqAnswers(prev => ({ ...prev, [question]: written })); return; }
     setFaqLoading(true);
     try {
-      const a = await askQuestion(question, primarySport, level, '', language);
+      const a = await askQuestion(question, primarySport, level, written ?? '', language);
       setFaqAnswers(prev => ({ ...prev, [question]: a }));
     } catch {
       setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
@@ -155,7 +159,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   // (Rank-card bar animation now lives in the shared <RankCard /> component — Gate 5A extraction.)
 
-  const faqs = SPORT_FAQS[primarySport];
+  const faqs = faqsFor(primarySport);
 
   // Games available for the current category (filters by each game's supportedSports).
   const visibleGames = gamesForSportKeys(category.sportKeys);
