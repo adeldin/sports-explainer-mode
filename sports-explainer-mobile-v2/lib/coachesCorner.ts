@@ -23,6 +23,7 @@ export type CCPieceId =
   | "review-or-save"                                     // cricket
   // — v1.5 wave 2 —
   | "rpo-give-or-pull" | "motion-man-or-zone" | "read-the-coverage"   // NFL
+  | "play-action-freeze"                                              // NFL (RND-31)
   | "infield-in-or-back" | "tag-up"                                   // MLB
   | "switch-the-play"                                                 // soccer
   | "serve-target"                                                    // tennis
@@ -74,7 +75,7 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "cricket") pieces.push("review-or-save");
 
   // wave 2 — same tier-independent rule
-  if (sport === "nfl") pieces.push("rpo-give-or-pull", "motion-man-or-zone", "read-the-coverage");
+  if (sport === "nfl") pieces.push("rpo-give-or-pull", "motion-man-or-zone", "read-the-coverage", "play-action-freeze");
   if (sport === "mlb") pieces.push("infield-in-or-back", "tag-up");
   if (isSoccer(sport)) pieces.push("switch-the-play");
   if (sport === "tennis") pieces.push("serve-target");

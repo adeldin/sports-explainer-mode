@@ -40,6 +40,7 @@ import ReviewOrSaveGame from '../components/academy/ReviewOrSaveGame';
 import RpoGiveOrPullGame from '../components/academy/RpoGiveOrPullGame';
 import MotionManOrZoneGame from '../components/academy/MotionManOrZoneGame';
 import ReadTheCoverageGame from '../components/academy/ReadTheCoverageGame';
+import PlayActionFreezeGame from '../components/academy/PlayActionFreezeGame';
 import InfieldInOrBackGame from '../components/academy/InfieldInOrBackGame';
 import TagUpGame from '../components/academy/TagUpGame';
 import SwitchThePlayGame from '../components/academy/SwitchThePlayGame';
@@ -95,6 +96,7 @@ const PIECE_GAME = {
   'rpo-give-or-pull': { id: 'cc-rpo-give-or-pull', title: 'Give or Pull?', icon: '🏈', blurb: 'RPO mesh — one defender is wrong either way', Component: RpoGiveOrPullGame, landscape: true },
   'motion-man-or-zone': { id: 'cc-motion-man-or-zone', title: 'Man or Zone?', icon: '🏃', blurb: 'Send him in motion — watch who follows', Component: MotionManOrZoneGame, landscape: true },
   'read-the-coverage': { id: 'cc-read-the-coverage', title: 'Read the Coverage', icon: '🛡️', blurb: 'Count the safeties — middle open or shut?', Component: ReadTheCoverageGame, landscape: true },
+  'play-action-freeze': { id: 'cc-play-action-freeze', title: 'Play-Action Freeze', icon: '🧊', blurb: 'The fake moves the linebackers. Find the space it leaves', Component: PlayActionFreezeGame, landscape: true },
   'infield-in-or-back': { id: 'cc-infield-in-or-back', title: 'Infield In or Back?', icon: '🧤', blurb: "Cut the run, or take the outs — not both", Component: InfieldInOrBackGame, landscape: true },
   'tag-up': { id: 'cc-tag-up', title: 'Tag and Go', icon: '⏱️', blurb: 'The first touch is the starting gun', Component: TagUpGame, landscape: true },
   'switch-the-play': { id: 'cc-switch-the-play', title: 'Switch the Play', icon: '🔄', blurb: "They all slid over — where ISN'T the defense?", Component: SwitchThePlayGame, landscape: true },
@@ -162,6 +164,7 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'rpo-give-or-pull': { icon: '🏈', title: 'Give or Pull?' },
   'motion-man-or-zone': { icon: '🏃', title: 'Man or Zone?' },
   'read-the-coverage': { icon: '🛡️', title: 'Read the Coverage' },
+  'play-action-freeze': { icon: '🧊', title: 'Play-Action Freeze' },
   'infield-in-or-back': { icon: '🧤', title: 'Infield In or Back?' },
   'tag-up': { icon: '⏱️', title: 'Tag and Go' },
   'switch-the-play': { icon: '🔄', title: 'Switch the Play' },
