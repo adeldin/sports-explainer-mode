@@ -158,9 +158,9 @@ export const SCENARIOS: PenaltyScenario[] = [
     },
     why: {
       rookie: "The other team has a player in the sin bin — 14 against your 15 for ten minutes. That's the time to go for tries, not settle for small points.",
-      beginner: "A yellow card costs the average team about seven points while it runs. Smart teams cash the advantage as tries: every defensive job now has one less body — especially in the forwards.",
+      beginner: "At the 2019 World Cup a yellow card cost the short side about two points on average, and often nothing at all. Smart teams cash the advantage as tries: every defensive job now has one less body — especially in the forwards.",
       intermediate: "The corner maul attacks the shortage directly: a seven-man pack defending a maul must borrow tacklers from the line, which opens the width. Either the maul scores or the overlap appears — it's why try rates jump during yellows.",
-      expert: "Sin-bin economics: analyses put the average points swing near seven per yellow card, and set-piece platforms are where it's harvested. The captain's job is converting a temporary numbers edge into permanent scoreboard — three points spends the penalty without spending the man advantage.",
+      expert: "Sin-bin economics: World Rugby's 2019 World Cup analysis put the average points swing at only about two per yellow card, so the edge is easy to waste, and set-piece platforms are where it's harvested. The captain's job is converting a temporary numbers edge into permanent scoreboard — three points spends the penalty without spending the man advantage.",
     },
   },
 ];

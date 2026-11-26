@@ -111,7 +111,7 @@ export const SCENARIOS: PTCScenario[] = [
         bmsg: 'ONE RUN', bsub: 'NEED 47 OFF 29 · RATE 9.7',
         olab: 'single — rate creeps up',
         t: 'Safe — and slowly losing',
-        b: 'Nothing bad happened, and that’s the trap: 47 off 29 is HARDER than 48 off 30. With a fat wicket buffer and a free sector on offer, a single spends your scarcest resource — balls — to protect your most plentiful one. Do this every ball and you’ll finish 20 short, unbeaten.',
+        b: 'Nothing bad happened, and that’s the trap: 47 off 29 is HARDER than 48 off 30. With a fat wicket buffer and a free sector on offer, a single spends your scarcest resource — balls — to protect your most plentiful one. Do this every ball and you’ll finish 18 short, unbeaten.',
       },
       defend: {
         k: 'bad', shot: { to: [348, 300], air: false }, outcome: 'dot',
@@ -178,7 +178,7 @@ export const SCENARIOS: PTCScenario[] = [
     },
     why: {
       rookie: '96 runs in 60 balls sounds huge, but they still have 8 of their 10 wickets — almost their whole team. Teams in that shape are allowed to swing hard NOW. Waiting only makes the mountain steeper.',
-      beginner: 'The rate compounds: score 6 an over for two overs and 9.6 becomes 10.8. Eight wickets means you can absorb three or four failed swings and still be fine — the buffer exists precisely so you can attack early, before ‘needed’ becomes ‘impossible’.',
+      beginner: 'The rate compounds: score 6 an over for two overs and 9.6 becomes 10.5. Eight wickets means you can absorb three or four failed swings and still be fine — the buffer exists precisely so you can attack early, before ‘needed’ becomes ‘impossible’.',
       intermediate: 'Sides needing 80–100 off the last 10 overs with 7+ wickets in hand win around 60% of the time — the position FEELS desperate and statistically isn’t. The losing pattern is inverted pacing: caution early, carnage late, when the same shots must beat set fields and better bowlers.',
       expert: 'Expected-run math: an attacking ball at ~1.6 runs/ball with 12% dismissal risk beats a rotating ball at ~0.9 with 3% risk whenever the wicket buffer covers the variance — and 8 wickets over 60 balls is enormous cover. Elite chasing sides front-load risk against the 4th/5th bowlers now rather than face the death specialists needing 12 an over.',
     },
@@ -233,7 +233,7 @@ export const SCENARIOS: PTCScenario[] = [
     },
     why: {
       rookie: 'They need 9 runs an over, which is a lot — but they only have 3 wickets left. Lose them and the game just ends. A safe single keeps the score moving WITHOUT risking a wicket. See the green wedge? That run is free.',
-      beginner: 'Flip of the last tab: now wickets are the scarce fuel. 9 an over is very gettable — a single every ball is 6, plus one boundary an over is 10. The only thing that makes 36 off 24 hard is losing a wicket, so the plan is the one that can’t lose one.',
+      beginner: 'Flip of the last tab: now wickets are the scarce fuel. 9 an over is very gettable — a single every ball is 6, and swapping one of those singles for a four makes it 9. The only thing that makes 36 off 24 hard is losing a wicket, so the plan is the one that can’t lose one.',
       intermediate: 'Risk pricing changed with the wicket count: the same 12% dismissal chance you’d happily pay with 6 wickets is ruinous with 3, because each wicket now exposes a far weaker batter to the SAME required rate. Rotation at ~3% risk keeps the win probability curve flat instead of cliff-shaped.',
       expert: 'Wickets-in-hand modeling values the 8th wicket at several times the 5th in T20 endgames — the marginal wicket is worth most exactly when few remain (ODI and T20 curves differ, but both spike at the tail). At 9.0 required, EV(rotate) ≈ EV(attack) on runs alone, so the wicket term dominates the equation entirely: take the single every time the wedge is open.',
     },

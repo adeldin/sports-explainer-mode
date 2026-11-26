@@ -90,7 +90,7 @@ export const SCEN: FourthDownScenario[] = [
     grade: {
       punt: {
         k: 'good', t: 'Punt — this is what punts are for',
-        b: "Eight yards is a low-percentage ask, and you're standing on your own 25 with a lead. The punt flips the field sixty yards and makes their offense earn every blade of grass. Boring and correct.",
+        b: "Eight yards is a low-percentage ask, and you're standing on your own 25 with a lead. The punt flips the field about forty yards and makes their offense earn every blade of grass. Boring and correct.",
       },
       go: {
         k: 'bad', t: 'A gift wrapped at your own doorstep',

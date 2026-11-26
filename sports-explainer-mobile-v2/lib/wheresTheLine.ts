@@ -82,7 +82,7 @@ export function judge(s: WTLScenario, action: WTLAction, guessX: number): WTLVer
   if (d < 0) {
     return {
       k: 'bad', tag: 'Not quite', title: "Too far forward — that's a penalty line",
-      body: "A defender standing on your line would be in front of his last teammate's back foot. The referee pings 'offside at the ruck' and marches the defense back ten meters.",
+      body: "A defender standing on your line would be in front of his last teammate's back foot. The referee pings 'offside at the ruck' and awards the attack a penalty.",
     };
   }
   return {

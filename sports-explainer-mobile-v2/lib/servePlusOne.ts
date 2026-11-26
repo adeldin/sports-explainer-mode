@@ -60,7 +60,7 @@ export const HINT_IDLE = 'Read the trail, not the ball.';
 export const HINT_DONE = 'Reset, or play the next +1.';
 export const PROMPT_DONE = 'Moving man? <b>Hit behind him.</b> Parked man? <b>Hit space — or reset.</b>';
 export const SUB = "The third shot is tennis's RPO: serve, return, <b>and now what?</b> Don't watch the ball — watch his <b>recovery trail</b>. Where he's been and how fast he's leaving tells you where ball three goes.";
-export const FOOT = 'Coach’s Corner tennis spike · first serves earn an attackable +1 ball on ~58% of points; second serves only ~23% · sometimes the kill shot is where he WAS, not where he isn’t.';
+export const FOOT = 'Coach’s Corner tennis spike · first serves win outright or set up an attacking +1 on ~58% of points; second serves only ~23% · sometimes the kill shot is where he WAS, not where he isn’t.';
 
 // A hero ball that MISSES (nets or sails) — these two get their CAUSE drawn on the court.
 export const isHeroMiss = (idx: number, opt: SP1Option): boolean =>
@@ -96,7 +96,7 @@ export const SCENARIOS: SP1Scenario[] = [
       rookie: "Look where he's standing: off the court. Hit the ball to the far corner — the open side. He can't run that far in time.",
       beginner: "The wide serve's whole job was to create this picture: him stretched outside the line, you with a short ball. The +1 into the open court wins about 8 in 10 times — it's the highest-percentage full swing in tennis.",
       intermediate: "The trail is the decision engine: dots frozen at the sideline mean zero recovery started, so space beats wrong-footing. 'Behind him' is a weapon against a RUNNER, not a statue. Match the shot to the trail, not to a slogan.",
-      expert: "First serves buy an attackable +1 on ~58% of points, and converting those at the ~82% open-court rate is what separates holding at 80% from holding at 90%. The +1 isn't a bonus ball — build the serve pattern specifically to manufacture this exact frame, and don't overthink it when it arrives.",
+      expert: "First serves win outright or set up an attacking +1 on ~58% of points, and converting the +1 balls at the ~82% open-court rate is what separates holding at 80% from holding at 90%. The +1 isn't a bonus ball — build the serve pattern specifically to manufacture this exact frame, and don't overthink it when it arrives.",
     },
   },
   {

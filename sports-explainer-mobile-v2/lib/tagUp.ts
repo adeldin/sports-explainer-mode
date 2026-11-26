@@ -168,17 +168,17 @@ export const SCEN: TagScenario[] = [
   },
   {
     tab: 'Medium fly, right field', of: 'RF', catch: [534, 118], catchT: 56, window: 7, arm: 'strong',
-    hud: ['Fly ball: medium-deep right', 'RF arm: strong — longest throw, best arms', '1 out, down a run'],
+    hud: ['Fly ball: medium-deep right', 'RF arm: strong — right field gets the best arms', '1 out, down a run'],
     verd: {
       early: { t: 'Doubled off — a razor-thin play thrown away',
         b: 'This one was going to be close ANYWAY — and you handed it away before it started. Leave a blink before the touch and the appeal at third ends the argument. Tight windows punish sloppy feet the hardest.' },
       good: { t: 'Safe — because you left ON the touch',
-        b: 'Right field is the longest throw home, but right fielders carry the best arms for exactly that reason — this was a genuine race. You won it by leaving at the first touch, not the secure catch. That half-second IS the margin.' },
+        b: 'Right fielders carry the best arms in the outfield, built for the long throw across to third — this was a genuine race. You won it by leaving at the first touch, not the secure catch. That half-second IS the margin.' },
       late: { t: 'Out — you gave the arm its head start back',
         b: 'Against a strong arm on a medium ball, the window is one beat wide: the touch. You left on the squeeze instead, and the throw arrived with the tag waiting. The race was winnable — at full price only.' },
     },
     why: {
-      rookie: 'Right fielders usually have the strongest arms because their throw home is the longest. On a medium fly to right, you can score — but only if you leave the INSTANT he touches it.',
+      rookie: 'Right fielders usually have the strongest arms because they have to make the long throw across to third base. On a medium fly to right, you can score — but only if you leave the INSTANT he touches it.',
       beginner: "'First touch, not full catch' matters most when the play is close: the ball can bobble in the glove for half a second, and that half-second belongs to you. Feet on the bag, eyes on the glove, go on contact.",
       intermediate: 'This is a true 50/50 the runner tilts with technique: left foot on the bag, body already leaning home, watching the ball into the glove himself rather than waiting for the coach\'s shout. The launch is rehearsed like a sprint start.',
       expert: 'Down a run late changes the risk math — the tying run\'s value justifies sending a coin-flip that a tie game wouldn\'t. Aggression on the bases should track the scoreboard: the same throw, same arm, same window can be a green light in one score state and red in another.',

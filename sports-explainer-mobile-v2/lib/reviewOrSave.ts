@@ -228,7 +228,7 @@ export const RS_SCENARIOS: RSScenario[] = [
       rookie: "When the cameras say the ball would only just clip the stumps, the tech isn't sure enough to overrule a human — so the umpire's original answer stands. He said not out, so this review can't win.",
       beginner: "'Umpire's call' = less than half the ball projected to hit. The on-field decision stays, and your review is handed back. Sounds harmless — but it means marginal balls can NEVER be overturned. Only review when you think it's clearly hitting, not clipping.",
       intermediate: "Around 30% of all ball-tracking reviews end umpire's call — nearly a third of challenges are structurally incapable of changing the decision. The question before reviewing is never 'might it be hitting?' It's 'would tracking show MORE than half the ball hitting?' Shaving leg fails that test by definition.",
-      expert: "Post-2023 playing conditions sweetened umpire's call — the review is retained, so the expected cost is ~zero — which is why modern captains fire more marginal reviews late in innings when tokens would otherwise expire unused. But mid-innings the calculus holds: an umpire's-call review converts 0% of the time and burns your bowler's reset window. Save it and plan the next over instead.",
+      expert: "Since 2017, playing conditions have sweetened umpire's call — the review is retained, so the expected cost is ~zero — which is why modern captains fire more marginal reviews late in innings when tokens would otherwise expire unused. But mid-innings the calculus holds: an umpire's-call review converts 0% of the time and burns your bowler's reset window. Save it and plan the next over instead.",
     },
   },
   {
