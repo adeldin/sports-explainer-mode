@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { clearHappyMoment } from '../../lib/reviewPrompt';
 
 /**
  * A module that throws must not take the app down with it.
@@ -25,6 +26,7 @@ export default class GameErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    clearHappyMoment();
     // Console is the dev-build path; the on-screen card below is the TestFlight path.
     console.error(`[Coach's Corner] ${this.props.title ?? 'module'} crashed:`, error, info.componentStack);
   }

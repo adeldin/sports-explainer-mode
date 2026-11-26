@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
@@ -15,7 +15,7 @@ import { askQuestion, Sport } from '../lib/api';
 import { useAppState } from '../lib/appState';
 import { useTheme, Theme } from '../lib/theme';
 import { UI_STRINGS } from '../lib/strings';
-import { SPORT_FAQS } from '../lib/faqs';
+import { faqsFor, seasonalAnswer } from '../lib/faqs';
 import { SPORT_FULL_NAME } from '../lib/sports';
 import { ACADEMY_CATEGORIES, AcademyCategory } from '../lib/academyCategories';
 import { AcademyGameId, getAcademyGame, gamesForSportKeys } from '../lib/academyGames';
@@ -25,6 +25,8 @@ import RankCard from '../components/RankCard';
 import GameHost from '../components/academy/GameHost';
 import SportStrip from '../components/SportStrip';
 import AppIcon from '../components/AppIcon';
+import { askForReviewIfHappy } from '../lib/reviewPrompt';
+import { trackFeature } from '../lib/usage';
 
 
 // Map a Live sport key to its Academy category (e.g. mlr → Rugby). Falls back to
@@ -59,6 +61,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   // Which game is open full-screen (null = the home). Local state, no nav stack.
   const [activeGameId, setActiveGameId] = useState<AcademyGameId | null>(null);
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
+  const activeGameRef = useRef(activeGameId); useEffect(() => { activeGameRef.current = activeGameId; }, [activeGameId]); // read by the rating ask after its wait
 
   // Tap the active Academy tab while inside a game → pop back to the Academy landing (standard
   // "tap active tab = go to root"). No-op when already on the landing; switching tabs is untouched.
@@ -112,6 +115,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   };
 
   const openGame = async (id: AcademyGameId) => {
+    trackFeature(`academy.${id}`);
     await Haptics.selectionAsync();
     setActiveGameId(id);
   };
@@ -121,11 +125,16 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const toggleFaq = async (question: string) => {
     await Haptics.selectionAsync();
     if (activeFaq === question) { setActiveFaq(null); return; }
+    trackFeature('academy.faq');
     setActiveFaq(question);
     if (faqAnswers[question]) return; // already cached
+    // Seasonal entries carry a checked English answer: show it at once in English,
+    // or pass it as context so other languages translate facts instead of recalling them.
+    const written = seasonalAnswer(question, primarySport);
+    if (written && language === 'en') { setFaqAnswers(prev => ({ ...prev, [question]: written })); return; }
     setFaqLoading(true);
     try {
-      const a = await askQuestion(question, primarySport, level, '', language);
+      const a = await askQuestion(question, primarySport, level, written ?? '', language);
       setFaqAnswers(prev => ({ ...prev, [question]: a }));
     } catch {
       setFaqAnswers(prev => ({ ...prev, [question]: S.answerError }));
@@ -138,6 +147,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   const handleAsk = async () => {
     const q = askText.trim();
     if (!q || asking) return;
+    trackFeature('academy.ask');
     Keyboard.dismiss();
     setAskText('');
     setAskedQ(q);
@@ -155,7 +165,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
 
   // (Rank-card bar animation now lives in the shared <RankCard /> component — Gate 5A extraction.)
 
-  const faqs = SPORT_FAQS[primarySport];
+  const faqs = faqsFor(primarySport);
 
   // Games available for the current category (filters by each game's supportedSports).
   const visibleGames = gamesForSportKeys(category.sportKeys);
@@ -165,7 +175,7 @@ export default function AcademyScreen({ route }: AcademyScreenProps) {
   if (activeGame) {
     return (
       <Animated.View key={activeGame.id} style={styles.root} entering={SlideInRight.duration(220)}>
-        <GameHost game={activeGame} sportKeys={category.sportKeys} categoryEmoji={category.emoji} onBack={() => setActiveGameId(null)} />
+        <GameHost game={activeGame} sportKeys={category.sportKeys} categoryEmoji={category.emoji} onBack={() => { setActiveGameId(null); askForReviewIfHappy(() => navigation.isFocused() && activeGameRef.current === null); }} />
       </Animated.View>
     );
   }

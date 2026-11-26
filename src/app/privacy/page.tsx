@@ -2,10 +2,11 @@ export default function PrivacyPolicy() {
   return (
     <main style={{ maxWidth: '720px', margin: '0 auto', padding: '40px 20px', fontFamily: 'system-ui, sans-serif' }}>
       <h1>Privacy Policy — Sports Explainer</h1>
-      <p><em>Last updated: June 2026</em></p>
+      <p><em>Last updated: November 2026</em></p>
 
       <h2>What We Collect</h2>
       <p>Sports Explainer only transmits: selected sport, game ID, explanation level, language preference, and questions you type in Ask Anything.</p>
+      <p>The apps send anonymous counts of which features are opened (the feature name and whether the phone is iPhone or Android). These counts are not linked to you or your device and are kept for about 120 days.</p>
 
       <h2>What We Do NOT Collect</h2>
       <p>We do not collect browsing history, video content, passwords, payment data, or any personal information.</p>

@@ -21,6 +21,8 @@ import {
   BoardSummary, CrestFallback, TileResult, TIER_LABEL,
 } from './jeopardyTiles';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
+import { trackFeature } from '../../lib/usage';
 
 // Sportswise Jeopardy — the Academy's capstone LESSON unit. A board of columns
 // (one per engine the sport supports — built by lib/jeopardy) × 5 value rows
@@ -121,6 +123,7 @@ export default function JeopardyGame({ sportKeys, categoryEmoji }: AcademyGamePr
     const prev = prevCombo.current;
     prevCombo.current = combo;
     if (combo <= prev || combo === 0) return;
+    if (combo === 5) markHappyMoment('five-in-a-row');
 
     const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
     comboScale.value = withSequence(
@@ -154,6 +157,7 @@ export default function JeopardyGame({ sportKeys, categoryEmoji }: AcademyGamePr
     if (!activityRecorded.current) {
       activityRecorded.current = true;
       streakNow = recordQuizActivity(); // returns today's updated count
+      if (streakNow >= 2) trackFeature('streak.kept');
     }
     if (notificationsEnabled && !reminderArmed.current) {
       reminderArmed.current = true;
@@ -245,7 +249,7 @@ export default function JeopardyGame({ sportKeys, categoryEmoji }: AcademyGamePr
       });
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setCombo(0);
+      setCombo(0); clearHappyMoment();
     }
     onAnswered();
   };

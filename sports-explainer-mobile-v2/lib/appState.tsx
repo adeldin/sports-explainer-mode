@@ -4,6 +4,7 @@ import * as Localization from 'expo-localization';
 import { Level, Language } from './api';
 import { SPORTS, orderSports, type SportTab } from './sports';
 import { DailyCapState, GameCapState, EMPTY_DAILY, EMPTY_GAME } from './caps';
+import { markHappyMoment } from './reviewPrompt';
 
 // Local YYYY-MM-DD (NOT toISOString, which is UTC and would flip the "day" across
 // timezones near midnight). Used for the daily-quiz streak's day-boundary logic.
@@ -261,6 +262,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) return points;
     const newTotal = Math.max(0, points + amount);
     setPoints(newTotal);
+    if (getRank(newTotal).name !== getRank(points).name) markHappyMoment('rank-up');
     return newTotal;
   }, [points]);
 

@@ -13,6 +13,7 @@ import { VerdictCard, NextButton } from '../FieldEngine';
 import { SIGNAL_DECODER, poolForLevel, signalSportForKeys, SignalScenario } from '../../lib/signalDecoder';
 import { SignalArt } from '../../lib/signalArt';
 import type { AcademyGameProps } from '../../lib/academyGames';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
 
 // Same scoring contract as QuizGame (the canonical award block, copied verbatim):
 // base points by the answered scenario's difficulty tier + a capped combo bonus.
@@ -121,6 +122,7 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
     const prev = prevCombo.current;
     prevCombo.current = combo;
     if (combo <= prev || combo === 0) return;
+    if (combo === 5) markHappyMoment('five-in-a-row');
 
     const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
     comboScale.value = withSequence(
@@ -224,7 +226,7 @@ export default function SignalDecoderGame({ sportKeys, categoryEmoji }: AcademyG
       setCombo(c => c + 1);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setCombo(0);
+      setCombo(0); clearHappyMoment();
     }
     onAnswered();
   };

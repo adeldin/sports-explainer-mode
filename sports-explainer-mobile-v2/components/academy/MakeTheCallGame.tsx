@@ -17,6 +17,7 @@ import { useTheme, Theme } from '../../lib/theme';
 import { scheduleQuizReminder } from '../../lib/notifications';
 import type { AcademyGameProps } from '../../lib/academyGames';
 import MakeTheCallCard from './MakeTheCallCard';
+import { markHappyMoment, clearHappyMoment } from '../../lib/reviewPrompt';
 
 // COPIED from QuizGame (values identical — reuse without touching the shipped file).
 const QUIZ_POINTS: Record<Level, number> = { kid: 5, beginner: 10, intermediate: 20, expert: 40 };
@@ -46,6 +47,7 @@ export default function MakeTheCallGame({ sportKeys, categoryEmoji }: AcademyGam
     const prev = prevCombo.current;
     prevCombo.current = combo;
     if (combo <= prev || combo === 0) return;
+    if (combo === 5) markHappyMoment('five-in-a-row');
     const isMilestone = combo === 3 || combo === 5 || combo === 7 || combo === 10;
     comboScale.value = withSequence(
       withTiming(isMilestone ? 1.3 : 1.15, { duration: isMilestone ? 180 : 120, easing: Easing.out(Easing.quad) }),
@@ -158,7 +160,7 @@ export default function MakeTheCallGame({ sportKeys, categoryEmoji }: AcademyGam
             setCombo((c) => c + 1);
             onQuizAnswered();
           }}
-          onWrong={() => { setCombo(0); onQuizAnswered(); }}
+          onWrong={() => { setCombo(0); clearHappyMoment(); onQuizAnswered(); }}
         />
       </ScrollView>
     </View>

@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Sport } from '../lib/api';
 import { useTheme, Theme } from '../lib/theme';
-import FACTS from '../lib/facts';
+import { factsFor } from '../lib/facts';
+import { trackFeature } from '../lib/usage';
 
 interface Props {
   sportKeys: Sport[]; // one or more league keys; facts are pooled across them
@@ -23,15 +24,16 @@ function randomIndex(len: number, exclude?: number): number {
 export default function DidYouKnow({ sportKeys }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  // Pool facts across every league key in the category.
-  const facts = sportKeys.flatMap(k => FACTS[k] || []);
+  // Pool facts across every league key in the category. In-window seasonal facts
+  // (e.g. NBA Cup, College Football Playoff) lead the list, and the card opens on one.
+  const { facts, pinned } = factsFor(sportKeys);
 
-  const [idx, setIdx] = useState(() => randomIndex(facts.length));
+  const [idx, setIdx] = useState(() => (pinned > 0 ? 0 : randomIndex(facts.length)));
   const opacity = useSharedValue(1);
 
-  // Fresh random fact whenever the category's keys change.
+  // Fresh fact whenever the category's keys change (seasonal one first if any).
   useEffect(() => {
-    setIdx(randomIndex(facts.length));
+    setIdx(pinned > 0 ? 0 : randomIndex(facts.length));
     opacity.value = 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportKeys.join(',')]);
@@ -50,6 +52,7 @@ export default function DidYouKnow({ sportKeys }: Props) {
 
   const next = () => {
     if (facts.length <= 1) return;
+    trackFeature('academy.did-you-know-next');
     opacity.value = withTiming(0, { duration: 150 }, finished => {
       if (finished) runOnJS(swap)();
     });

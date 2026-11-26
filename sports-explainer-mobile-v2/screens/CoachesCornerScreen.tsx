@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, SlideInRight } from 'react-native-reanimated';
@@ -65,6 +65,8 @@ import OneMorePhaseGame from '../components/academy/OneMorePhaseGame';
 import HoldShortSideGame from '../components/academy/HoldShortSideGame';
 import { coachesCornerSports, piecesForSport, CCPieceId } from '../lib/coachesCorner';
 import AppIcon from '../components/AppIcon';
+import { askForReviewIfHappy } from '../lib/reviewPrompt';
+import { trackFeature } from '../lib/usage';
 
 // The GameHost-mounted pieces, as local descriptors. GameHost doesn't read `id` (it renders
 // icon/title + the Component), so the id is just a local label; `as any` at the call site keeps it off
@@ -194,7 +196,9 @@ export default function CoachesCornerScreen() {
   const ccSports = coachesCornerSports(level);          // ALL candidates, each tagged enabled (≥ soccer always enabled)
   const [selectedSport, setSelectedSport] = useState<Sport>(ccSports.find(s => s.enabled)?.key ?? 'soccer');
   const [activePiece, setActivePiece] = useState<CCPieceId | null>(null);
+  const openPiece = (p: CCPieceId) => { trackFeature(`cc.${p}`); setActivePiece(p); };
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
+  const activePieceRef = useRef(activePiece); useEffect(() => { activePieceRef.current = activePiece; }, [activePiece]); // read by the rating ask after its wait
 
   // Tap the active Coach's Corner tab while inside a piece → pop back to the landing screen (standard
   // "tap active tab = go to root"). No-op when already on the landing (state null), so a normal tab tap
@@ -255,7 +259,7 @@ export default function CoachesCornerScreen() {
           sportKeys={[activeSport]}
           categoryEmoji={activeEntry?.emoji}
           backLabel="Coach's Corner"
-          onBack={() => setActivePiece(null)}
+          onBack={() => { setActivePiece(null); askForReviewIfHappy(() => navigation.isFocused() && activePieceRef.current === null); }}
         />
       </Animated.View>
     );
@@ -291,7 +295,7 @@ export default function CoachesCornerScreen() {
               <TouchableOpacity
                 style={styles.heroCard}
                 activeOpacity={0.85}
-                onPress={() => setActivePiece('make-the-call')}>
+                onPress={() => openPiece('make-the-call')}>
                 <Text style={styles.heroKicker}>FEATURED</Text>
                 <View style={styles.heroRow}>
                   <Text style={styles.heroIcon}>📋</Text>
@@ -312,7 +316,7 @@ export default function CoachesCornerScreen() {
             </Text>
             <View style={styles.pieceGrid}>
               {pieces.map(p => (
-                <TouchableOpacity key={p} style={styles.pieceTile} activeOpacity={0.8} onPress={() => setActivePiece(p)}>
+                <TouchableOpacity key={p} style={styles.pieceTile} activeOpacity={0.8} onPress={() => openPiece(p)}>
                   <AppIcon emoji={PIECE_META[p].icon} size={28} style={styles.pieceIcon} />
                   <Text style={styles.pieceTitle} numberOfLines={1}>{PIECE_META[p].title}</Text>
                 </TouchableOpacity>

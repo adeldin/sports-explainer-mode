@@ -2,7 +2,7 @@
   "expo": {
     "name": "SportsWise",
     "slug": "sports-explainer-mobile-v2",
-    "version": "1.9.1",
+    "version": "1.10.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -41,7 +41,8 @@
           "photosPermission": "SportsWise uses your photos so you can analyze a screenshot of the game.",
           "cameraPermission": "SportsWise uses the camera so you can analyze what's on screen."
         }
-      ]
+      ],
+      "./plugins/withAndroid16kbLibs"
     ],
     "extra": {
       "eas": {
