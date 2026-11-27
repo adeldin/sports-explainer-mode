@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeImage } from './visionProvider';
 import { getNhlContextLine } from './nhlContext';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
-import { getGameData, type PitchEvent } from './dataProvider';
+import { getGameData, latestSoccerPlayText, type PitchEvent } from './dataProvider';
 import { getNationsCupMatch } from './zylaProvider';
 import { normalizeCricsheet } from './cricsheetProvider';
 import { normalizeSportmonks } from './sportmonksProvider';
@@ -429,9 +429,7 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
             { cache: 'no-store' },
           );
           const sum = await sumRes.json();
-          const ke: any[] = sum?.keyEvents || [];
-          const comm: any[] = sum?.commentary || [];
-          play = ke[ke.length - 1]?.text || comm[comm.length - 1]?.text || play;
+          play = latestSoccerPlayText(sum) || play;
         }
       }
     }

@@ -94,6 +94,30 @@ const ESPN_CONFIG: Record<string, EspnCfg> = {
   golf: { sport: 'golf', league: 'pga', learnMode: true },
 };
 
+// Soccer "THE PLAY" text from an ESPN soccer summary. keyEvents holds only the big moments (goals,
+// cards, subs, half-time), so always taking its last entry froze the card for long quiet stretches
+// (RND-12: a 28' goal still showing at 47'). commentary[] is the minute-by-minute feed (shots, fouls,
+// corners, chances) and already contains every key event, so its newest line is the real latest
+// play. One guard: if the newest key event is not in commentary yet (the feeds can lag each other
+// mid-match), use that key event so a fresh goal is never hidden behind an older commentary line.
+type SoccerKeyEvent = { id?: string | number; text?: string };
+type SoccerCommentary = { sequence?: number; text?: string; play?: { id?: string | number } };
+export function latestSoccerPlayText(
+  sum: { keyEvents?: SoccerKeyEvent[]; commentary?: SoccerCommentary[] } | null | undefined,
+): string | undefined {
+  const ke = (sum?.keyEvents || []).filter(e => e?.text);
+  const comm = (sum?.commentary || []).filter(c => c?.text);
+  const seq = (c: SoccerCommentary) => (typeof c.sequence === 'number' ? c.sequence : -1);
+  const newestComm = comm.length
+    ? comm.reduce((a, b) => (seq(b) >= seq(a) ? b : a))
+    : undefined;
+  const lastKe = ke[ke.length - 1];
+  if (lastKe && (!newestComm || (lastKe.id != null && !comm.some(c => String(c.play?.id) === String(lastKe.id))))) {
+    return lastKe.text;
+  }
+  return newestComm?.text || lastKe?.text;
+}
+
 // THE entry point. ESPN base (always) → optional enricher merge (best-effort) → normalized shape.
 export async function getGameData(sport: string, gameId?: string): Promise<NormalizedGameData | null> {
   const base = await fetchEspnBase(sport, gameId);
@@ -209,9 +233,7 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
     if (['soccer', 'worldcup', 'epl', 'laliga', 'seriea', 'bundesliga'].includes(sport)) {
       try {
         const sum = await (await fetch(`https://site.api.espn.com/apis/site/v2/sports/${cfg.sport}/${cfg.league}/summary?event=${game.id}`, { cache: 'no-store' })).json();
-        const ke: any[] = sum?.keyEvents || [];
-        const comm: any[] = sum?.commentary || [];
-        out.lastPlay = ke[ke.length - 1]?.text || comm[comm.length - 1]?.text || out.lastPlay;
+        out.lastPlay = latestSoccerPlayText(sum) || out.lastPlay;
         // Gate D-1: pull REAL team stats from the SAME summary (no extra fetch). Mirrors the recap's
         // parsing (route.ts buildSoccerRecapExtras): key by homeAway, possessionPct is already 0–100.
         // Only attach teamStats when BOTH sides expose a given stat (else leave it undefined → honest).
