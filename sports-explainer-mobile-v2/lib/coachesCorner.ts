@@ -34,7 +34,8 @@ export type CCPieceId =
   | "pick-your-poison" | "two-for-one" | "foul-up-three"                       // NBA
   | "serve-plus-one" | "pass-or-lob"                                           // tennis
   | "escape-or-hero"                                                           // golf
-  | "pace-the-chase" | "bowl-or-change";                                       // cricket
+  | "pace-the-chase" | "bowl-or-change"                                        // cricket
+  | "attack-the-closeout";                                                     // NBA (RND-41)
 
 // Formations + read-the-play are soccer-only by construction.
 import { isSoccer, isRugby } from "./leagueGroups";
@@ -85,6 +86,9 @@ export function piecesForSport(sport: Sport, level: Level): CCPieceId[] {
   if (sport === "tennis") pieces.push("serve-plus-one", "pass-or-lob");
   if (sport === "golf") pieces.push("escape-or-hero");
   if (sport === "cricket") pieces.push("pace-the-chase", "bowl-or-change");
+  // RND-41: the first NBA offensive read. Shown at every level like the other NBA pieces
+  // (Rookie gets the labels, the closeout arrow and the shaded open lane).
+  if (sport === "nba") pieces.push("attack-the-closeout");
   return pieces;
 }
 

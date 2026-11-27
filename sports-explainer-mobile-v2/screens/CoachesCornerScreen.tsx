@@ -53,6 +53,7 @@ import WheresTheLineGame from '../components/academy/WheresTheLineGame';
 import PickYourPoisonGame from '../components/academy/PickYourPoisonGame';
 import TwoForOneGame from '../components/academy/TwoForOneGame';
 import FoulUpThreeGame from '../components/academy/FoulUpThreeGame';
+import AttackTheCloseoutGame from '../components/academy/AttackTheCloseoutGame';
 import ServePlusOneGame from '../components/academy/ServePlusOneGame';
 import PassOrLobGame from '../components/academy/PassOrLobGame';
 import EscapeOrHeroGame from '../components/academy/EscapeOrHeroGame';
@@ -108,6 +109,7 @@ const PIECE_GAME = {
   'pick-your-poison': { id: 'cc-pick-your-poison', title: 'Pick Your Poison', icon: '🏀', blurb: 'Drop, switch or blitz — every coverage sends a bill', Component: PickYourPoisonGame, landscape: true },
   'two-for-one': { id: 'cc-two-for-one', title: 'Two-for-One', icon: '⏱️', blurb: "Shoot early and the ball comes back", Component: TwoForOneGame, landscape: true },
   'foul-up-three': { id: 'cc-foul-up-three', title: 'Foul Up Three?', icon: '🚨', blurb: 'Two free throws can never tie you', Component: FoulUpThreeGame, landscape: true },
+  'attack-the-closeout': { id: 'cc-attack-the-closeout', title: 'Attack the Closeout', icon: '🏀', blurb: 'He is running too fast to stop', Component: AttackTheCloseoutGame, landscape: true },
   'serve-plus-one': { id: 'cc-serve-plus-one', title: 'Serve +1', icon: '🎾', blurb: 'Read his recovery trail, not the ball', Component: ServePlusOneGame, landscape: true },
   'pass-or-lob': { id: 'cc-pass-or-lob', title: 'Pass or Lob?', icon: '🎾', blurb: 'His distance picks the shot; his lean picks the lane', Component: PassOrLobGame, landscape: true },
   'escape-or-hero': { id: 'cc-escape-or-hero', title: 'Escape or Hero?', icon: '🌲', blurb: 'Gap width vs shot width — the 9-of-10 rule', Component: EscapeOrHeroGame, landscape: true },
@@ -175,6 +177,7 @@ const PIECE_META: Record<CCPieceId, { icon: string; title: string }> = {
   'pick-your-poison': { icon: '🏀', title: 'Pick Your Poison' },
   'two-for-one': { icon: '⏱️', title: 'Two-for-One' },
   'foul-up-three': { icon: '🚨', title: 'Foul Up Three?' },
+  'attack-the-closeout': { icon: '🏀', title: 'Attack the Closeout' },
   'serve-plus-one': { icon: '🎾', title: 'Serve +1' },
   'pass-or-lob': { icon: '🎾', title: 'Pass or Lob?' },
   'escape-or-hero': { icon: '🌲', title: 'Escape or Hero?' },

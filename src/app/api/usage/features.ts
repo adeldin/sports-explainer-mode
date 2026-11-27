@@ -19,7 +19,7 @@ const CC_PIECES = [
   'draw-and-pass', 'how-many-in', 'wheres-the-line', 'jam-or-drift', 'commit-or-fan',
   'exit-strategy', 'one-more-phase', 'hold-short-side', 'pick-your-poison', 'two-for-one',
   'foul-up-three', 'serve-plus-one', 'pass-or-lob', 'escape-or-hero', 'pace-the-chase',
-  'bowl-or-change',
+  'bowl-or-change', 'attack-the-closeout',
 ];
 
 const SPORTS = [
