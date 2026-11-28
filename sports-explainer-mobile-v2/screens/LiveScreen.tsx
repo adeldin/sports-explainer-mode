@@ -46,6 +46,7 @@ import { WatchCandidate, gatherWatchCandidates, selectWatchNext, parentSport } f
 import { SPORTS, isOffSeason, SPORT_FULL_NAME } from '../lib/sports';
 import { useAppState } from '../lib/appState';
 import { trackFeature } from '../lib/usage';
+import { favKey, parseFavKey, isFavTeam, isFavGame, toggledFavorites } from '../lib/favorites';
 
 // SPORTS now lives in ./lib/sports (shared with the onboarding picker).
 
@@ -225,18 +226,16 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     // cards. Guarded on favorites.length so an empty list can never blank the board — a filter that
     // silently hides everything reads as the app being broken.
     //
-    // NOTE this matches on the DISPLAY abbreviation, which is what `favorite_teams` stores. That is
-    // safe within one board but not globally unique across leagues, so if team filtering ever grows
-    // teeth it wants {sport, teamId} the way followed_teams already does.
+    // Favorites are scoped to their league (lib/favorites.ts), so "LA" in MLS no longer matches the
+    // Lakers on a merged or cross-sport board.
     if (onlyMyTeams && favorites.length) {
-      out = out.filter(g => favorites.includes(g.homeTeam) || favorites.includes(g.awayTeam));
+      out = out.filter(g => isFavGame(favorites, g));
     }
     return out;
   }, [games, sport, rugbyLeague, soccerLeague, collegeConf, selectedDate, onlyMyTeams, favorites]);
-  // Every team on the current board, for the filter sheet's search field. Keyed by the DISPLAY
-  // ABBREVIATION because that is what `favorite_teams` stores and what toggleFavorite expects —
-  // the same known limitation flagged on the favourites path (not globally unique across leagues,
-  // fine within one board). Full display names are what people actually type, so those are the
+  // Every team on the current board, for the filter sheet's search field. Keyed by the league-scoped
+  // favorite key ("epl:LIV"), which is what `favorite_teams` stores and what the star toggle parses
+  // back, so two leagues' "LA" stay two rows. Full display names are what people actually type, so those are the
   // searchable label: "notre" has to find the Fighting Irish, not require guessing "ND".
   const boardTeams = useMemo(() => {
     const seen = new Map<string, { key: string; label: string; logo?: string }>();
@@ -245,8 +244,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
         { abbr: g.homeTeam, full: g.homeTeamFull, logo: g.homeLogo },
         { abbr: g.awayTeam, full: g.awayTeamFull, logo: g.awayLogo },
       ]) {
-        if (!side.abbr || seen.has(side.abbr)) continue;
-        seen.set(side.abbr, { key: side.abbr, label: side.full || side.abbr, logo: side.logo });
+        if (!side.abbr) continue;
+        const key = favKey(g.sport, side.abbr);
+        if (seen.has(key)) continue;
+        seen.set(key, { key, label: side.full || side.abbr, logo: side.logo });
       }
     }
     return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -519,8 +520,8 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
       // Favorites-first ordering is a LiveScreen preference (depends on `favorites`),
       // so it stays here rather than in the shared fetcher.
       const sorted = [...parsed].sort((a, b) => {
-        const aFav = favorites.includes(a.homeTeam) || favorites.includes(a.awayTeam);
-        const bFav = favorites.includes(b.homeTeam) || favorites.includes(b.awayTeam);
+        const aFav = isFavGame(favorites, a);
+        const bFav = isFavGame(favorites, b);
         if ((a.isLive && aFav) && !(b.isLive && bFav)) return -1;
         if (!(a.isLive && aFav) && (b.isLive && bFav)) return 1;
         if (a.isLive && !b.isLive) return -1;
@@ -674,12 +675,10 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
     </>
   );
 
-  const toggleFavorite = async (teamAbbr: string) => {
-    if (!favorites.includes(teamAbbr)) trackFeature('live.favorite-team');
+  const toggleFavorite = async (teamSport: string, teamAbbr: string) => {
+    if (!isFavTeam(favorites, teamSport, teamAbbr)) trackFeature('live.favorite-team');
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newFavs = favorites.includes(teamAbbr)
-      ? favorites.filter(f => f !== teamAbbr)
-      : [...favorites, teamAbbr];
+    const newFavs = toggledFavorites(favorites, teamSport, teamAbbr);
     // Persistence is handled by AppStateProvider's auto-persist effect (single
     // source of truth for favorites) — just update shared state here.
     setFavorites(newFavs);
@@ -1151,8 +1150,11 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
               searchPlaceholder={sport === 'cfb' || sport === 'cbb' ? 'Search conferences or teams' : 'Search leagues or teams'}
               teams={boardTeams}
               teamsTitle="Follow a team"
-              starredKeys={new Set(favorites)}
-              onToggleStar={toggleFavorite}
+              starredKeys={new Set(boardTeams.filter(t => {
+                const p = parseFavKey(t.key);
+                return !!p && isFavTeam(favorites, p.sport, p.abbr);
+              }).map(t => t.key))}
+              onToggleStar={(k) => { const p = parseFavKey(k); if (p) toggleFavorite(p.sport, p.abbr); }}
               toggleRow={favorites.length > 0 && games.length > 0
                 ? { label: 'Only my teams', value: onlyMyTeams, onChange: setOnlyMyTeams }
                 : undefined}
@@ -1211,23 +1213,23 @@ export default function LiveScreen({ initialSport, navigation }: LiveScreenProps
                   <GameCard
                     game={item}
                     isSelected={selectedGameId === item.id}
-                    isFavorite={favorites.includes(item.homeTeam) || favorites.includes(item.awayTeam)}
+                    isFavorite={isFavGame(favorites, item)}
                     onPress={async () => { await Haptics.selectionAsync(); setSelectedGameId(item.id); }}
                     onToggleFavorite={() => {
                       const game = games.find(g => g.id === item.id);
                       if (!game) return;
-                      const homeIsFav = favorites.includes(game.homeTeam);
-                      const awayIsFav = favorites.includes(game.awayTeam);
+                      const homeIsFav = isFavTeam(favorites, game.sport, game.homeTeam);
+                      const awayIsFav = isFavTeam(favorites, game.sport, game.awayTeam);
                       if (homeIsFav || awayIsFav) {
-                        toggleFavorite(homeIsFav ? game.homeTeam : game.awayTeam);
+                        toggleFavorite(game.sport, homeIsFav ? game.homeTeam : game.awayTeam);
                         return;
                       }
                       Alert.alert(
                         S.favTitle,
                         S.favMsg,
                         [
-                          { text: game.awayTeam, onPress: () => toggleFavorite(game.awayTeam) },
-                          { text: game.homeTeam, onPress: () => toggleFavorite(game.homeTeam) },
+                          { text: game.awayTeam, onPress: () => toggleFavorite(game.sport, game.awayTeam) },
+                          { text: game.homeTeam, onPress: () => toggleFavorite(game.sport, game.homeTeam) },
                           { text: S.cancel, style: 'cancel' },
                         ]
                       );
