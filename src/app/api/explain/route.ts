@@ -4,6 +4,7 @@ import { getNhlContextLine } from './nhlContext';
 import { normalizeCoachState, buildCoachPrompt } from './coachState';
 import { getGameData, type PitchEvent } from './dataProvider';
 import { getNationsCupMatch } from './zylaProvider';
+import { getCoreRugbyMatch, findCoreRugbyMatch } from './espnCoreRugby';
 import { normalizeCricsheet } from './cricsheetProvider';
 import { normalizeSportmonks } from './sportmonksProvider';
 import { getSmFixture, SM_ID_PREFIX } from './sportmonksLive';
@@ -338,38 +339,19 @@ async function fetchGameData(sport: string, gameId?: string, skipPlayLookup = fa
     comp?.competitors?.find((c: any) => c.homeAway === side)?.team?.displayName || '';
 
   try {
-    if (cfg.core) {
-      // Core API: list event $refs for today, then resolve each event.
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const evRes = await fetch(
-        `https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`,
-        { cache: 'no-store' },
-      );
-      const evData = await evRes.json();
-      const items: any[] = (evData.items || []).slice(0, 20);
-      const events = (
-        await Promise.all(
-          items.map(async (it: any) => {
-            try {
-              const r = await fetch(it.$ref, { cache: 'no-store' });
-              return await r.json();
-            } catch {
-              return null;
-            }
-          }),
-        )
-      ).filter(Boolean);
-
-      const game = gameId
-        ? events.find((e: any) => String(e.id) === String(gameId))
-        : events.find((e: any) => e.status?.type?.state === 'in') || events[0];
-      if (game) {
-        const comp = game.competitions?.[0];
-        homeTeam = teamName(comp, 'home');
-        awayTeam = teamName(comp, 'away');
-        gameContext = `${awayTeam} vs ${homeTeam} — ${game.status?.type?.shortDetail || ''}`;
-        // Core-API play-by-play sits behind further $refs; use the best cue available.
-        play = comp?.situation?.lastPlay?.text || game.status?.type?.detail || play;
+    if (cfg.core && cfg.league) {
+      // Core API (rugby): team names, score, status and the scoring log each sit behind their own
+      // $ref. Reading them straight off the event gave blank names and no play, and the placeholder
+      // play then let the model invent one. getCoreRugbyMatch resolves the refs and returns either
+      // the latest REAL event or an honest "nothing yet" line. See espnCoreRugby.ts.
+      const m = gameId
+        ? await getCoreRugbyMatch(cfg.league, String(gameId))
+        : await findCoreRugbyMatch(cfg.league);
+      if (m) {
+        homeTeam = m.homeTeam;
+        awayTeam = m.awayTeam;
+        gameContext = `${awayTeam} vs ${homeTeam} — ${m.statusDetail}`;
+        play = m.play || play;
       }
     } else {
       const res = await fetch(

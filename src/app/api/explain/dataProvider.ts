@@ -15,6 +15,7 @@
 
 import { highlightlyEnricher } from './highlightlyEnricher';
 import { gumboEnricher } from './gumboEnricher';
+import { getCoreRugbyMatch, findCoreRugbyMatch } from './espnCoreRugby';
 
 // --- Optional enrichment placeholders (PitchEvent for the GUMBO follow-on; MatchEvent populated
 //     by the soccer enricher below) ---
@@ -121,23 +122,17 @@ async function fetchEspnBase(sport: string, gameId?: string): Promise<Normalized
   const teamAbbr = (comp: any, id: string) => comp?.competitors?.find((c: any) => String(c.id) === String(id))?.team?.abbreviation || '';
   try {
     if (cfg.core) {
-      // Core-API sports (rugby/MLR): identity only — ESPN exposes no per-play situation.
-      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const evRes = await fetch(`https://sports.core.api.espn.com/v2/sports/${cfg.sport}/leagues/${cfg.league}/events?dates=${today}`, { cache: 'no-store' });
-      const evData = await evRes.json();
-      const items: any[] = (evData.items || []).slice(0, 20);
-      const events = (await Promise.all(items.map(async (it: any) => {
-        try { return await (await fetch(it.$ref, { cache: 'no-store' })).json(); } catch { return null; }
-      }))).filter(Boolean);
-      const game = gameId ? events.find((e: any) => String(e.id) === String(gameId)) : events[0];
-      if (!game) return null;
-      const comp = game.competitions?.[0];
+      // Core-API sports (rugby): names, scores and status sit behind $refs, so reading them off the
+      // event gave blank names, an "[object Object]" score and no state. The shared resolver reads
+      // the refs and the real scoring log. No per-play SITUATION exists for rugby; that stays absent.
+      const m = gameId ? await getCoreRugbyMatch(cfg.league, String(gameId)) : await findCoreRugbyMatch(cfg.league);
+      if (!m) return null;
       return {
-        sport, gameId: String(game.id),
-        homeTeam: teamName(comp, 'home'), awayTeam: teamName(comp, 'away'),
-        homeScore: scoreOf(comp, 'home'), awayScore: scoreOf(comp, 'away'),
-        state: game.status?.type?.state || '', statusDetail: game.status?.type?.shortDetail || game.status?.type?.detail || '',
-        lastPlay: comp?.situation?.lastPlay?.text || undefined,
+        sport, gameId: m.id,
+        homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+        homeScore: m.homeScore, awayScore: m.awayScore,
+        state: m.state, statusDetail: m.statusDetail,
+        lastPlay: m.state === 'pre' ? undefined : m.play,
       };
     }
 
