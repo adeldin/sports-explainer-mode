@@ -189,6 +189,10 @@ export interface SeasonalFact {
 
 const NBA_CUP = { sport: 'nba' as Sport, from: '2026-10-30', until: '2026-12-12' };
 const CFP = { sport: 'cfb' as Sport, from: '2026-12-06', until: '2027-01-26' };
+// RND-39 holiday games: shown Dec 23 to Dec 27 (until is the first day not shown).
+const HOLIDAY = { from: '2026-12-23', until: '2026-12-28' };
+const HOLIDAY_NBA = { ...HOLIDAY, sport: 'nba' as Sport };
+const HOLIDAY_NFL = { ...HOLIDAY, sport: 'nfl' as Sport };
 
 export const SEASONAL_FACTS: SeasonalFact[] = [
   { ...NBA_CUP, text: "On an NBA Cup Night, every NBA game being played is a Cup game." },
@@ -200,6 +204,12 @@ export const SEASONAL_FACTS: SeasonalFact[] = [
   { ...CFP, text: "The committee does not move teams around to avoid rematches, even if two teams played in the regular season or share a conference." },
   { ...CFP, text: "The top seeds in the College Football Playoff get to pick which bowl hosts their quarterfinal." },
   { ...CFP, text: "This is the last 12-team College Football Playoff. Starting with the 2027-28 season, the field grows to 24 teams." },
+  { ...HOLIDAY_NBA, text: "Five NBA games are played on Christmas Day 2026, back to back from noon Eastern until late at night." },
+  { ...HOLIDAY_NBA, text: "The NBA has played on Christmas Day every season since the 1940s, except in seasons a lockout cut into." },
+  { ...HOLIDAY_NBA, text: "A player is allowed six fouls in the NBA, one more than in college." },
+  { ...HOLIDAY_NFL, text: "Three NFL games are played on Christmas Day 2026, a Friday." },
+  { ...HOLIDAY_NFL, text: "A team can kick for 1 point after a touchdown or try one play from the 2-yard line for 2." },
+  { ...HOLIDAY_NFL, text: "Each coach gets two red-flag challenges a game, and a third only if the first two are both right." },
 ];
 
 // Facts pooled across a category's league keys, with in-window seasonal facts first.

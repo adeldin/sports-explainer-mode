@@ -1,5 +1,6 @@
-// Checks the RND-30 seasonal FAQ and Did You Know windows (NBA Cup, College Football
-// Playoff): before, inside and after each window, and that Cup entries never reach WNBA.
+// Checks the seasonal FAQ and Did You Know windows: RND-30 (NBA Cup, College Football
+// Playoff) and RND-39 (Christmas holiday games, NFL and NBA): before, inside and after
+// each window, and that NBA entries never reach WNBA.
 // Run from the mobile app dir (sports-explainer-mobile-v2):
 //   npx tsx scripts/test-seasonal.mjs
 
@@ -12,10 +13,14 @@ const ens = f => f.questions.map(q => q.en);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const noDupes = arr => new Set(arr).size === arr.length;
 
-const cupQs = SEASONAL_FAQS.filter(f => f.sport === 'nba').map(f => f.question);
+const CUP_FROM = '2026-10-30';
+const HOL_FROM = '2026-12-23';
+const isCup = f => f.sport === 'nba' && f.from === CUP_FROM;
+const isHol = sport => f => f.sport === sport && f.from === HOL_FROM;
+const cupQs = SEASONAL_FAQS.filter(isCup).map(f => f.question);
 const cfpQs = SEASONAL_FAQS.filter(f => f.sport === 'cfb').map(f => f.question);
 const cfpNew = SEASONAL_FAQS.filter(f => f.sport === 'cfb' && !f.existing).map(f => f.question);
-const cupFacts = SEASONAL_FACTS.filter(f => f.sport === 'nba').map(f => f.text);
+const cupFacts = SEASONAL_FACTS.filter(isCup).map(f => f.text);
 const cfpFacts = SEASONAL_FACTS.filter(f => f.sport === 'cfb').map(f => f.text);
 const twelveQ = 'How does the 12-team College Football Playoff work?';
 
@@ -32,7 +37,7 @@ for (const d of ['2026-10-30', '2026-11-20', '2026-12-11']) {
   const q = ens(faqsFor('nba', d));
   check(`NBA ${d} (inside): starts with the 5 Cup questions`, same(q.slice(0, 5), cupQs));
   check(`NBA ${d} (inside): then the normal list, no duplicates`, same(q.slice(5), ens(SPORT_FAQS.nba)) && noDupes(q));
-  check(`NBA ${d} (inside): every Cup question has its written answer`, SEASONAL_FAQS.filter(f => f.sport === 'nba').every(f => seasonalAnswer(f.question, 'nba', d) === f.answer));
+  check(`NBA ${d} (inside): every Cup question has its written answer`, SEASONAL_FAQS.filter(isCup).every(f => seasonalAnswer(f.question, 'nba', d) === f.answer));
   const ff = factsFor(['nba'], d);
   check(`NBA ${d} (inside): Did You Know opens on Cup facts (pinned 4)`, ff.pinned === 4 && same(ff.facts.slice(0, 4), cupFacts));
 }
@@ -67,6 +72,39 @@ check('College football never shows Cup entries (Nov 20)', !ens(faqsFor('cfb', '
 
 // --- The removed, out-of-date fact is gone ---
 check('Old "conference races now decide seeding" fact removed', !factsFor(['cfb'], '2026-11-20').facts.some(t => t.includes('conference races now decide seeding')));
+
+// --- Holiday games (RND-39): 2026-12-23 up to but not including 2026-12-28 ---
+const holQs = { nfl: SEASONAL_FAQS.filter(isHol('nfl')), nba: SEASONAL_FAQS.filter(isHol('nba')) };
+const holFacts = { nfl: SEASONAL_FACTS.filter(isHol('nfl')).map(f => f.text), nba: SEASONAL_FACTS.filter(isHol('nba')).map(f => f.text) };
+check('5 NFL and 4 NBA holiday questions, 3 NFL and 3 NBA holiday facts',
+  holQs.nfl.length === 5 && holQs.nba.length === 4 && holFacts.nfl.length === 3 && holFacts.nba.length === 3);
+check('Every holiday entry ends on 2026-12-28', [...holQs.nfl, ...holQs.nba].every(f => f.until === '2026-12-28')
+  && SEASONAL_FACTS.filter(f => f.from === HOL_FROM).every(f => f.until === '2026-12-28'));
+check('Holiday and NBA Cup windows never overlap', SEASONAL_FAQS.filter(isCup).every(f => f.until <= HOL_FROM));
+for (const sport of ['nfl', 'nba']) {
+  const qs = holQs[sport].map(f => f.question);
+  check(`Shared ${sport} list does not already hold the holiday questions`, !ens(SPORT_FAQS[sport]).some(x => qs.includes(x)));
+  for (const d of ['2026-12-22', '2026-12-28', '2027-01-05']) {
+    check(`${sport} ${d} (outside): no holiday questions or answers`, !ens(faqsFor(sport, d)).some(x => qs.includes(x)) && qs.every(q => seasonalAnswer(q, sport, d) === undefined));
+    check(`${sport} ${d} (outside): no holiday facts`, !factsFor([sport], d).facts.some(t => holFacts[sport].includes(t)));
+  }
+  for (const d of ['2026-12-23', '2026-12-25', '2026-12-27']) {
+    const q = ens(faqsFor(sport, d));
+    check(`${sport} ${d} (inside): starts with the ${qs.length} holiday questions`, same(q.slice(0, qs.length), qs));
+    check(`${sport} ${d} (inside): then the normal list, no duplicates`, same(q.slice(qs.length), ens(SPORT_FAQS[sport])) && noDupes(q));
+    check(`${sport} ${d} (inside): every holiday question has its written answer`, holQs[sport].every(f => seasonalAnswer(f.question, sport, d) === f.answer));
+    const ff = factsFor([sport], d);
+    check(`${sport} ${d} (inside): Did You Know opens on holiday facts (pinned 3)`, ff.pinned === 3 && same(ff.facts.slice(0, 3), holFacts[sport]));
+  }
+}
+for (const d of ['2026-12-23', '2026-12-25', '2026-12-27']) {
+  const all = [...holQs.nfl, ...holQs.nba].map(f => f.question);
+  check(`WNBA ${d}: no holiday questions, answers or facts`, !ens(faqsFor('wnba', d)).some(x => all.includes(x))
+    && all.every(x => seasonalAnswer(x, 'wnba', d) === undefined) && factsFor(['wnba'], d).pinned === 0);
+  check(`CFB ${d}: no holiday questions (CFP entries only)`, !ens(faqsFor('cfb', d)).some(x => all.includes(x)));
+}
+check('NFL and NBA tie answers stay separate on Dec 25', seasonalAnswer('What happens if it is tied at the end?', 'nfl', '2026-12-25') === holQs.nfl[4].answer
+  && seasonalAnswer('What happens if it is tied at the end?', 'nba', '2026-12-25') === holQs.nba[3].answer);
 
 console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed');
 process.exit(failed ? 1 : 0);

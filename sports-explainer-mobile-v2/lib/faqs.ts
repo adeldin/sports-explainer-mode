@@ -907,7 +907,7 @@ export const SPORT_FAQS: Record<Sport, SportFaq> = {
 // Sources and CLAIMs are in the RND-30 spec in Notion. Matched on the exact sport
 // key, so NBA Cup entries never reach the WNBA list (which reuses the NBA questions).
 export interface SeasonalFaq {
-  sport: Sport;          // 'nba' or 'cfb'; never added to the shared BASE_FAQS lists
+  sport: Sport;          // exact sport key (e.g. 'nba', 'cfb', 'nfl'); never added to the shared BASE_FAQS lists
   from: string;          // 'YYYY-MM-DD', first day shown
   until: string;         // 'YYYY-MM-DD', first day NOT shown
   question: string;      // English
@@ -917,6 +917,10 @@ export interface SeasonalFaq {
 
 const NBA_CUP = { sport: 'nba' as Sport, from: '2026-10-30', until: '2026-12-12' };
 const CFP = { sport: 'cfb' as Sport, from: '2026-12-06', until: '2027-01-26' };
+// RND-39 holiday games: shown Dec 23 to Dec 27 (until is the first day not shown).
+const HOLIDAY = { from: '2026-12-23', until: '2026-12-28' };
+const HOLIDAY_NFL = { ...HOLIDAY, sport: 'nfl' as Sport };
+const HOLIDAY_NBA = { ...HOLIDAY, sport: 'nba' as Sport };
 
 export const SEASONAL_FAQS: SeasonalFaq[] = [
   // NBA Cup (nba only, not WNBA)
@@ -976,6 +980,53 @@ export const SEASONAL_FAQS: SeasonalFaq[] = [
     ...CFP,
     question: `Where is the College Football Playoff title game?`,
     answer: `This season's national championship game is at Allegiant Stadium in Las Vegas on Monday, January 25, 2027.`,
+  },
+  // Holiday games for newcomers (RND-39): Christmas window, NFL
+  {
+    ...HOLIDAY_NFL,
+    question: `Why does the clock keep stopping?`,
+    answer: `The game clock stops after an incomplete pass, when the ball carrier runs out of bounds, after a score, when a team calls a timeout, when the ball changes hands, and while a penalty is sorted out. Each team gets three timeouts per half, and there is an automatic break called the two-minute warning when two minutes are left in each half. Running out of bounds only keeps the clock stopped until the next snap in the last two minutes of the first half and the last five minutes of the game; at other times the clock starts again once the ball is set. That is why the last few minutes can take much longer than the minutes on the clock.`,
+  },
+  {
+    ...HOLIDAY_NFL,
+    question: `What does a yellow flag mean?`,
+    answer: `A yellow flag means an official saw a foul (a penalty). Most penalties move the ball 5, 10 or 15 yards against the team that broke the rule, and some also give the other team an automatic first down. The team that was fouled can decline the penalty if the result of the play was better for them. Common ones: false start (an attacking player moves before the snap), holding (grabbing a player to stop him), and pass interference (blocking a receiver or defender from catching the ball).`,
+  },
+  {
+    ...HOLIDAY_NFL,
+    question: `Why do teams go for two?`,
+    answer: `After a touchdown (6 points), a team can kick the ball through the posts for 1 more point, or run one play from the 2-yard line for 2 points. The kick is snapped from the 15-yard line, so it is about a 33-yard kick. The kick works most of the time, and the two-point play works a little under half the time. Teams go for two when the score makes the extra point worth the risk, for example to get within one score late in the game.`,
+  },
+  {
+    ...HOLIDAY_NFL,
+    question: `Why did the coach throw a red flag?`,
+    answer: `A coach throws a red flag to challenge a call and ask for a video replay. Each coach gets two challenges a game and a third if both are right; losing a challenge costs a timeout. In the last two minutes of each half, in overtime, and on every score and turnover, the replay officials decide on their own whether to look again, so coaches do not challenge those.`,
+  },
+  {
+    ...HOLIDAY_NFL,
+    question: `What happens if it is tied at the end?`,
+    answer: `In the regular season there is one 10-minute overtime period. Since 2025 both teams get at least one chance with the ball in regular-season overtime, unless the first team scores a safety or the second team takes the ball away. If it is still tied after overtime in the regular season, the game ends in a tie.`,
+  },
+  // Holiday games for newcomers (RND-39): Christmas window, NBA (not WNBA)
+  {
+    ...HOLIDAY_NBA,
+    question: `What does fouling out mean?`,
+    answer: `An NBA player who commits six personal fouls in one game must leave and cannot come back. In college and the WNBA it is five, not six. That is why a coach may sit a star who picks up early fouls.`,
+  },
+  {
+    ...HOLIDAY_NBA,
+    question: `How many timeouts does each team get?`,
+    answer: `Each NBA team gets seven timeouts in a game. A team can use no more than four in the fourth quarter and no more than two in the last three minutes. In each overtime, each team gets two more. The TV breaks in each quarter are separate from these.`,
+  },
+  {
+    ...HOLIDAY_NBA,
+    question: `Why do teams foul on purpose at the end?`,
+    answer: `A foul stops the clock. Once a team has committed five fouls in a quarter (or two in the last two minutes of it), every foul by them sends the other team to the line for two free throws. A team that is behind fouls on purpose to stop the clock and gamble that the other team misses free throws, then hopes to score quickly with the ball back.`,
+  },
+  {
+    ...HOLIDAY_NBA,
+    question: `What happens if it is tied at the end?`,
+    answer: `The teams play a five-minute overtime, and more five-minute periods until someone wins. NBA games cannot end in a tie.`,
   },
 ];
 
