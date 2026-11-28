@@ -17,7 +17,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import type { UpcomingGame } from './upcomingGames';
+import type { Sport } from './api';
+import { findUpcomingGames, type UpcomingGame } from './upcomingGames';
 import { trackFeature } from './usage';
 
 const STORAGE_KEY = 'starred_games';
@@ -134,13 +135,16 @@ export async function unstarGame(gameId: string): Promise<void> {
  * pruned by loadStarred), and iOS can drop pending notifications across a reinstall or restore.
  * Re-scheduling by stable identifier is idempotent — an existing entry is replaced, not duplicated.
  *
- * What this deliberately does NOT do is re-check start times against the provider. A postponed game
- * would notify at its original time; catching that needs a schedule refetch, which is a bigger
- * feature than the alert itself and not worth doing on every foreground.
+ * It also re-checks start times. A postponed or moved game keeps its ESPN event id but gets a new
+ * date, so we look up each starred game's league once (findUpcomingGames, one lookup per league,
+ * not per game) and move the stored time and the alert to the new one. If the lookup fails or the
+ * game is not in the feed, the stored time stands: an alert at the old time beats losing it.
  */
 export async function resyncGameAlerts(): Promise<void> {
   if (!notificationsUsable()) return;
-  const starred = await loadStarred();
+  let starred = await loadStarred();
+  if (starred.length === 0) return;
+  starred = await refreshStartTimes(starred);
   if (starred.length === 0) return;
   try {
     const Notifications = await import('expo-notifications');
@@ -161,4 +165,30 @@ export async function resyncGameAlerts(): Promise<void> {
       });
     }
   } catch { /* best-effort */ }
+}
+
+/**
+ * Pull current start times for starred games from the schedule feeds and persist any that moved.
+ * A game whose new time is already past is dropped, the same as loadStarred prunes it.
+ */
+async function refreshStartTimes(starred: StarredGame[], now: number = Date.now()): Promise<StarredGame[]> {
+  const sports = [...new Set(starred.map(g => g.sport))];
+  const fresh = new Map<string, number>();
+  await Promise.all(sports.map(async sport => {
+    try {
+      for (const g of await findUpcomingGames(sport as Sport, now)) {
+        if (g.sport === sport) fresh.set(`${sport}|${g.id}`, g.startTime);
+      }
+    } catch { /* that league keeps its stored times */ }
+  }));
+
+  let changed = false;
+  const updated = starred.map(g => {
+    const t = fresh.get(`${g.sport}|${g.id}`);
+    if (t === undefined || t === g.startTime) return g;
+    changed = true;
+    return { ...g, startTime: t };
+  }).filter(g => g.startTime > now);
+  if (changed) await persist(updated);
+  return updated.sort((a, b) => a.startTime - b.startTime);
 }
