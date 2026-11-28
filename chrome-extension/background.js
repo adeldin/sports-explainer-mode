@@ -645,8 +645,11 @@ async function handleFetchGames(sport) {
     const logoOf = c => c?.team?.logo || c?.team?.logos?.[0]?.href || '';
     const broadcastsOf = () => {
       const names = [];
-      for (const b of (comp.broadcasts || [])) for (const n of (b?.names || [])) if (n) names.push(String(n));
-      for (const g of (comp.geoBroadcasts || [])) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
+      // Array.isArray, not `|| []`: the Core API (rugby) sends `broadcasts` as one { $ref } object,
+      // which is truthy but not iterable, so the old form threw and blanked the rugby list.
+      const list = v => (Array.isArray(v) ? v : []);
+      for (const b of list(comp.broadcasts)) for (const n of list(b?.names)) if (n) names.push(String(n));
+      for (const g of list(comp.geoBroadcasts)) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
       return Array.from(new Set(names)).join(', ');
     };
     const state = statusType?.state || 'pre';
@@ -710,12 +713,17 @@ async function handleFetchGames(sport) {
     const eventsData = await eventsRes.json();
     const items = (eventsData.items || []).slice(0, 30); // cap the per-event $ref fan-out
 
-    const games = await Promise.all(items.map(async (item) => {
-      // Core API $refs come back http:// — upgrade to https (same as the iOS httpsRef helper).
-      const eventRes = await fetch(String(item.$ref).replace(/^http:\/\//i, 'https://'), { cache: 'no-store' });
-      const eventData = await eventRes.json();
-      return buildGame(eventData.id, eventData.competitions?.[0], eventData.status?.type, eventData.date);
-    }));
+    const games = (await Promise.all(items.map(async (item) => {
+      // One event that fails to load or parse costs that one game, never the whole rugby list.
+      try {
+        // Core API $refs come back http:// — upgrade to https (same as the iOS httpsRef helper).
+        const eventRes = await fetch(String(item.$ref).replace(/^http:\/\//i, 'https://'), { cache: 'no-store' });
+        const eventData = await eventRes.json();
+        return buildGame(eventData.id, eventData.competitions?.[0], eventData.status?.type, eventData.date);
+      } catch {
+        return null;
+      }
+    }))).filter(Boolean);
 
     return { games };
   }

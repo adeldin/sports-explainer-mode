@@ -252,8 +252,13 @@ export async function fetchScoreboard(
   // TV/streaming — merge BOTH broadcasts (names[]) and geoBroadcasts (media.shortName), deduped.
   const broadcastsOf = (comp: any): string[] | undefined => {
     const names: string[] = [];
-    for (const b of (comp?.broadcasts || [])) for (const n of (b?.names || [])) if (n) names.push(String(n));
-    for (const g of (comp?.geoBroadcasts || [])) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
+    // Array.isArray, NOT `|| []`. The Core API (rugby) sends `broadcasts` as a single { $ref } object
+    // once a broadcaster is assigned, and an object is truthy but not iterable: the old `|| []` threw
+    // inside toGame, the throw sank the whole league, and every rugby league with a televised fixture
+    // came back empty. Seen 2026-11-28: a blank Rugby tile minutes before Japan at Wales.
+    const list = (v: any): any[] => (Array.isArray(v) ? v : []);
+    for (const b of list(comp?.broadcasts)) for (const n of list(b?.names)) if (n) names.push(String(n));
+    for (const g of list(comp?.geoBroadcasts)) { const sn = g?.media?.shortName; if (sn) names.push(String(sn)); }
     const uniq = Array.from(new Set(names));
     return uniq.length ? uniq : undefined;
   };
@@ -389,9 +394,22 @@ export async function fetchScoreboard(
 
     // Collapse ESPN's phantom duplicates (a real post/scored event plus a pre/0-0
     // swapped-teams twin with a different ID). Group by order-independent team pair;
-    // if any game in the group was played (post/in) keep those and drop the pre
-    // phantoms; keep multiple played legs (home-and-away series); collapse pre/pre
-    // swapped twins to the lowest-ID (real-sequence) one.
+    // keep every played leg (home-and-away series); drop a pre event only when it sits
+    // within TWIN_MS of a played one, and collapse pre/pre twins that close together to
+    // the lowest-ID (real-sequence) one.
+    //
+    // The time test is the whole point. A phantom is a copy of the SAME fixture, so it
+    // shares its kickoff. The old rule ("any played game in the pair drops every pre")
+    // also deleted real return fixtures, because the window reaches back 90 days: on
+    // 2026-11-28 it hid Japan at Wales and New Zealand at England on the day they were
+    // played, since both pairs had met earlier in November, plus three URC return legs.
+    const TWIN_MS = 48 * 60 * 60 * 1000;
+    const kickoff = (ev: any) => (ev?.date ? Date.parse(ev.date) : NaN);
+    // Unknown kickoff counts as "same fixture", which is the old, cautious behaviour.
+    const sameFixture = (a: any, b: any) => {
+      const ta = kickoff(a), tb = kickoff(b);
+      return !Number.isFinite(ta) || !Number.isFinite(tb) || Math.abs(ta - tb) <= TWIN_MS;
+    };
     const teamId = (c: any) => String(c?.team?.id ?? '');
     const pairKey = (ev: any) =>
       ((ev.competitions?.[0]?.competitors || []).map(teamId).sort()).join('-');
@@ -407,13 +425,18 @@ export async function fetchScoreboard(
     const deduped: any[] = [];
     for (const group of groups.values()) {
       const played = group.filter(isPlayed);
-      if (played.length > 0) {
-        deduped.push(...played);
-      } else {
-        deduped.push(group.reduce((a, b) => (Number(a.id) <= Number(b.id) ? a : b)));
-      }
+      deduped.push(...played);
+      const upcoming = group
+        .filter(ev => !isPlayed(ev) && !played.some(p => sameFixture(p, ev)))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      const kept: any[] = [];
+      for (const ev of upcoming) if (!kept.some(k => sameFixture(k, ev))) kept.push(ev);
+      deduped.push(...kept);
     }
-    parsed = deduped.map(toGame);
+    // One event ESPN shapes unexpectedly must cost that one card, never the league's whole board.
+    parsed = deduped.flatMap((ev: any) => {
+      try { return [toGame(ev)]; } catch { return []; }
+    });
   } else {
     // Date strip: fetch a specific day via ?dates=YYYYMMDD; default (no date) = bare "today".
     const q = date ? `?dates=${compactLocal(date)}` : '';
